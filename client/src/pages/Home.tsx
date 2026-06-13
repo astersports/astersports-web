@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Code, Globe, Wrench, Shield, Mail, ArrowRight } from "lucide-react";
+import { Code, Globe, Wrench, Shield, Mail, ArrowRight, MapPin, Menu, X } from "lucide-react";
 
 const LOGO_URL = "/manus-storage/aster_sports_logo_high_res_2b537f86.png";
 const HERO_BG_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663756289268/4gGAtBP2vWCBU9FC7zDMWA/hero-bg-kP7SSTui5UuAzDmbnWb2NK.webp";
@@ -64,12 +64,22 @@ function useScrollReveal() {
 
 function Header() {
   const [scrolled, setScrolled] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Close mobile menu on scroll
+  useEffect(() => {
+    if (mobileOpen) {
+      const close = () => setMobileOpen(false);
+      window.addEventListener("scroll", close);
+      return () => window.removeEventListener("scroll", close);
+    }
+  }, [mobileOpen]);
 
   return (
     <header
@@ -90,14 +100,67 @@ function Header() {
             Aster Sports
           </span>
         </a>
-        <a
-          href="mailto:frank@astersports.co"
-          className="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#f5b731] to-[#e67e22] text-[#0a0e1a] font-medium text-sm transition-transform duration-160 hover:scale-[1.03] active:scale-[0.97]"
-          style={{ fontFamily: "var(--font-display)" }}
+
+        {/* Desktop nav */}
+        <nav className="hidden sm:flex items-center gap-6">
+          <a href="#services" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
+            Services
+          </a>
+          <a href="#about" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
+            About
+          </a>
+          <a
+            href="mailto:frank@astersports.co"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#f5b731] to-[#e67e22] text-[#0a0e1a] font-medium text-sm transition-transform duration-160 hover:scale-[1.03] active:scale-[0.97]"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            <Mail className="w-4 h-4" />
+            Get in Touch
+          </a>
+        </nav>
+
+        {/* Mobile menu button */}
+        <button
+          className="sm:hidden p-2 text-white"
+          onClick={() => setMobileOpen(!mobileOpen)}
+          aria-label="Toggle menu"
         >
-          <Mail className="w-4 h-4" />
-          Get in Touch
-        </a>
+          {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
+      </div>
+
+      {/* Mobile menu dropdown */}
+      <div
+        className={`sm:hidden overflow-hidden transition-all duration-300 ease-out ${
+          mobileOpen ? "max-h-64 opacity-100" : "max-h-0 opacity-0"
+        }`}
+      >
+        <nav className="container pb-6 flex flex-col gap-4 bg-[#0a0e1a]/95 backdrop-blur-xl">
+          <a
+            href="#services"
+            className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2"
+            style={{ fontFamily: "var(--font-display)" }}
+            onClick={() => setMobileOpen(false)}
+          >
+            Services
+          </a>
+          <a
+            href="#about"
+            className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2"
+            style={{ fontFamily: "var(--font-display)" }}
+            onClick={() => setMobileOpen(false)}
+          >
+            About
+          </a>
+          <a
+            href="mailto:frank@astersports.co"
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-gradient-to-r from-[#f5b731] to-[#e67e22] text-[#0a0e1a] font-medium text-sm transition-transform duration-160 active:scale-[0.97]"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            <Mail className="w-4 h-4" />
+            Get in Touch
+          </a>
+        </nav>
       </div>
     </header>
   );
@@ -164,7 +227,7 @@ function HeroSection() {
           </p>
 
           <div
-            className={`flex flex-col sm:flex-row gap-4 transition-all duration-700 delay-300 ${
+            className={`flex flex-col sm:flex-row gap-4 mb-8 transition-all duration-700 delay-300 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
           >
@@ -183,6 +246,16 @@ function HeroSection() {
             >
               Our Services
             </a>
+          </div>
+
+          {/* Location */}
+          <div
+            className={`flex items-center gap-2 text-slate-400 text-sm transition-all duration-700 delay-400 ${
+              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+            }`}
+          >
+            <MapPin className="w-4 h-4 text-[#f5b731]/60" />
+            <span>Based in Westchester, NY</span>
           </div>
         </div>
       </div>
@@ -256,11 +329,11 @@ function ServicesSection() {
                 <div
                   key={service.title}
                   className={`flex gap-4 group transition-all duration-500 ${
-                    isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+                    isVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-4"
                   }`}
-                  style={{ transitionDelay: `${150 + i * 80}ms` }}
+                  style={{ transitionDelay: `${150 + i * 100}ms` }}
                 >
-                  <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-[#f5b731]/10 border border-[#f5b731]/20 flex items-center justify-center group-hover:bg-[#f5b731]/20 transition-colors duration-200">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-[#f5b731]/10 border border-[#f5b731]/20 flex items-center justify-center group-hover:bg-[#f5b731]/20 group-hover:border-[#f5b731]/40 transition-all duration-200">
                     <service.icon className="w-5 h-5 text-[#f5b731]" />
                   </div>
                   <div>
@@ -335,12 +408,15 @@ function ProcessSection() {
           {steps.map((step, i) => (
             <div
               key={step.number}
-              className={`relative p-6 rounded-xl border border-white/5 bg-[#0a0e1a]/60 backdrop-blur-sm hover:border-[#f5b731]/20 transition-all duration-300 ${
-                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+              className={`relative p-6 rounded-xl border border-white/5 bg-[#0a0e1a]/60 backdrop-blur-sm hover:border-[#f5b731]/20 hover:bg-[#0a0e1a]/80 transition-all duration-300 group ${
+                isVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-8 scale-95"
               }`}
-              style={{ transitionDelay: `${200 + i * 100}ms` }}
+              style={{
+                transitionDelay: `${200 + i * 120}ms`,
+                transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)",
+              }}
             >
-              <span className="text-4xl font-bold bg-gradient-to-b from-[#f5b731] to-[#e67e22] bg-clip-text text-transparent" style={{ fontFamily: "var(--font-display)" }}>
+              <span className="text-4xl font-bold bg-gradient-to-b from-[#f5b731] to-[#e67e22] bg-clip-text text-transparent group-hover:scale-110 inline-block transition-transform duration-200" style={{ fontFamily: "var(--font-display)" }}>
                 {step.number}
               </span>
               <h3 className="text-lg font-semibold text-white mt-3 mb-2" style={{ fontFamily: "var(--font-display)" }}>
@@ -351,6 +427,71 @@ function ProcessSection() {
               </p>
             </div>
           ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AboutSection() {
+  const { ref, isVisible } = useScrollReveal();
+
+  return (
+    <section id="about" className="relative py-24 md:py-32 bg-[#0a0e1a]">
+      <div className="container" ref={ref}>
+        <div className="max-w-3xl mx-auto">
+          <div
+            className={`flex items-center gap-2 mb-4 transition-all duration-500 ${
+              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+            }`}
+          >
+            <StarAccent />
+            <span className="text-sm font-medium text-[#f5b731] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
+              About Us
+            </span>
+          </div>
+
+          <h2
+            className={`text-3xl md:text-4xl font-bold text-white mb-8 tracking-tight transition-all duration-700 delay-100 ${
+              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+            }`}
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Built on precision.
+            <br />
+            <span className="text-slate-400">Driven by craft.</span>
+          </h2>
+
+          <div
+            className={`space-y-5 transition-all duration-700 delay-200 ${
+              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+            }`}
+          >
+            <p className="text-lg text-slate-300 leading-relaxed">
+              Aster Sports is a web development agency based in Westchester, NY. We specialize in
+              building custom websites and web applications for organizations that value reliability,
+              performance, and long-term partnership over quick fixes.
+            </p>
+            <p className="text-lg text-slate-300 leading-relaxed">
+              We treat every project like infrastructure — because that's what it is. Your website
+              is the foundation of your digital presence, and it deserves the same care and precision
+              as any critical system. From initial architecture to ongoing maintenance, we're in it
+              for the long haul.
+            </p>
+            <p className="text-slate-400 leading-relaxed">
+              Currently building digital solutions for faith-based organizations and community-driven
+              institutions across the Northeast.
+            </p>
+          </div>
+
+          <div
+            className={`mt-8 flex items-center gap-2 text-slate-400 text-sm transition-all duration-700 delay-300 ${
+              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+            }`}
+          >
+            <MapPin className="w-4 h-4 text-[#f5b731]/60" />
+            <span>Westchester, NY</span>
+          </div>
         </div>
       </div>
     </section>
@@ -412,31 +553,49 @@ function Footer() {
   return (
     <footer className="py-12 bg-[#070a12] border-t border-white/5">
       <div className="container">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-3">
-            <img
-              src={LOGO_URL}
-              alt="Aster Sports"
-              className="w-8 h-8"
-            />
-            <span className="text-base font-semibold text-white" style={{ fontFamily: "var(--font-display)" }}>
-              Aster Sports
-            </span>
+        <div className="flex flex-col gap-8">
+          {/* Top row */}
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-3">
+              <img
+                src={LOGO_URL}
+                alt="Aster Sports"
+                className="w-8 h-8"
+              />
+              <span className="text-base font-semibold text-white" style={{ fontFamily: "var(--font-display)" }}>
+                Aster Sports
+              </span>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 text-sm text-slate-400">
+              <span>Custom Web Development & Maintenance</span>
+              <a
+                href="mailto:frank@astersports.co"
+                className="text-[#f5b731] hover:text-[#e67e22] transition-colors"
+              >
+                frank@astersports.co
+              </a>
+            </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 text-sm text-slate-400">
-            <span>Custom Web Development & Maintenance</span>
-            <a
-              href="mailto:frank@astersports.co"
-              className="text-[#f5b731] hover:text-[#e67e22] transition-colors"
-            >
-              frank@astersports.co
-            </a>
+          {/* Bottom row */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-white/5">
+            <p className="text-xs text-slate-500">
+              &copy; {new Date().getFullYear()} Aster Sports. All rights reserved.
+            </p>
+            <div className="flex items-center gap-6 text-xs text-slate-500">
+              <a href="/privacy" className="hover:text-slate-300 transition-colors">
+                Privacy Policy
+              </a>
+              <a href="/terms" className="hover:text-slate-300 transition-colors">
+                Terms of Service
+              </a>
+              <span className="flex items-center gap-1">
+                <MapPin className="w-3 h-3" />
+                Westchester, NY
+              </span>
+            </div>
           </div>
-
-          <p className="text-xs text-slate-500">
-            &copy; {new Date().getFullYear()} Aster Sports. All rights reserved.
-          </p>
         </div>
       </div>
     </footer>
@@ -450,6 +609,7 @@ export default function Home() {
       <HeroSection />
       <ServicesSection />
       <ProcessSection />
+      <AboutSection />
       <CTASection />
       <Footer />
     </div>
