@@ -62,3 +62,10 @@
 - [x] Add play summary/stats per player (aggregate play types, totals)
 - [x] Optimize video layout — compact thumbnail grid instead of full-size cards (reduce scrolling)
 - [x] Enhanced content: better browsing UX (compact grid with play labels, expandable lightbox modal on click)
+
+# Film Section - Play Type Filtering
+
+- [x] Add play type filter: clicking a play category pill filters the grid to only show clips of that type
+- [x] Add "All" reset button to clear the filter
+- [x] Show filtered clip count (e.g., "9 of 20 clips")
+- [x] Visual highlight on active filter pill

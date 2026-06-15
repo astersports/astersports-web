@@ -159,6 +159,7 @@ export default function FilmHighlights() {
   const [expandedClip, setExpandedClip] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(true); // Muted by default
   const [showSummary, setShowSummary] = useState(true);
+  const [activeFilter, setActiveFilter] = useState<string | null>(null); // Play type filter
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
 
   const currentPlayerData = selectedPlayer
@@ -172,6 +173,12 @@ export default function FilmHighlights() {
   }, [selectedPlayer]);
 
   const playBreakdown = useMemo(() => getPlayBreakdown(currentClips), [currentClips]);
+
+  // Filtered clips based on active play type filter
+  const filteredClips = useMemo(() => {
+    if (!activeFilter) return currentClips;
+    return currentClips.filter(c => normalizePlayType(c.playType) === activeFilter);
+  }, [currentClips, activeFilter]);
 
   const totalClips = ALL_CLIPS.reduce((sum, pc) => sum + pc.clips.length, 0);
 
@@ -280,7 +287,7 @@ export default function FilmHighlights() {
           return (
             <button
               key={player.number}
-              onClick={() => setSelectedPlayer(isSelected ? null : player.number)}
+              onClick={() => { setSelectedPlayer(isSelected ? null : player.number); setActiveFilter(null); }}
               className="as-press"
               style={{
                 padding: '8px 14px',
@@ -401,28 +408,83 @@ export default function FilmHighlights() {
               border: '1px solid var(--as-border-default)',
             }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {playBreakdown.map(({ type, count, pct }) => (
-                  <div key={type} style={{
+                {/* "All" reset button */}
+                <button
+                  onClick={() => setActiveFilter(null)}
+                  className="as-press"
+                  style={{
                     padding: '6px 10px',
                     borderRadius: 8,
-                    backgroundColor: 'var(--as-bg-tertiary)',
-                    border: '1px solid var(--as-border-default)',
+                    backgroundColor: !activeFilter ? `color-mix(in srgb, ${currentPlayerData.color} 15%, var(--as-bg-tertiary))` : 'var(--as-bg-tertiary)',
+                    border: !activeFilter ? `1.5px solid ${currentPlayerData.color}` : '1px solid var(--as-border-default)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 6,
-                  }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: currentPlayerData.color }}>
-                      {count}
-                    </span>
-                    <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--as-text-secondary)' }}>
-                      {type}
-                    </span>
-                    <span style={{ fontSize: 9, color: 'var(--as-text-tertiary)' }}>
-                      {pct}%
-                    </span>
-                  </div>
-                ))}
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    transition: 'all 150ms ease',
+                  }}
+                >
+                  <span style={{ fontSize: 11, fontWeight: 700, color: !activeFilter ? currentPlayerData.color : 'var(--as-text-secondary)' }}>
+                    {currentClips.length}
+                  </span>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: !activeFilter ? 'var(--as-text-primary)' : 'var(--as-text-secondary)' }}>
+                    All
+                  </span>
+                </button>
+                {playBreakdown.map(({ type, count, pct }) => {
+                  const isActive = activeFilter === type;
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => setActiveFilter(isActive ? null : type)}
+                      className="as-press"
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: 8,
+                        backgroundColor: isActive ? `color-mix(in srgb, ${currentPlayerData.color} 15%, var(--as-bg-tertiary))` : 'var(--as-bg-tertiary)',
+                        border: isActive ? `1.5px solid ${currentPlayerData.color}` : '1px solid var(--as-border-default)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        transition: 'all 150ms ease',
+                      }}
+                    >
+                      <span style={{ fontSize: 11, fontWeight: 700, color: isActive ? currentPlayerData.color : currentPlayerData.color }}>
+                        {count}
+                      </span>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: isActive ? 'var(--as-text-primary)' : 'var(--as-text-secondary)' }}>
+                        {type}
+                      </span>
+                      <span style={{ fontSize: 9, color: isActive ? currentPlayerData.color : 'var(--as-text-tertiary)' }}>
+                        {pct}%
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
+            </div>
+          )}
+
+          {/* ─── FILTERED CLIP COUNT ─── */}
+          {activeFilter && (
+            <div className="as-fade-in" style={{
+              marginBottom: 10,
+              padding: '6px 12px',
+              borderRadius: 8,
+              backgroundColor: `color-mix(in srgb, ${currentPlayerData.color} 5%, var(--as-bg-tertiary))`,
+              border: `1px solid color-mix(in srgb, ${currentPlayerData.color} 15%, var(--as-border-default))`,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}>
+              <Target size={11} style={{ color: currentPlayerData.color }} />
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--as-text-secondary)' }}>
+                Showing <span style={{ color: currentPlayerData.color, fontWeight: 700 }}>{filteredClips.length}</span> of {currentClips.length} clips
+              </span>
+              <span style={{ fontSize: 10, color: 'var(--as-text-tertiary)' }}>— {activeFilter}</span>
             </div>
           )}
 
@@ -432,7 +494,7 @@ export default function FilmHighlights() {
             gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
             gap: 8,
           }}>
-            {currentClips.map((clip, i) => {
+            {filteredClips.map((clip, i) => {
               const isExpanded = expandedClip === clip.id;
               return (
                 <div
