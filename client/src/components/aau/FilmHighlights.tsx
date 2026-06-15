@@ -1,5 +1,5 @@
-import { useState, useRef, useMemo } from "react";
-import { Play, Pause, Star, Film, ChevronRight, Flame, Zap, Target } from "lucide-react";
+import { useState, useRef, useMemo, useCallback } from "react";
+import { Play, Pause, Star, Film, ChevronRight, Flame, Zap, Target, X, Volume2, VolumeX, BarChart3, ChevronLeft, ChevronDown } from "lucide-react";
 import SectionHeading from "./SectionHeading";
 
 // ─── Player Data ────────────────────────────────────────────────────────────
@@ -127,10 +127,38 @@ const TOURNAMENT_INFO = {
   games: '3 Pool Games + Final Four',
 };
 
+// ─── Helper: Compute play type breakdown ─────────────────────────────────────
+function getPlayBreakdown(clips: Clip[]): { type: string; count: number; pct: number }[] {
+  const counts: Record<string, number> = {};
+  clips.forEach(c => {
+    // Normalize similar play types
+    const normalized = normalizePlayType(c.playType);
+    counts[normalized] = (counts[normalized] || 0) + 1;
+  });
+  const total = clips.length;
+  return Object.entries(counts)
+    .map(([type, count]) => ({ type, count, pct: Math.round((count / total) * 100) }))
+    .sort((a, b) => b.count - a.count);
+}
+
+function normalizePlayType(type: string): string {
+  const lower = type.toLowerCase();
+  if (lower.includes('fast break') || lower.includes('transition')) return 'Transition';
+  if (lower.includes('drive') || lower.includes('coast-to-coast') || lower.includes('full drive') || lower.includes('full-court')) return 'Drives';
+  if (lower.includes('layup') || lower.includes('finish') || lower.includes('score')) return 'Finishes';
+  if (lower.includes('steal') || lower.includes('assist')) return 'Playmaking';
+  if (lower.includes('putback') || lower.includes('rebound') || lower.includes('interior') || lower.includes('post')) return 'Inside Game';
+  if (lower.includes('three') || lower.includes('mid-range') || lower.includes('jumper')) return 'Shooting';
+  if (lower.includes('free throw')) return 'Free Throws';
+  return 'Other';
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function FilmHighlights() {
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
-  const [activeClip, setActiveClip] = useState<string | null>(null);
+  const [expandedClip, setExpandedClip] = useState<string | null>(null);
+  const [isMuted, setIsMuted] = useState(true); // Muted by default
+  const [showSummary, setShowSummary] = useState(true);
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
 
   const currentPlayerData = selectedPlayer
@@ -143,26 +171,40 @@ export default function FilmHighlights() {
     return playerClips?.clips || [];
   }, [selectedPlayer]);
 
+  const playBreakdown = useMemo(() => getPlayBreakdown(currentClips), [currentClips]);
+
   const totalClips = ALL_CLIPS.reduce((sum, pc) => sum + pc.clips.length, 0);
 
-  const handlePlayClip = (clipId: string) => {
-    // Pause any currently playing video
-    if (activeClip && activeClip !== clipId) {
-      const prevVideo = videoRefs.current.get(activeClip);
-      if (prevVideo) prevVideo.pause();
-    }
-    setActiveClip(clipId);
-    const video = videoRefs.current.get(clipId);
-    if (video) {
-      video.play();
-    }
-  };
+  const handlePlayClip = useCallback((clipId: string) => {
+    setExpandedClip(clipId);
+    // Wait for DOM update then play
+    setTimeout(() => {
+      const video = videoRefs.current.get(clipId);
+      if (video) {
+        video.muted = isMuted;
+        video.play();
+      }
+    }, 100);
+  }, [isMuted]);
 
-  const handlePauseClip = (clipId: string) => {
-    const video = videoRefs.current.get(clipId);
-    if (video) video.pause();
-    setActiveClip(null);
-  };
+  const handleCloseExpanded = useCallback(() => {
+    if (expandedClip) {
+      const video = videoRefs.current.get(expandedClip);
+      if (video) video.pause();
+    }
+    setExpandedClip(null);
+  }, [expandedClip]);
+
+  const toggleMute = useCallback(() => {
+    setIsMuted(prev => {
+      const newVal = !prev;
+      // Update all video elements
+      videoRefs.current.forEach(video => {
+        video.muted = newVal;
+      });
+      return newVal;
+    });
+  }, []);
 
   return (
     <div className="as-fade-in">
@@ -173,10 +215,10 @@ export default function FilmHighlights() {
         ghostText="FILM"
       />
 
-      {/* Tournament context badge */}
+      {/* Tournament context + controls */}
       <div className="as-fade-in as-stagger-1" style={{
-        marginBottom: 20,
-        padding: '12px 16px',
+        marginBottom: 16,
+        padding: '10px 14px',
         borderRadius: 10,
         backgroundColor: 'var(--as-bg-card)',
         border: '1px solid var(--as-border-default)',
@@ -187,15 +229,34 @@ export default function FilmHighlights() {
         gap: 8,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Film size={14} style={{ color: 'var(--as-team-primary)' }} />
-          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--as-text-primary)' }}>
+          <Film size={13} style={{ color: 'var(--as-team-primary)' }} />
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--as-text-primary)' }}>
             {TOURNAMENT_INFO.name}
           </span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 11, color: 'var(--as-text-tertiary)' }}>
+          <span style={{ fontSize: 10, color: 'var(--as-text-tertiary)' }}>
             {TOURNAMENT_INFO.date}
           </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Mute toggle */}
+          <button
+            onClick={toggleMute}
+            className="as-press"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: '4px 8px', borderRadius: 6,
+              backgroundColor: isMuted ? 'var(--as-bg-tertiary)' : 'color-mix(in srgb, var(--as-team-primary) 15%, transparent)',
+              border: `1px solid ${isMuted ? 'var(--as-border-default)' : 'var(--as-team-primary)'}`,
+              cursor: 'pointer', fontFamily: 'inherit',
+              transition: 'all 150ms ease',
+            }}
+            title={isMuted ? 'Unmute all videos' : 'Mute all videos'}
+          >
+            {isMuted ? <VolumeX size={11} style={{ color: 'var(--as-text-tertiary)' }} /> : <Volume2 size={11} style={{ color: 'var(--as-team-primary)' }} />}
+            <span style={{ fontSize: 10, fontWeight: 600, color: isMuted ? 'var(--as-text-tertiary)' : 'var(--as-team-primary)' }}>
+              {isMuted ? 'Muted' : 'Sound On'}
+            </span>
+          </button>
           <span style={{
             fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 5,
             backgroundColor: 'var(--as-team-primary-soft)',
@@ -206,12 +267,13 @@ export default function FilmHighlights() {
         </div>
       </div>
 
-      {/* ─── PLAYER SELECTOR ─── */}
+      {/* ─── PLAYER SELECTOR (compact row) ─── */}
       <div className="as-fade-in as-stagger-2" style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-        gap: 8,
-        marginBottom: 24,
+        display: 'flex',
+        gap: 6,
+        marginBottom: 16,
+        overflowX: 'auto',
+        paddingBottom: 4,
       }}>
         {PLAYERS.map((player) => {
           const isSelected = selectedPlayer === player.number;
@@ -221,8 +283,8 @@ export default function FilmHighlights() {
               onClick={() => setSelectedPlayer(isSelected ? null : player.number)}
               className="as-press"
               style={{
-                padding: '14px 12px',
-                borderRadius: 12,
+                padding: '8px 14px',
+                borderRadius: 10,
                 border: isSelected
                   ? `2px solid ${player.color}`
                   : '1.5px solid var(--as-border-default)',
@@ -230,44 +292,32 @@ export default function FilmHighlights() {
                   ? `color-mix(in srgb, ${player.color} 10%, var(--as-bg-card))`
                   : 'var(--as-bg-card)',
                 cursor: 'pointer',
-                textAlign: 'center',
                 fontFamily: 'inherit',
                 transition: 'all 180ms cubic-bezier(0.23, 1, 0.32, 1)',
-                position: 'relative',
-                overflow: 'hidden',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
               }}
             >
-              {/* Active indicator bar */}
-              {isSelected && (
-                <div style={{
-                  position: 'absolute', top: 0, left: 0, right: 0, height: 3,
-                  backgroundColor: player.color,
-                }} />
-              )}
-
               <div style={{
-                width: 36, height: 36, borderRadius: 10, margin: '0 auto 8px',
+                width: 28, height: 28, borderRadius: 8,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 backgroundColor: `color-mix(in srgb, ${player.color} 15%, transparent)`,
                 border: `1.5px solid ${player.color}`,
               }}>
-                <span style={{ fontSize: 14, fontWeight: 800, color: player.color, fontFamily: 'var(--font-display)' }}>
+                <span style={{ fontSize: 12, fontWeight: 800, color: player.color, fontFamily: 'var(--font-display)' }}>
                   {player.number.replace('#', '')}
                 </span>
               </div>
-
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--as-text-primary)', marginBottom: 2 }}>
-                {player.name}
-              </div>
-              <div style={{ fontSize: 10, fontWeight: 500, color: player.color, marginBottom: 6 }}>
-                {player.role}
-              </div>
-              <div style={{
-                fontSize: 10, fontWeight: 600, color: 'var(--as-text-tertiary)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-              }}>
-                <Film size={9} />
-                {player.clipCount} clips
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--as-text-primary)' }}>
+                  {player.name}
+                </div>
+                <div style={{ fontSize: 9, fontWeight: 500, color: 'var(--as-text-tertiary)' }}>
+                  {player.clipCount} clips
+                </div>
               </div>
             </button>
           );
@@ -277,24 +327,24 @@ export default function FilmHighlights() {
       {/* ─── NO PLAYER SELECTED STATE ─── */}
       {!selectedPlayer && (
         <div className="as-fade-in" style={{
-          padding: '40px 20px',
+          padding: '32px 20px',
           textAlign: 'center',
           borderRadius: 14,
           backgroundColor: 'var(--as-bg-card)',
           border: '1px solid var(--as-border-default)',
         }}>
           <div style={{
-            width: 56, height: 56, borderRadius: 14, margin: '0 auto 16px',
+            width: 48, height: 48, borderRadius: 12, margin: '0 auto 12px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             backgroundColor: 'var(--as-team-primary-soft)',
           }}>
-            <Film size={24} style={{ color: 'var(--as-team-primary)' }} />
+            <Film size={22} style={{ color: 'var(--as-team-primary)' }} />
           </div>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--as-text-primary)', margin: '0 0 8px', fontFamily: 'var(--font-display)' }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--as-text-primary)', margin: '0 0 6px', fontFamily: 'var(--font-display)' }}>
             Select a Player
           </h3>
-          <p style={{ fontSize: 13, color: 'var(--as-text-tertiary)', margin: 0, maxWidth: 280, marginInline: 'auto' }}>
-            Tap a player above to view their individual highlight clips from the ZG National Finals.
+          <p style={{ fontSize: 12, color: 'var(--as-text-tertiary)', margin: 0, maxWidth: 260, marginInline: 'auto' }}>
+            Tap a player above to view their highlight clips from the ZG National Finals.
           </p>
         </div>
       )}
@@ -302,135 +352,174 @@ export default function FilmHighlights() {
       {/* ─── PLAYER CLIPS VIEW ─── */}
       {selectedPlayer && currentPlayerData && (
         <div className="as-fade-in">
-          {/* Player header */}
-          <div style={{
-            marginBottom: 16,
-            padding: '16px 18px',
-            borderRadius: 12,
-            backgroundColor: `color-mix(in srgb, ${currentPlayerData.color} 6%, var(--as-bg-card))`,
-            border: `1px solid color-mix(in srgb, ${currentPlayerData.color} 20%, var(--as-border-default))`,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{
-                  width: 44, height: 44, borderRadius: 12,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: `color-mix(in srgb, ${currentPlayerData.color} 18%, transparent)`,
-                  border: `2px solid ${currentPlayerData.color}`,
-                }}>
-                  <span style={{ fontSize: 18, fontWeight: 800, color: currentPlayerData.color, fontFamily: 'var(--font-display)' }}>
-                    {currentPlayerData.number.replace('#', '')}
-                  </span>
-                </div>
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--as-text-primary)', fontFamily: 'var(--font-display)' }}>
-                    {currentPlayerData.name}
-                  </div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: currentPlayerData.color }}>
-                    {currentPlayerData.role}
-                  </div>
-                </div>
-              </div>
-              <div style={{
-                padding: '6px 10px', borderRadius: 8,
-                backgroundColor: `color-mix(in srgb, ${currentPlayerData.color} 12%, transparent)`,
-                display: 'flex', alignItems: 'center', gap: 5,
+          {/* Play Summary Toggle */}
+          <button
+            onClick={() => setShowSummary(!showSummary)}
+            className="as-press"
+            style={{
+              width: '100%',
+              marginBottom: 12,
+              padding: '10px 14px',
+              borderRadius: 10,
+              backgroundColor: `color-mix(in srgb, ${currentPlayerData.color} 5%, var(--as-bg-card))`,
+              border: `1px solid color-mix(in srgb, ${currentPlayerData.color} 15%, var(--as-border-default))`,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              transition: 'all 150ms ease',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <BarChart3 size={13} style={{ color: currentPlayerData.color }} />
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--as-text-primary)' }}>
+                {currentPlayerData.name} — Play Breakdown
+              </span>
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                backgroundColor: `color-mix(in srgb, ${currentPlayerData.color} 15%, transparent)`,
+                color: currentPlayerData.color,
               }}>
-                <Flame size={12} style={{ color: currentPlayerData.color }} />
-                <span style={{ fontSize: 12, fontWeight: 700, color: currentPlayerData.color }}>
-                  {currentClips.length}
-                </span>
+                {currentClips.length} plays
+              </span>
+            </div>
+            <ChevronDown size={14} style={{
+              color: 'var(--as-text-tertiary)',
+              transform: showSummary ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 200ms ease',
+            }} />
+          </button>
+
+          {/* Play Summary Panel */}
+          {showSummary && (
+            <div className="as-fade-in" style={{
+              marginBottom: 16,
+              padding: '12px 14px',
+              borderRadius: 10,
+              backgroundColor: 'var(--as-bg-card)',
+              border: '1px solid var(--as-border-default)',
+            }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {playBreakdown.map(({ type, count, pct }) => (
+                  <div key={type} style={{
+                    padding: '6px 10px',
+                    borderRadius: 8,
+                    backgroundColor: 'var(--as-bg-tertiary)',
+                    border: '1px solid var(--as-border-default)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: currentPlayerData.color }}>
+                      {count}
+                    </span>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--as-text-secondary)' }}>
+                      {type}
+                    </span>
+                    <span style={{ fontSize: 9, color: 'var(--as-text-tertiary)' }}>
+                      {pct}%
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Clips grid */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* ─── COMPACT THUMBNAIL GRID ─── */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+            gap: 8,
+          }}>
             {currentClips.map((clip, i) => {
-              const isActive = activeClip === clip.id;
+              const isExpanded = expandedClip === clip.id;
               return (
                 <div
                   key={clip.id}
                   className={`as-fade-in as-stagger-${Math.min(i + 1, 10)}`}
                   style={{
-                    borderRadius: 12,
+                    borderRadius: 10,
                     overflow: 'hidden',
                     backgroundColor: 'var(--as-bg-card)',
-                    border: isActive
-                      ? `1.5px solid ${currentPlayerData.color}`
+                    border: isExpanded
+                      ? `2px solid ${currentPlayerData.color}`
                       : '1px solid var(--as-border-default)',
-                    transition: 'border-color 200ms ease',
+                    cursor: 'pointer',
+                    transition: 'all 180ms cubic-bezier(0.23, 1, 0.32, 1)',
                   }}
+                  onClick={() => !isExpanded && handlePlayClip(clip.id)}
                 >
-                  {/* Video container */}
+                  {/* Thumbnail / Video */}
                   <div style={{ position: 'relative', aspectRatio: '16/9', backgroundColor: '#000' }}>
-                    <video
-                      ref={(el) => { if (el) videoRefs.current.set(clip.id, el); }}
-                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                      controls
-                      preload="metadata"
-                      playsInline
-                      onPlay={() => setActiveClip(clip.id)}
-                      onPause={() => { if (activeClip === clip.id) setActiveClip(null); }}
-                      onEnded={() => setActiveClip(null)}
-                    >
-                      <source src={clip.videoUrl} type="video/mp4" />
-                    </video>
-
-                    {/* Play/Pause overlay */}
-                    {!isActive && (
-                      <div
-                        onClick={() => handlePlayClip(clip.id)}
-                        style={{
+                    {isExpanded ? (
+                      <video
+                        ref={(el) => { if (el) videoRefs.current.set(clip.id, el); }}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                        controls
+                        autoPlay
+                        muted={isMuted}
+                        preload="auto"
+                        playsInline
+                        onEnded={() => setExpandedClip(null)}
+                      >
+                        <source src={clip.videoUrl} type="video/mp4" />
+                      </video>
+                    ) : (
+                      <>
+                        <video
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          preload="metadata"
+                          muted
+                          playsInline
+                        >
+                          <source src={clip.videoUrl + '#t=1'} type="video/mp4" />
+                        </video>
+                        {/* Play overlay */}
+                        <div style={{
                           position: 'absolute', inset: 0,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: 'linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.5) 100%)',
-                          cursor: 'pointer',
-                          transition: 'opacity 200ms ease',
-                        }}
-                      >
-                        <div style={{
-                          width: 48, height: 48, borderRadius: '50%',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          backgroundColor: 'rgba(255,255,255,0.12)',
-                          backdropFilter: 'blur(6px)',
-                          border: '2px solid rgba(255,255,255,0.25)',
+                          background: 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.6) 100%)',
                         }}>
-                          <Play size={20} fill="white" stroke="white" style={{ marginLeft: 2 }} />
+                          <div style={{
+                            width: 32, height: 32, borderRadius: '50%',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            backgroundColor: 'rgba(255,255,255,0.15)',
+                            backdropFilter: 'blur(4px)',
+                            border: '1.5px solid rgba(255,255,255,0.3)',
+                          }}>
+                            <Play size={14} fill="white" stroke="white" style={{ marginLeft: 1 }} />
+                          </div>
                         </div>
-                      </div>
+                        {/* Duration badge */}
+                        <div style={{
+                          position: 'absolute', bottom: 4, right: 4,
+                          padding: '2px 5px', borderRadius: 4,
+                          backgroundColor: 'rgba(0,0,0,0.8)', color: 'white',
+                          fontSize: 9, fontWeight: 600, pointerEvents: 'none',
+                        }}>
+                          {clip.duration}
+                        </div>
+                      </>
                     )}
-
-                    {/* Duration badge */}
-                    <div style={{
-                      position: 'absolute', bottom: 8, right: 8,
-                      padding: '3px 7px', borderRadius: 5,
-                      backgroundColor: 'rgba(0,0,0,0.8)', color: 'white',
-                      fontSize: 10, fontWeight: 600, pointerEvents: 'none',
-                    }}>
-                      {clip.duration}
-                    </div>
-
-                    {/* Play type badge */}
-                    <div style={{
-                      position: 'absolute', top: 8, left: 8,
-                      display: 'flex', alignItems: 'center', gap: 4,
-                      padding: '4px 8px', borderRadius: 5,
-                      backgroundColor: `color-mix(in srgb, ${currentPlayerData.color} 80%, black)`,
-                      color: 'white',
-                      fontSize: 10, fontWeight: 700, pointerEvents: 'none',
-                    }}>
-                      <Zap size={9} fill="white" stroke="white" />
-                      {clip.playType}
-                    </div>
                   </div>
 
-                  {/* AI Caption */}
-                  <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                    <Target size={12} style={{ color: 'var(--as-text-tertiary)', marginTop: 2, flexShrink: 0 }} />
-                    <p style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--as-text-secondary)', margin: 0 }}>
-                      {clip.aiCaption}
-                    </p>
+                  {/* Clip info */}
+                  <div style={{ padding: '7px 9px' }}>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      marginBottom: 2,
+                    }}>
+                      <Zap size={8} style={{ color: currentPlayerData.color }} />
+                      <span style={{ fontSize: 10, fontWeight: 700, color: currentPlayerData.color }}>
+                        {clip.playType}
+                      </span>
+                    </div>
+                    {isExpanded && (
+                      <p style={{ fontSize: 10, lineHeight: 1.4, color: 'var(--as-text-tertiary)', margin: '4px 0 0' }}>
+                        {clip.aiCaption}
+                      </p>
+                    )}
                   </div>
                 </div>
               );
@@ -439,16 +528,89 @@ export default function FilmHighlights() {
         </div>
       )}
 
+      {/* ─── EXPANDED VIDEO MODAL ─── */}
+      {expandedClip && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            backgroundColor: 'rgba(0,0,0,0.85)',
+            backdropFilter: 'blur(8px)',
+            padding: 16,
+          }}
+          onClick={handleCloseExpanded}
+        >
+          <div
+            style={{
+              width: '100%', maxWidth: 720,
+              borderRadius: 14, overflow: 'hidden',
+              backgroundColor: 'var(--as-bg-card)',
+              border: '1px solid var(--as-border-default)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Video */}
+            <div style={{ position: 'relative', aspectRatio: '16/9', backgroundColor: '#000' }}>
+              <video
+                ref={(el) => { if (el) videoRefs.current.set(expandedClip + '-modal', el); }}
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                controls
+                autoPlay
+                muted={isMuted}
+                playsInline
+                onEnded={handleCloseExpanded}
+              >
+                <source src={currentClips.find(c => c.id === expandedClip)?.videoUrl} type="video/mp4" />
+              </video>
+              {/* Close button */}
+              <button
+                onClick={handleCloseExpanded}
+                style={{
+                  position: 'absolute', top: 8, right: 8,
+                  width: 28, height: 28, borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: 'rgba(0,0,0,0.6)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  cursor: 'pointer',
+                }}
+              >
+                <X size={14} style={{ color: 'white' }} />
+              </button>
+            </div>
+            {/* Caption */}
+            {(() => {
+              const clip = currentClips.find(c => c.id === expandedClip);
+              if (!clip) return null;
+              return (
+                <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    padding: '4px 8px', borderRadius: 6,
+                    backgroundColor: currentPlayerData ? `color-mix(in srgb, ${currentPlayerData.color} 15%, transparent)` : 'var(--as-bg-tertiary)',
+                  }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: currentPlayerData?.color || 'var(--as-text-primary)' }}>
+                      {clip.playType}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: 12, color: 'var(--as-text-secondary)' }}>
+                    {clip.aiCaption}
+                  </span>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
       {/* ─── STATS FOOTER ─── */}
       <div className="as-fade-in as-stagger-7" style={{
-        marginTop: 24, padding: '16px 18px', borderRadius: 12,
+        marginTop: 20, padding: '12px 14px', borderRadius: 10,
         backgroundColor: 'var(--as-bg-card)',
         border: '1px solid var(--as-border-default)',
       }}>
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--as-text-tertiary)', display: 'block', marginBottom: 12 }}>
+        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--as-text-tertiary)', display: 'block', marginBottom: 10 }}>
           FILM ROOM STATS
         </span>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: 8 }}>
           <StatBlock label="Total Clips" value={String(totalClips)} />
           <StatBlock label="Players" value="5" />
           <StatBlock label="Tournament" value="ZG Finals" />
@@ -463,10 +625,10 @@ export default function FilmHighlights() {
 function StatBlock({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ textAlign: 'center' }}>
-      <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--as-text-primary)', fontFamily: 'var(--font-display)' }}>
+      <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--as-text-primary)', fontFamily: 'var(--font-display)' }}>
         {value}
       </div>
-      <div style={{ fontSize: 9, fontWeight: 500, color: 'var(--as-text-tertiary)', marginTop: 2 }}>
+      <div style={{ fontSize: 8, fontWeight: 500, color: 'var(--as-text-tertiary)', marginTop: 2 }}>
         {label}
       </div>
     </div>

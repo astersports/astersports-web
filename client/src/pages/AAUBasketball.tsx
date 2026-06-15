@@ -97,19 +97,22 @@ export default function AAUBasketball() {
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 6,
+              gap: 8,
               fontSize: 13,
-              fontWeight: 500,
-              color: 'var(--as-text-tertiary)',
+              fontWeight: 600,
+              color: 'var(--as-text-secondary)',
               textDecoration: 'none',
-              marginBottom: 12,
-              padding: '4px 0',
-              transition: 'color 0.15s ease',
+              marginBottom: 16,
+              padding: '8px 14px',
+              borderRadius: 8,
+              backgroundColor: 'var(--as-bg-card)',
+              border: '1px solid var(--as-border-default)',
+              transition: 'all 0.15s ease',
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--as-team-primary)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--as-text-tertiary)')}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--as-team-primary)'; e.currentTarget.style.borderColor = 'var(--as-team-primary)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--as-text-secondary)'; e.currentTarget.style.borderColor = 'var(--as-border-default)'; }}
           >
-            <ArrowLeft style={{ width: 14, height: 14 }} />
+            <ArrowLeft style={{ width: 16, height: 16 }} />
             Back to Aster Sports
           </a>
 

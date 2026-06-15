@@ -54,3 +54,11 @@
 
 - [x] Add back button/link on AAU page to navigate back to main landing page
 - [x] Fix film section videos not playing in AAU page (redesigned with player-centric layout, 60 clips across 5 players)
+
+# Film Section Optimization
+
+- [x] Fix back button not visible on AAU page (made more prominent with pill background)
+- [x] Mute all videos by default (page-level mute toggle, muted on load)
+- [x] Add play summary/stats per player (aggregate play types, totals)
+- [x] Optimize video layout — compact thumbnail grid instead of full-size cards (reduce scrolling)
+- [x] Enhanced content: better browsing UX (compact grid with play labels, expandable lightbox modal on click)
