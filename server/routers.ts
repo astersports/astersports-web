@@ -2,6 +2,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
+import { billingRouter } from "./billing";
 import { fetchAllGames, invalidateAllCaches, getTournamentRegistry } from "./scraper";
 import { notifyOwner } from "./_core/notification";
 import { sdk } from "./_core/sdk";
@@ -20,6 +21,9 @@ export const appRouter = router({
       return { success: true } as const;
     }),
   }),
+
+  // Stripe billing routes (admin-only)
+  billing: billingRouter,
 
   // AAU Basketball endpoints
   games: router({

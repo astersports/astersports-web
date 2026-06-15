@@ -69,3 +69,28 @@ export const scraperCache = mysqlTable("scraper_cache", {
 
 export type ScraperCache = typeof scraperCache.$inferSelect;
 export type InsertScraperCache = typeof scraperCache.$inferInsert;
+
+/**
+ * Billing — Clients table
+ * Stores Stripe customer/subscription info for each billing client.
+ */
+export const billingClients = mysqlTable("billing_clients", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Client display name (e.g. "St. Patrick's Church") */
+  name: varchar("name", { length: 255 }).notNull(),
+  /** Client email for Stripe invoices */
+  email: varchar("email", { length: 320 }).notNull(),
+  /** Stripe Customer ID (cus_xxx) */
+  stripeCustomerId: varchar("stripeCustomerId", { length: 128 }).notNull().unique(),
+  /** Stripe Subscription ID (sub_xxx) — null if no active subscription */
+  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 128 }),
+  /** Subscription status from Stripe (active, past_due, canceled, etc.) */
+  subscriptionStatus: varchar("subscriptionStatus", { length: 32 }).default("none"),
+  /** Optional notes about the client */
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type BillingClient = typeof billingClients.$inferSelect;
+export type InsertBillingClient = typeof billingClients.$inferInsert;
