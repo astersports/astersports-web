@@ -93,46 +93,46 @@ function BillingContent() {
   });
 
   return (
-    <div className="min-h-screen bg-[#0a0e1a]">
+    <div className="min-h-screen bg-[#0a0e1a] overflow-x-hidden">
       {/* Header */}
-      <header className="bg-[#0a0e1a] border-b border-white/5">
-        <div className="container flex items-center justify-between h-16 px-4">
-          <div className="flex items-center gap-4">
-            <a href="/" className="text-slate-400 hover:text-white transition-colors">
-              <ArrowLeft className="w-5 h-5" />
-            </a>
-            <div className="flex items-center gap-3">
-              <img src={LOGO_URL} alt="Aster Sports" className="w-8 h-8" />
-              <div>
-                <h1 className="text-lg font-semibold text-white" style={{ fontFamily: "var(--font-display)" }}>
-                  Billing Dashboard
+      <header className="bg-[#0a0e1a] border-b border-white/5 pt-2">
+        <div className="max-w-5xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <a href="/" className="text-slate-400 hover:text-white transition-colors flex-shrink-0">
+                <ArrowLeft className="w-5 h-5" />
+              </a>
+              <img src={LOGO_URL} alt="Aster Sports" className="w-8 h-8 flex-shrink-0" />
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-lg font-semibold text-white truncate" style={{ fontFamily: "var(--font-display)" }}>
+                  Dashboard
                 </h1>
-                <p className="text-xs text-slate-400">Manage client subscriptions & payments</p>
+                <p className="text-xs text-slate-400 truncate">Manage client subscriptions & payments</p>
               </div>
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => syncMutation.mutate()}
-              disabled={syncMutation.isPending}
-              className="border-white/10 text-slate-300 hover:text-white hover:border-white/20 bg-transparent"
-            >
-              {syncMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              ) : (
-                <RefreshCw className="w-4 h-4 mr-2" />
-              )}
-              Sync
-            </Button>
-            <CreateClientDialog onSuccess={() => refetch()} />
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => syncMutation.mutate()}
+                disabled={syncMutation.isPending}
+                className="border-white/10 text-slate-300 hover:text-white hover:border-white/20 bg-transparent"
+              >
+                {syncMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin sm:mr-2" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 sm:mr-2" />
+                )}
+                <span className="hidden sm:inline">Sync</span>
+              </Button>
+              <CreateClientDialog onSuccess={() => refetch()} />
+            </div>
           </div>
         </div>
       </header>
 
       {/* Stats */}
-      <div className="container py-8 px-4">
+      <div className="max-w-5xl mx-auto py-8 px-4">
         {error && (
           <div className="mb-6 p-4 rounded-xl border border-red-500/20 bg-red-500/5">
             <p className="text-red-400 text-sm font-medium">Failed to load billing data</p>
@@ -368,8 +368,8 @@ function CreateClientDialog({ onSuccess }: { onSuccess: () => void }) {
           size="sm"
           className="bg-gradient-to-r from-[#f5b731] to-[#e67e22] text-[#0a0e1a] font-medium hover:opacity-90"
         >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Client
+          <Plus className="w-4 h-4 sm:mr-2" />
+          <span className="hidden sm:inline">Add Client</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="bg-[#111827] border-white/10 text-white">
