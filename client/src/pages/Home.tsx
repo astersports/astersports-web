@@ -111,6 +111,9 @@ function Header() {
           <a href="#faq" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
             FAQ
           </a>
+          <a href="/aau" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
+            AAU Basketball
+          </a>
           <a
             href="#contact"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#f5b731] to-[#e67e22] text-[#0a0e1a] font-medium text-sm transition-transform duration-160 hover:scale-[1.03] active:scale-[0.97]"
@@ -146,6 +149,9 @@ function Header() {
           </a>
           <a href="#faq" className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
             FAQ
+          </a>
+          <a href="/aau" className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
+            AAU Basketball
           </a>
           <a
             href="#contact"

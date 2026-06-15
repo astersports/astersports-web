@@ -167,3 +167,455 @@
   stroke-dasharray: 1000;
   stroke-dashoffset: 1000;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   AAU BASKETBALL — DESIGN TOKENS
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  /* ─── Aster Sports Platform Tokens (Dark) ─── */
+  --as-bg-page: #0F1119;
+  --as-bg-card: #1A1D2B;
+  --as-bg-card-hover: #222538;
+  --as-bg-secondary: #151825;
+  --as-bg-tertiary: #1E2133;
+  --as-text-primary: #F5F5F7;
+  --as-text-secondary: #A0AEC0;
+  --as-text-tertiary: #6B7A90;
+  --as-text-inverse: #FFFFFF;
+  --as-border-default: #2D3348;
+  --as-border-subtle: #232840;
+
+  /* ─── Status (semantic) ─── */
+  --as-success: #16A34A;
+  --as-success-soft: rgba(22, 163, 74, 0.15);
+  --as-warning: #D97706;
+  --as-warning-soft: rgba(217, 119, 6, 0.15);
+  --as-danger: #DC2626;
+  --as-danger-soft: rgba(220, 38, 38, 0.15);
+  --as-info: #3B82F6;
+  --as-info-soft: rgba(59, 130, 246, 0.15);
+  --as-neutral: #9CA3AF;
+  --as-neutral-soft: rgba(156, 163, 175, 0.12);
+
+  /* ─── Legacy Hoopers Org Brand ─── */
+  --as-accent: #4a8fd4;
+  --as-accent-hover: #5BA0E0;
+  --as-accent-soft: rgba(74, 143, 212, 0.12);
+  --as-header: #4a8fd4;
+  --as-text-on-dark: #FFFFFF;
+
+  /* ─── 11U Girls Team Color ─── */
+  --as-team-primary: #a78bfa;
+  --as-team-primary-soft: rgba(167, 139, 250, 0.12);
+
+  /* ─── Achievement / Gold ─── */
+  --as-gold: #B8860B;
+  --as-gold-soft: rgba(184, 134, 11, 0.15);
+  --as-gold-text: #FFD700;
+
+  /* ─── Shadows ─── */
+  --as-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --as-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --as-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+  /* ─── Live badge ─── */
+  --as-live: #EF4444;
+  --as-live-soft: rgba(239, 68, 68, 0.15);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AAU BASKETBALL — KEYFRAME ANIMATIONS
+   ═══════════════════════════════════════════════════════════════ */
+@keyframes as-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 0.7; }
+}
+@keyframes as-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes as-pulse-dot {
+  0%, 100% { transform: scale(1);   opacity: 1;   }
+  50%      { transform: scale(1.5); opacity: 0.5; }
+}
+@keyframes as-bounce-tap {
+  0%   { transform: scale(1);    }
+  40%  { transform: scale(0.95); }
+  100% { transform: scale(1);    }
+}
+@keyframes as-fill-grow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+@keyframes card-expand {
+  from { opacity: 0; transform: scaleY(0.96); transform-origin: top; }
+  to   { opacity: 1; transform: scaleY(1);    transform-origin: top; }
+}
+@keyframes sheet-rise {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0);    }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.6; transform: scale(1.1); }
+}
+@keyframes countdown-glow {
+  0%, 100% { text-shadow: 0 0 0 transparent; }
+  50%      { text-shadow: 0 0 8px var(--as-accent); }
+}
+@keyframes score-pop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AAU BASKETBALL — ANIMATION UTILITY CLASSES
+   ═══════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: no-preference) {
+  .as-pulse       { animation: as-pulse      1.5s ease-in-out infinite; }
+  .as-fade-in     { animation: as-fade-in    0.35s cubic-bezier(0.23, 1, 0.32, 1) both; }
+  .as-pulse-dot   { animation: as-pulse-dot  2s   ease-in-out infinite; }
+  .as-bounce-tap  { animation: as-bounce-tap 0.3s ease-out; }
+  .as-fill-grow   { animation: as-fill-grow  0.6s ease-out both; transform-origin: left; }
+  .as-card-expand { animation: card-expand   0.25s ease-out both; }
+  .as-sheet-rise  { animation: sheet-rise    0.28s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+  .as-shimmer {
+    background: linear-gradient(90deg, var(--as-bg-tertiary) 25%, var(--as-bg-card-hover) 50%, var(--as-bg-tertiary) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+  .as-score-pop   { animation: score-pop 0.3s ease-out; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .as-pulse, .as-fade-in, .as-pulse-dot, .as-bounce-tap,
+  .as-fill-grow, .as-card-expand, .as-sheet-rise, .as-shimmer, .as-score-pop {
+    animation: none !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AAU BASKETBALL — INTERACTION PATTERNS
+   ═══════════════════════════════════════════════════════════════ */
+.as-press {
+  transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1);
+  cursor: pointer;
+}
+.as-press:active {
+  transform: scale(0.97);
+}
+
+.as-card-hover {
+  transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1),
+              box-shadow 180ms cubic-bezier(0.23, 1, 0.32, 1),
+              background-color 180ms ease;
+}
+.as-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--as-shadow-md);
+  background-color: var(--as-bg-card-hover);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AAU BASKETBALL — COLLAPSIBLE SECTIONS
+   ═══════════════════════════════════════════════════════════════ */
+.as-collapsible {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 300ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.as-collapsible[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+.as-collapsible > .as-collapsible-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AAU BASKETBALL — LIVE BADGE
+   ═══════════════════════════════════════════════════════════════ */
+.live-badge {
+  animation: live-pulse 1.5s ease-in-out infinite;
+}
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--as-live);
+  animation: as-pulse-dot 2s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AAU BASKETBALL — COUNTDOWN URGENCY
+   ═══════════════════════════════════════════════════════════════ */
+.as-countdown        { color: var(--as-accent); }
+.as-urgency-24h      { color: var(--as-text-tertiary); }
+.as-urgency-6h       { color: var(--as-success); }
+.as-urgency-1h       { color: var(--as-danger); animation: countdown-glow 2s ease-in-out infinite; }
+
+/* ═══════════════════════════════════════════════════════════════
+   AAU BASKETBALL — PROGRESS BAR
+   ═══════════════════════════════════════════════════════════════ */
+.as-progress-bar {
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background-color: var(--as-bg-tertiary);
+}
+.as-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  transform-origin: left;
+  animation: as-fill-grow 0.8s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AAU BASKETBALL — TYPOGRAPHY
+   ═══════════════════════════════════════════════════════════════ */
+.font-display {
+  font-family: 'Barlow Condensed', 'Inter', sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.font-display-xl {
+  font-family: 'Barlow Condensed', 'Inter', sans-serif;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AAU BASKETBALL — SCROLLBAR & UTILITY
+   ═══════════════════════════════════════════════════════════════ */
+.as-no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.as-no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ═══════════════════════════════════════════════════════════════
+   AAU BASKETBALL — STAGGER DELAYS
+   ═══════════════════════════════════════════════════════════════ */
+.as-stagger-1 { animation-delay: 0ms; }
+.as-stagger-2 { animation-delay: 40ms; }
+.as-stagger-3 { animation-delay: 80ms; }
+.as-stagger-4 { animation-delay: 120ms; }
+.as-stagger-5 { animation-delay: 160ms; }
+.as-stagger-6 { animation-delay: 200ms; }
+.as-stagger-7 { animation-delay: 240ms; }
+.as-stagger-8 { animation-delay: 280ms; }
+.as-stagger-9 { animation-delay: 320ms; }
+.as-stagger-10 { animation-delay: 360ms; }
+
+/* ═══════════════════════════════════════════════════════════════
+   AAU BASKETBALL — BROADCAST PATTERNS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── StatHeroBar ─── */
+.as-statbar {
+  display: flex;
+  background: linear-gradient(135deg, #0b1f3a, #122d52);
+  border-bottom: 4px solid var(--as-accent);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.as-statbar-item {
+  flex: 1;
+  text-align: center;
+  padding: 16px 8px;
+  border-right: 1px solid rgba(255,255,255,0.08);
+}
+.as-statbar-item:last-child { border-right: none; }
+.as-statbar-num {
+  font-family: 'Barlow Condensed', 'Inter', sans-serif;
+  font-size: clamp(22px, 4vw, 30px);
+  font-weight: 800;
+  line-height: 1;
+  display: block;
+  color: var(--as-text-primary);
+}
+.as-statbar-num.gold  { color: #f59e0b; }
+.as-statbar-num.green { color: #22c55e; }
+.as-statbar-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--as-text-tertiary);
+  margin-top: 5px;
+  display: block;
+}
+
+/* ─── Ghost Text (behind section headers) ─── */
+.as-ghost-text {
+  position: relative;
+  overflow: hidden;
+}
+.as-ghost-text::after {
+  content: attr(data-ghost);
+  position: absolute;
+  right: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: 'Barlow Condensed', 'Inter', sans-serif;
+  font-size: clamp(60px, 12vw, 140px);
+  font-weight: 800;
+  color: rgba(74,143,212,0.05);
+  line-height: 1;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 0;
+  text-transform: uppercase;
+}
+
+/* ─── Section Heading (eyebrow + display) ─── */
+.as-sec-eye {
+  font-family: 'Barlow Condensed', 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--as-accent);
+  margin-bottom: 6px;
+}
+.as-sec-h2 {
+  font-family: 'Barlow Condensed', 'Inter', sans-serif;
+  font-size: clamp(24px, 5vw, 36px);
+  font-weight: 800;
+  text-transform: uppercase;
+  line-height: 1.05;
+  color: var(--as-text-primary);
+  margin-bottom: 16px;
+}
+.as-sec-h2 b { color: var(--as-accent); font-weight: 800; }
+
+/* ─── Tournament Card ─── */
+.as-tourney {
+  background: var(--as-bg-card);
+  border: 1px solid var(--as-border-default);
+  border-radius: 10px;
+  padding: 10px 14px 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+.as-tourney:hover {
+  background-color: var(--as-bg-card-hover);
+}
+.as-tourney.expanded {
+  border-color: var(--as-accent);
+  background: color-mix(in srgb, var(--as-accent) 4%, var(--as-bg-card));
+}
+.as-tourney-pill {
+  font-family: 'Barlow Condensed', 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--as-text-tertiary);
+  flex-shrink: 0;
+}
+.as-tourney-pill.next {
+  background: rgba(74,143,212,0.15);
+  border-color: rgba(74,143,212,0.4);
+  color: var(--as-accent);
+  animation: as-tourney-pulse 2s ease-in-out infinite;
+}
+.as-tourney-pill.complete {
+  background: rgba(245,158,11,0.12);
+  border-color: rgba(245,158,11,0.3);
+  color: #f59e0b;
+}
+.as-tourney-pill.champions {
+  background: rgba(255,215,0,0.12);
+  border-color: rgba(255,215,0,0.3);
+  color: #FFD700;
+}
+@keyframes as-tourney-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.65; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .as-tourney-pill.next { animation: none; }
+}
+
+/* ─── Game Log Row (broadcast pattern) ─── */
+.as-glog {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  background: var(--as-bg-tertiary);
+  border: 1px solid var(--as-border-subtle);
+}
+.as-glog-result {
+  font-family: 'Barlow Condensed', 'Inter', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+.as-glog-result.W { background: rgba(34,197,94,0.18); color: var(--as-success); }
+.as-glog-result.L { background: rgba(239,68,68,0.18); color: var(--as-danger); }
+.as-glog-score {
+  font-family: 'Barlow Condensed', 'Inter', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--as-text-primary);
+}
+
+/* ─── FormGuide Dots ─── */
+.as-form-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.as-form-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1;
+}
+.as-form-dot.W { background: rgba(34,197,94,0.22); color: var(--as-success); }
+.as-form-dot.L { background: rgba(239,68,68,0.22); color: var(--as-danger); }
+
+/* ─── Championship Gold Glow ─── */
+.as-champ-glow {
+  border-color: rgba(255,215,0,0.3) !important;
+  box-shadow: 0 0 12px rgba(255,215,0,0.08);
+}
+.as-champ-badge {
+  display: inline-block;
+  font-family: 'Barlow Condensed', 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  margin-left: 8px;
+  border-radius: 3px;
+  background: rgba(245,158,11,0.18);
+  border: 1px solid rgba(245,158,11,0.4);
+  color: #f59e0b;
+  vertical-align: middle;
+}
