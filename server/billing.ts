@@ -12,7 +12,16 @@ import { ENV } from "./_core/env";
  * More restrictive than adminProcedure — only the owner can manage billing.
  */
 const ownerProcedure = protectedProcedure.use(async ({ ctx, next }) => {
-  if (ctx.user.openId !== ENV.ownerOpenId) {
+  console.log(`[Billing] Owner check: user.openId="${ctx.user.openId}" vs ENV.ownerOpenId="${ENV.ownerOpenId}"`);
+  if (!ENV.ownerOpenId) {
+    // If OWNER_OPEN_ID is not set, fall back to admin role check
+    if (ctx.user.role !== "admin") {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Only the site owner can access billing",
+      });
+    }
+  } else if (ctx.user.openId !== ENV.ownerOpenId) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "Only the site owner can access billing",

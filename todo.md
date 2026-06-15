@@ -34,3 +34,9 @@
 
 - [x] Add admin-only "Billing" link in site header (visible only when logged in as owner)
 - [x] Set up Resend email notifications for payment failures and subscription cancellations
+
+# Bug Fixes
+- [x] Fix billing page owner access error (owner can't access their own billing dashboard)
+- [x] Fix billing page header floating/overlapping content on mobile
+- [ ] Verify billing access works on production after deploy
+- [ ] Remove debug logging from ownerProcedure after confirming fix

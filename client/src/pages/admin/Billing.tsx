@@ -95,8 +95,8 @@ function BillingContent() {
   return (
     <div className="min-h-screen bg-[#0a0e1a]">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-[#0a0e1a]/90 backdrop-blur-xl border-b border-white/5">
-        <div className="container flex items-center justify-between h-16">
+      <header className="bg-[#0a0e1a] border-b border-white/5">
+        <div className="container flex items-center justify-between h-16 px-4">
           <div className="flex items-center gap-4">
             <a href="/" className="text-slate-400 hover:text-white transition-colors">
               <ArrowLeft className="w-5 h-5" />
@@ -132,7 +132,7 @@ function BillingContent() {
       </header>
 
       {/* Stats */}
-      <div className="container py-8">
+      <div className="container py-8 px-4">
         {error && (
           <div className="mb-6 p-4 rounded-xl border border-red-500/20 bg-red-500/5">
             <p className="text-red-400 text-sm font-medium">Failed to load billing data</p>
