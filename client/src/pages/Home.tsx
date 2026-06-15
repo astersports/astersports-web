@@ -6,7 +6,8 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Code, Globe, Wrench, Shield, Mail, ArrowRight, MapPin, Menu, X, ChevronDown, Send } from "lucide-react";
+import { Code, Globe, Wrench, Shield, Mail, ArrowRight, MapPin, Menu, X, ChevronDown, Send, Settings } from "lucide-react";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 const LOGO_URL = "/manus-storage/aster_sports_logo_high_res_2b537f86.png";
 const HERO_BG_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663756289268/4gGAtBP2vWCBU9FC7zDMWA/hero-bg-kP7SSTui5UuAzDmbnWb2NK.webp";
@@ -65,6 +66,8 @@ function useScrollReveal() {
 function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user } = useAuth();
+  const isOwner = user?.role === "admin" && user?.openId === import.meta.env.VITE_OWNER_OPEN_ID;
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -114,6 +117,12 @@ function Header() {
           <a href="/aau" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
             AAU Basketball
           </a>
+          {isOwner && (
+            <a href="/admin/billing" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors flex items-center gap-1" style={{ fontFamily: "var(--font-display)" }}>
+              <Settings className="w-3.5 h-3.5" />
+              Billing
+            </a>
+          )}
           <a
             href="#contact"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#f5b731] to-[#e67e22] text-[#0a0e1a] font-medium text-sm transition-transform duration-160 hover:scale-[1.03] active:scale-[0.97]"
@@ -153,6 +162,12 @@ function Header() {
           <a href="/aau" className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
             AAU Basketball
           </a>
+          {isOwner && (
+            <a href="/admin/billing" className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2 flex items-center gap-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
+              <Settings className="w-4 h-4" />
+              Billing
+            </a>
+          )}
           <a
             href="#contact"
             className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-gradient-to-r from-[#f5b731] to-[#e67e22] text-[#0a0e1a] font-medium text-sm transition-transform duration-160 active:scale-[0.97]"

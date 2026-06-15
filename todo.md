@@ -29,3 +29,8 @@
 - [x] Add Checkout Session flow for subscription activation (return hosted checkout URL)
 - [x] Add error UI states to /admin/billing for failed queries/mutations
 - [x] Enforce owner-only access on billing routes (check openId against OWNER_OPEN_ID)
+
+# Admin UX & Email Notifications
+
+- [x] Add admin-only "Billing" link in site header (visible only when logged in as owner)
+- [x] Set up Resend email notifications for payment failures and subscription cancellations

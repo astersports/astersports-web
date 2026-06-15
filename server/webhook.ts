@@ -5,6 +5,7 @@ import { getDb } from "./db";
 import { billingClients } from "../drizzle/schema";
 import { notifyOwner } from "./_core/notification";
 import { ENV } from "./_core/env";
+import { emailPaymentFailed, emailSubscriptionCanceled, emailSubscriptionActivated } from "./email";
 import type Stripe from "stripe";
 
 /**
@@ -81,6 +82,22 @@ export async function handleStripeWebhook(req: Request, res: Response) {
 }
 
 /**
+ * Helper: look up client name/email from Stripe customer ID
+ */
+async function getClientInfo(customerId: string): Promise<{ name: string; email: string }> {
+  const db = await getDb();
+  if (!db) return { name: "Unknown", email: "" };
+
+  const [client] = await db
+    .select({ name: billingClients.name, email: billingClients.email })
+    .from(billingClients)
+    .where(eq(billingClients.stripeCustomerId, customerId))
+    .limit(1);
+
+  return client ?? { name: "Unknown", email: "" };
+}
+
+/**
  * Handle checkout.session.completed — a client completed a checkout
  */
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
@@ -100,9 +117,19 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     })
     .where(eq(billingClients.stripeCustomerId, customerId));
 
+  const client = await getClientInfo(customerId);
+
+  // In-app notification
   await notifyOwner({
     title: "New Subscription Activated",
-    content: `Customer ${customerId} completed checkout. Subscription: ${subscriptionId}`,
+    content: `${client.name} (${client.email}) completed checkout. Subscription: ${subscriptionId}`,
+  });
+
+  // Email notification
+  await emailSubscriptionActivated({
+    clientName: client.name,
+    clientEmail: client.email,
+    subscriptionId,
   });
 }
 
@@ -148,9 +175,11 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 
   // Notify on concerning status changes
   if (["past_due", "unpaid", "canceled"].includes(subscription.status)) {
+    const client = await getClientInfo(customerId);
+
     await notifyOwner({
       title: `Subscription ${subscription.status}`,
-      content: `Customer ${customerId} subscription is now ${subscription.status}. Subscription ID: ${subscription.id}`,
+      content: `${client.name} (${client.email}) subscription is now ${subscription.status}. Subscription ID: ${subscription.id}`,
     });
   }
 }
@@ -171,9 +200,19 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     })
     .where(eq(billingClients.stripeCustomerId, customerId));
 
+  const client = await getClientInfo(customerId);
+
+  // In-app notification
   await notifyOwner({
     title: "Subscription Canceled",
-    content: `Customer ${customerId} subscription has been canceled. Subscription ID: ${subscription.id}`,
+    content: `${client.name} (${client.email}) subscription has been canceled. Subscription ID: ${subscription.id}`,
+  });
+
+  // Email notification
+  await emailSubscriptionCanceled({
+    clientName: client.name,
+    clientEmail: client.email,
+    subscriptionId: subscription.id,
   });
 }
 
@@ -184,9 +223,20 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
   if (!invoice.customer) return;
 
   const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer.id;
+  const amount = ((invoice.amount_due ?? 0) / 100).toFixed(2);
+  const client = await getClientInfo(customerId);
 
+  // In-app notification
   await notifyOwner({
     title: "Payment Failed",
-    content: `Payment failed for customer ${customerId}. Invoice: ${invoice.id}. Amount: $${((invoice.amount_due ?? 0) / 100).toFixed(2)}`,
+    content: `Payment failed for ${client.name} (${client.email}). Invoice: ${invoice.id}. Amount: $${amount}`,
+  });
+
+  // Email notification
+  await emailPaymentFailed({
+    clientName: client.name,
+    clientEmail: client.email,
+    amount,
+    invoiceId: invoice.id,
   });
 }
