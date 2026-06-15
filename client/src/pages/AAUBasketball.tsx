@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { ArrowLeft } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import LiveScores from "../components/aau/LiveScores";
 import TournamentHistory from "../components/aau/TournamentHistory";
@@ -89,7 +90,29 @@ export default function AAUBasketball() {
           background: `linear-gradient(90deg, var(--as-team-primary), var(--as-accent))`,
         }} />
 
-        <div className="container" style={{ paddingTop: 24, paddingBottom: 0 }}>
+        <div className="container" style={{ paddingTop: 16, paddingBottom: 0 }}>
+          {/* Back to main site */}
+          <a
+            href="/"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 13,
+              fontWeight: 500,
+              color: 'var(--as-text-tertiary)',
+              textDecoration: 'none',
+              marginBottom: 12,
+              padding: '4px 0',
+              transition: 'color 0.15s ease',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--as-team-primary)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--as-text-tertiary)')}
+          >
+            <ArrowLeft style={{ width: 14, height: 14 }} />
+            Back to Aster Sports
+          </a>
+
           {/* Team identity */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <div style={{

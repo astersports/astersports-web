@@ -40,3 +40,17 @@
 - [x] Fix billing page header floating/overlapping content on mobile
 - [x] Verify billing access works on production after deploy
 - [x] Remove debug logging from ownerProcedure after confirming fix
+
+# Webhook Handler Fix
+
+- [x] Add detailed error logging (try/catch) around each step in handleCheckoutCompleted
+- [x] Handle missing billing_clients row — auto-create client from Stripe customer data when checkout completes for unknown customer
+- [x] Add error logging to all other webhook handlers (handleInvoicePaid, handleSubscriptionUpdated, etc.)
+- [x] Wrap notifyOwner calls in try/catch to prevent TRPCError from crashing webhook handler
+- [x] Write vitest tests for webhook handler (checkout.session.completed with and without existing client)
+- [x] Clean up any remaining debug logging
+
+# Navigation
+
+- [x] Add back button/link on AAU page to navigate back to main landing page
+- [x] Fix film section videos not playing in AAU page (redesigned with player-centric layout, 60 clips across 5 players)
