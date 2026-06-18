@@ -69,3 +69,9 @@
 - [x] Add "All" reset button to clear the filter
 - [x] Show filtered clip count (e.g., "9 of 20 clips")
 - [x] Visual highlight on active filter pill
+
+# Landing Page Design Tightening
+
+- [x] Hide AAU Basketball from main nav menu
+- [x] Add AAU Basketball link to footer
+- [x] Tighten spacing between all landing page sections (reduced from py-24/py-32 to py-16/py-20)

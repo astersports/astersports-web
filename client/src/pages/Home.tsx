@@ -114,9 +114,7 @@ function Header() {
           <a href="#faq" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
             FAQ
           </a>
-          <a href="/aau" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
-            AAU Basketball
-          </a>
+
           {isOwner && (
             <a href="/admin/billing" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors flex items-center gap-1" style={{ fontFamily: "var(--font-display)" }}>
               <Settings className="w-3.5 h-3.5" />
@@ -159,9 +157,7 @@ function Header() {
           <a href="#faq" className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
             FAQ
           </a>
-          <a href="/aau" className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
-            AAU Basketball
-          </a>
+
           {isOwner && (
             <a href="/admin/billing" className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2 flex items-center gap-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
               <Settings className="w-4 h-4" />
@@ -309,7 +305,7 @@ function ServicesSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section id="services" className="relative py-24 md:py-32 bg-[#0a0e1a]">
+    <section id="services" className="relative py-16 md:py-20 bg-[#0a0e1a]">
       <div className="container" ref={ref}>
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           <div>
@@ -391,7 +387,7 @@ function ProcessSection() {
   ];
 
   return (
-    <section className="relative py-24 md:py-32 bg-[#0d1220]">
+    <section className="relative py-16 md:py-20 bg-[#0d1220]">
       <div className="container" ref={ref}>
         <div className="text-center mb-16">
           <div
@@ -447,7 +443,7 @@ function AboutSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section id="about" className="relative py-24 md:py-32 bg-[#0a0e1a]">
+    <section id="about" className="relative py-16 md:py-20 bg-[#0a0e1a]">
       <div className="container" ref={ref}>
         <div className="max-w-3xl mx-auto">
           <div
@@ -540,7 +536,7 @@ function FAQSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <section id="faq" className="relative py-24 md:py-32 bg-[#0d1220]">
+    <section id="faq" className="relative py-16 md:py-20 bg-[#0d1220]">
       <div className="container" ref={ref}>
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-12">
@@ -621,7 +617,7 @@ function ContactSection() {
   };
 
   return (
-    <section id="contact" className="relative py-24 md:py-32 overflow-hidden">
+    <section id="contact" className="relative py-16 md:py-20 overflow-hidden">
       {/* Background */}
       <div
         className="absolute inset-0"
@@ -771,6 +767,9 @@ function Footer() {
 
             <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 text-sm text-slate-400">
               <span>Custom Web Development & Maintenance</span>
+              <a href="/aau" className="text-[#f5b731] hover:text-[#e67e22] transition-colors">
+                AAU Basketball
+              </a>
               <a href="mailto:frank@astersports.co" className="text-[#f5b731] hover:text-[#e67e22] transition-colors">
                 frank@astersports.co
               </a>
