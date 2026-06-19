@@ -24,12 +24,30 @@
     "note": "HARD: non-white background + on-body — bbox membership clusters background near edges (raster signal)"
   },
   {
-    "id": "black-floral-skirt-pink-to-navy",
+    "id": "skirt-pink-navy-40",
     "imageUrl": "eval/samples/black-floral-skirt.jpg",
-    "fromColor": "#e3a3b4",
-    "toColor": "#1f2d5a",
+    "fromColor": "#E6A6B0",
+    "toColor": "#1B2A4A",
+    "coverage": 40,
+    "bbox": { "x": 0.27, "y": 0.16, "w": 0.46, "h": 0.78 },
+    "note": "REAL hanger sample, OFFLINE. Clean acceptance read: pink blossoms -> navy, low radius."
+  },
+  {
+    "id": "skirt-pink-navy-100",
+    "imageUrl": "eval/samples/black-floral-skirt.jpg",
+    "fromColor": "#E6A6B0",
+    "toColor": "#1B2A4A",
     "coverage": 100,
     "bbox": { "x": 0.27, "y": 0.16, "w": 0.46, "h": 0.78 },
-    "note": "REAL hanger sample, OFFLINE (manual bbox, local path). Black ground + pink satin blooms + blue sequin clusters + green bead stems + navy lace hem. Pink blossoms -> navy. Save the photo to the imageUrl path and run with no Forge creds."
+    "note": "Stress the red-rim pull at full radius — watch offFab + the PNG (op-tuning, not raster)."
+  },
+  {
+    "id": "skirt-blue-amber-60",
+    "imageUrl": "eval/samples/black-floral-skirt.jpg",
+    "fromColor": "#7AA0C8",
+    "toColor": "#E0A23C",
+    "coverage": 60,
+    "bbox": { "x": 0.27, "y": 0.16, "w": 0.46, "h": 0.78 },
+    "note": "Select the blue beaded clusters among black/pink/blue/green."
   }
 ]

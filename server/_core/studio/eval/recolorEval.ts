@@ -69,7 +69,8 @@ async function main() {
   const provider = getMaskProvider();
   const rows: string[] = [];
   const rasterNeeded: string[] = [];
-  let tPass = 0, lPass = 0, oPass = 0, det = 0;
+  const opTuning: string[] = [];
+  let tPass = 0, lPass = 0, oBgPass = 0, oFabPass = 0, det = 0;
 
   for (const c of cases) {
     try {
@@ -102,9 +103,12 @@ async function main() {
 
       if (v.targetPass) tPass++;
       if (v.lumPass) lPass++;
-      if (v.offPass) oPass++;
+      if (v.offBackgroundPass) oBgPass++;
+      if (v.offFabricPass) oFabPass++;
       if (deterministic) det++;
-      if (v.targetPass && v.lumPass && !v.offPass) rasterNeeded.push(c.id);
+      // Background bleed is raster-fixable; nearby-separation pull is op-tuning.
+      if (v.targetPass && v.lumPass && !v.offBackgroundPass) rasterNeeded.push(c.id);
+      if (v.targetPass && v.lumPass && !v.offFabricPass) opTuning.push(c.id);
 
       rows.push(
         [
@@ -114,7 +118,8 @@ async function main() {
           String(c.coverage),
           m.targetDeltaE.toFixed(2),
           m.lumSSIM.toFixed(3),
-          m.offTargetDeltaE.toFixed(2),
+          m.offTargetBackgroundDeltaE.toFixed(2),
+          m.offTargetFabricDeltaE.toFixed(2),
           v.pass ? "PASS" : "FAIL",
           deterministic ? "det" : "NONDET",
           `mask:${fabric.provider}${fabric.raster ? "+raster" : "(bbox)"}`,
@@ -128,15 +133,21 @@ async function main() {
 
   const n = cases.length;
   console.log("\n=== A1-EVAL: deterministic recolor ===");
-  console.log("id | from | to | cov | targetΔE | lumSSIM | offΔE | verdict | det | mask | artifact");
+  console.log("id | from | to | cov | targetΔE | lumSSIM | offBgΔE | offFabΔE | verdict | det | mask | artifact");
   console.log(rows.join("\n"));
   console.log("\n--- aggregate ---");
-  console.log(`target ΔE<=5 : ${tPass}/${n}`);
-  console.log(`lum SSIM>=.95: ${lPass}/${n}`);
-  console.log(`off ΔE<=2    : ${oPass}/${n}`);
-  console.log(`deterministic: ${det}/${n}`);
-  console.log("\n--- RASTER-NEEDED (pass target+lum, FAIL off on bbox-only) — D1 recolor signal ---");
-  console.log(rasterNeeded.length ? rasterNeeded.join(", ") : "(none — bbox membership clears off-target on this set)");
+  console.log(`target ΔE<=5    : ${tPass}/${n}`);
+  console.log(`lum SSIM>=.95   : ${lPass}/${n}`);
+  console.log(`offBg  ΔE<=2     : ${oBgPass}/${n}  (background bleed — raster-fixable)`);
+  console.log(`offFab ΔE<=2     : ${oFabPass}/${n}  (nearby-separation pull — op-tuning)`);
+  console.log(`deterministic   : ${det}/${n}`);
+  console.log("\n--- RASTER-NEEDED (pass target+lum, FAIL background bleed) — the ONLY D1 raster signal ---");
+  console.log(rasterNeeded.length ? rasterNeeded.join(", ") : "(none — background bleed clear on this set)");
+  console.log("\n--- OP-TUNING: reduce radius at high coverage (pass target+lum, FAIL fabric bleed) — NOT a mask problem ---");
+  console.log(opTuning.length ? opTuning.join(", ") : "(none — no nearby-separation pull on this set)");
+  console.log("\nNOTE: a single bbox run is an A1 acceptance read, not D1 evidence. The definitive");
+  console.log("raster signal is the bbox-vs-raster delta on the same image (lands when rasterReady");
+  console.log("flips). In-bbox background color-near fromColor is invisible to all numbers — read the PNGs.");
 }
 
 main().catch((e) => {
