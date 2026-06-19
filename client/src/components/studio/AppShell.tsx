@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LOW_BALANCE_THRESHOLD } from "@shared/billing";
+import { TrialBanner } from "./TrialBanner";
 
 const NAV_ITEMS = [
   { href: "/studio", label: "Editor", icon: Paintbrush },
@@ -149,6 +150,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Main content */}
       <main className="flex-1 min-w-0 md:p-6 p-4 pt-[7.5rem] md:pt-6">
+        {tenant && <TrialBanner tenantId={tenant.id} />}
         {children}
       </main>
     </div>

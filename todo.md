@@ -277,15 +277,15 @@
 - [x] Backend: Add usage analysis query (daily burn rate from credit ledger, days 4-7)
 - [x] Backend: Add recommendation engine (map usage velocity to plan suggestion)
 - [x] Backend: Add tRPC query for trial status + recommendation
-- [ ] Frontend: Trial status banner (days remaining, credits remaining)
-- [ ] Frontend: Smart recommendation banner starting day 4
-- [ ] Frontend: Trial expiry modal/gate blocking generation after day 7 or 0 credits
-- [ ] Frontend: "Choose a plan" CTA linking to billing page
+- [x] Frontend: Trial status banner (days remaining, credits remaining)
+- [x] Frontend: Smart recommendation banner starting day 4
+- [x] Frontend: Trial expiry modal/gate blocking generation after day 7 or 0 credits
+- [x] Frontend: "Choose a plan" CTA linking to billing page
 
 ## Side-by-Side Before/After with Synchronized Zoom
-- [ ] Replace slider-based BeforeAfter component with side-by-side layout
-- [ ] Add synchronized pan/zoom (pinch or scroll to zoom, drag to pan — both images move together)
-- [ ] Apply in StudioEditor results view and Generation Archive detail modal
+- [x] Replace slider-based BeforeAfter component with side-by-side layout
+- [x] Add synchronized pan/zoom (pinch or scroll to zoom, drag to pan — both images move together)
+- [x] Apply in StudioEditor results view and Generation Archive detail modal
 
 ## Scale & Density Prompt Improvements
 - [x] Fix: Improve Scale prompt to be more explicit about physical size change of motifs

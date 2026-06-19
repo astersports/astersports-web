@@ -110,13 +110,24 @@ export default function StudioEditor() {
     [handleFileSelect]
   );
 
+  // Fetch trial status to gate generation
+  const { data: trialStatus } = trpc.studio.trialStatus.useQuery(
+    { tenantId: tenant?.id ?? 0 },
+    { enabled: !!tenant }
+  );
+
   // Show confirmation dialog before generating
   const requestGenerate = useCallback(
     (controls: ControlSettings) => {
+      // Block generation if trial expired
+      if (trialStatus?.inTrial && (trialStatus.expired || trialStatus.daysRemaining === 0)) {
+        toast.error("Your free trial has ended. Please choose a plan to continue generating.");
+        return;
+      }
       setPendingControls(controls);
       setConfirmOpen(true);
     },
-    []
+    [trialStatus]
   );
 
   const handleConfirmGenerate = useCallback(async () => {

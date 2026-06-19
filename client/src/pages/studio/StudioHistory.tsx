@@ -7,6 +7,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { useTenant } from "@/contexts/TenantContext";
+import BeforeAfter from "@/components/studio/BeforeAfter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -698,39 +699,36 @@ export default function StudioHistory() {
                   </DialogTitle>
                 </DialogHeader>
 
-                {/* Before/After comparison */}
+                {/* Before/After comparison with synchronized zoom */}
                 <div className="mt-4">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
                     Before / After Comparison
                   </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <p className="text-[11px] text-muted-foreground text-center">Original</p>
-                      <div className="aspect-[3/4] rounded-lg overflow-hidden bg-muted border border-border">
-                        <img
-                          src={selectedJob.originalUrl}
-                          alt="Original"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <p className="text-[11px] text-muted-foreground text-center">Result</p>
-                      <div className="aspect-[3/4] rounded-lg overflow-hidden bg-muted border border-border">
-                        {selectedJob.variations?.[0]?.resultUrl ? (
+                  {selectedJob.variations?.[0]?.resultUrl ? (
+                    <BeforeAfter
+                      beforeUrl={selectedJob.originalUrl}
+                      afterUrl={selectedJob.variations[0].resultUrl}
+                    />
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] text-muted-foreground text-center">Original</p>
+                        <div className="aspect-[3/4] rounded-lg overflow-hidden bg-muted border border-border">
                           <img
-                            src={selectedJob.variations[0].resultUrl}
-                            alt="Result"
+                            src={selectedJob.originalUrl}
+                            alt="Original"
                             className="w-full h-full object-cover"
                           />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
-                            No result available
-                          </div>
-                        )}
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] text-muted-foreground text-center">Result</p>
+                        <div className="w-full aspect-[3/4] rounded-lg flex items-center justify-center text-muted-foreground text-sm bg-muted border border-border">
+                          No result available
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Metadata grid */}
