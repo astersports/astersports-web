@@ -3,15 +3,19 @@
  *
  * Pure functions over raw RGBA buffers — no I/O, fully unit-testable.
  *
- * Set definition (op-agnostic): the harness splits pixels by the SOURCE color's
- * perceptual distance to `fromColor`, NOT by whether the op changed them — so it
- * can measure bleed (off-target pixels that changed) independently of the op.
- *   - target set  = fabric pixels whose source is NEAR fromColor (ΔE2000 <= near)
- *   - off-target  = fabric pixels FAR from fromColor  +  all background pixels
+ * Set definition:
+ *   - target set  = pixels the op ACTUALLY REMAPPED (change-based: ΔE(source,out) > delta)
+ *   - off-target background = background pixels (membership==0) — bleed into non-fabric
+ *   - off-target fabric     = fabric pixels FAR from fromColor (ΔE2000 > far) — bleed
+ *                             into other separations
+ *   - near..far band        = excluded from off-target (transition zone)
  *
- * target metric is CHROMA/HUE at the pixel's OWN luminance (A1 preserves L by
+ * Target metric is CHROMA/HUE at the pixel's OWN luminance (A1 preserves L by
  * design, so a flat ΔE to the target color would falsely fail correct output —
  * a navy rose keeps the rose's bright highlights).
+ *
+ * Coverage-independent: because the target set is change-based, it measures only
+ * what the op committed to remapping, not a fixed source-distance band.
  */
 import { rgb255ToLab, hexToLab, deltaE2000 } from "../ops/color";
 
@@ -20,16 +24,24 @@ export interface RecolorMetrics {
   targetDeltaE: number;
   /** SSIM of the L channel (source vs out) over the target set. ~1.0 when L is held. */
   lumSSIM: number;
-  /** Mean ΔE2000 (source vs out) over off-target + background. The bleed metric. */
+  /** Mean ΔE2000 (source vs out) over off-target background pixels (membership==0). */
+  offTargetBackgroundDeltaE: number;
+  /** Mean ΔE2000 (source vs out) over off-target fabric pixels (dFrom > far). */
+  offTargetFabricDeltaE: number;
+  /** Legacy combined off-target (max of background and fabric). */
   offTargetDeltaE: number;
   targetCount: number;
+  offTargetBackgroundCount: number;
+  offTargetFabricCount: number;
   offTargetCount: number;
   fabricCount: number;
 }
 
 export interface MetricThresholds {
-  /** ΔE2000 radius around fromColor that counts a source pixel as "the target separation". */
-  near?: number;
+  /** ΔE2000 change threshold: pixels with ΔE(source,out) > delta are "remapped". Default 3. */
+  delta?: number;
+  /** ΔE2000 distance from fromColor beyond which fabric pixels count as off-target. Default 30. */
+  far?: number;
 }
 
 /** Single-window SSIM over two equal-length signals (L channel, range 0..100). */
@@ -61,12 +73,14 @@ export function computeRecolorMetrics(
   toColor: string,
   thresholds: MetricThresholds = {}
 ): RecolorMetrics {
-  const near = thresholds.near ?? 15;
+  const delta = thresholds.delta ?? 3;
+  const far = thresholds.far ?? 30;
   const fromLab = hexToLab(fromColor);
   const toLab = hexToLab(toColor);
 
   let targetSum = 0, targetCount = 0;
-  let offSum = 0, offCount = 0;
+  let offBgSum = 0, offBgCount = 0;
+  let offFabricSum = 0, offFabricCount = 0;
   let fabricCount = 0;
   const srcL: number[] = [];
   const outL: number[] = [];
@@ -79,25 +93,48 @@ export function computeRecolorMetrics(
     const inFabric = membership[i] === 1;
     if (inFabric) fabricCount++;
 
-    if (inFabric && deltaE2000(s, fromLab) <= near) {
-      // Target separation: measure chroma/hue match at the pixel's own L.
+    // TARGET set: pixels the op actually remapped (change-based).
+    const changed = deltaE2000(s, o) > delta;
+    if (changed && inFabric) {
+      // Measure chroma/hue match at the pixel's own L.
       targetSum += deltaE2000({ l: o.l, a: o.a, b: o.b }, { l: o.l, a: toLab.a, b: toLab.b });
       targetCount++;
       srcL.push(s.l);
       outL.push(o.l);
-    } else {
-      // Off-target (far-from-source fabric) or background: any change here is bleed.
-      offSum += deltaE2000(s, o);
-      offCount++;
+    }
+
+    // OFF-TARGET BACKGROUND: membership==0, any change is bleed into non-fabric.
+    if (!inFabric) {
+      offBgSum += deltaE2000(s, o);
+      offBgCount++;
+    }
+
+    // OFF-TARGET FABRIC: fabric pixels far from fromColor — bleed into other separations.
+    if (inFabric) {
+      const dFrom = deltaE2000(s, fromLab);
+      if (dFrom > far) {
+        offFabricSum += deltaE2000(s, o);
+        offFabricCount++;
+      }
+      // near..far band: excluded from off-target (transition zone)
     }
   }
+
+  const offTargetBackgroundDeltaE = offBgCount > 0 ? offBgSum / offBgCount : 0;
+  const offTargetFabricDeltaE = offFabricCount > 0 ? offFabricSum / offFabricCount : 0;
+  const offTargetCount = offBgCount + offFabricCount;
+  const offTargetDeltaE = Math.max(offTargetBackgroundDeltaE, offTargetFabricDeltaE);
 
   return {
     targetDeltaE: targetCount > 0 ? targetSum / targetCount : 0,
     lumSSIM: ssim(srcL, outL),
-    offTargetDeltaE: offCount > 0 ? offSum / offCount : 0,
+    offTargetBackgroundDeltaE,
+    offTargetFabricDeltaE,
+    offTargetDeltaE,
     targetCount,
-    offTargetCount: offCount,
+    offTargetBackgroundCount: offBgCount,
+    offTargetFabricCount: offFabricCount,
+    offTargetCount,
     fabricCount,
   };
 }

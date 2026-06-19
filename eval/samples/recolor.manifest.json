@@ -1,1 +1,58 @@
-[]
+[
+  {
+    "id": "synth-cov100-pink-to-navy",
+    "imageUrl": "eval/samples/synthetic-pink-circle.png",
+    "fromColor": "#d98aa6",
+    "toColor": "#1f2d5a",
+    "coverage": 100,
+    "bbox": {
+      "x": 0,
+      "y": 0,
+      "w": 1,
+      "h": 1
+    },
+    "note": "Synthetic: full coverage, pink circle -> navy"
+  },
+  {
+    "id": "synth-cov40-pink-to-navy",
+    "imageUrl": "eval/samples/synthetic-pink-circle.png",
+    "fromColor": "#d98aa6",
+    "toColor": "#1f2d5a",
+    "coverage": 40,
+    "bbox": {
+      "x": 0,
+      "y": 0,
+      "w": 1,
+      "h": 1
+    },
+    "note": "Synthetic: low coverage (40), pink circle -> navy — tests new tolerance semantics"
+  },
+  {
+    "id": "synth-cov70-pink-to-navy",
+    "imageUrl": "eval/samples/synthetic-pink-circle.png",
+    "fromColor": "#d98aa6",
+    "toColor": "#1f2d5a",
+    "coverage": 70,
+    "bbox": {
+      "x": 0,
+      "y": 0,
+      "w": 1,
+      "h": 1
+    },
+    "note": "Synthetic: medium coverage (70), pink circle -> navy"
+  },
+  {
+    "id": "synth-cov10-pink-to-navy",
+    "imageUrl": "eval/samples/synthetic-pink-circle.png",
+    "fromColor": "#d98aa6",
+    "toColor": "#1f2d5a",
+    "coverage": 10,
+    "bbox": {
+      "x": 0,
+      "y": 0,
+      "w": 1,
+      "h": 1
+    },
+    "note": "Synthetic: minimum coverage (10), pink circle -> navy — tightest tolerance"
+  }
+]

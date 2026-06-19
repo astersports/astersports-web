@@ -82,22 +82,31 @@ export async function separationRemap(
   const target = centroids[targetIdx];
   const toLab = hexToLab(params.toColor);
 
-  // coverage 10..100 -> soft-assignment radius (LAB euclidean units).
-  const radius = 5 + (clamp(params.coverage, 10, 100) / 100) * 40;
+  // coverage 10..100 -> selection tolerance in LAB units.
+  // Coverage means "how many related shades around fromColor come along" —
+  // a clean dye-lot swap, NOT a partial-tint blend. Full remap inside the
+  // tolerance, thin fixed antialias edge at the boundary, skip outside.
+  const T = 5 + (clamp(params.coverage, 10, 100) / 100) * 40; // selection tolerance, LAB
+  const edge = 3; // fixed antialias width (LAB units)
 
-  // Remap: shift a/b toward target, keep L. Soft falloff by distance to the
-  // target centroid blends edges and avoids halos. Pixels in other separations
-  // fall outside the radius (weight 0) and are untouched.
+  // Remap: shift a/b toward target, keep L. Pixels within tolerance get a
+  // FULL remap (w=1). A thin antialias band smooths the boundary. Pixels
+  // outside tolerance are untouched.
   for (let j = 0; j < idxs.length; j++) {
     const lab = labs[j];
     const dl = lab[0] - target[0];
     const da = lab[1] - target[1];
     const db = lab[2] - target[2];
     const dist = Math.sqrt(dl * dl + da * da + db * db);
-    let w = 1 - dist / radius;
-    if (w <= 0) continue;
-    if (w > 1) w = 1;
-    w = smoothstep(w);
+
+    let w: number;
+    if (dist <= T - edge) {
+      w = 1; // selected core -> FULL remap
+    } else if (dist < T) {
+      w = smoothstep((T - dist) / edge); // thin antialias edge
+    } else {
+      continue; // not selected
+    }
 
     const newA = lab[1] + (toLab.a - lab[1]) * w;
     const newB = lab[2] + (toLab.b - lab[2]) * w;

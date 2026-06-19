@@ -312,3 +312,12 @@
 - [x] Install culori + @types/culori dependency
 - [x] Verify TypeScript compiles cleanly (0 errors)
 - [x] All 118 tests passing (13 test files)
+
+## A1 Op Fix: Coverage Semantics + Metric Rewrite (per Claude's spec)
+- [x] separationRemap.ts: Replace blend-strength weight curve with selection-tolerance (full remap inside T, thin antialias edge, skip outside)
+- [x] metrics.ts: Switch target metric to change-based scoring (only score pixels the op actually remapped, ΔE(source,out) > delta)
+- [x] metrics.ts: Split off-target into offTargetBackgroundDeltaE (membership==0) and offTargetFabricDeltaE (dFrom > far)
+- [x] TypeScript compiles cleanly (0 errors)
+- [x] All 118 tests pass (13 test files)
+- [x] Synthetic eval: 4/4 PASS, all deterministic, targetΔE=0.11, lumSSIM=1.000, offΔE=0.00
+- [ ] Pending: Run eval on real garment photo (black-floral-skirt.jpg) once provided
