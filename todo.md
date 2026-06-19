@@ -291,3 +291,10 @@
 - [x] Fix: Improve Scale prompt to be more explicit about physical size change of motifs
 - [x] Fix: Improve Density prompt to be more explicit about removing/thinning motifs
 - [x] Fix: Rewrite Scale prompt v2 — use textile terminology (ditsy/statement print, repeat scale) instead of math percentages; describe end-state visually
+
+## Hybrid Scale Pipeline (SAM2 + Programmatic Resize)
+- [x] Set up Replicate API token as project secret
+- [x] Build server/replicateClient.ts — SAM2 segmentation via Replicate API
+- [x] Build server/hybridScale.ts — full hybrid pipeline (SAM2 → programmatic resize → bg infill → composite)
+- [x] Integrate hybrid pipeline into studio router (scale-only → hybrid, combined → AI)
+- [x] Write tests for routing logic, scale factor math, and Replicate token validation (90 tests passing)

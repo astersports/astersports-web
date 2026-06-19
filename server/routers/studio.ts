@@ -8,6 +8,7 @@ import { router } from "../_core/trpc";
 import { tenantProcedure } from "../tenancy";
 import { storagePut } from "../storage";
 import { detectPrintElements, generateEditedImage } from "../aiEngine";
+import { hybridScale } from "../hybridScale";
 import {
   createJob,
   updateJobStatus,
@@ -189,6 +190,10 @@ export const studioRouter = router({
       });
 
       // Generate variations in parallel — each is an independent AI call.
+      // EXCEPTION: If ONLY scale is enabled, use the hybrid pipeline (SAM2 + programmatic resize)
+      // because AI models cannot reliably perform geometric scaling.
+      const isScaleOnly = controls.scale.enabled && !controls.density.enabled && !controls.remove.enabled && !controls.recolor.enabled;
+
       const existingVariations = await getJobVariations(job.id);
       const nextRound = existingVariations.length > 0
         ? Math.max(...existingVariations.map((v) => v.round)) + 1
@@ -196,8 +201,19 @@ export const studioRouter = router({
 
       const settled = await Promise.allSettled(
         Array.from({ length: controls.variations }, async (_unused, i) => {
-          console.log(`[studio] Generating variation ${i + 1} for job ${job.id}`);
-          const resultUrl = await generateEditedImage(job.originalUrl, instruction);
+          console.log(`[studio] Generating variation ${i + 1} for job ${job.id}${isScaleOnly ? ' (hybrid scale)' : ''}`);
+
+          let resultUrl: string;
+          if (isScaleOnly) {
+            // Use hybrid pipeline: SAM2 segmentation → programmatic resize → composite
+            const scaleResult = await hybridScale(job.originalUrl, controls.scale.percent);
+            resultUrl = scaleResult.url;
+            console.log(`[studio] Hybrid scale complete: ${scaleResult.motifsScaled} motifs scaled`);
+          } else {
+            // Use AI-only pipeline for other controls (or combined controls)
+            resultUrl = await generateEditedImage(job.originalUrl, instruction);
+          }
+
           await addVariation({
             jobId: job.id,
             tenantId: ctx.tenant.id,
