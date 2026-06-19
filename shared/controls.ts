@@ -184,7 +184,6 @@ export function buildInstruction(c: ControlSettings): string {
     TEXTILE_PREAMBLE +
     "\n\n" +
     parts.join("\n\n") +
-    "\n\n" +
     "\n\nOUTPUT REQUIREMENTS:\n" +
     "- The output MUST be the same image with ONLY the print pattern modified.\n" +
     "- The garment must be in the EXACT same position and orientation — NOT rotated, NOT repositioned, NOT re-photographed.\n" +

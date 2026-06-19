@@ -9,7 +9,7 @@ import { emailPaymentFailed, emailSubscriptionCanceled, emailSubscriptionActivat
 import type Stripe from "stripe";
 import { grantCredits, updateTenantStripe } from "./studioDb";
 import { PLANS, TOPUP_PACKS, type PlanKey } from "../shared/billing";
-import { tenants } from "../drizzle/schema";
+import { tenants, stripeEvents } from "../drizzle/schema";
 
 /**
  * Stripe webhook handler.
@@ -27,6 +27,9 @@ export async function handleStripeWebhook(req: Request, res: Response) {
         sig,
         ENV.stripeWebhookSecret
       );
+    } else if (ENV.isProduction) {
+      console.error("[Stripe Webhook] STRIPE_WEBHOOK_SECRET missing in production; rejecting.");
+      return res.status(500).json({ error: "Webhook secret not configured" });
     } else {
       // No webhook secret configured — parse body directly (dev only)
       event = JSON.parse(req.body.toString()) as Stripe.Event;
@@ -35,7 +38,7 @@ export async function handleStripeWebhook(req: Request, res: Response) {
     // Check if this is a test event
     try {
       const parsed = JSON.parse(req.body.toString());
-      if (parsed.id && parsed.id.startsWith("evt_test_")) {
+      if (!ENV.isProduction && parsed.id && parsed.id.startsWith("evt_test_")) {
         console.log("[Stripe Webhook] Test event received:", parsed.id);
         return res.json({ verified: true });
       }
@@ -48,6 +51,17 @@ export async function handleStripeWebhook(req: Request, res: Response) {
   }
 
   console.log(`[Stripe Webhook] Event received: ${event.type} (${event.id})`);
+
+  // Idempotency: claim this event id. Duplicate delivery is acked and skipped.
+  const idemDb = await getDb();
+  if (idemDb) {
+    try {
+      await idemDb.insert(stripeEvents).values({ id: event.id, type: event.type });
+    } catch {
+      console.log(`[Stripe Webhook] Duplicate event ${event.id}, skipping.`);
+      return res.json({ received: true, duplicate: true });
+    }
+  }
 
   try {
     switch (event.type) {
@@ -112,6 +126,10 @@ export async function handleStripeWebhook(req: Request, res: Response) {
 
     res.json({ received: true });
   } catch (err) {
+    // Release the claim so Stripe's retry can reprocess a genuine failure.
+    if (idemDb) {
+      try { await idemDb.delete(stripeEvents).where(eq(stripeEvents.id, event.id)); } catch {}
+    }
     console.error("[Stripe Webhook] Handler error:", (err as Error).message, (err as Error).stack);
     res.status(500).json({ error: "Webhook handler failed" });
   }

@@ -154,14 +154,25 @@ export const studioRouter = router({
       // Build instruction
       const instruction = buildInstruction(controls);
 
-      // Deduct credits
-      const newBalance = await deductCredits(
-        ctx.tenant.id,
-        ctx.user.id,
-        creditCost,
-        "generation",
-        `job-${job.id}`
-      );
+      // Deduct credits (atomic; throws if a concurrent balance race loses).
+      let newBalance: number;
+      try {
+        newBalance = await deductCredits(
+          ctx.tenant.id,
+          ctx.user.id,
+          creditCost,
+          "generation",
+          `job-${job.id}`
+        );
+      } catch (e: any) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            e?.message === "Insufficient credits"
+              ? `Insufficient credits. Need ${creditCost}, have ${ctx.tenant.creditBalance}.`
+              : "Failed to reserve credits. Please try again.",
+        });
+      }
 
       // Update job status
       await updateJobStatus(job.id, "processing", {
@@ -170,40 +181,42 @@ export const studioRouter = router({
         creditsUsed: creditCost,
       });
 
-      // Generate variations
-      const results: Array<{ url: string; key: string }> = [];
+      // Generate variations in parallel — each is an independent AI call.
       const existingVariations = await getJobVariations(job.id);
       const nextRound = existingVariations.length > 0
         ? Math.max(...existingVariations.map((v) => v.round)) + 1
         : 1;
 
-      for (let i = 0; i < controls.variations; i++) {
-        try {
+      const settled = await Promise.allSettled(
+        Array.from({ length: controls.variations }, async (_unused, i) => {
           console.log(`[studio] Generating variation ${i + 1} for job ${job.id}`);
-          console.log(`[studio] Original URL: ${job.originalUrl}`);
-          console.log(`[studio] Instruction: ${instruction}`);
           const resultUrl = await generateEditedImage(job.originalUrl, instruction);
-          console.log(`[studio] Generated image URL: ${resultUrl}`);
-
-          // The result is already stored in S3 by generateImage helper
-          // resultUrl is already a /manus-storage/... path
           await addVariation({
             jobId: job.id,
             tenantId: ctx.tenant.id,
             resultKey: resultUrl.replace("/manus-storage/", ""),
-            resultUrl: resultUrl,
+            resultUrl,
             round: nextRound,
           });
+          return { url: resultUrl, key: resultUrl.replace("/manus-storage/", "") };
+        })
+      );
 
-          results.push({ url: resultUrl, key: resultUrl.replace("/manus-storage/", "") });
-        } catch (error: any) {
-          console.error(`[studio] Variation ${i + 1} failed:`, error?.message || error);
-          // Continue with remaining variations
+      const results = settled
+        .filter(
+          (r): r is PromiseFulfilledResult<{ url: string; key: string }> =>
+            r.status === "fulfilled"
+        )
+        .map((r) => r.value);
+
+      settled.forEach((r, i) => {
+        if (r.status === "rejected") {
+          console.error(`[studio] Variation ${i + 1} failed:`, r.reason?.message || r.reason);
         }
-      }
+      });
 
       if (results.length === 0) {
-        // Refund credits since all generations failed
+        // All generations failed — refund the full charge.
         await grantCredits(
           ctx.tenant.id,
           creditCost,
@@ -218,11 +231,30 @@ export const studioRouter = router({
         });
       }
 
-      await updateJobStatus(job.id, "done");
+      // Pro-rate a refund for any variations that failed (at least one succeeded).
+      // Each extra variation costs CREDIT_COST.extraVariation; refunding that per
+      // failure never claws back the base charge for the delivered image(s).
+      let creditsUsed = creditCost;
+      const failedCount = controls.variations - results.length;
+      if (failedCount > 0) {
+        const refund = failedCount * CREDIT_COST.extraVariation;
+        if (refund > 0) {
+          newBalance = await grantCredits(
+            ctx.tenant.id,
+            refund,
+            "refund",
+            `job-${job.id}-partial`,
+            ctx.user.id
+          );
+          creditsUsed = creditCost - refund;
+        }
+      }
+
+      await updateJobStatus(job.id, "done", { creditsUsed });
 
       return {
         results,
-        creditsUsed: creditCost,
+        creditsUsed,
         newBalance,
         lowBalance: newBalance <= LOW_BALANCE_THRESHOLD,
       };

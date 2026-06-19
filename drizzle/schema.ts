@@ -214,3 +214,17 @@ export const jobVariations = mysqlTable("studio_job_variations", {
 
 export type JobVariation = typeof jobVariations.$inferSelect;
 export type InsertJobVariation = typeof jobVariations.$inferInsert;
+
+/**
+ * Idempotency log for processed Stripe webhook events.
+ * Stripe delivers at-least-once and retries; the primary key prevents
+ * double-processing (e.g. duplicate credit grants on a retried invoice.paid).
+ */
+export const stripeEvents = mysqlTable("stripe_events", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  type: varchar("type", { length: 128 }).notNull(),
+  processedAt: timestamp("processedAt").defaultNow().notNull(),
+});
+
+export type StripeEvent = typeof stripeEvents.$inferSelect;
+export type InsertStripeEvent = typeof stripeEvents.$inferInsert;

@@ -2,7 +2,7 @@
  * Database helpers for the Print Studio module.
  * Separated from the main db.ts to keep files manageable.
  */
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, gte, desc, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import {
   categories,
@@ -165,23 +165,30 @@ export async function deductCredits(
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
 
-  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
-  if (!tenant) throw new Error("Tenant not found");
-  if (tenant.creditBalance < amount) {
-    throw new Error("Insufficient credits");
-  }
+  return db.transaction(async (tx) => {
+    // Atomic conditional debit: succeeds only if the balance is still sufficient.
+    // The row lock serializes concurrent generates on the same tenant.
+    const res = await tx
+      .update(tenants)
+      .set({ creditBalance: sql`${tenants.creditBalance} - ${amount}` })
+      .where(and(eq(tenants.id, tenantId), gte(tenants.creditBalance, amount)));
 
-  const newBalance = tenant.creditBalance - amount;
-  await db.update(tenants).set({ creditBalance: newBalance }).where(eq(tenants.id, tenantId));
-  await addCreditEntry({
-    tenantId,
-    userId,
-    delta: -amount,
-    balanceAfter: newBalance,
-    reason,
-    refId,
+    const affected = (res as any)?.[0]?.affectedRows ?? 0;
+    if (affected === 0) throw new Error("Insufficient credits");
+
+    const [tenant] = await tx.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+    const newBalance = tenant!.creditBalance;
+
+    await tx.insert(creditLedger).values({
+      tenantId,
+      userId,
+      delta: -amount,
+      balanceAfter: newBalance,
+      reason,
+      refId,
+    });
+    return newBalance;
   });
-  return newBalance;
 }
 
 /**
@@ -197,20 +204,28 @@ export async function grantCredits(
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
 
-  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
-  if (!tenant) throw new Error("Tenant not found");
+  return db.transaction(async (tx) => {
+    const res = await tx
+      .update(tenants)
+      .set({ creditBalance: sql`${tenants.creditBalance} + ${amount}` })
+      .where(eq(tenants.id, tenantId));
 
-  const newBalance = tenant.creditBalance + amount;
-  await db.update(tenants).set({ creditBalance: newBalance }).where(eq(tenants.id, tenantId));
-  await addCreditEntry({
-    tenantId,
-    userId: userId ?? null,
-    delta: amount,
-    balanceAfter: newBalance,
-    reason,
-    refId,
+    const affected = (res as any)?.[0]?.affectedRows ?? 0;
+    if (affected === 0) throw new Error("Tenant not found");
+
+    const [tenant] = await tx.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+    const newBalance = tenant!.creditBalance;
+
+    await tx.insert(creditLedger).values({
+      tenantId,
+      userId: userId ?? null,
+      delta: amount,
+      balanceAfter: newBalance,
+      reason,
+      refId,
+    });
+    return newBalance;
   });
-  return newBalance;
 }
 
 // ─── Jobs ────────────────────────────────────────────────────────────────────

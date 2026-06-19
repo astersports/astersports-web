@@ -193,7 +193,7 @@
 - [x] Add persistent top navigation menu with links to Home, Print Studio, Services, About, Contact
 - [x] Ensure nav works on mobile with hamburger menu
 - [x] Verify favicon shows in browser tab and bookmarks
-- [ ] Save checkpoint and push to GitHub
+- [x] Save checkpoint and push to GitHub
 
 ## AAU Access Control (Owner-Only)
 - [x] Add backend protection: make AAU/leaderboard procedures owner-only (check ctx.user matches OWNER_OPEN_ID)
@@ -201,3 +201,24 @@
 - [x] Hide AAU nav link in header and footer unless Frank is logged in
 - [x] Verify build and tests pass
 - [x] Save checkpoint
+
+## Print Studio Audit Fixes (Claude Code Review - Jun 19)
+- [x] Fix 3a: Add `gte` to drizzle-orm import in studioDb.ts
+- [x] Fix 3b: Replace deductCredits with atomic transaction version
+- [x] Fix 3c: Replace grantCredits with atomic transaction version
+- [x] Fix 4a: Add stripeEvents table to drizzle/schema.ts
+- [x] Fix 4b: Import stripeEvents in webhook.ts
+- [x] Fix 4c: Add idempotency claim before switch(event.type)
+- [x] Fix 4d: Release claim on failure in catch block
+- [x] Fix 5a: Reject unsigned webhooks in production
+- [x] Fix 5b: Gate evt_test_ bypass to non-production
+- [x] Fix 1+7 Step A: Error-map deductCredits in studio.ts
+- [x] Fix 1+7 Step B: Replace sequential loop with Promise.allSettled + pro-rated refund
+- [x] Fix 2a: Add mysql2/promise import to db.ts
+- [x] Fix 2b: Replace raw URL with connection pool
+- [x] Fix 10: Trim extra newlines before OUTPUT REQUIREMENTS in controls.ts
+- [x] Phase 1 Verification: pnpm install, db:push, check, test
+- [x] Fix 9: Add 16MB input ceiling in imageCompress.ts
+- [x] Fix 8: Add createImageBitmap EXIF orientation handling
+- [x] Phase 2 Verification: pnpm check + pnpm test
+- [x] Save checkpoint and push to GitHub

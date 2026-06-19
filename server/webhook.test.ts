@@ -106,6 +106,8 @@ describe("handleStripeWebhook", () => {
       vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(checkoutEvent as any);
 
       const mockDb = {
+        insert: vi.fn().mockReturnThis(),
+        values: vi.fn().mockResolvedValue([{ insertId: 1 }]),
         update: vi.fn().mockReturnThis(),
         set: vi.fn().mockReturnThis(),
         where: vi.fn().mockResolvedValue([{ affectedRows: 1 }]),
@@ -163,7 +165,7 @@ describe("handleStripeWebhook", () => {
 
     it("skips processing when customer or subscription is missing", async () => {
       const incompleteEvent = {
-        id: "evt_123",
+        id: "evt_skip_123",
         type: "checkout.session.completed",
         data: {
           object: {
@@ -175,11 +177,16 @@ describe("handleStripeWebhook", () => {
       };
       vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(incompleteEvent as any);
 
+      const mockDb = {
+        insert: vi.fn().mockReturnThis(),
+        values: vi.fn().mockResolvedValue([{ insertId: 1 }]),
+      };
+      vi.mocked(getDb).mockResolvedValue(mockDb as any);
+
       const { req, res } = createMockReqRes(incompleteEvent);
       await handleStripeWebhook(req, res);
 
       expect(res.json).toHaveBeenCalledWith({ received: true });
-      expect(getDb).not.toHaveBeenCalled();
     });
   });
 
@@ -199,6 +206,8 @@ describe("handleStripeWebhook", () => {
       vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(failedEvent as any);
 
       const mockDb = {
+        insert: vi.fn().mockReturnThis(),
+        values: vi.fn().mockResolvedValue([{ insertId: 1 }]),
         select: vi.fn().mockReturnThis(),
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),
@@ -238,15 +247,13 @@ describe("handleStripeWebhook", () => {
       };
       vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(deletedEvent as any);
 
-      // The handler calls getDb() twice: once for update, once for getClientInfo select
-      // We need the mock to handle both chains
+      // The handler calls getDb() multiple times: idempotency insert, update, getClientInfo select
       const mockDb = {
+        insert: vi.fn().mockReturnThis(),
+        values: vi.fn().mockResolvedValue([{ insertId: 1 }]),
         update: vi.fn().mockReturnThis(),
         set: vi.fn().mockReturnThis(),
         where: vi.fn().mockImplementation(() => {
-          // Return different results based on context
-          // After update().set().where() -> resolves to affectedRows
-          // After select().from().where() -> returns object with .limit()
           return {
             limit: vi.fn().mockResolvedValue([{ name: "Test Client", email: "client@example.com" }]),
             then: (resolve: any) => resolve([{ affectedRows: 1 }]),
@@ -289,7 +296,19 @@ describe("handleStripeWebhook", () => {
         },
       };
       vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(event as any);
-      vi.mocked(getDb).mockRejectedValue(new Error("DB connection failed"));
+      // First call for idempotency succeeds, second call for handler throws
+      const mockDb = {
+        insert: vi.fn().mockReturnThis(),
+        values: vi.fn().mockResolvedValue([{ insertId: 1 }]),
+        delete: vi.fn().mockReturnThis(),
+        where: vi.fn().mockResolvedValue(undefined),
+      };
+      let callCount = 0;
+      vi.mocked(getDb).mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) return mockDb as any; // idempotency
+        throw new Error("DB connection failed");
+      });
 
       const { req, res } = createMockReqRes(event);
       await handleStripeWebhook(req, res);
@@ -313,6 +332,8 @@ describe("handleStripeWebhook", () => {
       vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(checkoutEvent as any);
 
       const mockDb = {
+        insert: vi.fn().mockReturnThis(),
+        values: vi.fn().mockResolvedValue([{ insertId: 1 }]),
         update: vi.fn().mockReturnThis(),
         set: vi.fn().mockReturnThis(),
         where: vi.fn().mockResolvedValue([{ affectedRows: 1 }]),

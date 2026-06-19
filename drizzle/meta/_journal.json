@@ -22,6 +22,13 @@
       "when": 1781887173018,
       "tag": "0002_spooky_titania",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1781895046201,
+      "tag": "0003_wild_sunspot",
+      "breakpoints": true
     }
   ]
 }
