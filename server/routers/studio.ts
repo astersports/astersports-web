@@ -306,6 +306,7 @@ export const studioRouter = router({
         reason: z.string().optional(),
         from: z.number().optional(),
         to: z.number().optional(),
+        search: z.string().max(100).optional(),
       }).default({ limit: 25, offset: 0 })
     )
     .query(async ({ ctx, input }) => {
@@ -315,6 +316,7 @@ export const studioRouter = router({
         reason: input.reason,
         from: input.from,
         to: input.to,
+        search: input.search,
       });
     }),
 });

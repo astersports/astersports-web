@@ -4,7 +4,7 @@
  * - Compact grouped-by-date transaction list with colored left-edge bars
  * - Server-side type filtering and pagination
  */
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { useTenant } from "@/contexts/TenantContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import {
   Loader2,
   ChevronLeft,
@@ -29,6 +30,7 @@ import {
   Activity,
   Download,
   CalendarDays,
+  Search,
 } from "lucide-react";
 
 const PAGE_SIZE = 30;
@@ -127,6 +129,19 @@ export default function CreditLedger() {
   const [page, setPage] = useState(0);
   const [filter, setFilter] = useState<ReasonFilter>("all");
   const [dateRange, setDateRange] = useState<DateRange>("all");
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounce search input by 400ms
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setSearchQuery(searchInput.trim());
+      setPage(0);
+    }, 400);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [searchInput]);
 
   const rangeMs = useMemo(() => getDateRangeMs(dateRange), [dateRange]);
 
@@ -138,6 +153,7 @@ export default function CreditLedger() {
       reason: filter === "all" ? undefined : filter,
       from: rangeMs.from,
       to: rangeMs.to,
+      search: searchQuery || undefined,
     },
     { enabled: !!tenant }
   );
@@ -241,8 +257,17 @@ export default function CreditLedger() {
         </Card>
       </div>
 
-      {/* Filter bar */}
+      {/* Search + Filter bar */}
       <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative w-full sm:w-[220px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Search ref ID or note..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="pl-8 h-8 text-sm"
+          />
+        </div>
         <Select value={filter} onValueChange={(v) => { setFilter(v as ReasonFilter); setPage(0); }}>
           <SelectTrigger className="w-[180px]" size="sm">
             <SelectValue placeholder="Filter by type" />
@@ -383,17 +408,106 @@ export default function CreditLedger() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex items-center justify-between pt-3">
           <p className="text-xs text-muted-foreground">
             Page {page + 1} of {totalPages}
           </p>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-              <ChevronLeft className="w-4 h-4 mr-1" /> Previous
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              disabled={page === 0}
+              onClick={() => setPage(0)}
+              title="First page"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              <ChevronLeft className="w-3.5 h-3.5 -ml-2" />
             </Button>
-            <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
-              Next <ChevronRight className="w-4 h-4 ml-1" />
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              disabled={page === 0}
+              onClick={() => setPage((p) => p - 1)}
+              title="Previous page"
+            >
+              <ChevronLeft className="w-4 h-4" />
             </Button>
+
+            {/* Page numbers with ellipsis */}
+            {(() => {
+              const pages: (number | "...")[] = [];
+              if (totalPages <= 7) {
+                for (let i = 0; i < totalPages; i++) pages.push(i);
+              } else {
+                pages.push(0);
+                if (page > 3) pages.push("...");
+                const start = Math.max(1, page - 1);
+                const end = Math.min(totalPages - 2, page + 1);
+                for (let i = start; i <= end; i++) pages.push(i);
+                if (page < totalPages - 4) pages.push("...");
+                pages.push(totalPages - 1);
+              }
+              return pages.map((p, idx) =>
+                p === "..." ? (
+                  <span key={`ellipsis-${idx}`} className="px-1.5 text-xs text-muted-foreground">...</span>
+                ) : (
+                  <Button
+                    key={p}
+                    variant={p === page ? "default" : "outline"}
+                    size="icon"
+                    className="h-8 w-8 text-xs"
+                    onClick={() => setPage(p)}
+                  >
+                    {p + 1}
+                  </Button>
+                )
+              );
+            })()}
+
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              disabled={page >= totalPages - 1}
+              onClick={() => setPage((p) => p + 1)}
+              title="Next page"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              disabled={page >= totalPages - 1}
+              onClick={() => setPage(totalPages - 1)}
+              title="Last page"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+              <ChevronRight className="w-3.5 h-3.5 -ml-2" />
+            </Button>
+
+            {/* Jump to page */}
+            <div className="ml-2 flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Go to</span>
+              <Input
+                type="number"
+                min={1}
+                max={totalPages}
+                className="h-8 w-14 text-xs text-center"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const val = parseInt((e.target as HTMLInputElement).value, 10);
+                    if (val >= 1 && val <= totalPages) {
+                      setPage(val - 1);
+                      (e.target as HTMLInputElement).value = "";
+                    }
+                  }
+                }}
+                placeholder={String(page + 1)}
+              />
+            </div>
           </div>
         </div>
       )}

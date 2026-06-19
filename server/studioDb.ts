@@ -292,7 +292,7 @@ export async function getJobVariations(jobId: number) {
 
 export async function listCreditLedger(
   tenantId: number,
-  opts: { limit?: number; offset?: number; reason?: string; from?: number; to?: number } = {}
+  opts: { limit?: number; offset?: number; reason?: string; from?: number; to?: number; search?: string } = {}
 ) {
   const db = await getDb();
   if (!db) return { entries: [], total: 0 };
@@ -310,6 +310,12 @@ export async function listCreditLedger(
   }
   if (opts.to) {
     conditions.push(sql`${creditLedger.createdAt} <= ${new Date(opts.to)}`);
+  }
+  if (opts.search) {
+    const searchTerm = `%${opts.search}%`;
+    conditions.push(
+      sql`(${creditLedger.refId} LIKE ${searchTerm} OR ${creditLedger.note} LIKE ${searchTerm})`
+    );
   }
   const condition = and(...conditions);
 

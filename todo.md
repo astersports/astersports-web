@@ -241,3 +241,8 @@
 ## Remove Control Prompt Fix
 - [x] Fix: Improve 'Remove' control prompt to explicitly instruct AI to erase/delete elements, not redistribute them
 - [x] Fix: Finish pending confirmation dialog TypeScript errors
+
+## Credit Ledger Enhancements
+- [x] Backend: Add search/query parameter to creditLedger tRPC query (filter by refId or note)
+- [x] Frontend: Add search bar to Credit Ledger UI
+- [x] Frontend: Improve pagination controls with page numbers and jump-to-page
