@@ -20,14 +20,23 @@ Each case:
 **Include the hard cases — they're the point:** busy/overlapping florals, two
 nearby colors, colored (non-white) backgrounds, on-body shots.
 
+### Field: `bbox` (optional) — offline mode
+
+Add a normalized `bbox` (`{ x, y, w, h }`, 0..1) to a case to **skip the
+vision-LLM fabric mask and run fully offline — no Forge creds**. `imageUrl` may
+then be a **local filesystem path** (or `file://`). Without `bbox`, the harness
+calls the mask provider (needs Forge). Offline mode is the fast loop for tuning
+on your own images; the auto-bbox mode is the production-faithful path.
+
 ## Run
 
 ```
-# Forge creds required (the fabric mask uses the vision LLM):
+# Offline (manual bbox + local image, no creds):
+npx tsx server/_core/studio/eval/recolorEval.ts path/to/manifest.json
+
+# Auto fabric mask (vision LLM) — needs Forge creds:
 export BUILT_IN_FORGE_API_URL=...   BUILT_IN_FORGE_API_KEY=...
 npx tsx server/_core/studio/eval/recolorEval.ts
-# or point at a different manifest:
-npx tsx server/_core/studio/eval/recolorEval.ts path/to/manifest.json
 ```
 
 Artifacts (side-by-side before/after PNGs) are written to `eval/out/` (gitignored).

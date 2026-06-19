@@ -12,7 +12,7 @@
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
-import { getMaskProvider } from "../../masking";
+import { getMaskProvider, type FabricMask } from "../../masking";
 import { decodeUpright } from "../../image/decodeUpright";
 import { separationRemap } from "../ops/separationRemap";
 import { fabricMembership } from "../ops/membership";
@@ -25,6 +25,12 @@ interface EvalCase {
   toColor: string;
   coverage: number;
   note?: string;
+  /**
+   * Optional manual fabric bbox (normalized 0..1). When present the harness skips
+   * the vision-LLM fabric mask, so a case runs fully OFFLINE (no Forge) — useful
+   * for local sample images.
+   */
+  bbox?: { x: number; y: number; w: number; h: number };
 }
 
 const OUT_DIR = path.resolve("eval/out");
@@ -67,7 +73,10 @@ async function main() {
 
   for (const c of cases) {
     try {
-      const fabric = await provider.getFabricMask({ url: c.imageUrl });
+      // Manual bbox => fully offline (no vision call); else use the mask provider.
+      const fabric: FabricMask = c.bbox
+        ? { bbox: c.bbox, confidence: 1, provider: "classical" }
+        : await provider.getFabricMask({ url: c.imageUrl });
       const { buffer: src, width, height } = await decodeUpright(c.imageUrl);
 
       const outPng = await separationRemap(

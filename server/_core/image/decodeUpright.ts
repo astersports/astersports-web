@@ -14,6 +14,8 @@
  * mutation never corrupts the cache.
  */
 import sharp from "sharp";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { storageGetSignedUrl } from "../../storage";
 import { fetchWithTimeout, TIMEOUT } from "../../fetchTimeout";
 
@@ -38,20 +40,36 @@ export function clearDecodeCache(): void {
   cache.clear();
 }
 
-async function resolveAccessibleUrl(url: string): Promise<string> {
-  if (url.startsWith("/manus-storage/")) {
-    return storageGetSignedUrl(url.replace("/manus-storage/", ""));
+/**
+ * Read raw image bytes from a storage key, http(s) URL, file:// URL, or local
+ * filesystem path. Local-path support keeps the eval harness runnable offline on
+ * Frank's own sample garments (no Forge storage round-trip).
+ */
+async function readImageBytes(url: string): Promise<Buffer> {
+  if (url.startsWith("file://")) {
+    return readFile(fileURLToPath(url));
   }
-  return url;
+  if (url.startsWith("/manus-storage/")) {
+    const signed = await storageGetSignedUrl(url.replace("/manus-storage/", ""));
+    return fetchToBuffer(signed);
+  }
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return fetchToBuffer(url);
+  }
+  // Treat anything else as a local filesystem path.
+  return readFile(url);
 }
 
-async function decodeToEntry(url: string): Promise<CacheEntry> {
-  const accessible = await resolveAccessibleUrl(url);
-  const res = await fetchWithTimeout(accessible, {}, TIMEOUT.IMAGE_DOWNLOAD);
+async function fetchToBuffer(url: string): Promise<Buffer> {
+  const res = await fetchWithTimeout(url, {}, TIMEOUT.IMAGE_DOWNLOAD);
   if (!res.ok) {
     throw new Error(`decodeUpright: failed to download image (${res.status} ${res.statusText})`);
   }
-  const input = Buffer.from(await res.arrayBuffer());
+  return Buffer.from(await res.arrayBuffer());
+}
+
+async function decodeToEntry(url: string): Promise<CacheEntry> {
+  const input = await readImageBytes(url);
   // `.rotate()` with no args bakes the EXIF orientation tag into the pixels.
   const { data, info } = await sharp(input)
     .rotate()

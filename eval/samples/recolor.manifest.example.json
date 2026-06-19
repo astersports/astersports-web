@@ -22,5 +22,14 @@
     "toColor": "#7a3b5e",
     "coverage": 100,
     "note": "HARD: non-white background + on-body — bbox membership clusters background near edges (raster signal)"
+  },
+  {
+    "id": "black-floral-skirt-pink-to-navy",
+    "imageUrl": "eval/samples/black-floral-skirt.jpg",
+    "fromColor": "#e3a3b4",
+    "toColor": "#1f2d5a",
+    "coverage": 100,
+    "bbox": { "x": 0.27, "y": 0.16, "w": 0.46, "h": 0.78 },
+    "note": "REAL hanger sample, OFFLINE (manual bbox, local path). Black ground + pink satin blooms + blue sequin clusters + green bead stems + navy lace hem. Pink blossoms -> navy. Save the photo to the imageUrl path and run with no Forge creds."
   }
 ]
