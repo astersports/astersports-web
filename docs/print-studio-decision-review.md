@@ -5,6 +5,14 @@
 **Author:** Builder lane (Claude Code, read-write). **Reviewers:** Architect lane (Claude.ai), Frank.
 **Purpose:** consolidate everything needed to approve — or reject — the move from prompt-based editing to a deterministic-op + generative-finisher architecture for Scale / Density / Color-coding. **Nothing here commits spend or infra; this is the review gate.**
 
+> ### ⚠️ AMENDMENT 1 (2026-06-19) — read §13 before acting on §3, §6, or §9
+> Frank confirmed the product is **PRE-LAUNCH (no users)** and **Scale + Density are a MANDATORY build.** This supersedes:
+> - **§3 Tier 0** — the "disable Scale/Density" correction is **withdrawn**; keep both in the pipeline, keep the no-op guard on all four controls as the regression/eval signal.
+> - **§6 S5** — promoted from "cheapest read" to the **primary segmentation gate**.
+> - **§9 D1** — no longer yes/no; mandatory density **forces** segmentation. D1 is now a **tier choice** (classical floor vs hosted SAM 2), recommended floor-first against a swappable mask interface.
+>
+> Full detail in **§13. Amendment 1**.
+
 ---
 
 ## 0. TL;DR
@@ -175,3 +183,48 @@ Net new cost: the segmentation call (per-job, cacheable) + (if hosted) third-par
 ---
 
 *Companion docs in `docs/`: `scale-hybrid-plan.md`/`.txt` (swatch fallback spec), `collaboration-next-steps.md` (lane working agreement). Tier 0 hotfix is in PR #1.*
+
+---
+
+## 13. Amendment 1 (2026-06-19) — pre-launch + mandatory Scale/Density
+
+**Trigger:** Frank confirmed the product is **pre-launch (no users)** and **Scale + Density are mandatory** to ship. This amends §3, §6, and §9 of the base review above.
+
+### 13.1 Tier 0 correction withdrawn (amends §3)
+The earlier "disable Scale/Density + short-circuit" idea was premised on protecting live paying customers from an always-refund experience. At zero traffic that premise is void.
+- **Keep Scale and Density in the generation pipeline.**
+- **Keep the no-op guard ON for all four controls.** During the build it is the **regression/eval signal** — it flags the moment Scale or Density stops no-opping — and it seeds the eval harness (§3 / base ruling).
+- COGS-leak and money-path concerns are moot at zero traffic. **Tier 0 stands as committed on PR #1.**
+
+### 13.2 Mandatory density forces segmentation (amends §9 / D1)
+Density has **no** working non-segmentation path:
+- Prompt-only: fails (proven by identical output).
+- Reference swatch: a swatch encodes spatial **frequency**, not motif **count** — you cannot ask reference-transfer to "keep these exact motifs but delete 30%." No swatch analog exists for density.
+
+Reliable density **requires**: fabric-region mask → instance localization → erase X% → infill. So **D1 is no longer "whether" to invest in segmentation — mandatory density decides it.** Scale may still use the swatch as an interim *if S1 passes*; density may not.
+
+**D1 is now a TIER choice, not yes/no:**
+- **Floor (ship-now, no spend, no IP exposure):** classical mask (vision-LLM box + GrabCut) + template-matched instance localization. No GPU, no third party, customer art stays in-boundary. Fragile on busy/overlapping/draped prints.
+- **Best-in-class (needs hosting):** SAM 2 region masks + automatic instance masks. One model serves scale-mask + recolor-mask + density-instances.
+
+### 13.3 Ruling: build against a mask interface
+- Define one internal interface: `getFabricMask(image) -> mask` and `getInstanceMasks(image, mask) -> mask[]`. The deterministic scale/density/recolor ops consume the **interface**, not a specific model.
+- Wire the **classical implementation first** to unblock the mandatory build immediately — zero spend, no GPU.
+- Run **S5** to measure classical mask quality on real sample garments (flat-lay / hanging / on-body).
+- Adopt SAM 2 (and its hosting) **only if S5 shows classical is below the eval thresholds.** Swapping classical → SAM 2 then touches **none** of the deterministic op code (interface stays fixed).
+- This **defers GPU/hosting spend and its privacy decision** until there is measured evidence, while keeping the build in motion.
+
+### 13.4 Spike changes (amends §6)
+- **S1–S4 unchanged.**
+- **S5 promoted to the PRIMARY gate** — it now decides classical-vs-SAM, the only live segmentation question.
+- Pre-launch, **S5 runs on Frank's own sample garments**: no customer data, no privacy constraint, no DPA. Hosted SAM 2 may be used freely in the spike on these samples.
+
+### 13.5 Unchanged from the base review
+Build order recolor → scale → density (recolor split A1 separation-remap, then A2 per-element); eval thresholds are the primary acceptance gate with the Tier 0 judge as qualitative backstop; **S2 reproducibility — anchor determinism in the pixel ops, not a model seed**; `rerun()` background-task / deploy-model flag stands; **D2** (confirm Forge image model in the spike) stands.
+
+### 13.6 What remains Frank's call
+- **D2:** confirm the Forge image model in the spike.
+- **Segmentation TIER (not whether):** floor-first against the mask interface, upgrade to SAM 2 after S5 *(recommended)* — **or** commit to SAM 2 hosting up front.
+- **D4:** authorize the spike week *(recommended: yes, next)*.
+
+> **Builder note on 13.5 / S2:** anchoring determinism in the deterministic pixel ops (not a model `seed`) also sidesteps the Connect-RPC unknown-field risk flagged in §6/S2 — the classical/SAM mask + pixel math is reproducible by construction, so the `seed` question only matters for the generative *finish* pass.
