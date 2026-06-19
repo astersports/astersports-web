@@ -10,4 +10,25 @@ export const ENV = {
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
+  /**
+   * Studio no-op guard: when enabled (default), an edited image is QA-checked
+   * against the original and, if the requested change was not applied, the job
+   * fails (and credits are refunded) instead of silently billing for a no-op.
+   * Set STUDIO_NOOP_GUARD=false to disable.
+   */
+  studioNoOpGuard: process.env.STUDIO_NOOP_GUARD !== "false",
+  /**
+   * Active segmentation/mask provider for deterministic Print Studio edits.
+   * "classical" (default) is the ship-now floor (vision box + GrabCut, raster
+   * gated on spike S3). "sam2" is the hosted best-in-class tier (gated on D1/S5).
+   */
+  maskProvider: (process.env.STUDIO_MASK_PROVIDER === "sam2" ? "sam2" : "classical") as
+    | "classical"
+    | "sam2",
+  /**
+   * Route the Recolor control through the deterministic separation-remap op
+   * (A1) instead of the generative path. Default off — generative recolor stays
+   * the fallback until A1 clears its eval gate. Requires a source color input.
+   */
+  studioDeterministicRecolor: process.env.STUDIO_DETERMINISTIC_RECOLOR === "true",
 };

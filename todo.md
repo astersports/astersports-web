@@ -298,3 +298,17 @@
 - [x] Build server/hybridScale.ts — full hybrid pipeline (SAM2 → programmatic resize → bg infill → composite)
 - [x] Integrate hybrid pipeline into studio router (scale-only → hybrid, combined → AI)
 - [x] Write tests for routing logic, scale factor math, and Replicate token validation (90 tests passing)
+
+## Claude A1 Merge (deterministic recolor pipeline)
+- [x] Fetch and review Claude's branch (claude/jolly-pascal-k9tw4r)
+- [x] Copy masking interface (server/_core/masking/) — types, index, classical provider, sam2 stub, locateFabricRegion
+- [x] Copy image decode (server/_core/image/decodeUpright.ts) — EXIF-aware decode with LRU cache
+- [x] Copy A1 ops (server/_core/studio/ops/) — color.ts, kmeans.ts, membership.ts, separationRemap.ts
+- [x] Copy eval harness (server/_core/studio/eval/) — metrics.ts, recolorEval.ts
+- [x] Copy eval manifest and samples (eval/)
+- [x] Copy spike scripts (scripts/spike/)
+- [x] Copy all tests (separationRemap, masking, decodeUpright, metrics)
+- [x] Update server/_core/env.ts with Studio env vars (STUDIO_NOOP_GUARD, STUDIO_MASK_PROVIDER, STUDIO_DETERMINISTIC_RECOLOR)
+- [x] Install culori + @types/culori dependency
+- [x] Verify TypeScript compiles cleanly (0 errors)
+- [x] All 118 tests passing (13 test files)

@@ -1,0 +1,35 @@
+[
+  {
+    "id": "simple-pink-to-navy",
+    "imageUrl": "/manus-storage/studio/SAMPLE/pink-floral.jpg",
+    "fromColor": "#d98aa6",
+    "toColor": "#1f2d5a",
+    "coverage": 100,
+    "note": "simple case: clear pink blossoms on white ground"
+  },
+  {
+    "id": "hard-two-nearby-blues",
+    "imageUrl": "/manus-storage/studio/SAMPLE/two-blue-floral.jpg",
+    "fromColor": "#3a6ea5",
+    "toColor": "#b5532e",
+    "coverage": 70,
+    "note": "HARD: two nearby blues — tests off-target bleed via soft radius"
+  },
+  {
+    "id": "hard-colored-background",
+    "imageUrl": "/manus-storage/studio/SAMPLE/onbody-sage-ground.jpg",
+    "fromColor": "#c9b27a",
+    "toColor": "#7a3b5e",
+    "coverage": 100,
+    "note": "HARD: non-white background + on-body — bbox membership clusters background near edges (raster signal)"
+  },
+  {
+    "id": "black-floral-skirt-pink-to-navy",
+    "imageUrl": "eval/samples/black-floral-skirt.jpg",
+    "fromColor": "#e3a3b4",
+    "toColor": "#1f2d5a",
+    "coverage": 100,
+    "bbox": { "x": 0.27, "y": 0.16, "w": 0.46, "h": 0.78 },
+    "note": "REAL hanger sample, OFFLINE (manual bbox, local path). Black ground + pink satin blooms + blue sequin clusters + green bead stems + navy lace hem. Pink blossoms -> navy. Save the photo to the imageUrl path and run with no Forge creds."
+  }
+]
