@@ -126,6 +126,15 @@
 - [x] Write vitest tests for credit deduction logic
 
 ## Phase 8: Verify & Deliver
-- [ ] Verify build passes
-- [ ] Take screenshots of /studio pages
-- [ ] Save checkpoint
+- [x] Verify build passes
+- [x] Take screenshots of /studio pages
+- [x] Save checkpoint
+
+## Bug Fix: Image Generation Failure
+- [x] Diagnose root cause: Image generation API returns 403 when fetching CloudFront signed URLs
+- [x] Fix: Download image server-side and pass as base64 (b64Json) instead of URL
+- [x] Verify fix with direct API test (200 OK, 7.6s, 1.4MB result)
+- [x] TypeScript compilation clean
+- [x] All 37 tests passing
+- [x] Production build successful
+- [x] Save checkpoint with fix

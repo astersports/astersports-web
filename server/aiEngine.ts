@@ -72,6 +72,7 @@ export async function detectPrintElements(imageUrl: string): Promise<string[]> {
 
 /**
  * Generate an edited image based on the instruction and original image.
+ * Downloads the image server-side and passes it as base64 to avoid URL accessibility issues.
  * Returns the URL of the generated result.
  */
 export async function generateEditedImage(
@@ -79,25 +80,58 @@ export async function generateEditedImage(
   instruction: string,
   mimeType: string = "image/jpeg"
 ): Promise<string> {
-  // Get a publicly-accessible URL for the image
-  let accessibleUrl = originalImageUrl;
+  // Download the image and convert to base64
+  let imageBase64: string;
+  let resolvedMimeType = mimeType;
+
   if (originalImageUrl.startsWith("/manus-storage/")) {
     const key = originalImageUrl.replace("/manus-storage/", "");
-    accessibleUrl = await storageGetSignedUrl(key);
+    console.log(`[aiEngine] Resolving signed URL for key: ${key}`);
+    const signedUrl = await storageGetSignedUrl(key);
+    console.log(`[aiEngine] Downloading image from signed URL...`);
+    const response = await fetch(signedUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+    }
+    const contentType = response.headers.get("content-type");
+    if (contentType) resolvedMimeType = contentType;
+    const buffer = Buffer.from(await response.arrayBuffer());
+    imageBase64 = buffer.toString("base64");
+    console.log(`[aiEngine] Image downloaded, size: ${buffer.length} bytes, mime: ${resolvedMimeType}`);
+  } else {
+    // External URL — download it
+    console.log(`[aiEngine] Downloading image from external URL...`);
+    const response = await fetch(originalImageUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+    }
+    const contentType = response.headers.get("content-type");
+    if (contentType) resolvedMimeType = contentType;
+    const buffer = Buffer.from(await response.arrayBuffer());
+    imageBase64 = buffer.toString("base64");
+    console.log(`[aiEngine] Image downloaded, size: ${buffer.length} bytes, mime: ${resolvedMimeType}`);
   }
 
-  const result = await generateImage({
-    prompt: instruction,
-    originalImages: [
-      {
-        url: accessibleUrl,
-        mimeType,
-      },
-    ],
-  });
+  console.log(`[aiEngine] Calling generateImage with prompt length: ${instruction.length}`);
 
-  if (!result.url) {
-    throw new Error("Image generation returned no URL");
+  try {
+    const result = await generateImage({
+      prompt: instruction,
+      originalImages: [
+        {
+          b64Json: imageBase64,
+          mimeType: resolvedMimeType,
+        },
+      ],
+    });
+
+    if (!result.url) {
+      throw new Error("Image generation returned no URL");
+    }
+    console.log(`[aiEngine] Generation successful, result URL: ${result.url}`);
+    return result.url;
+  } catch (err: any) {
+    console.error(`[aiEngine] generateImage failed:`, err?.message || err);
+    throw err;
   }
-  return result.url;
 }

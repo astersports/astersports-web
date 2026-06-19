@@ -128,32 +128,25 @@ export const studioRouter = router({
 
       for (let i = 0; i < controls.variations; i++) {
         try {
+          console.log(`[studio] Generating variation ${i + 1} for job ${job.id}`);
+          console.log(`[studio] Original URL: ${job.originalUrl}`);
+          console.log(`[studio] Instruction: ${instruction}`);
           const resultUrl = await generateEditedImage(job.originalUrl, instruction);
+          console.log(`[studio] Generated image URL: ${resultUrl}`);
 
-          // Store the result
-          const resultKey = `studio/${ctx.tenant.id}/results/${job.id}-r${nextRound}-v${i + 1}.png`;
-          const response = await fetch(resultUrl);
-          if (!response.ok) {
-            throw new Error(`Failed to download generated image: ${response.status}`);
-          }
-          const resultBuffer = Buffer.from(await response.arrayBuffer());
-          const { key: storedKey, url: storedUrl } = await storagePut(
-            resultKey,
-            resultBuffer,
-            "image/png"
-          );
-
+          // The result is already stored in S3 by generateImage helper
+          // resultUrl is already a /manus-storage/... path
           await addVariation({
             jobId: job.id,
             tenantId: ctx.tenant.id,
-            resultKey: storedKey,
-            resultUrl: storedUrl,
+            resultKey: resultUrl.replace("/manus-storage/", ""),
+            resultUrl: resultUrl,
             round: nextRound,
           });
 
-          results.push({ url: storedUrl, key: storedKey });
-        } catch (error) {
-          console.error(`[studio] Variation ${i + 1} failed:`, error);
+          results.push({ url: resultUrl, key: resultUrl.replace("/manus-storage/", "") });
+        } catch (error: any) {
+          console.error(`[studio] Variation ${i + 1} failed:`, error?.message || error);
           // Continue with remaining variations
         }
       }
