@@ -20,6 +20,7 @@ import {
 } from "../studioDb";
 import { buildInstruction, computeCredits, type ControlSettings } from "../../shared/controls";
 import { CREDIT_COST, LOW_BALANCE_THRESHOLD } from "../../shared/billing";
+import { sanitizeElementName, sanitizeColorValue, MAX_ELEMENT_NAME_LENGTH } from "../../shared/sanitize";
 
 export const studioRouter = router({
   /** Upload an image and create a new job. Returns the job with storage URL. */
@@ -93,8 +94,17 @@ export const studioRouter = router({
         controls: z.object({
           scale: z.object({ enabled: z.boolean(), percent: z.number() }),
           density: z.object({ enabled: z.boolean(), percent: z.number() }),
-          remove: z.object({ enabled: z.boolean(), element: z.string(), percent: z.number() }),
-          recolor: z.object({ enabled: z.boolean(), element: z.string(), targetColor: z.string(), coverage: z.number().min(10).max(100) }),
+          remove: z.object({
+            enabled: z.boolean(),
+            element: z.string().max(MAX_ELEMENT_NAME_LENGTH).transform(sanitizeElementName),
+            percent: z.number(),
+          }),
+          recolor: z.object({
+            enabled: z.boolean(),
+            element: z.string().max(MAX_ELEMENT_NAME_LENGTH).transform(sanitizeElementName),
+            targetColor: z.string().max(30).transform(sanitizeColorValue),
+            coverage: z.number().min(10).max(100),
+          }),
           variations: z.number().min(1).max(4),
         }),
       })
@@ -106,6 +116,27 @@ export const studioRouter = router({
       }
 
       const controls = input.controls as ControlSettings;
+
+      // Validate sanitized element names are non-empty when controls are active
+      if (controls.remove.enabled && !controls.remove.element) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Remove element name is required and must contain valid characters.",
+        });
+      }
+      if (controls.recolor.enabled && !controls.recolor.element) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Recolor element name is required and must contain valid characters.",
+        });
+      }
+      if (controls.recolor.enabled && !controls.recolor.targetColor) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Target color is required and must contain valid characters.",
+        });
+      }
+
       const creditCost = computeCredits(controls, CREDIT_COST);
 
       if (creditCost === 0) {

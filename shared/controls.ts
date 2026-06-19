@@ -2,6 +2,7 @@
  * Shared definitions for the four print-editing controls.
  * Each percentage control supports 10% increments PLUS a custom value.
  */
+import { sanitizeElementName, sanitizeColorValue } from "./sanitize";
 
 export interface ScaleControl {
   enabled: boolean;
@@ -143,8 +144,10 @@ export function buildInstruction(c: ControlSettings): string {
   }
 
   if (c.remove.enabled && c.remove.element && c.remove.percent > 0) {
+    const safeRemoveElement = sanitizeElementName(c.remove.element);
+    if (!safeRemoveElement) return "Return the image unchanged.";
     parts.push(
-      `SELECTIVE ELEMENT REMOVAL: Remove approximately ${c.remove.percent}% of the "${c.remove.element}" motifs from the print, ` +
+      `SELECTIVE ELEMENT REMOVAL: Remove approximately ${c.remove.percent}% of the "${safeRemoveElement}" motifs from the print, ` +
       `distributed evenly across the fabric surface to avoid clustering or patchiness. ` +
       `Replace each removed instance with the surrounding base cloth ground color, seamlessly blending ` +
       `into the negative space as if the motif was never part of the original print strike-off. ` +
@@ -155,11 +158,14 @@ export function buildInstruction(c: ControlSettings): string {
   }
 
   if (c.recolor.enabled && c.recolor.element && c.recolor.targetColor) {
+    const safeRecolorElement = sanitizeElementName(c.recolor.element);
+    const safeTargetColor = sanitizeColorValue(c.recolor.targetColor);
+    if (!safeRecolorElement || !safeTargetColor) return "Return the image unchanged.";
     const coverageText = c.recolor.coverage < 100
       ? `approximately ${c.recolor.coverage}% of`
       : "all";
     parts.push(
-      `COLORWAY SHIFT: Recolor ${coverageText} the "${c.recolor.element}" motifs to "${c.recolor.targetColor}". ` +
+      `COLORWAY SHIFT: Recolor ${coverageText} the "${safeRecolorElement}" motifs to "${safeTargetColor}". ` +
       `Apply the new colorway as a professional dye-lot change — shift the hue, saturation, and value ` +
       `of the targeted motifs while preserving their internal tonal gradients, shading, highlights, and texture detail. ` +
       `The recolored motifs should look as if they were originally printed in the target color, ` +

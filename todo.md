@@ -173,3 +173,11 @@
 - [x] Add MIME type validation in upload procedure (JPEG, PNG, WebP only)
 - [x] Update tests and verify build
 - [x] Save checkpoint
+
+## Input Sanitization: Prompt Injection Prevention
+- [x] Create shared sanitizeElementName utility (strip dangerous patterns, limit length)
+- [x] Add Zod refinement in studio router for element name fields
+- [x] Apply sanitization in buildInstruction before interpolation
+- [x] Add tests for sanitization edge cases (injection attempts, unicode, special chars)
+- [x] Verify build and all tests pass
+- [x] Save checkpoint
