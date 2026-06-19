@@ -17,4 +17,12 @@ export const ENV = {
    * Set STUDIO_NOOP_GUARD=false to disable.
    */
   studioNoOpGuard: process.env.STUDIO_NOOP_GUARD !== "false",
+  /**
+   * Active segmentation/mask provider for deterministic Print Studio edits.
+   * "classical" (default) is the ship-now floor (vision box + GrabCut, raster
+   * gated on spike S3). "sam2" is the hosted best-in-class tier (gated on D1/S5).
+   */
+  maskProvider: (process.env.STUDIO_MASK_PROVIDER === "sam2" ? "sam2" : "classical") as
+    | "classical"
+    | "sam2",
 };
