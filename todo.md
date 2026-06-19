@@ -228,3 +228,6 @@
 - [x] Frontend: Create CreditLedger page component with table, filters, and type badges
 - [x] Navigation: Wire CreditLedger into Print Studio routes and sidebar/nav
 - [x] Verification: pnpm check + pnpm test passing
+
+## Park Variations Feature
+- [x] Hide variations selector in UI, lock to 1 variation per generation

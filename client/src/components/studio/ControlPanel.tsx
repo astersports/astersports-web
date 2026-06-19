@@ -40,7 +40,8 @@ export default function ControlPanel({
   isGenerating,
   creditBalance,
 }: Props) {
-  const [controls, setControls] = useState<ControlSettings>(defaultControls());
+  // Variations parked — always locked to 1 until quality validation is added.
+  const [controls, setControls] = useState<ControlSettings>({ ...defaultControls(), variations: 1 });
 
   const creditCost = computeCredits(controls, CREDIT_COST);
   // Validate that recolor has required fields when enabled
@@ -243,7 +244,7 @@ export default function ControlPanel({
         )}
       </div>
 
-      {/* Variations */}
+      {/* Variations — parked/hidden until quality validation is added.
       <div className="space-y-2 rounded-lg border border-border p-4 bg-card">
         <Label className="text-sm font-semibold">Variations</Label>
         <div className="flex gap-2">
@@ -266,6 +267,7 @@ export default function ControlPanel({
           Each additional variation costs {CREDIT_COST.extraVariation} credits.
         </p>
       </div>
+      */}
 
       {/* Generate button */}
       <div className="space-y-2">

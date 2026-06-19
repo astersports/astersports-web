@@ -106,7 +106,8 @@ export const studioRouter = router({
             targetColor: z.string().max(30).transform(sanitizeColorValue),
             coverage: z.number().min(10).max(100),
           }),
-          variations: z.number().min(1).max(4),
+          // Variations parked — clamped to 1 until quality validation is added.
+          variations: z.number().min(1).max(4).transform(() => 1),
         }),
       })
     )
