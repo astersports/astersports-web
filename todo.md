@@ -156,3 +156,9 @@
 - [x] Update tests for buildInstruction and computeCredits with recolor
 - [x] Verify build and test pass
 - [x] Save checkpoint
+
+## Critical Bug Fixes (User-reported Jun 19)
+- [x] Fix AI generation producing rotated/blank results — add strict orientation and garment preservation constraints to prompts
+- [x] Fix mobile horizontal scroll overflow in Before/After comparison viewer
+- [x] Optimize upload speed — add client-side image compression before upload
+- [ ] Push to GitHub for Claude Code analysis

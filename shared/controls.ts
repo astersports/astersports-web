@@ -85,13 +85,19 @@ export function defaultControls(): ControlSettings {
 /**
  * System-level preamble that establishes the textile/fashion editing context.
  * Prepended to every generation instruction to anchor the model's understanding.
+ * CRITICAL: Contains strong anti-rotation and anti-repositioning constraints.
  */
 const TEXTILE_PREAMBLE =
-  "You are a professional textile print designer editing a flat-lay product photograph of a printed garment. " +
-  "Treat the fabric surface as a repeating or placed print layout. " +
-  "Maintain the garment silhouette, construction details (seams, hems, closures), fabric drape, and photographic studio lighting throughout. " +
-  "Preserve the base cloth color and hand-feel appearance (woven, knit, or non-woven texture). " +
-  "All edits apply exclusively to the surface print/pattern — never alter the garment cut, fit, or styling.";
+  "You are a professional textile print designer performing a SURGICAL EDIT on an existing product photograph. " +
+  "CRITICAL CONSTRAINTS — you MUST obey ALL of these:\n" +
+  "1. DO NOT rotate, flip, reposition, or re-photograph the garment. The garment must remain in the EXACT same position, angle, and orientation as the input image.\n" +
+  "2. DO NOT change the camera angle, perspective, or crop. The output must be pixel-aligned with the input for everything except the print pattern.\n" +
+  "3. DO NOT lay the garment flat if it is hanging, or hang it if it is flat. Keep the EXACT same presentation.\n" +
+  "4. DO NOT change the background, lighting, shadows, hanger, clips, or any non-fabric elements.\n" +
+  "5. ONLY modify the printed pattern/motifs on the fabric surface. The garment silhouette, shape, drape, folds, and construction must be IDENTICAL to the input.\n" +
+  "6. Preserve the base cloth color and fabric texture (woven, knit, or non-woven).\n" +
+  "7. The output image must have the SAME dimensions and aspect ratio as the input.\n\n" +
+  "Think of this as digitally re-printing the fabric with a modified pattern while the garment stays frozen in place.";
 
 /**
  * Server-side instruction builder: converts control settings into a single
@@ -173,10 +179,14 @@ export function buildInstruction(c: ControlSettings): string {
     "\n\n" +
     parts.join("\n\n") +
     "\n\n" +
-    "OUTPUT REQUIREMENTS: Produce a photorealistic edited product photograph at the same resolution and aspect ratio. " +
-    "Match the original studio lighting, white balance, and shadow placement. " +
-    "The hanger, clips, mannequin, or lay-flat surface must remain identical. " +
-    "No watermarks, text overlays, or border artifacts."
+    "\n\nOUTPUT REQUIREMENTS:\n" +
+    "- The output MUST be the same image with ONLY the print pattern modified.\n" +
+    "- The garment must be in the EXACT same position and orientation — NOT rotated, NOT repositioned, NOT re-photographed.\n" +
+    "- Same resolution, same aspect ratio, same camera angle, same background.\n" +
+    "- Same lighting, white balance, and shadow placement.\n" +
+    "- The hanger, clips, mannequin, or surface must remain pixel-identical.\n" +
+    "- No watermarks, text overlays, or border artifacts.\n" +
+    "- If you cannot perform the edit without moving the garment, return the image unchanged rather than rotating it."
   );
 }
 

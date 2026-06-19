@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload, Loader2, Sparkles, RefreshCw, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { compressImage } from "@/lib/imageCompress";
 import type { ControlSettings } from "@shared/controls";
 
 export default function StudioEditor() {
@@ -35,32 +36,41 @@ export default function StudioEditor() {
   const detectMutation = trpc.studio.detectElements.useMutation();
   const generateMutation = trpc.studio.generate.useMutation();
 
+  const [uploadProgress, setUploadProgress] = useState("");
+
   const handleFileSelect = useCallback(
     async (file: File) => {
       if (!tenant) return;
       setIsUploading(true);
 
       try {
-        // Convert to base64
-        const buffer = await file.arrayBuffer();
+        // Step 1: Compress image client-side
+        setUploadProgress("Compressing image...");
+        const compressed = await compressImage(file);
+
+        // Step 2: Convert to base64
+        setUploadProgress("Preparing upload...");
+        const buffer = await compressed.arrayBuffer();
         const base64 = btoa(
           new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), "")
         );
 
-        // Upload
+        // Step 3: Upload to server
+        setUploadProgress("Uploading to server...");
         const job = await uploadMutation.mutateAsync({
           tenantId: tenant.id,
-          fileName: file.name,
+          fileName: compressed.name,
           fileBase64: base64,
-          mimeType: file.type || "image/jpeg",
+          mimeType: compressed.type || "image/jpeg",
           title: file.name.replace(/\.[^.]+$/, ""),
         });
 
         setJobId(job.id);
         setOriginalUrl(job.originalUrl);
 
-        // Auto-detect elements
+        // Step 4: Auto-detect elements
         setIsDetecting(true);
+        setUploadProgress("Analyzing print elements...");
         const { elements } = await detectMutation.mutateAsync({ tenantId: tenant.id, jobId: job.id });
         setDetectedElements(elements);
         setStep("controls");
@@ -71,9 +81,10 @@ export default function StudioEditor() {
       } finally {
         setIsUploading(false);
         setIsDetecting(false);
+        setUploadProgress("");
       }
     },
-    [tenant, uploadMutation, detectMutation, toast]
+    [tenant, uploadMutation, detectMutation]
   );
 
   const handleDrop = useCallback(
@@ -155,7 +166,7 @@ export default function StudioEditor() {
                 <>
                   <Loader2 className="w-10 h-10 text-primary animate-spin" />
                   <p className="text-sm text-muted-foreground">
-                    {isDetecting ? "Detecting print elements..." : "Uploading..."}
+                    {uploadProgress || "Processing..."}
                   </p>
                 </>
               ) : (
@@ -247,7 +258,7 @@ export default function StudioEditor() {
 
   // ─── Results step ──────────────────────────────────────────────────────────
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="max-w-full lg:max-w-5xl mx-auto overflow-hidden">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Results</h1>
