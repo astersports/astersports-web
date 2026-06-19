@@ -2,10 +2,19 @@
  * AI Engine for Print Studio.
  * Handles element detection (via LLM vision) and image editing (via generateImage).
  * Uses textile and fashion industry terminology for precision.
+ *
+ * Security & Reliability:
+ * - All fetch calls use AbortController timeouts to prevent indefinite hangs
+ * - Image size is validated before base64 encoding to prevent OOM
+ * - Signed URLs are not logged in production to avoid credential leakage
  */
 import { invokeLLM } from "./_core/llm";
 import { generateImage } from "./_core/imageGeneration";
 import { storageGetSignedUrl } from "./storage";
+import { fetchWithTimeout, TIMEOUT } from "./fetchTimeout";
+
+/** Maximum image size allowed for generation (5MB). Larger images are rejected. */
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 
 /**
  * System prompt for textile print element detection.
@@ -96,48 +105,68 @@ export async function detectPrintElements(imageUrl: string): Promise<string[]> {
 }
 
 /**
+ * Download an image from a URL with timeout and size validation.
+ * Returns the base64-encoded image data and resolved MIME type.
+ */
+async function downloadImageAsBase64(
+  url: string,
+  fallbackMimeType: string = "image/jpeg"
+): Promise<{ base64: string; mimeType: string }> {
+  const response = await fetchWithTimeout(url, {}, TIMEOUT.IMAGE_DOWNLOAD);
+
+  if (!response.ok) {
+    throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+  }
+
+  const contentType = response.headers.get("content-type") || fallbackMimeType;
+  const buffer = Buffer.from(await response.arrayBuffer());
+
+  // Validate image size before base64 encoding
+  if (buffer.length > MAX_IMAGE_SIZE_BYTES) {
+    throw new Error(
+      `Image too large for generation: ${(buffer.length / 1024 / 1024).toFixed(1)}MB exceeds ` +
+      `${(MAX_IMAGE_SIZE_BYTES / 1024 / 1024).toFixed(0)}MB limit. Please use a smaller image.`
+    );
+  }
+
+  console.log(`[aiEngine] Image downloaded: ${(buffer.length / 1024).toFixed(0)}KB, mime: ${contentType}`);
+
+  return {
+    base64: buffer.toString("base64"),
+    mimeType: contentType,
+  };
+}
+
+/**
  * Generate an edited image based on the instruction and original image.
  * Downloads the image server-side and passes it as base64 to avoid URL accessibility issues.
- * Returns the URL of the generated result.
+ * Returns the URL of the generated result stored in S3.
+ *
+ * Timeouts:
+ * - Image download: 30 seconds
+ * - Image generation API: 120 seconds (handled inside generateImage)
  */
 export async function generateEditedImage(
   originalImageUrl: string,
   instruction: string,
   mimeType: string = "image/jpeg"
 ): Promise<string> {
-  // Download the image and convert to base64
-  let imageBase64: string;
-  let resolvedMimeType = mimeType;
-
+  // Resolve the download URL
+  let downloadUrl: string;
   if (originalImageUrl.startsWith("/manus-storage/")) {
     const key = originalImageUrl.replace("/manus-storage/", "");
-    console.log(`[aiEngine] Resolving signed URL for key: ${key}`);
-    const signedUrl = await storageGetSignedUrl(key);
-    console.log(`[aiEngine] Downloading image from signed URL...`);
-    const response = await fetch(signedUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
-    }
-    const contentType = response.headers.get("content-type");
-    if (contentType) resolvedMimeType = contentType;
-    const buffer = Buffer.from(await response.arrayBuffer());
-    imageBase64 = buffer.toString("base64");
-    console.log(`[aiEngine] Image downloaded, size: ${buffer.length} bytes, mime: ${resolvedMimeType}`);
+    downloadUrl = await storageGetSignedUrl(key);
   } else {
-    // External URL — download it
-    console.log(`[aiEngine] Downloading image from external URL...`);
-    const response = await fetch(originalImageUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
-    }
-    const contentType = response.headers.get("content-type");
-    if (contentType) resolvedMimeType = contentType;
-    const buffer = Buffer.from(await response.arrayBuffer());
-    imageBase64 = buffer.toString("base64");
-    console.log(`[aiEngine] Image downloaded, size: ${buffer.length} bytes, mime: ${resolvedMimeType}`);
+    downloadUrl = originalImageUrl;
   }
 
-  console.log(`[aiEngine] Calling generateImage with prompt length: ${instruction.length}`);
+  // Download and validate the image (with timeout and size check)
+  const { base64: imageBase64, mimeType: resolvedMimeType } = await downloadImageAsBase64(
+    downloadUrl,
+    mimeType
+  );
+
+  console.log(`[aiEngine] Calling generateImage, prompt length: ${instruction.length} chars`);
 
   try {
     const result = await generateImage({
@@ -153,7 +182,7 @@ export async function generateEditedImage(
     if (!result.url) {
       throw new Error("Image generation returned no URL");
     }
-    console.log(`[aiEngine] Generation successful, result URL: ${result.url}`);
+    console.log(`[aiEngine] Generation successful, result stored.`);
     return result.url;
   } catch (err: any) {
     console.error(`[aiEngine] generateImage failed:`, err?.message || err);

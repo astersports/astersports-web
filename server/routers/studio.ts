@@ -34,6 +34,25 @@ export const studioRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const buffer = Buffer.from(input.fileBase64, "base64");
+
+      // Server-side file size validation (16MB limit)
+      const MAX_UPLOAD_SIZE = 16 * 1024 * 1024;
+      if (buffer.length > MAX_UPLOAD_SIZE) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `File too large: ${(buffer.length / 1024 / 1024).toFixed(1)}MB exceeds the 16MB limit. Please upload a smaller image.`,
+        });
+      }
+
+      // Validate MIME type
+      const allowedMimes = ["image/jpeg", "image/png", "image/webp"];
+      if (!allowedMimes.includes(input.mimeType)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Unsupported file type: ${input.mimeType}. Allowed: JPEG, PNG, WebP.`,
+        });
+      }
+
       const key = `studio/${ctx.tenant.id}/${Date.now()}-${input.fileName}`;
       const { key: storageKey, url } = await storagePut(key, buffer, input.mimeType);
 

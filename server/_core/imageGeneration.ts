@@ -1,5 +1,6 @@
 /**
- * Image generation helper using internal ImageService
+ * Image generation helper using internal ImageService.
+ * Includes a 120-second timeout to prevent indefinite hangs.
  *
  * Example usage:
  *   const { url: imageUrl } = await generateImage({
@@ -10,13 +11,14 @@
  *   const { url: imageUrl } = await generateImage({
  *     prompt: "Add a rainbow to this landscape",
  *     originalImages: [{
- *       url: "https://example.com/original.jpg",
+ *       b64Json: "<base64-encoded-image>",
  *       mimeType: "image/jpeg"
  *     }]
  *   });
  */
 import { storagePut } from "server/storage";
 import { ENV } from "./env";
+import { fetchWithTimeout, TIMEOUT } from "../fetchTimeout";
 
 export type GenerateImageOptions = {
   prompt: string;
@@ -50,19 +52,23 @@ export async function generateImage(
     baseUrl
   ).toString();
 
-  const response = await fetch(fullUrl, {
-    method: "POST",
-    headers: {
-      accept: "application/json",
-      "content-type": "application/json",
-      "connect-protocol-version": "1",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
+  const response = await fetchWithTimeout(
+    fullUrl,
+    {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        "connect-protocol-version": "1",
+        authorization: `Bearer ${ENV.forgeApiKey}`,
+      },
+      body: JSON.stringify({
+        prompt: options.prompt,
+        original_images: options.originalImages || [],
+      }),
     },
-    body: JSON.stringify({
-      prompt: options.prompt,
-      original_images: options.originalImages || [],
-    }),
-  });
+    TIMEOUT.IMAGE_GENERATION
+  );
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");

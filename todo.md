@@ -161,4 +161,15 @@
 - [x] Fix AI generation producing rotated/blank results — add strict orientation and garment preservation constraints to prompts
 - [x] Fix mobile horizontal scroll overflow in Before/After comparison viewer
 - [x] Optimize upload speed — add client-side image compression before upload
-- [ ] Push to GitHub for Claude Code analysis
+- [x] Push to GitHub for Claude Code analysis
+
+## Audit Fix: Timeouts & Size Validation
+- [x] Add fetch timeout utility with AbortController
+- [x] Add timeout to image download in generateEditedImage (30s)
+- [x] Add timeout to generateImage API call (120s)
+- [x] Add timeout to element detection signed URL fetch (via LLM retry)
+- [x] Add server-side image size validation in upload procedure (reject > 16MB)
+- [x] Add server-side image size check before base64 encoding in generateEditedImage (5MB)
+- [x] Add MIME type validation in upload procedure (JPEG, PNG, WebP only)
+- [x] Update tests and verify build
+- [x] Save checkpoint
