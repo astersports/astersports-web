@@ -75,6 +75,7 @@ export const studioRouter = router({
           scale: z.object({ enabled: z.boolean(), percent: z.number() }),
           density: z.object({ enabled: z.boolean(), percent: z.number() }),
           remove: z.object({ enabled: z.boolean(), element: z.string(), percent: z.number() }),
+          recolor: z.object({ enabled: z.boolean(), element: z.string(), targetColor: z.string(), coverage: z.number().min(10).max(100) }),
           variations: z.number().min(1).max(4),
         }),
       })

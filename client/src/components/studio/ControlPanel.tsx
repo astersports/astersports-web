@@ -1,13 +1,14 @@
 /**
- * ControlPanel — the three editing controls (Scale, Density, Remove by Element).
- * Each has a toggle, a PercentStepper, and the Remove control has an element selector.
+ * ControlPanel — the four editing controls (Scale, Density, Remove by Element, Color Recolor).
+ * Each has a toggle, appropriate inputs, and the Recolor control has element + color selectors.
  */
 import { useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles, Palette } from "lucide-react";
 import PercentStepper from "./PercentStepper";
 import {
   type ControlSettings,
@@ -17,7 +18,10 @@ import {
   DENSITY_MAX,
   REMOVE_MIN,
   REMOVE_MAX,
+  RECOLOR_COVERAGE_MIN,
+  RECOLOR_COVERAGE_MAX,
   MAX_VARIATIONS,
+  RECOLOR_PRESETS,
   defaultControls,
   computeCredits,
 } from "@shared/controls";
@@ -39,7 +43,9 @@ export default function ControlPanel({
   const [controls, setControls] = useState<ControlSettings>(defaultControls());
 
   const creditCost = computeCredits(controls, CREDIT_COST);
-  const canGenerate = creditCost > 0 && creditBalance >= creditCost && !isGenerating;
+  // Validate that recolor has required fields when enabled
+  const recolorValid = !controls.recolor.enabled || (controls.recolor.element !== "" && controls.recolor.targetColor.trim() !== "");
+  const canGenerate = creditCost > 0 && creditBalance >= creditCost && !isGenerating && recolorValid;
 
   const update = (partial: Partial<ControlSettings>) => {
     setControls((prev) => ({ ...prev, ...partial }));
@@ -139,6 +145,104 @@ export default function ControlPanel({
         )}
       </div>
 
+      {/* Color Recolor Control */}
+      <div className="space-y-3 rounded-lg border border-border p-4 bg-card">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Palette className="h-4 w-4 text-primary" />
+            <Label className="text-sm font-semibold">Color Recolor</Label>
+          </div>
+          <Switch
+            checked={controls.recolor.enabled}
+            onCheckedChange={(checked) =>
+              update({ recolor: { ...controls.recolor, enabled: checked } })
+            }
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Shift the colorway of a specific motif to a new target color.
+        </p>
+        {controls.recolor.enabled && (
+          <div className="space-y-3">
+            {/* Element selector */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Element to recolor</Label>
+              <Select
+                value={controls.recolor.element}
+                onValueChange={(element) =>
+                  update({ recolor: { ...controls.recolor, element } })
+                }
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Select element to recolor..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {detectedElements.map((el) => (
+                    <SelectItem key={el} value={el}>
+                      {el}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Target color */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Target color</Label>
+              <Input
+                value={controls.recolor.targetColor}
+                onChange={(e) =>
+                  update({ recolor: { ...controls.recolor, targetColor: e.target.value } })
+                }
+                placeholder="e.g. coral, deep navy, #2A4B7C"
+                className="bg-background"
+              />
+            </div>
+
+            {/* Color presets */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Quick presets</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {RECOLOR_PRESETS.map((preset) => (
+                  <button
+                    key={preset.value}
+                    type="button"
+                    onClick={() =>
+                      update({ recolor: { ...controls.recolor, targetColor: preset.value } })
+                    }
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                      controls.recolor.targetColor === preset.value
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-secondary-foreground hover:bg-accent"
+                    }`}
+                  >
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Coverage slider */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">
+                Coverage: {controls.recolor.coverage}%
+              </Label>
+              <PercentStepper
+                value={controls.recolor.coverage}
+                onChange={(coverage) =>
+                  update({ recolor: { ...controls.recolor, coverage } })
+                }
+                min={RECOLOR_COVERAGE_MIN}
+                max={RECOLOR_COVERAGE_MAX}
+              />
+              <p className="text-xs text-muted-foreground">
+                How much of the selected element to recolor (100% = all instances).
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Variations */}
       <div className="space-y-2 rounded-lg border border-border p-4 bg-card">
         <Label className="text-sm font-semibold">Variations</Label>
@@ -186,6 +290,11 @@ export default function ControlPanel({
         {creditCost > 0 && creditBalance < creditCost && (
           <p className="text-xs text-destructive text-center">
             Insufficient credits. Need {creditCost}, have {creditBalance}.
+          </p>
+        )}
+        {!recolorValid && (
+          <p className="text-xs text-amber-500 text-center">
+            Select an element and target color for recolor.
           </p>
         )}
       </div>

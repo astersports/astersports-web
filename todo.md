@@ -145,3 +145,14 @@
 - [x] Add a system-level image editing preamble for garment context
 - [x] Test generation quality with refined prompts
 - [x] Save checkpoint
+
+## Color Recolor Control
+- [x] Add RecolorControl interface and update ControlSettings in shared/controls.ts
+- [x] Add recolor instruction builder logic with textile terminology
+- [x] Update computeCredits to account for recolor control
+- [x] Update ControlPanel UI with color picker and element selector for recolor
+- [x] Update StudioEditor to pass recolor settings to generate mutation
+- [x] Update studio router to handle recolor in the generate procedure
+- [x] Update tests for buildInstruction and computeCredits with recolor
+- [x] Verify build and test pass
+- [x] Save checkpoint

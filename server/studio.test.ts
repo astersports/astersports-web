@@ -62,11 +62,61 @@ describe("buildInstruction", () => {
     expect(result).toContain("70%");
   });
 
+  it("builds recolor instruction with full coverage", () => {
+    const controls = defaultControls();
+    controls.recolor.enabled = true;
+    controls.recolor.element = "dusty rose petals";
+    controls.recolor.targetColor = "coral";
+    controls.recolor.coverage = 100;
+    const result = buildInstruction(controls);
+    expect(result).toContain("COLORWAY SHIFT");
+    expect(result).toContain("dusty rose petals");
+    expect(result).toContain("coral");
+    expect(result).toContain("all");
+    expect(result).toContain("dye-lot change");
+    expect(result).toContain("textile print designer");
+    expect(result).toContain("OUTPUT REQUIREMENTS");
+  });
+
+  it("builds recolor instruction with partial coverage", () => {
+    const controls = defaultControls();
+    controls.recolor.enabled = true;
+    controls.recolor.element = "blue forget-me-nots";
+    controls.recolor.targetColor = "deep navy";
+    controls.recolor.coverage = 60;
+    const result = buildInstruction(controls);
+    expect(result).toContain("COLORWAY SHIFT");
+    expect(result).toContain("approximately 60%");
+    expect(result).toContain("blue forget-me-nots");
+    expect(result).toContain("deep navy");
+  });
+
+  it("ignores recolor when element is empty", () => {
+    const controls = defaultControls();
+    controls.recolor.enabled = true;
+    controls.recolor.element = "";
+    controls.recolor.targetColor = "coral";
+    controls.recolor.coverage = 100;
+    const result = buildInstruction(controls);
+    expect(result).toBe("Return the image unchanged.");
+  });
+
+  it("ignores recolor when targetColor is empty", () => {
+    const controls = defaultControls();
+    controls.recolor.enabled = true;
+    controls.recolor.element = "pink blossoms";
+    controls.recolor.targetColor = "";
+    controls.recolor.coverage = 100;
+    const result = buildInstruction(controls);
+    expect(result).toBe("Return the image unchanged.");
+  });
+
   it("combines multiple controls into one instruction", () => {
     const controls: ControlSettings = {
       scale: { enabled: true, percent: 20 },
       density: { enabled: true, percent: 30 },
       remove: { enabled: true, element: "leaves", percent: 50 },
+      recolor: { enabled: false, element: "", targetColor: "", coverage: 100 },
       variations: 2,
     };
     const result = buildInstruction(controls);
@@ -75,6 +125,21 @@ describe("buildInstruction", () => {
     expect(result).toContain("leaves");
     expect(result).toContain("textile print designer");
     expect(result).toContain("OUTPUT REQUIREMENTS");
+  });
+
+  it("combines recolor with other controls", () => {
+    const controls: ControlSettings = {
+      scale: { enabled: false, percent: 0 },
+      density: { enabled: true, percent: 40 },
+      remove: { enabled: false, element: "", percent: 0 },
+      recolor: { enabled: true, element: "pink blossoms", targetColor: "sage green", coverage: 100 },
+      variations: 1,
+    };
+    const result = buildInstruction(controls);
+    expect(result).toContain("DENSITY REDUCTION");
+    expect(result).toContain("COLORWAY SHIFT");
+    expect(result).toContain("sage green");
+    expect(result).toContain("pink blossoms");
   });
 
   it("ignores enabled controls with zero percent", () => {
@@ -111,11 +176,35 @@ describe("computeCredits", () => {
     expect(cost).toBe(CREDIT_COST.standardGeneration); // 10
   });
 
+  it("charges standard generation for recolor alone", () => {
+    const controls = defaultControls();
+    controls.recolor.enabled = true;
+    controls.recolor.element = "pink blossoms";
+    controls.recolor.targetColor = "coral";
+    controls.recolor.coverage = 100;
+    controls.variations = 1;
+    const cost = computeCredits(controls, CREDIT_COST);
+    expect(cost).toBe(CREDIT_COST.standardGeneration); // 10
+  });
+
   it("charges combined controls for multiple active controls", () => {
     const controls: ControlSettings = {
       scale: { enabled: true, percent: 20 },
       density: { enabled: true, percent: 30 },
       remove: { enabled: false, element: "", percent: 0 },
+      recolor: { enabled: false, element: "", targetColor: "", coverage: 100 },
+      variations: 1,
+    };
+    const cost = computeCredits(controls, CREDIT_COST);
+    expect(cost).toBe(CREDIT_COST.combinedControls); // 15
+  });
+
+  it("charges combined when recolor is combined with another control", () => {
+    const controls: ControlSettings = {
+      scale: { enabled: false, percent: 0 },
+      density: { enabled: true, percent: 30 },
+      remove: { enabled: false, element: "", percent: 0 },
+      recolor: { enabled: true, element: "blossoms", targetColor: "coral", coverage: 100 },
       variations: 1,
     };
     const cost = computeCredits(controls, CREDIT_COST);
@@ -137,11 +226,25 @@ describe("computeCredits", () => {
       scale: { enabled: true, percent: 20 },
       density: { enabled: true, percent: 30 },
       remove: { enabled: true, element: "buds", percent: 40 },
+      recolor: { enabled: false, element: "", targetColor: "", coverage: 100 },
       variations: 4,
     };
     const cost = computeCredits(controls, CREDIT_COST);
     // combined (15) + 3 extra * 10 = 45
     expect(cost).toBe(CREDIT_COST.combinedControls + 3 * CREDIT_COST.extraVariation);
+  });
+
+  it("charges combined + extra for all four controls with variations", () => {
+    const controls: ControlSettings = {
+      scale: { enabled: true, percent: 10 },
+      density: { enabled: true, percent: 20 },
+      remove: { enabled: true, element: "buds", percent: 30 },
+      recolor: { enabled: true, element: "petals", targetColor: "coral", coverage: 100 },
+      variations: 2,
+    };
+    const cost = computeCredits(controls, CREDIT_COST);
+    // combined (15) + 1 extra * 10 = 25
+    expect(cost).toBe(CREDIT_COST.combinedControls + 1 * CREDIT_COST.extraVariation);
   });
 });
 

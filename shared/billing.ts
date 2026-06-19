@@ -29,7 +29,7 @@ export const PLANS: Record<Exclude<PlanKey, "none">, PlanDef> = {
     perSeat: false,
     creditsPerCycle: 3900,
     blurb: "For a single designer or a trial firm.",
-    features: ["3,900 credits / mo", "~390 generations", "1 seat", "All three controls"],
+    features: ["3,900 credits / mo", "~390 generations", "1 seat", "All four controls"],
   },
   pro: {
     key: "pro",

@@ -1,5 +1,5 @@
 /**
- * Shared definitions for the three print-editing controls.
+ * Shared definitions for the four print-editing controls.
  * Each percentage control supports 10% increments PLUS a custom value.
  */
 
@@ -23,10 +23,21 @@ export interface RemoveControl {
   percent: number;
 }
 
+export interface RecolorControl {
+  enabled: boolean;
+  /** Natural-language element name to recolor, e.g. "pink blossoms". */
+  element: string;
+  /** Target color name or hex code, e.g. "coral", "deep navy", "#2A4B7C". */
+  targetColor: string;
+  /** Optional: coverage percentage — what percent of the selected element to recolor (default 100). */
+  coverage: number;
+}
+
 export interface ControlSettings {
   scale: ScaleControl;
   density: DensityControl;
   remove: RemoveControl;
+  recolor: RecolorControl;
   /** Number of variations to generate (1..4). */
   variations: number;
 }
@@ -37,17 +48,36 @@ export const DENSITY_MIN = 0;
 export const DENSITY_MAX = 90;
 export const REMOVE_MIN = 0;
 export const REMOVE_MAX = 100;
+export const RECOLOR_COVERAGE_MIN = 10;
+export const RECOLOR_COVERAGE_MAX = 100;
 export const MAX_VARIATIONS = 4;
 
 /** 10% increment steppers (custom values are still allowed via the input field). */
 export const SCALE_STEPS = [-50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50];
 export const PERCENT_STEPS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
+/** Curated palette of common textile recolor targets. */
+export const RECOLOR_PRESETS = [
+  { name: "Coral", value: "coral" },
+  { name: "Deep Navy", value: "deep navy" },
+  { name: "Sage Green", value: "sage green" },
+  { name: "Dusty Rose", value: "dusty rose" },
+  { name: "Ivory", value: "ivory" },
+  { name: "Burnt Sienna", value: "burnt sienna" },
+  { name: "Cobalt Blue", value: "cobalt blue" },
+  { name: "Chartreuse", value: "chartreuse" },
+  { name: "Mauve", value: "mauve" },
+  { name: "Terracotta", value: "terracotta" },
+  { name: "Midnight Black", value: "midnight black" },
+  { name: "Champagne Gold", value: "champagne gold" },
+] as const;
+
 export function defaultControls(): ControlSettings {
   return {
     scale: { enabled: false, percent: 0 },
     density: { enabled: false, percent: 0 },
     remove: { enabled: false, element: "", percent: 0 },
+    recolor: { enabled: false, element: "", targetColor: "", coverage: 100 },
     variations: 1,
   };
 }
@@ -118,6 +148,22 @@ export function buildInstruction(c: ControlSettings): string {
     );
   }
 
+  if (c.recolor.enabled && c.recolor.element && c.recolor.targetColor) {
+    const coverageText = c.recolor.coverage < 100
+      ? `approximately ${c.recolor.coverage}% of`
+      : "all";
+    parts.push(
+      `COLORWAY SHIFT: Recolor ${coverageText} the "${c.recolor.element}" motifs to "${c.recolor.targetColor}". ` +
+      `Apply the new colorway as a professional dye-lot change — shift the hue, saturation, and value ` +
+      `of the targeted motifs while preserving their internal tonal gradients, shading, highlights, and texture detail. ` +
+      `The recolored motifs should look as if they were originally printed in the target color, ` +
+      `not as if a flat color overlay was applied. Maintain natural color variation within each motif ` +
+      `(lighter petal edges, darker shadow areas, vein details) transposed into the new colorway. ` +
+      `All other print elements retain their original colors exactly. ` +
+      `The base cloth ground color, garment construction, and photographic setting remain unchanged.`
+    );
+  }
+
   if (parts.length === 0) {
     return "Return the image unchanged.";
   }
@@ -139,7 +185,12 @@ export function computeCredits(
   c: ControlSettings,
   costs: { standardGeneration: number; extraVariation: number; combinedControls: number }
 ): number {
-  const activeControls = [c.scale.enabled, c.density.enabled, c.remove.enabled].filter(Boolean).length;
+  const activeControls = [
+    c.scale.enabled,
+    c.density.enabled,
+    c.remove.enabled,
+    c.recolor.enabled,
+  ].filter(Boolean).length;
   if (activeControls === 0) return 0;
   const base = activeControls > 1 ? costs.combinedControls : costs.standardGeneration;
   const extra = Math.max(0, c.variations - 1) * costs.extraVariation;
