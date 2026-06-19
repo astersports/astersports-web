@@ -13,6 +13,7 @@ import {
   updateJobStatus,
   getJob,
   listTenantJobs,
+  listTenantJobsEnhanced,
   getJobVariations,
   addVariation,
   deductCredits,
@@ -287,6 +288,33 @@ export const studioRouter = router({
       detectedElements: j.detectedElements ? JSON.parse(j.detectedElements) : [],
     }));
   }),
+
+  /** Enhanced history with search, filter, pagination, and result images. */
+  historyArchive: tenantProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(24),
+        offset: z.number().min(0).default(0),
+        status: z.string().optional(),
+        search: z.string().max(200).optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const result = await listTenantJobsEnhanced(ctx.tenant.id, {
+        limit: input.limit,
+        offset: input.offset,
+        status: input.status,
+        search: input.search,
+      });
+      return {
+        jobs: result.jobs.map((j) => ({
+          ...j,
+          detectedElements: j.detectedElements ? JSON.parse(j.detectedElements) : [],
+          controls: j.controls ? JSON.parse(j.controls) : null,
+        })),
+        total: result.total,
+      };
+    }),
 
   /** Get tenant credit balance and low-balance warning. */
   balance: tenantProcedure.query(async ({ ctx }) => {

@@ -250,3 +250,12 @@
 ## Per-Row Expand Feature (Credit Ledger)
 - [x] Backend: Add metadata/note field to creditLedger query response (include generation prompt from jobs table)
 - [x] Frontend: Add expandable row with animation showing full metadata on click
+
+## History → Generation Archive Enhancements
+- [x] Backend: Enhance history query to include job variations (result images), support search, status filter, pagination
+- [x] Frontend: Before/After thumbnail comparison on each card
+- [x] Frontend: Human-readable change description from parsed controls JSON
+- [x] Frontend: One-click re-download button for result images
+- [x] Frontend: Search bar (by title/element) and status filter
+- [x] Frontend: Expanded detail view (modal or inline) with full prompt, controls, before/after
+- [x] Frontend: Grid/List view toggle

@@ -270,6 +270,74 @@ export async function listTenantJobs(tenantId: number, limit = 50) {
     .limit(limit);
 }
 
+/**
+ * Enhanced history query with search, status filter, pagination,
+ * and joined variations (result images).
+ */
+export async function listTenantJobsEnhanced(
+  tenantId: number,
+  opts: { limit?: number; offset?: number; status?: string; search?: string } = {}
+) {
+  const db = await getDb();
+  if (!db) return { jobs: [], total: 0 };
+
+  const limit = opts.limit ?? 24;
+  const offset = opts.offset ?? 0;
+
+  const conditions = [eq(jobs.tenantId, tenantId)];
+  if (opts.status && opts.status !== "all") {
+    conditions.push(sql`${jobs.status} = ${opts.status}`);
+  }
+  if (opts.search) {
+    const term = `%${opts.search}%`;
+    conditions.push(
+      sql`(${jobs.title} LIKE ${term} OR ${jobs.detectedElements} LIKE ${term} OR ${jobs.instruction} LIKE ${term})`
+    );
+  }
+  const condition = and(...conditions);
+
+  const [jobRows, countResult] = await Promise.all([
+    db
+      .select()
+      .from(jobs)
+      .where(condition)
+      .orderBy(desc(jobs.createdAt))
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(jobs)
+      .where(condition),
+  ]);
+
+  // Fetch variations for all returned jobs in one query
+  const jobIds = jobRows.map((j) => j.id);
+  let variationsMap: Record<number, Array<{ id: number; resultUrl: string; round: number; createdAt: Date }>> = {};
+  if (jobIds.length > 0) {
+    const allVariations = await db
+      .select({
+        id: jobVariations.id,
+        jobId: jobVariations.jobId,
+        resultUrl: jobVariations.resultUrl,
+        round: jobVariations.round,
+        createdAt: jobVariations.createdAt,
+      })
+      .from(jobVariations)
+      .where(sql`${jobVariations.jobId} IN (${sql.raw(jobIds.join(","))})`);
+    for (const v of allVariations) {
+      if (!variationsMap[v.jobId]) variationsMap[v.jobId] = [];
+      variationsMap[v.jobId].push({ id: v.id, resultUrl: v.resultUrl, round: v.round, createdAt: v.createdAt });
+    }
+  }
+
+  const enrichedJobs = jobRows.map((j) => ({
+    ...j,
+    variations: variationsMap[j.id] || [],
+  }));
+
+  return { jobs: enrichedJobs, total: countResult[0]?.count ?? 0 };
+}
+
 // ─── Job Variations ──────────────────────────────────────────────────────────
 
 export async function addVariation(data: InsertJobVariation) {
