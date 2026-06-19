@@ -25,4 +25,10 @@ export const ENV = {
   maskProvider: (process.env.STUDIO_MASK_PROVIDER === "sam2" ? "sam2" : "classical") as
     | "classical"
     | "sam2",
+  /**
+   * Route the Recolor control through the deterministic separation-remap op
+   * (A1) instead of the generative path. Default off — generative recolor stays
+   * the fallback until A1 clears its eval gate. Requires a source color input.
+   */
+  studioDeterministicRecolor: process.env.STUDIO_DETERMINISTIC_RECOLOR === "true",
 };
