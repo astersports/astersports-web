@@ -304,6 +304,8 @@ export const studioRouter = router({
         limit: z.number().min(1).max(100).default(25),
         offset: z.number().min(0).default(0),
         reason: z.string().optional(),
+        from: z.number().optional(),
+        to: z.number().optional(),
       }).default({ limit: 25, offset: 0 })
     )
     .query(async ({ ctx, input }) => {
@@ -311,6 +313,8 @@ export const studioRouter = router({
         limit: input.limit,
         offset: input.offset,
         reason: input.reason,
+        from: input.from,
+        to: input.to,
       });
     }),
 });

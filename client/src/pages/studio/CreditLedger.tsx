@@ -4,7 +4,7 @@
  * - Compact grouped-by-date transaction list with colored left-edge bars
  * - Server-side type filtering and pagination
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { useTenant } from "@/contexts/TenantContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +27,8 @@ import {
   Minus,
   Plus,
   Activity,
+  Download,
+  CalendarDays,
 } from "lucide-react";
 
 const PAGE_SIZE = 30;
@@ -106,10 +108,27 @@ function BalanceSparkline({ entries }: { entries: Array<{ balanceAfter: number }
   );
 }
 
+type DateRange = "all" | "today" | "7d" | "30d" | "90d";
+
+function getDateRangeMs(range: DateRange): { from?: number; to?: number } {
+  if (range === "all") return {};
+  const now = Date.now();
+  const dayMs = 86_400_000;
+  switch (range) {
+    case "today": return { from: now - dayMs, to: now };
+    case "7d": return { from: now - 7 * dayMs, to: now };
+    case "30d": return { from: now - 30 * dayMs, to: now };
+    case "90d": return { from: now - 90 * dayMs, to: now };
+  }
+}
+
 export default function CreditLedger() {
   const { tenant } = useTenant();
   const [page, setPage] = useState(0);
   const [filter, setFilter] = useState<ReasonFilter>("all");
+  const [dateRange, setDateRange] = useState<DateRange>("all");
+
+  const rangeMs = useMemo(() => getDateRangeMs(dateRange), [dateRange]);
 
   const { data, isLoading } = trpc.studio.creditLedger.useQuery(
     {
@@ -117,6 +136,8 @@ export default function CreditLedger() {
       limit: PAGE_SIZE,
       offset: page * PAGE_SIZE,
       reason: filter === "all" ? undefined : filter,
+      from: rangeMs.from,
+      to: rangeMs.to,
     },
     { enabled: !!tenant }
   );
@@ -221,7 +242,7 @@ export default function CreditLedger() {
       </div>
 
       {/* Filter bar */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <Select value={filter} onValueChange={(v) => { setFilter(v as ReasonFilter); setPage(0); }}>
           <SelectTrigger className="w-[180px]" size="sm">
             <SelectValue placeholder="Filter by type" />
@@ -237,9 +258,50 @@ export default function CreditLedger() {
             <SelectItem value="adjustment">Adjustment</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={dateRange} onValueChange={(v) => { setDateRange(v as DateRange); setPage(0); }}>
+          <SelectTrigger className="w-[140px]" size="sm">
+            <CalendarDays className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+            <SelectValue placeholder="Date range" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Time</SelectItem>
+            <SelectItem value="today">Last 24h</SelectItem>
+            <SelectItem value="7d">Last 7 days</SelectItem>
+            <SelectItem value="30d">Last 30 days</SelectItem>
+            <SelectItem value="90d">Last 90 days</SelectItem>
+          </SelectContent>
+        </Select>
         <span className="text-xs text-muted-foreground">
           {data?.total ?? 0} total entries
         </span>
+        <div className="ml-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={entries.length === 0}
+            onClick={() => {
+              const rows = entries.map((e) => ({
+                Date: new Date(e.createdAt).toISOString(),
+                Type: REASON_LABELS[e.reason] || e.reason,
+                Reference: e.refId || e.note || "",
+                Amount: e.delta,
+                Balance: e.balanceAfter,
+              }));
+              const header = Object.keys(rows[0] || {}).join(",");
+              const csv = [header, ...rows.map((r) => Object.values(r).map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))].join("\n");
+              const blob = new Blob([csv], { type: "text/csv" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `credit-ledger-${new Date().toISOString().slice(0, 10)}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            <Download className="w-4 h-4 mr-1" />
+            Export CSV
+          </Button>
+        </div>
       </div>
 
       {/* Grouped transaction list */}

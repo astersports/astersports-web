@@ -231,3 +231,13 @@
 
 ## Park Variations Feature
 - [x] Hide variations selector in UI, lock to 1 variation per generation
+
+## Bug Fix + New Features
+- [x] Fix: AAU Basketball page hooks ordering error (conditional hook calls)
+- [x] Feature: CSV export button on Credit Ledger
+- [x] Feature: Date-range filtering on Credit Ledger
+- [x] Feature: Regenerate confirmation dialog in Print Studio editor
+
+## Remove Control Prompt Fix
+- [x] Fix: Improve 'Remove' control prompt to explicitly instruct AI to erase/delete elements, not redistribute them
+- [x] Fix: Finish pending confirmation dialog TypeScript errors

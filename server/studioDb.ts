@@ -292,7 +292,7 @@ export async function getJobVariations(jobId: number) {
 
 export async function listCreditLedger(
   tenantId: number,
-  opts: { limit?: number; offset?: number; reason?: string } = {}
+  opts: { limit?: number; offset?: number; reason?: string; from?: number; to?: number } = {}
 ) {
   const db = await getDb();
   if (!db) return { entries: [], total: 0 };
@@ -300,10 +300,18 @@ export async function listCreditLedger(
   const limit = opts.limit ?? 50;
   const offset = opts.offset ?? 0;
 
-  // Build where condition: always filter by tenant, optionally by reason.
-  const condition = opts.reason
-    ? and(eq(creditLedger.tenantId, tenantId), eq(creditLedger.reason, opts.reason))
-    : eq(creditLedger.tenantId, tenantId);
+  // Build where condition: always filter by tenant, optionally by reason and date range.
+  const conditions = [eq(creditLedger.tenantId, tenantId)];
+  if (opts.reason) {
+    conditions.push(eq(creditLedger.reason, opts.reason));
+  }
+  if (opts.from) {
+    conditions.push(gte(creditLedger.createdAt, new Date(opts.from)));
+  }
+  if (opts.to) {
+    conditions.push(sql`${creditLedger.createdAt} <= ${new Date(opts.to)}`);
+  }
+  const condition = and(...conditions);
 
   const [entries, countResult] = await Promise.all([
     db

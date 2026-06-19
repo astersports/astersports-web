@@ -147,12 +147,20 @@ export function buildInstruction(c: ControlSettings): string {
     const safeRemoveElement = sanitizeElementName(c.remove.element);
     if (!safeRemoveElement) return "Return the image unchanged.";
     parts.push(
-      `SELECTIVE ELEMENT REMOVAL: Remove approximately ${c.remove.percent}% of the "${safeRemoveElement}" motifs from the print, ` +
-      `distributed evenly across the fabric surface to avoid clustering or patchiness. ` +
-      `Replace each removed instance with the surrounding base cloth ground color, seamlessly blending ` +
-      `into the negative space as if the motif was never part of the original print strike-off. ` +
+      `SELECTIVE ELEMENT REMOVAL — ERASE AND DELETE: Permanently erase approximately ${c.remove.percent}% of the "${safeRemoveElement}" motifs from the print. ` +
+      `CRITICAL: "Remove" means COMPLETELY DELETE — paint over them with the base fabric background color so they VANISH entirely. ` +
+      `DO NOT move, reposition, scatter, shift, or redistribute the removed motifs to other areas of the fabric. ` +
+      `DO NOT push motifs to the edges, corners, or borders. ` +
+      `DO NOT rearrange the remaining motifs — every surviving motif must stay in its EXACT original position. ` +
+      `The removal process is: (1) Identify all instances of "${safeRemoveElement}" across the fabric. ` +
+      `(2) Select approximately ${c.remove.percent}% of them, distributed evenly across the surface. ` +
+      `(3) For each selected instance, ERASE it completely by filling that area with the surrounding base cloth ground color ` +
+      `(the fabric's background — in this case, match the exact background color visible between existing motifs). ` +
+      `(4) Blend the erased area seamlessly so it looks like bare fabric — as if the motif was never printed there. ` +
+      `The remaining ${100 - c.remove.percent}% of "${safeRemoveElement}" motifs stay EXACTLY where they are — same position, same scale, same color. ` +
       `All other print elements (companion florals, foliage, geometric fillers, accent dots, trailing vines, ` +
       `border motifs, and ground textures) remain completely untouched in position, scale, and color. ` +
+      `The result should have FEWER total motifs visible — more empty/bare fabric showing — NOT the same number of motifs rearranged. ` +
       `The garment construction, fabric hand, and photographic setting are unchanged.`
     );
   }

@@ -12,10 +12,22 @@ import ControlPanel from "@/components/studio/ControlPanel";
 import BeforeAfter from "@/components/studio/BeforeAfter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Upload, Loader2, Sparkles, RefreshCw, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { compressImage } from "@/lib/imageCompress";
 import type { ControlSettings } from "@shared/controls";
+import { computeCredits } from "@shared/controls";
+import { CREDIT_COST } from "@shared/billing";
 
 export default function StudioEditor() {
   const { tenant } = useTenant();
@@ -31,6 +43,8 @@ export default function StudioEditor() {
   const [isUploading, setIsUploading] = useState(false);
   const [isDetecting, setIsDetecting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingControls, setPendingControls] = useState<ControlSettings | null>(null);
 
   const uploadMutation = trpc.studio.upload.useMutation();
   const detectMutation = trpc.studio.detectElements.useMutation();
@@ -96,10 +110,21 @@ export default function StudioEditor() {
     [handleFileSelect]
   );
 
-  const handleGenerate = useCallback(
-    async (controls: ControlSettings) => {
-      if (!jobId || !tenant) return;
-      setIsGenerating(true);
+  // Show confirmation dialog before generating
+  const requestGenerate = useCallback(
+    (controls: ControlSettings) => {
+      setPendingControls(controls);
+      setConfirmOpen(true);
+    },
+    []
+  );
+
+  const handleConfirmGenerate = useCallback(async () => {
+    if (!pendingControls || !jobId || !tenant) return;
+    setConfirmOpen(false);
+    const controls = pendingControls;
+    setPendingControls(null);
+    setIsGenerating(true);
 
       try {
         const result = await generateMutation.mutateAsync({
@@ -123,9 +148,7 @@ export default function StudioEditor() {
       } finally {
         setIsGenerating(false);
       }
-    },
-    [jobId, tenant, generateMutation, utils, toast]
-  );
+  }, [pendingControls, jobId, tenant, generateMutation, utils]);
 
   const handleRegenerate = () => {
     setStep("controls");
@@ -197,9 +220,31 @@ export default function StudioEditor() {
     );
   }
 
+  // ─── Confirmation cost (must be computed before any early returns that use it) ──
+  const confirmCreditCost = pendingControls ? computeCredits(pendingControls, CREDIT_COST) : 0;
+
   // ─── Controls step ─────────────────────────────────────────────────────────
   if (step === "controls") {
     return (
+      <>
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Generation</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will use <span className="font-bold text-foreground">{confirmCreditCost} credit{confirmCreditCost !== 1 ? "s" : ""}</span> from your balance
+              (currently {tenant?.creditBalance.toLocaleString() ?? 0} credits). This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmGenerate}>
+              <Sparkles className="w-4 h-4 mr-1.5" />
+              Generate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -246,18 +291,38 @@ export default function StudioEditor() {
           <div>
             <ControlPanel
               detectedElements={detectedElements}
-              onGenerate={handleGenerate}
+              onGenerate={requestGenerate}
               isGenerating={isGenerating}
               creditBalance={tenant?.creditBalance ?? 0}
             />
           </div>
         </div>
       </div>
+      </>
     );
   }
 
   // ─── Results step ──────────────────────────────────────────────────────────
   return (
+    <>
+    <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Confirm Generation</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will use <span className="font-bold text-foreground">{confirmCreditCost} credit{confirmCreditCost !== 1 ? "s" : ""}</span> from your balance
+            (currently {tenant?.creditBalance.toLocaleString() ?? 0} credits). This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleConfirmGenerate}>
+            <Sparkles className="w-4 h-4 mr-1.5" />
+            Generate
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <div className="max-w-full lg:max-w-5xl mx-auto overflow-hidden">
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -313,5 +378,6 @@ export default function StudioEditor() {
         </div>
       </div>
     </div>
+    </>
   );
 }
