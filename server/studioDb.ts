@@ -2,7 +2,7 @@
  * Database helpers for the Print Studio module.
  * Separated from the main db.ts to keep files manageable.
  */
-import { eq, and, gte, desc, sql } from "drizzle-orm";
+import { eq, and, gte, desc, sql, like } from "drizzle-orm";
 import { getDb } from "./db";
 import {
   categories,
@@ -321,8 +321,27 @@ export async function listCreditLedger(
 
   const [entries, countResult] = await Promise.all([
     db
-      .select()
+      .select({
+        id: creditLedger.id,
+        tenantId: creditLedger.tenantId,
+        userId: creditLedger.userId,
+        delta: creditLedger.delta,
+        balanceAfter: creditLedger.balanceAfter,
+        reason: creditLedger.reason,
+        refId: creditLedger.refId,
+        note: creditLedger.note,
+        createdAt: creditLedger.createdAt,
+        // Joined metadata from jobs table
+        jobInstruction: jobs.instruction,
+        jobControls: jobs.controls,
+        jobStatus: jobs.status,
+        jobTitle: jobs.title,
+      })
       .from(creditLedger)
+      .leftJoin(
+        jobs,
+        sql`${creditLedger.refId} IS NOT NULL AND ${jobs.id} = CAST(REPLACE(REPLACE(${creditLedger.refId}, 'job-', ''), '-failed', '') AS UNSIGNED)`
+      )
       .where(condition)
       .orderBy(desc(creditLedger.createdAt))
       .limit(limit)
