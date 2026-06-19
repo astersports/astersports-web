@@ -111,28 +111,50 @@ export function buildInstruction(c: ControlSettings): string {
 
   if (c.scale.enabled && c.scale.percent !== 0) {
     if (c.scale.percent > 0) {
+      // Describe scale-up using textile print terminology
+      const scaleUpDescriptor = c.scale.percent >= 40
+        ? "dramatically oversized, jumbo-scale"
+        : c.scale.percent >= 20
+        ? "noticeably larger, bold-scale"
+        : "slightly enlarged";
       parts.push(
-        `SCALE UP — MAKE EACH MOTIF PHYSICALLY LARGER:\n` +
-        `Take EVERY individual motif (flower, leaf, bud, geometric shape, decorative element) and ENLARGE it by ${c.scale.percent}% ` +
-        `in both width and height. Each flower that was 2cm should now be approximately ${(2 * (1 + c.scale.percent / 100)).toFixed(1)}cm.\n` +
-        `WHAT THIS MEANS VISUALLY: Each individual flower/motif becomes BIGGER — takes up more physical space on the fabric. ` +
-        `The motifs will appear closer together because they are larger, but do NOT change their center positions.\n` +
-        `DO NOT just add more motifs. DO NOT change colors. DO NOT move motif positions. ` +
-        `ONLY increase the physical dimensions of each existing motif while keeping it centered on its original location.\n` +
-        `Keep all fine details (veins, petals, outlines, gradients) proportionally scaled up.`
+        `PRINT SCALE CHANGE — ENLARGE THE MOTIF REPEAT:\n` +
+        `Redraw the entire surface print at a LARGER repeat scale. Every printed motif (flowers, leaves, buds, shapes) ` +
+        `must be redrawn ${scaleUpDescriptor} — each motif should occupy approximately ${100 + c.scale.percent}% of its current area on the fabric.\n` +
+        `VISUAL REFERENCE: Imagine the original print was photographed through a magnifying glass at ${100 + c.scale.percent}% zoom — ` +
+        `that is how large each individual flower/motif should appear. The motifs become CHUNKIER and BOLDER, ` +
+        `filling more of the fabric surface. Gaps between motifs become SMALLER because each motif is bigger.\n` +
+        `CRITICAL RULES:\n` +
+        `- Every motif must be visibly BIGGER than in the input image — this is the #1 requirement.\n` +
+        `- Keep the same number of motifs (do not add extras).\n` +
+        `- Keep the same colors, style, and artistic treatment.\n` +
+        `- Keep motifs in approximately the same positions (center points unchanged).\n` +
+        `- The result should look like the SAME print design but at a LARGER scale — as if the textile mill enlarged the screen/roller.`
       );
     } else {
+      // Describe scale-down using textile print terminology
+      const absPercent = Math.abs(c.scale.percent);
+      const scaleDownDescriptor = absPercent >= 40
+        ? "tiny, miniature ditsy-scale"
+        : absPercent >= 20
+        ? "noticeably smaller, petite-scale"
+        : "slightly reduced";
+      const remainingScale = 100 - absPercent;
       parts.push(
-        `SCALE DOWN — MAKE EACH MOTIF PHYSICALLY SMALLER:\n` +
-        `Take EVERY individual motif (flower, leaf, bud, geometric shape, decorative element) and SHRINK it by ${Math.abs(c.scale.percent)}% ` +
-        `in both width and height. Each flower that was 2cm should now be approximately ${(2 * (1 - Math.abs(c.scale.percent) / 100)).toFixed(1)}cm.\n` +
-        `WHAT THIS MEANS VISUALLY: Each individual flower/motif becomes SMALLER — takes up less physical space on the fabric. ` +
-        `More of the background fabric color will be visible between motifs because each motif is now smaller.\n` +
-        `DO NOT remove any motifs — the SAME NUMBER of motifs should remain. ` +
-        `DO NOT move motif positions — each motif stays centered on its original location. ` +
-        `DO NOT change colors. ONLY reduce the physical dimensions of each existing motif.\n` +
-        `The freed space around each shrunken motif should show the base fabric background color. ` +
-        `Keep all fine details (veins, petals, outlines, gradients) proportionally scaled down — maintain crispness.`
+        `PRINT SCALE CHANGE — SHRINK THE MOTIF REPEAT:\n` +
+        `Redraw the entire surface print at a SMALLER repeat scale. Every printed motif (flowers, leaves, buds, shapes) ` +
+        `must be redrawn ${scaleDownDescriptor} — each motif should occupy only about ${remainingScale}% of its current area on the fabric.\n` +
+        `VISUAL REFERENCE: If a flower currently spans 3cm across, it must now span only about ${(3 * remainingScale / 100).toFixed(1)}cm. ` +
+        `The motifs become DAINTIER and more DELICATE. Much more of the plain background fabric will be visible ` +
+        `in the gaps between motifs because each motif is physically SMALLER.\n` +
+        `CRITICAL RULES:\n` +
+        `- Every motif must be visibly SMALLER than in the input image — this is the #1 requirement. The change must be OBVIOUS to the eye.\n` +
+        `- Keep the SAME NUMBER of motifs (do not remove any).\n` +
+        `- Keep the same colors, style, and artistic treatment.\n` +
+        `- Keep motifs in approximately the same positions (center points unchanged).\n` +
+        `- The freed space around each shrunken motif shows the plain background fabric color.\n` +
+        `- The result should look like the SAME print design but at a SMALLER scale — as if the textile mill reduced the screen/roller size.\n` +
+        `- Think of it as converting from a "statement print" to a "ditsy print" — same design, much smaller execution.`
       );
     }
   }

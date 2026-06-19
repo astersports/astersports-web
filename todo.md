@@ -290,3 +290,4 @@
 ## Scale & Density Prompt Improvements
 - [x] Fix: Improve Scale prompt to be more explicit about physical size change of motifs
 - [x] Fix: Improve Density prompt to be more explicit about removing/thinning motifs
+- [x] Fix: Rewrite Scale prompt v2 — use textile terminology (ditsy/statement print, repeat scale) instead of math percentages; describe end-state visually

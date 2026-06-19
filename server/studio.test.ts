@@ -26,10 +26,10 @@ describe("buildInstruction", () => {
     controls.scale.enabled = true;
     controls.scale.percent = 30;
     const result = buildInstruction(controls);
-    expect(result).toContain("SCALE UP");
-    expect(result).toContain("ENLARGE it by 30%");
-    expect(result).toContain("30%");
-    expect(result).not.toContain("SCALE DOWN");
+    expect(result).toContain("ENLARGE THE MOTIF REPEAT");
+    expect(result).toContain("LARGER repeat scale");
+    expect(result).toContain("130%");
+    expect(result).not.toContain("SHRINK");
   });
 
   it("builds scale-down instruction", () => {
@@ -37,9 +37,9 @@ describe("buildInstruction", () => {
     controls.scale.enabled = true;
     controls.scale.percent = -20;
     const result = buildInstruction(controls);
-    expect(result).toContain("SCALE DOWN");
-    expect(result).toContain("SHRINK it by 20%");
-    expect(result).toContain("20%");
+    expect(result).toContain("SHRINK THE MOTIF REPEAT");
+    expect(result).toContain("SMALLER repeat scale");
+    expect(result).toContain("80%");
   });
 
   it("builds density reduction instruction", () => {
@@ -120,7 +120,7 @@ describe("buildInstruction", () => {
       variations: 2,
     };
     const result = buildInstruction(controls);
-    expect(result).toContain("SCALE UP");
+    expect(result).toContain("ENLARGE THE MOTIF REPEAT");
     expect(result).toContain("DENSITY REDUCTION");
     expect(result).toContain("leaves");
     expect(result).toContain("textile print designer");
