@@ -259,3 +259,14 @@
 - [x] Frontend: Search bar (by title/element) and status filter
 - [x] Frontend: Expanded detail view (modal or inline) with full prompt, controls, before/after
 - [x] Frontend: Grid/List view toggle
+
+## Generation Archive: Re-run, Batch Download, Favorites
+- [x] Backend: Add jobFavorites table to schema
+- [x] Backend: Add toggle favorite mutation + list favorites filter
+- [x] Backend: Add re-run mutation (clone job with same settings)
+- [x] Backend: Batch download handled client-side via fetch+JSZip (no server endpoint needed)
+- [x] Frontend: Add star/pin toggle on each card and in detail modal
+- [x] Frontend: Add "Favorites" filter option in the archive
+- [x] Frontend: Add "Re-run" button in detail modal
+- [x] Frontend: Add batch select mode with checkbox overlay + "Download ZIP" action bar
+- [x] Verification: pnpm check + pnpm test passing

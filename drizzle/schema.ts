@@ -228,3 +228,16 @@ export const stripeEvents = mysqlTable("stripe_events", {
 
 export type StripeEvent = typeof stripeEvents.$inferSelect;
 export type InsertStripeEvent = typeof stripeEvents.$inferInsert;
+
+/**
+ * Favorites/pinned jobs — tenants can star their best results for quick access.
+ */
+export const jobFavorites = mysqlTable("studio_job_favorites", {
+  id: int("id").autoincrement().primaryKey(),
+  jobId: int("jobId").notNull(),
+  tenantId: int("tenantId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type JobFavorite = typeof jobFavorites.$inferSelect;
+export type InsertJobFavorite = typeof jobFavorites.$inferInsert;

@@ -19,6 +19,8 @@ import {
   deductCredits,
   grantCredits,
   listCreditLedger,
+  toggleFavorite,
+  getTenantFavoriteJobIds,
 } from "../studioDb";
 import { buildInstruction, computeCredits, type ControlSettings } from "../../shared/controls";
 import { CREDIT_COST, LOW_BALANCE_THRESHOLD } from "../../shared/billing";
@@ -297,6 +299,7 @@ export const studioRouter = router({
         offset: z.number().min(0).default(0),
         status: z.string().optional(),
         search: z.string().max(200).optional(),
+        favoritesOnly: z.boolean().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -305,6 +308,7 @@ export const studioRouter = router({
         offset: input.offset,
         status: input.status,
         search: input.search,
+        favoritesOnly: input.favoritesOnly,
       });
       return {
         jobs: result.jobs.map((j) => ({
@@ -346,5 +350,77 @@ export const studioRouter = router({
         to: input.to,
         search: input.search,
       });
+    }),
+
+  // ─── Favorites ──────────────────────────────────────────────────────────────
+
+  /** Toggle a job as favorite/unfavorite. Returns new state. */
+  toggleFavorite: tenantProcedure
+    .input(z.object({ jobId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const isFavorited = await toggleFavorite(ctx.tenant.id, input.jobId);
+      return { favorited: isFavorited };
+    }),
+
+  /** Get all favorite job IDs for the tenant. */
+  favoriteIds: tenantProcedure.query(async ({ ctx }) => {
+    return getTenantFavoriteJobIds(ctx.tenant.id);
+  }),
+
+  // ─── Re-run ──────────────────────────────────────────────────────────────────
+
+  /** Re-run a previous job with the same settings. Creates a new job and generates. */
+  rerun: tenantProcedure
+    .input(z.object({ jobId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const originalJob = await getJob(input.jobId);
+      if (!originalJob || originalJob.tenantId !== ctx.tenant.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Job not found" });
+      }
+      if (!originalJob.controls || !originalJob.originalUrl) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Job has no controls to re-run" });
+      }
+
+      const controls: ControlSettings = JSON.parse(originalJob.controls);
+      const cost = computeCredits(controls, CREDIT_COST);
+
+      // Deduct credits
+      try {
+        await deductCredits(ctx.tenant.id, ctx.user?.id ?? 0, cost, `rerun-${originalJob.id}`);
+      } catch {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Insufficient credits" });
+      }
+
+      // Create new job
+      const instruction = buildInstruction(controls);
+      const newJob = await createJob({
+        tenantId: ctx.tenant.id,
+        userId: ctx.user?.id ?? 0,
+        title: `${originalJob.title} (re-run)`,
+        originalKey: originalJob.originalKey,
+        originalUrl: originalJob.originalUrl,
+        detectedElements: originalJob.detectedElements,
+        controls: originalJob.controls,
+        instruction,
+        creditsUsed: cost,
+        status: "processing",
+      });
+
+      // Generate in background (don't block response)
+      (async () => {
+        try {
+          const resultUrl = await generateEditedImage(originalJob.originalUrl, instruction);
+          const key = `studio/${ctx.tenant.id}/${newJob.id}/result-1.png`;
+          const { url } = await storagePut(key, Buffer.from(await (await fetch(resultUrl)).arrayBuffer()), "image/png");
+          await addVariation({ jobId: newJob.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: 1 });
+          await updateJobStatus(newJob.id, "done");
+        } catch (err) {
+          await updateJobStatus(newJob.id, "failed");
+          // Refund credits on failure
+          await grantCredits(ctx.tenant.id, cost, "refund", `job-${newJob.id}-failed`, ctx.user?.id);
+        }
+      })();
+
+      return { jobId: newJob.id, creditsUsed: cost };
     }),
 });

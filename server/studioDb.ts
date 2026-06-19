@@ -11,6 +11,7 @@ import {
   creditLedger,
   jobs,
   jobVariations,
+  jobFavorites,
   type Tenant,
   type InsertTenant,
   type InsertMembership,
@@ -276,7 +277,7 @@ export async function listTenantJobs(tenantId: number, limit = 50) {
  */
 export async function listTenantJobsEnhanced(
   tenantId: number,
-  opts: { limit?: number; offset?: number; status?: string; search?: string } = {}
+  opts: { limit?: number; offset?: number; status?: string; search?: string; favoritesOnly?: boolean } = {}
 ) {
   const db = await getDb();
   if (!db) return { jobs: [], total: 0 };
@@ -292,6 +293,11 @@ export async function listTenantJobsEnhanced(
     const term = `%${opts.search}%`;
     conditions.push(
       sql`(${jobs.title} LIKE ${term} OR ${jobs.detectedElements} LIKE ${term} OR ${jobs.instruction} LIKE ${term})`
+    );
+  }
+  if (opts.favoritesOnly) {
+    conditions.push(
+      sql`${jobs.id} IN (SELECT ${jobFavorites.jobId} FROM ${jobFavorites} WHERE ${jobFavorites.tenantId} = ${tenantId})`
     );
   }
   const condition = and(...conditions);
@@ -421,4 +427,36 @@ export async function listCreditLedger(
   ]);
 
   return { entries, total: countResult[0]?.count ?? 0 };
+}
+
+// ─── Favorites ──────────────────────────────────────────────────────────────
+
+export async function toggleFavorite(tenantId: number, jobId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+
+  // Check if already favorited
+  const [existing] = await db
+    .select()
+    .from(jobFavorites)
+    .where(and(eq(jobFavorites.tenantId, tenantId), eq(jobFavorites.jobId, jobId)))
+    .limit(1);
+
+  if (existing) {
+    await db.delete(jobFavorites).where(eq(jobFavorites.id, existing.id));
+    return false; // unfavorited
+  } else {
+    await db.insert(jobFavorites).values({ tenantId, jobId });
+    return true; // favorited
+  }
+}
+
+export async function getTenantFavoriteJobIds(tenantId: number): Promise<number[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({ jobId: jobFavorites.jobId })
+    .from(jobFavorites)
+    .where(eq(jobFavorites.tenantId, tenantId));
+  return rows.map((r) => r.jobId);
 }
