@@ -16,6 +16,7 @@ import StudioEditor from "./pages/studio/StudioEditor";
 import StudioHistory from "./pages/studio/StudioHistory";
 import StudioAdmin from "./pages/studio/StudioAdmin";
 import StudioBilling from "./pages/studio/StudioBilling";
+import CreditLedger from "./pages/studio/CreditLedger";
 
 function Router() {
   return (
@@ -39,6 +40,9 @@ function Router() {
       </Route>
       <Route path="/studio/billing">
         <StudioLayout><StudioBilling /></StudioLayout>
+      </Route>
+      <Route path="/studio/ledger">
+        <StudioLayout><CreditLedger /></StudioLayout>
       </Route>
 
       <Route path={"/404"} component={NotFound} />

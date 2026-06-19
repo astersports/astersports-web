@@ -222,3 +222,9 @@
 - [x] Fix 8: Add createImageBitmap EXIF orientation handling
 - [x] Phase 2 Verification: pnpm check + pnpm test
 - [x] Save checkpoint and push to GitHub
+
+## Credit Ledger UI (Print Studio Dashboard)
+- [x] Backend: Add tRPC query to fetch paginated credit ledger entries for a tenant
+- [x] Frontend: Create CreditLedger page component with table, filters, and type badges
+- [x] Navigation: Wire CreditLedger into Print Studio routes and sidebar/nav
+- [x] Verification: pnpm check + pnpm test passing

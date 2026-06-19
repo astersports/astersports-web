@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   Sparkles,
   AlertTriangle,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LOW_BALANCE_THRESHOLD } from "@shared/billing";
@@ -20,6 +21,7 @@ import { LOW_BALANCE_THRESHOLD } from "@shared/billing";
 const NAV_ITEMS = [
   { href: "/studio", label: "Editor", icon: Paintbrush },
   { href: "/studio/history", label: "History", icon: History },
+  { href: "/studio/ledger", label: "Credit Ledger", icon: BookOpen },
   { href: "/studio/billing", label: "Billing", icon: CreditCard },
   { href: "/studio/admin", label: "Admin", icon: Users, adminOnly: true },
 ];

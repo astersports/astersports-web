@@ -287,3 +287,37 @@ export async function getJobVariations(jobId: number) {
     .where(eq(jobVariations.jobId, jobId))
     .orderBy(desc(jobVariations.createdAt));
 }
+
+// ─── Credit Ledger ──────────────────────────────────────────────────────────
+
+export async function listCreditLedger(
+  tenantId: number,
+  opts: { limit?: number; offset?: number; reason?: string } = {}
+) {
+  const db = await getDb();
+  if (!db) return { entries: [], total: 0 };
+
+  const limit = opts.limit ?? 50;
+  const offset = opts.offset ?? 0;
+
+  // Build where condition: always filter by tenant, optionally by reason.
+  const condition = opts.reason
+    ? and(eq(creditLedger.tenantId, tenantId), eq(creditLedger.reason, opts.reason))
+    : eq(creditLedger.tenantId, tenantId);
+
+  const [entries, countResult] = await Promise.all([
+    db
+      .select()
+      .from(creditLedger)
+      .where(condition)
+      .orderBy(desc(creditLedger.createdAt))
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(creditLedger)
+      .where(condition),
+  ]);
+
+  return { entries, total: countResult[0]?.count ?? 0 };
+}

@@ -17,6 +17,7 @@ import {
   addVariation,
   deductCredits,
   grantCredits,
+  listCreditLedger,
 } from "../studioDb";
 import { buildInstruction, computeCredits, type ControlSettings } from "../../shared/controls";
 import { CREDIT_COST, LOW_BALANCE_THRESHOLD } from "../../shared/billing";
@@ -294,4 +295,21 @@ export const studioRouter = router({
       plan: ctx.tenant.plan,
     };
   }),
+
+  /** Paginated credit ledger for the tenant. */
+  creditLedger: tenantProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(25),
+        offset: z.number().min(0).default(0),
+        reason: z.string().optional(),
+      }).default({ limit: 25, offset: 0 })
+    )
+    .query(async ({ ctx, input }) => {
+      return listCreditLedger(ctx.tenant.id, {
+        limit: input.limit,
+        offset: input.offset,
+        reason: input.reason,
+      });
+    }),
 });
