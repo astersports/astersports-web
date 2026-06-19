@@ -26,9 +26,10 @@ describe("buildInstruction", () => {
     controls.scale.enabled = true;
     controls.scale.percent = 30;
     const result = buildInstruction(controls);
-    expect(result).toContain("Enlarge");
+    expect(result).toContain("SCALE UP");
+    expect(result).toContain("enlarge every motif");
     expect(result).toContain("30%");
-    expect(result).not.toContain("Reduce the size");
+    expect(result).not.toContain("SCALE DOWN");
   });
 
   it("builds scale-down instruction", () => {
@@ -36,7 +37,8 @@ describe("buildInstruction", () => {
     controls.scale.enabled = true;
     controls.scale.percent = -20;
     const result = buildInstruction(controls);
-    expect(result).toContain("Reduce the size");
+    expect(result).toContain("SCALE DOWN");
+    expect(result).toContain("Uniformly reduce every motif");
     expect(result).toContain("20%");
   });
 
@@ -45,8 +47,9 @@ describe("buildInstruction", () => {
     controls.density.enabled = true;
     controls.density.percent = 50;
     const result = buildInstruction(controls);
-    expect(result).toContain("density");
+    expect(result).toContain("DENSITY REDUCTION");
     expect(result).toContain("50%");
+    expect(result).toContain("base cloth ground color");
   });
 
   it("builds remove element instruction", () => {
@@ -67,10 +70,11 @@ describe("buildInstruction", () => {
       variations: 2,
     };
     const result = buildInstruction(controls);
-    expect(result).toContain("Enlarge");
-    expect(result).toContain("density");
+    expect(result).toContain("SCALE UP");
+    expect(result).toContain("DENSITY REDUCTION");
     expect(result).toContain("leaves");
-    expect(result).toContain("Preserve the photographic look");
+    expect(result).toContain("textile print designer");
+    expect(result).toContain("OUTPUT REQUIREMENTS");
   });
 
   it("ignores enabled controls with zero percent", () => {

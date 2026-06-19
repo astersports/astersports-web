@@ -1,14 +1,39 @@
 /**
  * AI Engine for Print Studio.
  * Handles element detection (via LLM vision) and image editing (via generateImage).
+ * Uses textile and fashion industry terminology for precision.
  */
 import { invokeLLM } from "./_core/llm";
 import { generateImage } from "./_core/imageGeneration";
 import { storageGetSignedUrl } from "./storage";
 
 /**
+ * System prompt for textile print element detection.
+ * Uses industry-standard terminology to guide accurate motif identification.
+ */
+const ELEMENT_DETECTION_SYSTEM_PROMPT = `You are a senior textile print designer and colorist analyzing a product photograph of a printed garment. Your task is to identify every distinct visual motif or design element present in the fabric's surface print.
+
+CLASSIFICATION GUIDELINES:
+- Name each element using standard textile/fashion print terminology (2-5 words).
+- Distinguish between primary motifs (hero elements that anchor the design) and secondary motifs (fillers, accents, ground textures).
+- Use precise color descriptors: "dusty rose", "cobalt blue", "chartreuse", "ivory", not just "pink" or "blue".
+- Identify motif types accurately:
+  • Florals: "open peony heads", "scattered rosebuds", "trailing wisteria", "ditsy daisies", "abstract blooms"
+  • Foliage: "pinnate fern fronds", "broad tropical leaves", "trailing ivy", "eucalyptus sprigs", "beaded stems"
+  • Geometrics: "ogee lattice", "chevron stripes", "polka dots", "medallion tiles", "trellis grid"
+  • Conversationals: "paisley teardrops", "toile figures", "animal silhouettes", "nautical anchors"
+  • Textures/grounds: "stippled ground", "watercolor wash", "marbled veining", "lace overlay"
+  • Accents: "metallic foil dots", "seed bead clusters", "fine pinstripes", "scattered sequins"
+
+- Do NOT identify garment construction elements (seams, hems, zippers, buttons, labels).
+- Do NOT identify the hanger, mannequin, or photographic background.
+- Return 3-10 elements ordered from most visually dominant to least.
+
+OUTPUT: Return ONLY a JSON object with an "elements" array of short descriptive strings.`;
+
+/**
  * Detect natural-language element names from a garment print image.
- * Uses vision LLM to identify distinct motifs/elements in the fabric print.
+ * Uses vision LLM with textile-specific prompting for accurate motif identification.
  */
 export async function detectPrintElements(imageUrl: string): Promise<string[]> {
   // Get a publicly-accessible URL for the image
@@ -22,7 +47,7 @@ export async function detectPrintElements(imageUrl: string): Promise<string[]> {
     messages: [
       {
         role: "system" as const,
-        content: `You are an expert textile analyst. Given a photo of a printed garment, identify all distinct visual elements/motifs in the fabric print. Return ONLY a JSON array of short natural-language element names (2-4 words each). Examples: "pink blossoms", "blue buds", "green leaves", "gold dots", "black swirls". Focus on the print/pattern elements, not the garment itself. Return 3-10 elements. Output ONLY the JSON array, no other text.`,
+        content: ELEMENT_DETECTION_SYSTEM_PROMPT,
       },
       {
         role: "user" as const,
@@ -33,7 +58,7 @@ export async function detectPrintElements(imageUrl: string): Promise<string[]> {
           },
           {
             type: "text" as const,
-            text: "Identify all distinct print elements/motifs in this fabric print.",
+            text: "Analyze this garment photograph. Identify and name every distinct print motif or design element visible on the fabric surface. Use precise textile terminology and color descriptors.",
           },
         ],
       },
@@ -49,7 +74,7 @@ export async function detectPrintElements(imageUrl: string): Promise<string[]> {
             elements: {
               type: "array",
               items: { type: "string" },
-              description: "Array of element names found in the print",
+              description: "Array of textile print element names found in the fabric design",
             },
           },
           required: ["elements"],

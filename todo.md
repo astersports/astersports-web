@@ -138,3 +138,10 @@
 - [x] All 37 tests passing
 - [x] Production build successful
 - [x] Save checkpoint with fix
+
+## Prompt Refinement: Textile & Fashion Terminology
+- [x] Refine buildInstruction() in shared/controls.ts with textile-specific language
+- [x] Refine element detection system prompt in server/aiEngine.ts with fashion terminology
+- [x] Add a system-level image editing preamble for garment context
+- [x] Test generation quality with refined prompts
+- [x] Save checkpoint
