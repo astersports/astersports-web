@@ -7,6 +7,12 @@ export const CREDITS_PER_GENERATION = 10;
 /** Warn the tenant when balance falls at or below this threshold. */
 export const LOW_BALANCE_THRESHOLD = 100;
 
+/** Free trial configuration. */
+export const TRIAL_DURATION_DAYS = 7;
+export const TRIAL_CREDITS = 150;
+/** Day (1-indexed) when the recommendation banner first appears. */
+export const TRIAL_RECOMMENDATION_START_DAY = 4;
+
 export type PlanKey = "none" | "starter" | "pro" | "team";
 
 export interface PlanDef {

@@ -112,34 +112,47 @@ export function buildInstruction(c: ControlSettings): string {
   if (c.scale.enabled && c.scale.percent !== 0) {
     if (c.scale.percent > 0) {
       parts.push(
-        `SCALE UP: Uniformly enlarge every motif in the repeat by approximately ${c.scale.percent}%. ` +
-        `Increase the motif footprint proportionally — enlarge each floral head, leaf cluster, geometric unit, or decorative element ` +
-        `while maintaining the original colorway, motif spacing rhythm, and half-drop or block repeat structure. ` +
-        `The overall print density (motifs per square inch) should decrease slightly as each motif occupies more ground area. ` +
-        `Keep stroke weights and fine interior details (veins, stippling, outlines) proportionally scaled.`
+        `SCALE UP — MAKE EACH MOTIF PHYSICALLY LARGER:\n` +
+        `Take EVERY individual motif (flower, leaf, bud, geometric shape, decorative element) and ENLARGE it by ${c.scale.percent}% ` +
+        `in both width and height. Each flower that was 2cm should now be approximately ${(2 * (1 + c.scale.percent / 100)).toFixed(1)}cm.\n` +
+        `WHAT THIS MEANS VISUALLY: Each individual flower/motif becomes BIGGER — takes up more physical space on the fabric. ` +
+        `The motifs will appear closer together because they are larger, but do NOT change their center positions.\n` +
+        `DO NOT just add more motifs. DO NOT change colors. DO NOT move motif positions. ` +
+        `ONLY increase the physical dimensions of each existing motif while keeping it centered on its original location.\n` +
+        `Keep all fine details (veins, petals, outlines, gradients) proportionally scaled up.`
       );
     } else {
       parts.push(
-        `SCALE DOWN: Uniformly reduce every motif in the repeat by approximately ${Math.abs(c.scale.percent)}%. ` +
-        `Shrink each floral head, leaf cluster, geometric unit, or decorative element proportionally ` +
-        `while maintaining the original colorway, motif spacing rhythm, and repeat structure. ` +
-        `The overall print density (motifs per square inch) should increase slightly as each motif occupies less ground area. ` +
-        `Maintain crisp edges and fine interior details (veins, stippling, outlines) at the reduced scale. ` +
-        `Fill the freed negative space with the base cloth ground color — do not stretch or duplicate motifs.`
+        `SCALE DOWN — MAKE EACH MOTIF PHYSICALLY SMALLER:\n` +
+        `Take EVERY individual motif (flower, leaf, bud, geometric shape, decorative element) and SHRINK it by ${Math.abs(c.scale.percent)}% ` +
+        `in both width and height. Each flower that was 2cm should now be approximately ${(2 * (1 - Math.abs(c.scale.percent) / 100)).toFixed(1)}cm.\n` +
+        `WHAT THIS MEANS VISUALLY: Each individual flower/motif becomes SMALLER — takes up less physical space on the fabric. ` +
+        `More of the background fabric color will be visible between motifs because each motif is now smaller.\n` +
+        `DO NOT remove any motifs — the SAME NUMBER of motifs should remain. ` +
+        `DO NOT move motif positions — each motif stays centered on its original location. ` +
+        `DO NOT change colors. ONLY reduce the physical dimensions of each existing motif.\n` +
+        `The freed space around each shrunken motif should show the base fabric background color. ` +
+        `Keep all fine details (veins, petals, outlines, gradients) proportionally scaled down — maintain crispness.`
       );
     }
   }
 
   if (c.density.enabled && c.density.percent > 0) {
     parts.push(
-      `DENSITY REDUCTION: Thin out the print coverage by removing approximately ${c.density.percent}% of the motifs ` +
-      `evenly distributed across the fabric ground. Select motifs for removal using a stochastic scatter — ` +
-      `avoid creating obvious gaps, bald patches, or directional bias. ` +
-      `The remaining motifs stay at their original scale, color saturation, and placement coordinates. ` +
-      `Exposed areas reveal the base cloth ground color (the fabric's dyed or greige background). ` +
-      `Maintain the overall visual balance and rhythm of the repeat — the result should read as a ` +
-      `lighter, more open version of the same print design, not a damaged or incomplete pattern. ` +
-      `Do not shift, rotate, or recolor any surviving motifs.`
+      `DENSITY REDUCTION — DELETE ${c.density.percent}% OF ALL MOTIFS FROM THE FABRIC:\n` +
+      `Count the total number of printed motifs (flowers, leaves, buds, all decorative elements) visible on the fabric. ` +
+      `Then PERMANENTLY DELETE approximately ${c.density.percent}% of them by erasing them completely — ` +
+      `paint over each deleted motif with the base fabric background color so it DISAPPEARS.\n` +
+      `WHAT THE RESULT SHOULD LOOK LIKE: If there were originally 100 flowers, only approximately ${100 - c.density.percent} should remain. ` +
+      `The fabric should look MORE SPARSE — more bare background visible, FEWER total motifs printed on it.\n` +
+      `RULES FOR DELETION:\n` +
+      `- Choose which motifs to delete RANDOMLY and EVENLY across the entire fabric surface (not just from one area).\n` +
+      `- DO NOT move, shift, or reposition any motifs. Every surviving motif stays in its EXACT original position.\n` +
+      `- DO NOT resize any surviving motifs. They stay at their original scale.\n` +
+      `- DO NOT change colors of surviving motifs.\n` +
+      `- DO NOT add new motifs anywhere.\n` +
+      `- Where a motif was deleted, that area should show ONLY the plain background fabric color (match the color visible between existing motifs).\n` +
+      `- The result must have VISIBLY FEWER motifs than the input — this is the primary visual change.`
     );
   }
 

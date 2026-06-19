@@ -36,6 +36,13 @@
       "when": 1781900571246,
       "tag": "0004_yellow_doorman",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1781901590961,
+      "tag": "0005_slow_dragon_man",
+      "breakpoints": true
     }
   ]
 }

@@ -2,7 +2,7 @@
  * Database helpers for the Print Studio module.
  * Separated from the main db.ts to keep files manageable.
  */
-import { eq, and, gte, desc, sql, like } from "drizzle-orm";
+import { eq, and, gte, lte, desc, sql, like } from "drizzle-orm";
 import { getDb } from "./db";
 import {
   categories,
@@ -459,4 +459,73 @@ export async function getTenantFavoriteJobIds(tenantId: number): Promise<number[
     .from(jobFavorites)
     .where(eq(jobFavorites.tenantId, tenantId));
   return rows.map((r) => r.jobId);
+}
+
+// ─── Trial & Usage Analysis ─────────────────────────────────────────────────
+
+/**
+ * Get the trial status for a tenant: days remaining, credits used, whether expired.
+ */
+export function getTrialStatus(tenant: Tenant) {
+  if (!tenant.trialStartedAt) {
+    return { inTrial: false, daysRemaining: 0, trialDay: 0, expired: false };
+  }
+
+  const now = Date.now();
+  const started = new Date(tenant.trialStartedAt).getTime();
+  const elapsed = now - started;
+  const elapsedDays = Math.floor(elapsed / (1000 * 60 * 60 * 24));
+  const trialDay = elapsedDays + 1; // 1-indexed
+  const daysRemaining = Math.max(0, 7 - elapsedDays);
+  const expired = daysRemaining === 0;
+  const creditsUsed = tenant.trialCredits - tenant.creditBalance;
+
+  return { inTrial: true, daysRemaining, trialDay, expired, creditsUsed };
+}
+
+/**
+ * Analyze usage velocity during days 4-7 of the trial to recommend a plan.
+ * Returns average daily credit burn and a recommended plan key.
+ */
+export async function analyzeTrialUsage(tenantId: number, trialStartedAt: Date) {
+  const db = await getDb();
+  if (!db) return { avgDailyBurn: 0, recommendedPlan: "starter" as const };
+
+  // Days 4-7: from day 3 (0-indexed) to day 7
+  const day4Start = new Date(trialStartedAt.getTime() + 3 * 24 * 60 * 60 * 1000);
+  const day7End = new Date(trialStartedAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const now = new Date();
+  const endDate = now < day7End ? now : day7End;
+
+  // Sum deductions (negative amounts) during days 4-7
+  const [result] = await db
+    .select({
+      totalSpent: sql<number>`COALESCE(ABS(SUM(CASE WHEN ${creditLedger.delta} < 0 THEN ${creditLedger.delta} ELSE 0 END)), 0)`,
+      deductionCount: sql<number>`COUNT(CASE WHEN ${creditLedger.delta} < 0 THEN 1 END)`,
+    })
+    .from(creditLedger)
+    .where(
+      and(
+        eq(creditLedger.tenantId, tenantId),
+        gte(creditLedger.createdAt, day4Start),
+        lte(creditLedger.createdAt, endDate)
+      )
+    );
+
+  const totalSpent = Number(result?.totalSpent ?? 0);
+  const daysCovered = Math.max(1, Math.ceil((endDate.getTime() - day4Start.getTime()) / (1000 * 60 * 60 * 24)));
+  const avgDailyBurn = totalSpent / daysCovered;
+
+  // Recommendation thresholds:
+  // < 50 credits/day (~5 generations) → Starter
+  // 50-200 credits/day (5-20 generations) → Pro
+  // > 200 credits/day (20+ generations) → Team
+  let recommendedPlan: "starter" | "pro" | "team" = "starter";
+  if (avgDailyBurn > 200) {
+    recommendedPlan = "team";
+  } else if (avgDailyBurn > 50) {
+    recommendedPlan = "pro";
+  }
+
+  return { avgDailyBurn, recommendedPlan, totalSpent, daysCovered, deductionCount: Number(result?.deductionCount ?? 0) };
 }

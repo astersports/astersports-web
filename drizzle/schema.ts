@@ -125,6 +125,10 @@ export const tenants = mysqlTable("tenants", {
   seats: int("seats").default(1).notNull(),
   /** Restrict membership to emails from this domain (null = open). */
   allowedEmailDomain: varchar("allowedEmailDomain", { length: 255 }),
+  /** When the 7-day free trial started (null = no trial / already converted). */
+  trialStartedAt: timestamp("trialStartedAt"),
+  /** Credits granted at trial start (for tracking how much of the trial was used). */
+  trialCredits: int("trialCredits").default(0).notNull(),
   /** Stripe Customer ID for this tenant. */
   stripeCustomerId: varchar("stripeCustomerId", { length: 128 }),
   /** Stripe Subscription ID for the active plan. */

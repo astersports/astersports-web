@@ -21,9 +21,11 @@ import {
   listCreditLedger,
   toggleFavorite,
   getTenantFavoriteJobIds,
+  getTrialStatus,
+  analyzeTrialUsage,
 } from "../studioDb";
 import { buildInstruction, computeCredits, type ControlSettings } from "../../shared/controls";
-import { CREDIT_COST, LOW_BALANCE_THRESHOLD } from "../../shared/billing";
+import { CREDIT_COST, LOW_BALANCE_THRESHOLD, PLANS, TRIAL_DURATION_DAYS, TRIAL_RECOMMENDATION_START_DAY } from "../../shared/billing";
 import { sanitizeElementName, sanitizeColorValue, MAX_ELEMENT_NAME_LENGTH } from "../../shared/sanitize";
 
 export const studioRouter = router({
@@ -423,4 +425,39 @@ export const studioRouter = router({
 
       return { jobId: newJob.id, creditsUsed: cost };
     }),
+
+  /** Get the current trial status and plan recommendation for the tenant. */
+  trialStatus: tenantProcedure.query(async ({ ctx }) => {
+    const tenant = ctx.tenant;
+    const trial = getTrialStatus(tenant);
+
+    // If not in trial or before day 4, skip usage analysis
+    if (!trial.inTrial || trial.trialDay < TRIAL_RECOMMENDATION_START_DAY) {
+      return {
+        ...trial,
+        recommendation: null,
+      };
+    }
+
+    // Analyze usage from days 4-7 and recommend a plan
+    const usage = await analyzeTrialUsage(tenant.id, tenant.trialStartedAt!);
+    const plan = PLANS[usage.recommendedPlan];
+
+    return {
+      ...trial,
+      recommendation: {
+        planKey: usage.recommendedPlan,
+        planName: plan.name,
+        priceMonthly: plan.priceMonthly,
+        creditsPerCycle: plan.creditsPerCycle,
+        avgDailyBurn: Math.round(usage.avgDailyBurn),
+        projectedMonthly: Math.round(usage.avgDailyBurn * 30),
+        reason: usage.avgDailyBurn > 200
+          ? "Your team's high generation volume would benefit from pooled seats."
+          : usage.avgDailyBurn > 50
+          ? "Your active usage suggests the Pro plan's larger credit pool is the best fit."
+          : "The Starter plan covers your current usage comfortably.",
+      },
+    };
+  }),
 });

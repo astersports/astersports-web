@@ -270,3 +270,23 @@
 - [x] Frontend: Add "Re-run" button in detail modal
 - [x] Frontend: Add batch select mode with checkbox overlay + "Download ZIP" action bar
 - [x] Verification: pnpm check + pnpm test passing
+
+## Free Trial + Smart Billing Recommendation
+- [x] Backend: Add trialStartedAt and trialCredits columns to tenants table
+- [x] Backend: Initialize new tenants with 150 trial credits and trialStartedAt = now
+- [x] Backend: Add usage analysis query (daily burn rate from credit ledger, days 4-7)
+- [x] Backend: Add recommendation engine (map usage velocity to plan suggestion)
+- [x] Backend: Add tRPC query for trial status + recommendation
+- [ ] Frontend: Trial status banner (days remaining, credits remaining)
+- [ ] Frontend: Smart recommendation banner starting day 4
+- [ ] Frontend: Trial expiry modal/gate blocking generation after day 7 or 0 credits
+- [ ] Frontend: "Choose a plan" CTA linking to billing page
+
+## Side-by-Side Before/After with Synchronized Zoom
+- [ ] Replace slider-based BeforeAfter component with side-by-side layout
+- [ ] Add synchronized pan/zoom (pinch or scroll to zoom, drag to pan — both images move together)
+- [ ] Apply in StudioEditor results view and Generation Archive detail modal
+
+## Scale & Density Prompt Improvements
+- [x] Fix: Improve Scale prompt to be more explicit about physical size change of motifs
+- [x] Fix: Improve Density prompt to be more explicit about removing/thinning motifs

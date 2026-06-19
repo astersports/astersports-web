@@ -16,6 +16,7 @@ import {
   getTenantById,
 } from "../studioDb";
 import { emailAllowedForDomain } from "../../shared/domain";
+import { TRIAL_CREDITS } from "../../shared/billing";
 import { getUserByOpenId } from "../db";
 import { eq, and } from "drizzle-orm";
 import { getDb } from "../db";
@@ -53,12 +54,15 @@ export const tenantsRouter = router({
       const category = await ensureCategory(input.categoryName, input.categorySlug);
       if (!category) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create category" });
 
-      // Create tenant
+      // Create tenant with 7-day free trial
       const tenant = await createTenant({
         name: input.name,
         slug: input.slug,
         categoryId: category.id,
         allowedEmailDomain: input.allowedEmailDomain ?? null,
+        trialStartedAt: new Date(),
+        trialCredits: TRIAL_CREDITS,
+        creditBalance: TRIAL_CREDITS,
       });
 
       if (!tenant) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create tenant" });

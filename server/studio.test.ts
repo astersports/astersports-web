@@ -27,7 +27,7 @@ describe("buildInstruction", () => {
     controls.scale.percent = 30;
     const result = buildInstruction(controls);
     expect(result).toContain("SCALE UP");
-    expect(result).toContain("enlarge every motif");
+    expect(result).toContain("ENLARGE it by 30%");
     expect(result).toContain("30%");
     expect(result).not.toContain("SCALE DOWN");
   });
@@ -38,7 +38,7 @@ describe("buildInstruction", () => {
     controls.scale.percent = -20;
     const result = buildInstruction(controls);
     expect(result).toContain("SCALE DOWN");
-    expect(result).toContain("Uniformly reduce every motif");
+    expect(result).toContain("SHRINK it by 20%");
     expect(result).toContain("20%");
   });
 
@@ -49,7 +49,7 @@ describe("buildInstruction", () => {
     const result = buildInstruction(controls);
     expect(result).toContain("DENSITY REDUCTION");
     expect(result).toContain("50%");
-    expect(result).toContain("base cloth ground color");
+    expect(result).toContain("base fabric background color");
   });
 
   it("builds remove element instruction", () => {
