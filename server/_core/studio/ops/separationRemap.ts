@@ -16,6 +16,7 @@ import { decodeUpright } from "../../image/decodeUpright";
 import type { FabricMask, MaskImageInput } from "../../masking";
 import { rgb255ToLab, labToRgb255, hexToLab, deltaE2000 } from "./color";
 import { kmeans, type Vec3 } from "./kmeans";
+import { fabricMembership } from "./membership";
 
 export interface SeparationRemapParams {
   /** User-picked source color to identify the separation to change (hex/CSS). */
@@ -38,24 +39,6 @@ export interface SeparationRemapOptions {
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const smoothstep = (w: number) => w * w * (3 - 2 * w);
 
-/** Fabric pixel membership: raster when dims match, else the normalized bbox. */
-function buildMembership(fabric: FabricMask, width: number, height: number): Uint8Array {
-  const m = new Uint8Array(width * height);
-  const r = fabric.raster;
-  if (r && r.width === width && r.height === height) {
-    for (let i = 0; i < m.length; i++) m[i] = r.data[i] > 127 ? 1 : 0;
-    return m;
-  }
-  const x0 = clamp(Math.floor(fabric.bbox.x * width), 0, width);
-  const y0 = clamp(Math.floor(fabric.bbox.y * height), 0, height);
-  const x1 = clamp(Math.ceil((fabric.bbox.x + fabric.bbox.w) * width), 0, width);
-  const y1 = clamp(Math.ceil((fabric.bbox.y + fabric.bbox.h) * height), 0, height);
-  for (let y = y0; y < y1; y++) {
-    for (let x = x0; x < x1; x++) m[y * width + x] = 1;
-  }
-  return m;
-}
-
 export async function separationRemap(
   image: MaskImageInput,
   fabric: FabricMask,
@@ -67,7 +50,7 @@ export async function separationRemap(
   const maxSamples = options.maxSamples ?? 20000;
 
   const { buffer, width, height } = await decodeUpright(image.url); // mutable RGBA copy
-  const membership = buildMembership(fabric, width, height);
+  const membership = fabricMembership(fabric, width, height);
 
   // Collect fabric pixel indices + their LAB.
   const idxs: number[] = [];
