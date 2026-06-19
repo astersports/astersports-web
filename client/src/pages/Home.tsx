@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Code, Globe, Wrench, Shield, Mail, ArrowRight, MapPin, Menu, X, ChevronDown, Send, Settings } from "lucide-react";
+import { Code, Globe, Wrench, Shield, Mail, ArrowRight, MapPin, Menu, X, ChevronDown, Send, Settings, Palette, Sparkles } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 const LOGO_URL = "/manus-storage/aster_sports_logo_high_res_2b537f86.png";
@@ -105,6 +105,9 @@ function Header() {
 
         {/* Desktop nav */}
         <nav className="hidden sm:flex items-center gap-6">
+          <a href="/studio" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
+            Print Studio
+          </a>
           <a href="#services" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
             Services
           </a>
@@ -116,10 +119,15 @@ function Header() {
           </a>
 
           {isOwner && (
-            <a href="/admin/billing" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors flex items-center gap-1" style={{ fontFamily: "var(--font-display)" }}>
-              <Settings className="w-3.5 h-3.5" />
-              Billing
-            </a>
+            <>
+              <a href="/aau" className="text-sm text-[#f5b731] hover:text-[#e67e22] transition-colors font-medium" style={{ fontFamily: "var(--font-display)" }}>
+                AAU Basketball
+              </a>
+              <a href="/admin/billing" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors flex items-center gap-1" style={{ fontFamily: "var(--font-display)" }}>
+                <Settings className="w-3.5 h-3.5" />
+                Billing
+              </a>
+            </>
           )}
           <a
             href="#contact"
@@ -148,6 +156,9 @@ function Header() {
         }`}
       >
         <nav className="container pb-6 flex flex-col gap-4 bg-[#0a0e1a]/95 backdrop-blur-xl">
+          <a href="/studio" className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
+            Print Studio
+          </a>
           <a href="#services" className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
             Services
           </a>
@@ -159,10 +170,15 @@ function Header() {
           </a>
 
           {isOwner && (
-            <a href="/admin/billing" className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2 flex items-center gap-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
-              <Settings className="w-4 h-4" />
-              Billing
-            </a>
+            <>
+              <a href="/aau" className="text-base text-[#f5b731] hover:text-[#e67e22] transition-colors py-2 font-medium" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
+                AAU Basketball
+              </a>
+              <a href="/admin/billing" className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2 flex items-center gap-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
+                <Settings className="w-4 h-4" />
+                Billing
+              </a>
+            </>
           )}
           <a
             href="#contact"
@@ -208,7 +224,7 @@ function HeroSection() {
           >
             <StarAccent className="animate-pulse-glow" />
             <span className="text-sm font-medium text-[#f5b731] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
-              Web Development Agency
+              Design & Technology Studio
             </span>
           </div>
 
@@ -218,12 +234,12 @@ function HeroSection() {
             }`}
             style={{ fontFamily: "var(--font-display)" }}
           >
-            We build digital
+            We design, build &
             <br />
-            infrastructure that
+            elevate brands that
             <br />
             <span className="bg-gradient-to-r from-[#f5b731] to-[#e67e22] bg-clip-text text-transparent">
-              doesn't break.
+              stand apart.
             </span>
           </h1>
 
@@ -232,8 +248,7 @@ function HeroSection() {
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
           >
-            Aster Sports provides custom web development and ongoing maintenance
-            for organizations that need reliable, high-performance digital presence.
+            From print design and pattern engineering to web development and brand identity — we bring creative vision and technical precision to sports, fashion, and lifestyle brands.
           </p>
 
           <div
@@ -276,28 +291,28 @@ function HeroSection() {
 
 const services = [
   {
+    icon: Palette,
+    title: "Print & Pattern Design",
+    description:
+      "AI-powered print engineering for textiles and apparel. Scale, recolor, and refine patterns with precision tools built for fashion production.",
+  },
+  {
     icon: Code,
-    title: "Custom Web Development",
+    title: "Web Development",
     description:
       "Bespoke websites and web applications built from the ground up. Clean code, modern frameworks, pixel-perfect execution.",
   },
   {
-    icon: Wrench,
-    title: "Ongoing Maintenance",
+    icon: Sparkles,
+    title: "Brand Identity",
     description:
-      "Continuous updates, security patches, performance monitoring, and content changes. Your site stays current without the headache.",
+      "Visual identity systems, logo design, and brand guidelines that give sports and lifestyle brands a distinctive creative edge.",
   },
   {
     icon: Globe,
-    title: "Hosting & Infrastructure",
+    title: "Digital Strategy",
     description:
-      "Reliable hosting solutions with SSL, CDN, and automated backups. We keep your digital presence online and fast.",
-  },
-  {
-    icon: Shield,
-    title: "Security & Performance",
-    description:
-      "Regular security audits, performance optimization, and uptime monitoring. Protection and speed as standard.",
+      "End-to-end digital presence management — hosting, performance, security, and ongoing evolution of your online platform.",
   },
 ];
 
@@ -474,19 +489,18 @@ function AboutSection() {
             }`}
           >
             <p className="text-lg text-slate-300 leading-relaxed">
-              Aster Sports is a web development agency based in Westchester, NY. We specialize in
-              building custom websites and web applications for organizations that value reliability,
-              performance, and long-term partnership over quick fixes.
+              Aster Sports is a design and technology studio based in Westchester, NY. We work at
+              the intersection of creative design and technical engineering — from AI-powered print
+              pattern tools for fashion production to custom web platforms for sports and lifestyle brands.
             </p>
             <p className="text-lg text-slate-300 leading-relaxed">
-              We treat every project like infrastructure — because that's what it is. Your website
-              is the foundation of your digital presence, and it deserves the same care and precision
-              as any critical system. From initial architecture to ongoing maintenance, we're in it
-              for the long haul.
+              We treat every project with the precision it deserves. Whether it's engineering a
+              textile print workflow, building a brand identity system, or developing a web application,
+              we bring the same care and craftsmanship to every detail.
             </p>
             <p className="text-slate-400 leading-relaxed">
-              Currently building digital solutions for St. Patrick's in Armonk, NY and other
-              community-driven institutions across the Northeast.
+              Currently serving fashion brands, sports organizations, and community-driven
+              institutions across the Northeast and beyond.
             </p>
           </div>
 
@@ -506,28 +520,28 @@ function AboutSection() {
 
 const faqs = [
   {
+    question: "What services does Aster Sports offer?",
+    answer: "We offer AI-powered print and pattern design for textiles, custom web development, brand identity systems, and digital strategy. Our Print Studio tool lets fashion brands scale, recolor, and refine garment prints with precision.",
+  },
+  {
+    question: "How does the Print Studio work?",
+    answer: "Upload a garment photo, and our AI detects the print elements (florals, geometrics, textures). Then use controls to adjust density, scale, remove elements, or shift colorways. Results are generated in seconds.",
+  },
+  {
     question: "What's your typical project timeline?",
-    answer: "Most websites take 4–8 weeks from kickoff to launch, depending on complexity. A simple landing page can be ready in 1–2 weeks. We'll give you a clear timeline during our discovery call and keep you updated throughout.",
+    answer: "Print Studio edits are instant. For web development and branding projects, most take 4–8 weeks from kickoff to launch. We'll give you a clear timeline during our discovery call.",
   },
   {
     question: "How does billing work?",
-    answer: "We typically structure projects with a 50% deposit upfront and 50% upon completion. For ongoing maintenance, we offer monthly retainer plans billed automatically. We accept credit cards and bank transfers.",
+    answer: "Print Studio uses a credit-based system — each generation costs credits. For web and branding projects, we structure with a 50% deposit upfront and 50% upon completion. Monthly retainers available for ongoing work.",
   },
   {
-    question: "What does ongoing maintenance include?",
-    answer: "Our maintenance plans cover security updates, performance monitoring, content changes, bug fixes, uptime monitoring, and regular backups. Think of it as having a dedicated tech team on call without the overhead.",
+    question: "Do you work with clients outside of Westchester?",
+    answer: "Absolutely. While we're based in Westchester, NY, we work with fashion brands and organizations nationwide. Print Studio is available globally, and all collaboration happens digitally.",
   },
   {
-    question: "Do you work with organizations outside of Westchester?",
-    answer: "Absolutely. While we're based in Westchester, NY, we work with clients across the country. All of our communication and collaboration happens digitally, so location is never a barrier.",
-  },
-  {
-    question: "What technologies do you use?",
-    answer: "We use modern, battle-tested frameworks and tools — React, Next.js, Node.js, and Tailwind CSS among others. We choose the right stack for each project based on your specific needs, not just what's trendy.",
-  },
-  {
-    question: "Can you take over an existing website?",
-    answer: "Yes. We regularly take over existing sites for maintenance, redesigns, or performance improvements. We'll audit your current setup, identify issues, and propose a clear path forward.",
+    question: "What technologies power your tools?",
+    answer: "Our Print Studio uses advanced AI image generation with textile-specific prompt engineering. Web projects use React, Node.js, and modern frameworks chosen for each client's needs.",
   },
 ];
 
@@ -643,10 +657,10 @@ function ContactSection() {
                 className="text-3xl md:text-4xl font-bold text-white mb-6 tracking-tight"
                 style={{ fontFamily: "var(--font-display)" }}
               >
-                Ready to build something
+                Ready to create something
                 <br />
                 <span className="bg-gradient-to-r from-[#f5b731] to-[#e67e22] bg-clip-text text-transparent">
-                  that lasts?
+                  that stands apart?
                 </span>
               </h2>
               <p className="text-lg text-slate-300 mb-8 leading-relaxed">
@@ -753,6 +767,8 @@ function ContactSection() {
 }
 
 function Footer() {
+  const { user } = useAuth();
+  const isOwner = user?.role === "admin" && user?.openId === import.meta.env.VITE_OWNER_OPEN_ID;
   return (
     <footer className="py-12 bg-[#070a12] border-t border-white/5">
       <div className="container">
@@ -766,10 +782,12 @@ function Footer() {
             </div>
 
             <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 text-sm text-slate-400">
-              <span>Custom Web Development & Maintenance</span>
-              <a href="/aau" className="text-[#f5b731] hover:text-[#e67e22] transition-colors">
-                AAU Basketball
-              </a>
+              <span>Design, Technology & Creative Services</span>
+              {isOwner && (
+                <a href="/aau" className="text-[#f5b731] hover:text-[#e67e22] transition-colors">
+                  AAU Basketball
+                </a>
+              )}
               <a href="/studio" className="text-[#f5b731] hover:text-[#e67e22] transition-colors">
                 Print Studio
               </a>

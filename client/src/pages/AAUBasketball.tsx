@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2, ShieldX } from "lucide-react";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import LiveScores from "../components/aau/LiveScores";
 import TournamentHistory from "../components/aau/TournamentHistory";
@@ -21,8 +22,39 @@ const SECTIONS = [
 type SectionId = typeof SECTIONS[number]["id"];
 
 export default function AAUBasketball() {
+  const { user, loading: authLoading, isAuthenticated } = useAuth();
   const [activeSection, setActiveSection] = useState<SectionId>("scores");
   const tabsRef = useRef<HTMLDivElement>(null);
+
+  // Owner gate: only frank@astersports.co can access
+  const ownerOpenId = import.meta.env.VITE_OWNER_OPEN_ID;
+  const isOwner = isAuthenticated && user?.openId === ownerOpenId;
+
+  // Show loading state while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#0a0e1a] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-[#f5b731] animate-spin" />
+      </div>
+    );
+  }
+
+  // Block non-owners
+  if (!isOwner) {
+    return (
+      <div className="min-h-screen bg-[#0a0e1a] flex items-center justify-center">
+        <div className="text-center max-w-md px-6">
+          <ShieldX className="w-16 h-16 text-red-400 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-white mb-2">Access Restricted</h1>
+          <p className="text-slate-400 mb-6">This section is only available to authorized team members.</p>
+          <a href="/" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#f5b731] to-[#e67e22] text-[#0a0e1a] font-medium text-sm">
+            <ArrowLeft className="w-4 h-4" />
+            Back to Home
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   // Fetch leaderboard for the dynamic record display
   const { data: leaderboardData } = trpc.leaderboard.get.useQuery(undefined, {

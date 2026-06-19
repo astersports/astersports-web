@@ -181,3 +181,23 @@
 - [x] Add tests for sanitization edge cases (injection attempts, unicode, special chars)
 - [x] Verify build and all tests pass
 - [x] Save checkpoint
+
+## Rebrand: Favicon, Meta, Messaging & Navigation
+- [x] Generate favicon.ico (16x16, 32x32, 48x48) from constellation logo
+- [x] Generate apple-touch-icon.png (180x180) from logo
+- [x] Create OG image (1200x630) with logo + brand name for social sharing
+- [x] Update index.html with proper meta tags (og:image, apple-touch-icon, theme-color)
+- [x] Update site title/description meta tags to reflect design studio positioning
+- [x] Rebrand hero section messaging from "web development agency" to creative design studio
+- [x] Update services section to reflect broader offerings (Print Design, Web Development, Brand Identity)
+- [x] Add persistent top navigation menu with links to Home, Print Studio, Services, About, Contact
+- [x] Ensure nav works on mobile with hamburger menu
+- [x] Verify favicon shows in browser tab and bookmarks
+- [ ] Save checkpoint and push to GitHub
+
+## AAU Access Control (Owner-Only)
+- [x] Add backend protection: make AAU/leaderboard procedures owner-only (check ctx.user matches OWNER_OPEN_ID)
+- [x] Add frontend guard: redirect non-owner users away from /aau
+- [x] Hide AAU nav link in header and footer unless Frank is logged in
+- [x] Verify build and tests pass
+- [x] Save checkpoint

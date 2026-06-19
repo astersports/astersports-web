@@ -1,7 +1,9 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { ENV } from "./_core/env";
+import { TRPCError } from "@trpc/server";
 import { billingRouter } from "./billing";
 import { tenantsRouter } from "./routers/tenants";
 import { studioRouter } from "./routers/studio";
@@ -10,6 +12,18 @@ import { fetchAllGames, invalidateAllCaches, getTournamentRegistry } from "./scr
 import { notifyOwner } from "./_core/notification";
 import { sdk } from "./_core/sdk";
 import type { Game } from "../shared/types";
+
+// Owner-only procedure: restricts access to the site owner (OWNER_OPEN_ID)
+const ownerProcedure = protectedProcedure.use(async ({ ctx, next }) => {
+  if (!ENV.ownerOpenId) {
+    if (ctx.user.role !== "admin") {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Owner access only" });
+    }
+  } else if (ctx.user.openId !== ENV.ownerOpenId) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Owner access only" });
+  }
+  return next({ ctx });
+});
 
 // Track last known game statuses for notifications
 const lastKnownStatuses: Map<string, string> = new Map();
@@ -33,9 +47,9 @@ export const appRouter = router({
   studio: studioRouter,
   studioBilling: studioBillingRouter,
 
-  // AAU Basketball endpoints
+  // AAU Basketball endpoints (owner-only)
   games: router({
-    list: publicProcedure.query(async () => {
+    list: ownerProcedure.query(async () => {
       const result = await fetchAllGames();
       return {
         games: result.games,
@@ -45,7 +59,7 @@ export const appRouter = router({
       };
     }),
 
-    live: publicProcedure.query(async () => {
+    live: ownerProcedure.query(async () => {
       const result = await fetchAllGames();
       const liveGames = result.games.filter((g: Game) => g.status === 'live');
       return {
@@ -55,7 +69,7 @@ export const appRouter = router({
       };
     }),
 
-    completed: publicProcedure.query(async () => {
+    completed: ownerProcedure.query(async () => {
       const result = await fetchAllGames();
       const completedGames = result.games.filter((g: Game) => g.status === 'completed');
       return {
@@ -64,7 +78,7 @@ export const appRouter = router({
       };
     }),
 
-    refresh: publicProcedure.mutation(async () => {
+    refresh: ownerProcedure.mutation(async () => {
       invalidateAllCaches();
       const result = await fetchAllGames();
       return {
@@ -76,7 +90,7 @@ export const appRouter = router({
   }),
 
   leaderboard: router({
-    get: publicProcedure.query(async () => {
+    get: ownerProcedure.query(async () => {
       const result = await fetchAllGames();
       const completedGames = result.games.filter((g: Game) => g.status === 'completed');
 
