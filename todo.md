@@ -75,3 +75,57 @@
 - [x] Hide AAU Basketball from main nav menu
 - [x] Add AAU Basketball link to footer
 - [x] Tighten spacing between all landing page sections (reduced from py-24/py-32 to py-16/py-20)
+
+# Print Studio Integration (/studio)
+## Phase 1: Database Schema
+- [x] Add categories table to drizzle/schema.ts
+- [x] Add tenants table to drizzle/schema.ts
+- [x] Add memberships table to drizzle/schema.ts
+- [x] Add credit_ledger table to drizzle/schema.ts
+- [x] Add jobs table to drizzle/schema.ts
+- [x] Add job_variations table to drizzle/schema.ts
+- [x] Run pnpm db:push to sync schema
+
+## Phase 2: Shared Modules & Server Middleware
+- [x] Add shared/controls.ts (ControlSettings, buildInstruction, computeCredits)
+- [x] Add shared/billing.ts (PLANS, TOPUP_PACKS, CREDIT_COST)
+- [x] Add shared/domain.ts (emailAllowedForDomain)
+- [x] Add server/tenancy.ts (tenantProcedure, tenantAdminProcedure)
+- [x] Extend server/db.ts with tenant/membership/credit/job helpers (server/studioDb.ts)
+
+## Phase 3: Server Routers & AI Engine
+- [x] Add server/routers/tenants.ts
+- [x] Add server/routers/studio.ts
+- [x] Add server/routers/studioBilling.ts
+- [x] Add server/aiEngine.ts (detectPrintElements, generateEditedImage)
+- [x] Wire new routers into server/routers.ts appRouter
+
+## Phase 4: Frontend Components & Pages
+- [x] Add client/src/contexts/TenantContext.tsx
+- [x] Add client/src/components/studio/AppShell.tsx
+- [x] Add client/src/components/studio/ControlPanel.tsx
+- [x] Add client/src/components/studio/PercentStepper.tsx
+- [x] Add client/src/components/studio/BeforeAfter.tsx
+- [x] Add client/src/pages/studio/StudioEditor.tsx
+- [x] Add client/src/pages/studio/StudioHistory.tsx
+- [x] Add client/src/pages/studio/StudioAdmin.tsx
+- [x] Add client/src/pages/studio/StudioBilling.tsx
+
+## Phase 5: Routing & Navigation
+- [x] Add Protected wrapper and /studio routes in App.tsx
+- [x] Add Studio link in landing page nav/footer (via StudioLayout gating)
+
+## Phase 6: Stripe Billing for Studio
+- [x] Add Studio Stripe products (Starter, Pro, Team, top-ups) via studioBilling router
+- [x] Implement real checkout sessions in studioBilling router
+- [x] Add webhook handlers for Studio subscription/top-up events
+
+## Phase 7: Tests
+- [x] Write vitest tests for controls (buildInstruction, computeCredits)
+- [x] Write vitest tests for domain helpers
+- [x] Write vitest tests for credit deduction logic
+
+## Phase 8: Verify & Deliver
+- [ ] Verify build passes
+- [ ] Take screenshots of /studio pages
+- [ ] Save checkpoint

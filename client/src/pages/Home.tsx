@@ -770,6 +770,9 @@ function Footer() {
               <a href="/aau" className="text-[#f5b731] hover:text-[#e67e22] transition-colors">
                 AAU Basketball
               </a>
+              <a href="/studio" className="text-[#f5b731] hover:text-[#e67e22] transition-colors">
+                Print Studio
+              </a>
               <a href="mailto:frank@astersports.co" className="text-[#f5b731] hover:text-[#e67e22] transition-colors">
                 frank@astersports.co
               </a>

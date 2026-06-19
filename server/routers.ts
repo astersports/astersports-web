@@ -3,6 +3,9 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { billingRouter } from "./billing";
+import { tenantsRouter } from "./routers/tenants";
+import { studioRouter } from "./routers/studio";
+import { studioBillingRouter } from "./routers/studioBilling";
 import { fetchAllGames, invalidateAllCaches, getTournamentRegistry } from "./scraper";
 import { notifyOwner } from "./_core/notification";
 import { sdk } from "./_core/sdk";
@@ -24,6 +27,11 @@ export const appRouter = router({
 
   // Stripe billing routes (admin-only)
   billing: billingRouter,
+
+  // Print Studio routes
+  tenants: tenantsRouter,
+  studio: studioRouter,
+  studioBilling: studioBillingRouter,
 
   // AAU Basketball endpoints
   games: router({

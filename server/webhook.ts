@@ -7,6 +7,9 @@ import { notifyOwner } from "./_core/notification";
 import { ENV } from "./_core/env";
 import { emailPaymentFailed, emailSubscriptionCanceled, emailSubscriptionActivated } from "./email";
 import type Stripe from "stripe";
+import { grantCredits, updateTenantStripe } from "./studioDb";
+import { PLANS, TOPUP_PACKS, type PlanKey } from "../shared/billing";
+import { tenants } from "../drizzle/schema";
 
 /**
  * Stripe webhook handler.
@@ -48,21 +51,56 @@ export async function handleStripeWebhook(req: Request, res: Response) {
 
   try {
     switch (event.type) {
-      case "checkout.session.completed":
-        await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        // Route to Studio handler if metadata indicates print-studio product
+        if (session.metadata?.product === "print-studio") {
+          await handleStudioCheckoutCompleted(session);
+        } else {
+          await handleCheckoutCompleted(session);
+        }
         break;
+      }
 
-      case "invoice.paid":
-        await handleInvoicePaid(event.data.object as Stripe.Invoice);
+      case "invoice.paid": {
+        const invoice = event.data.object as Stripe.Invoice;
+        // Check if this invoice belongs to a Studio subscription
+        const invSub = (invoice as any).subscription;
+        let isStudioInvoice = false;
+        if (invSub) {
+          try {
+            const subId = typeof invSub === "string" ? invSub : invSub.id;
+            const sub = await stripe.subscriptions.retrieve(subId);
+            isStudioInvoice = sub.metadata?.product === "print-studio";
+          } catch { /* ignore */ }
+        }
+        if (isStudioInvoice) {
+          await handleStudioInvoicePaid(invoice);
+        } else {
+          await handleInvoicePaid(invoice);
+        }
         break;
+      }
 
-      case "customer.subscription.updated":
-        await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
+      case "customer.subscription.updated": {
+        const sub = event.data.object as Stripe.Subscription;
+        if (sub.metadata?.product === "print-studio") {
+          await handleStudioSubscriptionUpdated(sub);
+        } else {
+          await handleSubscriptionUpdated(sub);
+        }
         break;
+      }
 
-      case "customer.subscription.deleted":
-        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+      case "customer.subscription.deleted": {
+        const sub = event.data.object as Stripe.Subscription;
+        if (sub.metadata?.product === "print-studio") {
+          await handleStudioSubscriptionDeleted(sub);
+        } else {
+          await handleSubscriptionDeleted(sub);
+        }
         break;
+      }
 
       case "invoice.payment_failed":
         await handlePaymentFailed(event.data.object as Stripe.Invoice);
@@ -399,5 +437,160 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
     console.log(`[Stripe Webhook] Payment failed processed: ${invoice.id} for ${clientName}`);
   } catch (err) {
     console.error("[Stripe Webhook] Error handling payment_failed:", (err as Error).message);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PRINT STUDIO WEBHOOK HANDLERS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Handle Studio checkout.session.completed — subscription or top-up purchase.
+ */
+async function handleStudioCheckoutCompleted(session: Stripe.Checkout.Session) {
+  const tenantId = parseInt(session.metadata?.tenantId ?? "0", 10);
+  if (!tenantId) {
+    console.error("[Studio Webhook] Missing tenantId in checkout metadata");
+    return;
+  }
+
+  const db = await getDb();
+  if (!db) {
+    console.error("[Studio Webhook] Database not available");
+    return;
+  }
+
+  // Handle subscription checkout
+  if (session.mode === "subscription" && session.subscription) {
+    const subscriptionId =
+      typeof session.subscription === "string" ? session.subscription : session.subscription.id;
+    const plan = (session.metadata?.plan ?? "starter") as PlanKey;
+    const planDef = PLANS[plan as Exclude<PlanKey, "none">];
+
+    // Update tenant with Stripe IDs and plan
+    await updateTenantStripe(tenantId, {
+      stripeSubscriptionId: subscriptionId,
+      plan: plan as any,
+    });
+
+    // Grant initial credits (multiply by seats for Team plan)
+    if (planDef) {
+      const seats = parseInt(session.metadata?.seats ?? "1", 10) || 1;
+      const totalCredits = planDef.perSeat ? planDef.creditsPerCycle * seats : planDef.creditsPerCycle;
+      await grantCredits(
+        tenantId,
+        totalCredits,
+        "subscription_start",
+        subscriptionId
+      );
+    }
+
+    console.log(`[Studio Webhook] Subscription activated for tenant ${tenantId}: ${plan}`);
+
+    try {
+      await notifyOwner({
+        title: "Print Studio Subscription",
+        content: `Tenant #${tenantId} subscribed to ${plan} plan. Subscription: ${subscriptionId}`,
+      });
+    } catch { /* ignore */ }
+  }
+
+  // Handle top-up payment
+  if (session.mode === "payment" && session.metadata?.packKey) {
+    const pack = TOPUP_PACKS.find((p) => p.key === session.metadata!.packKey);
+    if (pack) {
+      await grantCredits(
+        tenantId,
+        pack.credits,
+        "topup",
+        session.id
+      );
+      console.log(`[Studio Webhook] Top-up ${pack.name} (${pack.credits} credits) for tenant ${tenantId}`);
+    }
+  }
+}
+
+/**
+ * Handle Studio invoice.paid — recurring subscription renewal.
+ * Grants credits for the billing cycle.
+ */
+async function handleStudioInvoicePaid(invoice: Stripe.Invoice) {
+  // Only grant credits for recurring invoices (not the first one, which is handled by checkout)
+  const billingReason = (invoice as any).billing_reason;
+  if (billingReason === "subscription_create") {
+    console.log("[Studio Webhook] Skipping initial invoice (handled by checkout)");
+    return;
+  }
+
+  const invSub = (invoice as any).subscription;
+  if (!invSub) return;
+
+  const subId = typeof invSub === "string" ? invSub : invSub.id;
+
+  try {
+    const sub = await stripe.subscriptions.retrieve(subId);
+    const tenantId = parseInt(sub.metadata?.tenantId ?? "0", 10);
+    const plan = (sub.metadata?.plan ?? "starter") as PlanKey;
+
+    if (!tenantId) return;
+
+    const planDef = PLANS[plan as Exclude<PlanKey, "none">];
+    if (planDef) {
+      const seats = parseInt(sub.metadata?.seats ?? "1", 10) || 1;
+      const totalCredits = planDef.perSeat ? planDef.creditsPerCycle * seats : planDef.creditsPerCycle;
+      await grantCredits(
+        tenantId,
+        totalCredits,
+        "subscription_renewal",
+        invoice.id
+      );
+      console.log(`[Studio Webhook] Renewal credits granted for tenant ${tenantId}: ${totalCredits}`);
+    }
+  } catch (err) {
+    console.error("[Studio Webhook] Error handling invoice.paid:", (err as Error).message);
+  }
+}
+
+/**
+ * Handle Studio subscription updated.
+ */
+async function handleStudioSubscriptionUpdated(subscription: Stripe.Subscription) {
+  const tenantId = parseInt(subscription.metadata?.tenantId ?? "0", 10);
+  if (!tenantId) return;
+
+  const plan = (subscription.metadata?.plan ?? "none") as PlanKey;
+
+  try {
+    await updateTenantStripe(tenantId, {
+      stripeSubscriptionId: subscription.id,
+      plan: plan as any,
+    });
+    console.log(`[Studio Webhook] Subscription updated for tenant ${tenantId}: ${subscription.status}`);
+  } catch (err) {
+    console.error("[Studio Webhook] Error handling subscription.updated:", (err as Error).message);
+  }
+}
+
+/**
+ * Handle Studio subscription deleted/canceled.
+ */
+async function handleStudioSubscriptionDeleted(subscription: Stripe.Subscription) {
+  const tenantId = parseInt(subscription.metadata?.tenantId ?? "0", 10);
+  if (!tenantId) return;
+
+  try {
+    await updateTenantStripe(tenantId, {
+      plan: "none" as any,
+    });
+    console.log(`[Studio Webhook] Subscription canceled for tenant ${tenantId}`);
+
+    try {
+      await notifyOwner({
+        title: "Print Studio Subscription Canceled",
+        content: `Tenant #${tenantId} subscription canceled. ID: ${subscription.id}`,
+      });
+    } catch { /* ignore */ }
+  } catch (err) {
+    console.error("[Studio Webhook] Error handling subscription.deleted:", (err as Error).message);
   }
 }

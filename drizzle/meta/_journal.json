@@ -15,6 +15,13 @@
       "when": 1781525774147,
       "tag": "0001_goofy_newton_destine",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1781887173018,
+      "tag": "0002_spooky_titania",
+      "breakpoints": true
     }
   ]
 }

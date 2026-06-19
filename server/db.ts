@@ -89,4 +89,5 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// Re-export studio-specific helpers for convenience
+export * from "./studioDb";
