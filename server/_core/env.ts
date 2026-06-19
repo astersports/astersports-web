@@ -10,4 +10,11 @@ export const ENV = {
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
+  /**
+   * Studio no-op guard: when enabled (default), an edited image is QA-checked
+   * against the original and, if the requested change was not applied, the job
+   * fails (and credits are refunded) instead of silently billing for a no-op.
+   * Set STUDIO_NOOP_GUARD=false to disable.
+   */
+  studioNoOpGuard: process.env.STUDIO_NOOP_GUARD !== "false",
 };

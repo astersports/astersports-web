@@ -9,6 +9,7 @@ import {
   buildInstruction,
   computeCredits,
   defaultControls,
+  describeExpectedChange,
   type ControlSettings,
 } from "../shared/controls";
 import { CREDIT_COST, PLANS, TOPUP_PACKS } from "../shared/billing";
@@ -157,6 +158,62 @@ describe("buildInstruction", () => {
     controls.remove.percent = 50;
     const result = buildInstruction(controls);
     expect(result).toBe("Return the image unchanged.");
+  });
+
+  it("no longer instructs the model to return the image unchanged as a fallback", () => {
+    const controls = defaultControls();
+    controls.scale.enabled = true;
+    controls.scale.percent = -50;
+    const result = buildInstruction(controls);
+    // The old escape hatch ("return the image unchanged rather than rotating it")
+    // produced billable no-ops and must not be present in an active edit prompt.
+    expect(result).not.toContain("unchanged rather than rotating");
+    expect(result).toContain("MUST apply the requested change");
+  });
+});
+
+describe("describeExpectedChange", () => {
+  it("returns empty string when no controls are active", () => {
+    expect(describeExpectedChange(defaultControls())).toBe("");
+  });
+
+  it("describes a scale-down as smaller motifs", () => {
+    const controls = defaultControls();
+    controls.scale.enabled = true;
+    controls.scale.percent = -50;
+    expect(describeExpectedChange(controls)).toContain("SMALLER");
+  });
+
+  it("describes a scale-up as larger motifs", () => {
+    const controls = defaultControls();
+    controls.scale.enabled = true;
+    controls.scale.percent = 30;
+    expect(describeExpectedChange(controls)).toContain("LARGER");
+  });
+
+  it("describes density, remove and recolor changes", () => {
+    const controls: ControlSettings = {
+      scale: { enabled: false, percent: 0 },
+      density: { enabled: true, percent: 40 },
+      remove: { enabled: true, element: "blue buds", percent: 50 },
+      recolor: { enabled: true, element: "pink blossoms", targetColor: "coral", coverage: 100 },
+      variations: 1,
+    };
+    const desc = describeExpectedChange(controls);
+    expect(desc).toContain("FEWER");
+    expect(desc).toContain("blue buds");
+    expect(desc).toContain("pink blossoms");
+    expect(desc).toContain("coral");
+  });
+
+  it("ignores controls with empty/zero values", () => {
+    const controls = defaultControls();
+    controls.density.enabled = true;
+    controls.density.percent = 0;
+    controls.remove.enabled = true;
+    controls.remove.element = "";
+    controls.remove.percent = 50;
+    expect(describeExpectedChange(controls)).toBe("");
   });
 });
 

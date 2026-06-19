@@ -24,7 +24,7 @@ import {
   getTrialStatus,
   analyzeTrialUsage,
 } from "../studioDb";
-import { buildInstruction, computeCredits, type ControlSettings } from "../../shared/controls";
+import { buildInstruction, computeCredits, describeExpectedChange, type ControlSettings } from "../../shared/controls";
 import { CREDIT_COST, LOW_BALANCE_THRESHOLD, PLANS, TRIAL_DURATION_DAYS, TRIAL_RECOMMENDATION_START_DAY } from "../../shared/billing";
 import { sanitizeElementName, sanitizeColorValue, MAX_ELEMENT_NAME_LENGTH } from "../../shared/sanitize";
 
@@ -158,8 +158,9 @@ export const studioRouter = router({
         });
       }
 
-      // Build instruction
+      // Build instruction + the expected-change description used by the no-op guard.
       const instruction = buildInstruction(controls);
+      const expectation = describeExpectedChange(controls);
 
       // Deduct credits (atomic; throws if a concurrent balance race loses).
       let newBalance: number;
@@ -197,7 +198,7 @@ export const studioRouter = router({
       const settled = await Promise.allSettled(
         Array.from({ length: controls.variations }, async (_unused, i) => {
           console.log(`[studio] Generating variation ${i + 1} for job ${job.id}`);
-          const resultUrl = await generateEditedImage(job.originalUrl, instruction);
+          const resultUrl = await generateEditedImage(job.originalUrl, instruction, "image/jpeg", expectation);
           await addVariation({
             jobId: job.id,
             tenantId: ctx.tenant.id,
@@ -395,6 +396,7 @@ export const studioRouter = router({
 
       // Create new job
       const instruction = buildInstruction(controls);
+      const expectation = describeExpectedChange(controls);
       const newJob = await createJob({
         tenantId: ctx.tenant.id,
         userId: ctx.user?.id ?? 0,
@@ -411,7 +413,7 @@ export const studioRouter = router({
       // Generate in background (don't block response)
       (async () => {
         try {
-          const resultUrl = await generateEditedImage(originalJob.originalUrl, instruction);
+          const resultUrl = await generateEditedImage(originalJob.originalUrl, instruction, "image/jpeg", expectation);
           const key = `studio/${ctx.tenant.id}/${newJob.id}/result-1.png`;
           const { url } = await storagePut(key, Buffer.from(await (await fetch(resultUrl)).arrayBuffer()), "image/png");
           await addVariation({ jobId: newJob.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: 1 });

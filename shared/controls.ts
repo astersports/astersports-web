@@ -234,8 +234,43 @@ export function buildInstruction(c: ControlSettings): string {
     "- Same lighting, white balance, and shadow placement.\n" +
     "- The hanger, clips, mannequin, or surface must remain pixel-identical.\n" +
     "- No watermarks, text overlays, or border artifacts.\n" +
-    "- If you cannot perform the edit without moving the garment, return the image unchanged rather than rotating it."
+    "- You MUST apply the requested change. Do NOT return the image unchanged. " +
+    "Preserve the garment's position and orientation, but the print modification above is REQUIRED."
   );
+}
+
+/**
+ * Human-readable description of the visible change a given control set should
+ * produce. Used by the server-side no-op guard (and, later, the eval harness)
+ * to verify the edited image actually differs from the original as requested.
+ * Returns "" when no change is expected.
+ */
+export function describeExpectedChange(c: ControlSettings): string {
+  const parts: string[] = [];
+
+  if (c.scale.enabled && c.scale.percent !== 0) {
+    parts.push(
+      c.scale.percent < 0
+        ? "the printed motifs are visibly SMALLER (reduced print scale), with more plain background fabric showing between them"
+        : "the printed motifs are visibly LARGER (enlarged print scale), filling more of the fabric surface"
+    );
+  }
+  if (c.density.enabled && c.density.percent > 0) {
+    parts.push(
+      "there are visibly FEWER printed motifs (the print is thinned out, with more bare background fabric showing)"
+    );
+  }
+  if (c.remove.enabled && c.remove.element && c.remove.percent > 0) {
+    const el = sanitizeElementName(c.remove.element);
+    if (el) parts.push(`some "${el}" motifs have been erased/removed from the fabric`);
+  }
+  if (c.recolor.enabled && c.recolor.element && c.recolor.targetColor) {
+    const el = sanitizeElementName(c.recolor.element);
+    const color = sanitizeColorValue(c.recolor.targetColor);
+    if (el && color) parts.push(`the "${el}" motifs have been recolored toward "${color}"`);
+  }
+
+  return parts.join("; ");
 }
 
 /** How many credits a given control settings job will consume. */
