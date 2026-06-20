@@ -41,6 +41,18 @@ async function startServer() {
     handleStripeWebhook
   );
 
+  // G0 diagnostic: temporary env-check endpoint (remove after verification)
+  app.get("/api/env-check", (_req, res) => {
+    res.json({
+      studioDensityLive: process.env.STUDIO_DENSITY_LIVE === "true",
+      maskProvider: process.env.STUDIO_MASK_PROVIDER || "classical",
+      appIdSet: !!process.env.VITE_APP_ID,
+      replicateTokenSet: !!process.env.REPLICATE_API_TOKEN,
+      nodeEnv: process.env.NODE_ENV || "unknown",
+      deployedAt: new Date().toISOString(),
+    });
+  });
+
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
