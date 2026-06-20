@@ -85,8 +85,8 @@ async function readPixelLab(png: Buffer, width: number, x: number, y: number) {
 
 describe("separationRemap (A1 acceptance)", () => {
   const W = 64, H = 64;
-  const LEFT = [40, 90, 120];   // target separation (muted blue)
-  const RIGHT = [60, 140, 70];  // off-target separation (green)
+  const LEFT = [40, 90, 120];    // target separation (muted blue)
+  const RIGHT = [225, 205, 40];  // off-target separation (yellow) — distinct cluster, beyond coverage tolerance
 
   // Target color shares the source separation's luminance (the op preserves L),
   // so a correct remap lands the separation on the target color in chroma.

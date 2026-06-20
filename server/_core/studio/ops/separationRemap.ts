@@ -23,7 +23,8 @@ export interface SeparationRemapParams {
   fromColor: string;
   /** Target color the separation is remapped toward (hex/CSS). */
   toColor: string;
-  /** 10..100 — soft-assignment radius in LAB (higher = more of the separation). */
+  /** 10..100 — selection tolerance over color families (ΔE2000 from fromColor a
+   *  centroid may sit and still be selected). Higher pulls in more nearby families. */
   coverage: number;
 }
 
@@ -37,7 +38,6 @@ export interface SeparationRemapOptions {
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-const smoothstep = (w: number) => w * w * (3 - 2 * w);
 
 export async function separationRemap(
   image: MaskImageInput,
@@ -79,28 +79,59 @@ export async function separationRemap(
     const d = deltaE2000(fromLab, { l: c[0], a: c[1], b: c[2] });
     if (d < best) { best = d; targetIdx = ci; }
   });
-  const target = centroids[targetIdx];
   const toLab = hexToLab(params.toColor);
 
-  // coverage 10..100 -> soft-assignment radius (LAB euclidean units).
-  const radius = 5 + (clamp(params.coverage, 10, 100) / 100) * 40;
+  // coverage 10..100 -> CLUSTER tolerance (LAB ΔE2000): how far a centroid may sit
+  // from fromColor and still belong to the selected separation. NOT a per-pixel
+  // radius — selection is by k-means cluster membership, so a distinct nearby
+  // separation (e.g. red rims) is bounded out by its own Voronoi cell. Crank
+  // coverage too high and adjacent color families come along — which is exactly
+  // what the eval's offTargetFabricDeltaE is there to report, now visible.
+  const tol = 5 + (clamp(params.coverage, 10, 100) / 100) * 40;
+  const selected = new Set<number>([targetIdx]);
+  centroids.forEach((c, ci) => {
+    if (deltaE2000(fromLab, { l: c[0], a: c[1], b: c[2] }) <= tol) selected.add(ci);
+  });
 
-  // Remap: shift a/b toward target, keep L. Soft falloff by distance to the
-  // target centroid blends edges and avoids halos. Pixels in other separations
-  // fall outside the radius (weight 0) and are untouched.
+  const nearestCentroid = (lab: Vec3): number => {
+    let bi = 0, bd = Infinity;
+    for (let ci = 0; ci < centroids.length; ci++) {
+      const c = centroids[ci];
+      const dl = lab[0] - c[0], da = lab[1] - c[1], db = lab[2] - c[2];
+      const d = dl * dl + da * da + db * db;
+      if (d < bd) { bd = d; bi = ci; }
+    }
+    return bi;
+  };
+
+  // Binary selection mask over the full image: 255 where a fabric pixel's nearest
+  // centroid is selected. Selected pixels get a FULL chroma remap (a,b -> target,
+  // L preserved) = a true dye-lot change across the whole separation incl. tonal
+  // spread. Unselected clusters are untouched.
+  const selMask = Buffer.alloc(width * height);
   for (let j = 0; j < idxs.length; j++) {
-    const lab = labs[j];
-    const dl = lab[0] - target[0];
-    const da = lab[1] - target[1];
-    const db = lab[2] - target[2];
-    const dist = Math.sqrt(dl * dl + da * da + db * db);
-    let w = 1 - dist / radius;
-    if (w <= 0) continue;
-    if (w > 1) w = 1;
-    w = smoothstep(w);
+    if (selected.has(nearestCentroid(labs[j]))) selMask[idxs[j]] = 255;
+  }
 
-    const newA = lab[1] + (toLab.a - lab[1]) * w;
-    const newB = lab[2] + (toLab.b - lab[2]) * w;
+  // Feather the selection ~1px in image space (thin and FIXED — not coverage-
+  // scaled) so cluster boundaries blend instead of speckling. Deterministic blur.
+  // sharp may emit >1 channel from a 1-channel raw input, so read with its stride.
+  const { data: alpha, info: alphaInfo } = await sharp(selMask, {
+    raw: { width, height, channels: 1 },
+  })
+    .blur(1)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const aStride = alphaInfo.channels;
+
+  // Blend remapped (a,b -> target) vs source by the feathered alpha, L held.
+  // Only fabric pixels are written; background is never touched.
+  for (let j = 0; j < idxs.length; j++) {
+    const a = alpha[idxs[j] * aStride] / 255;
+    if (a <= 0) continue;
+    const lab = labs[j];
+    const newA = lab[1] + (toLab.a - lab[1]) * a;
+    const newB = lab[2] + (toLab.b - lab[2]) * a;
     const rgb = labToRgb255({ l: lab[0], a: newA, b: newB });
     const p = idxs[j] * 4;
     buffer[p] = rgb.r;
