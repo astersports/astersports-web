@@ -25,7 +25,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Upload, Loader2, Sparkles, RefreshCw, AlertTriangle } from "lucide-react";
+import { Upload, Loader2, Sparkles, RefreshCw, AlertTriangle, Clock } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { compressImage } from "@/lib/imageCompress";
 import type { ControlSettings } from "@shared/controls";
@@ -53,11 +54,37 @@ export default function StudioEditor() {
   const [pollingJobId, setPollingJobId] = useState<number | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Processing timer & progress state
+  const [processingStartTime, setProcessingStartTime] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const uploadMutation = trpc.studio.upload.useMutation();
   const detectMutation = trpc.studio.detectElements.useMutation();
   const generateMutation = trpc.studio.generate.useMutation();
 
   const [uploadProgress, setUploadProgress] = useState("");
+
+  // Elapsed timer — ticks every second while processing
+  useEffect(() => {
+    if (step === "processing" && processingStartTime) {
+      setElapsedSeconds(0);
+      timerRef.current = setInterval(() => {
+        setElapsedSeconds(Math.floor((Date.now() - processingStartTime) / 1000));
+      }, 1000);
+      return () => {
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+      };
+    }
+    // Reset when leaving processing
+    if (step !== "processing" && timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, [step, processingStartTime]);
 
   // Poll for async job completion
   useEffect(() => {
@@ -210,6 +237,8 @@ export default function StudioEditor() {
 
         if (result.async) {
           // Async job started — switch to processing view and start polling
+          setProcessingStartTime(Date.now());
+          setElapsedSeconds(0);
           setStep("processing");
           setPollingJobId(result.jobId);
           toast.info("Processing started — this may take up to a minute.");
@@ -308,6 +337,28 @@ export default function StudioEditor() {
 
   // ─── Processing step (async job in progress) ──────────────────────────────
   if (step === "processing") {
+    // Estimated duration: 50s typical. Progress uses an ease-out curve
+    // so it moves fast at first and slows near the end (never reaches 100% until done).
+    const ESTIMATED_DURATION = 50;
+    const rawProgress = Math.min(elapsedSeconds / ESTIMATED_DURATION, 0.95);
+    // Ease-out curve: fast start, slow finish
+    const easedProgress = 1 - Math.pow(1 - rawProgress, 2.5);
+    const progressPercent = Math.round(easedProgress * 95); // cap at 95% until done
+
+    const formatTime = (s: number) => {
+      const mins = Math.floor(s / 60);
+      const secs = s % 60;
+      return mins > 0 ? `${mins}:${secs.toString().padStart(2, "0")}` : `${secs}s`;
+    };
+
+    const statusMessage = elapsedSeconds < 10
+      ? "Segmenting print elements..."
+      : elapsedSeconds < 25
+      ? "Analyzing motif instances..."
+      : elapsedSeconds < 40
+      ? "Processing density adjustments..."
+      : "Finalizing result...";
+
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <div>
@@ -318,23 +369,35 @@ export default function StudioEditor() {
         </div>
 
         <Card>
-          <CardContent className="flex flex-col items-center justify-center gap-6 py-16">
+          <CardContent className="flex flex-col items-center justify-center gap-6 py-12">
             <div className="relative">
-              <Loader2 className="w-16 h-16 text-primary animate-spin" />
-              <Sparkles className="w-6 h-6 text-primary/60 absolute -top-1 -right-1 animate-pulse" />
+              <Loader2 className="w-14 h-14 text-primary animate-spin" />
+              <Sparkles className="w-5 h-5 text-primary/60 absolute -top-1 -right-1 animate-pulse" />
             </div>
-            <div className="text-center space-y-2">
+
+            <div className="text-center space-y-1">
               <p className="text-lg font-medium">Generating your result...</p>
-              <p className="text-sm text-muted-foreground">
-                The AI is analyzing and modifying your print. Please wait — this page will update automatically.
-              </p>
+              <p className="text-sm text-muted-foreground">{statusMessage}</p>
             </div>
+
+            {/* Progress bar */}
+            <div className="w-full max-w-sm space-y-2">
+              <Progress value={progressPercent} className="h-2.5" />
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {formatTime(elapsedSeconds)} elapsed
+                </span>
+                <span>~{formatTime(Math.max(0, ESTIMATED_DURATION - elapsedSeconds))} remaining</span>
+              </div>
+            </div>
+
             {originalUrl && (
-              <div className="mt-4 w-full max-w-xs">
+              <div className="mt-2 w-full max-w-xs">
                 <img
                   src={originalUrl}
                   alt="Original"
-                  className="w-full rounded-lg object-contain max-h-48 opacity-60"
+                  className="w-full rounded-lg object-contain max-h-40 opacity-50"
                 />
                 <p className="text-xs text-center text-muted-foreground mt-2">Original image</p>
               </div>

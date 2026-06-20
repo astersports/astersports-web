@@ -631,3 +631,8 @@
 - [x] Update StudioEditor frontend to poll for job completion instead of awaiting mutation directly
 - [x] Show progress UI during async density generation (processing state with estimated time)
 - [x] Run all tests and save checkpoint
+
+## Processing Screen UX Enhancements
+- [x] Add elapsed timer (counting up from 0s) to the processing screen
+- [x] Add dynamic progress bar with estimated completion (based on typical 30-60s duration)
+- [x] Smooth animation on progress bar and timer updates
