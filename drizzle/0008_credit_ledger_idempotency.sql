@@ -1,0 +1,11 @@
+-- C3: hard idempotency backstop for credit grants.
+-- At most one ledger row per (refId, reason). MySQL permits multiple NULL refIds,
+-- so manual adjustments without a refId are unaffected.
+--
+-- PRE-FLIGHT (Architect, money path per CLAUDE.md §4): before applying, confirm
+-- there are no pre-existing duplicate (refId, reason) rows from earlier
+-- double-grants, or this statement will fail:
+--   SELECT refId, reason, COUNT(*) c FROM credit_ledger
+--   WHERE refId IS NOT NULL GROUP BY refId, reason HAVING c > 1;
+-- Resolve any duplicates first, then apply.
+CREATE UNIQUE INDEX `uniq_credit_ledger_ref_reason` ON `credit_ledger` (`refId`, `reason`);

@@ -71,10 +71,12 @@ export async function generateImage(
   );
 
   if (!response.ok) {
+    // H4: the upstream body can echo internal hosts/request content — log it
+    // server-side only and surface a generic message to callers (and to the
+    // serverLogs row the studio router writes from this error).
     const detail = await response.text().catch(() => "");
-    throw new Error(
-      `Image generation request failed (${response.status} ${response.statusText})${detail ? `: ${detail}` : ""}`
-    );
+    console.error(`[imageGeneration] upstream error ${response.status} ${response.statusText}: ${detail}`);
+    throw new Error(`Image generation request failed (${response.status})`);
   }
 
   const result = (await response.json()) as {

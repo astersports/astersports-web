@@ -34,7 +34,12 @@ export const adminLogsRouter = router({
       if (input.source) conditions.push(eq(serverLogs.source, input.source));
       if (input.jobId) conditions.push(eq(serverLogs.jobId, input.jobId));
       if (input.tenantId) conditions.push(eq(serverLogs.tenantId, input.tenantId));
-      if (input.search) conditions.push(like(serverLogs.message, `%${input.search}%`));
+      if (input.search) {
+        // M6: escape LIKE metacharacters so a user-supplied `%`/`_` can't turn the
+        // search into a wildcard scan. `\` is the default MySQL LIKE escape char.
+        const escaped = input.search.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+        conditions.push(like(serverLogs.message, `%${escaped}%`));
+      }
       if (input.from) conditions.push(gte(serverLogs.createdAt, new Date(input.from)));
       if (input.to) conditions.push(lte(serverLogs.createdAt, new Date(input.to)));
 

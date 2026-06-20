@@ -1,4 +1,5 @@
 import type { CookieOptions, Request } from "express";
+import { ENV } from "./env";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
@@ -52,6 +53,9 @@ export function getSessionCookieOptions(
     httpOnly: true,
     path: "/",
     sameSite: "lax",
-    secure: isSecureRequest(req),
+    // M3: in production the session cookie is ALWAYS Secure — never let a
+    // client-spoofed `x-forwarded-proto: http` strip the flag and expose the
+    // cookie over plaintext. Header sniffing is only trusted in dev (http://localhost).
+    secure: ENV.isProduction ? true : isSecureRequest(req),
   };
 }

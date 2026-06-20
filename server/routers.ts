@@ -199,11 +199,24 @@ export const appRouter = router({
   }),
 });
 
+// H3: optional shared-secret gate for server-to-server scheduled endpoints.
+// When CRON_SECRET is configured, the matching `x-cron-secret` header is required
+// IN ADDITION to the existing cron session check — so privilege no longer derives
+// from a session claim alone. Backward-compatible: unset = no extra gate.
+function cronSecretOk(req: any): boolean {
+  if (!ENV.cronSecret) return true;
+  const provided = req.headers["x-cron-secret"];
+  return typeof provided === "string" && provided === ENV.cronSecret;
+}
+
 // Register the scheduled endpoints outside tRPC
 export function registerScheduledRoutes(app: any) {
   // Log retention cleanup — prune server_logs older than 30 days
   app.post('/api/scheduled/log-cleanup', async (req: any, res: any) => {
     try {
+      if (!cronSecretOk(req)) {
+        return res.status(403).json({ error: 'forbidden' });
+      }
       const user = await sdk.authenticateRequest(req);
       if (!user.isCron || !user.taskUid) {
         return res.status(403).json({ error: 'cron-only' });
@@ -218,12 +231,11 @@ export function registerScheduledRoutes(app: any) {
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
+      // M8: log details server-side only; never leak stack/internal context to the response.
       console.error('[log-cleanup] Error:', (error as Error).message);
       res.status(500).json({
         success: false,
-        error: (error as Error).message,
-        stack: (error as Error).stack,
-        context: { url: req.url, taskUid: (req as any).__taskUid },
+        error: 'log cleanup failed',
         timestamp: new Date().toISOString(),
       });
     }
@@ -288,6 +300,9 @@ export function registerScheduledRoutes(app: any) {
   // Game status check
   app.post('/api/scheduled/game-check', async (req: any, res: any) => {
     try {
+      if (!cronSecretOk(req)) {
+        return res.status(403).json({ error: 'forbidden' });
+      }
       // Authenticate cron request
       const user = await sdk.authenticateRequest(req);
       if (!user.isCron || !user.taskUid) {

@@ -73,7 +73,9 @@ export const studioBillingRouter = router({
     .input(z.object({ plan: z.enum(["starter", "pro", "team"]) }))
     .mutation(async ({ ctx, input }) => {
       const planDef = PLANS[input.plan];
-      const amountCents = planDef.priceMonthly * 100;
+      // M7: round to whole cents so a non-integer dollar price can't produce a
+      // fractional-cent amount that Stripe rejects or rounds unexpectedly.
+      const amountCents = Math.round(planDef.priceMonthly * 100);
       const priceId = await ensureStudioPrice(
         `Print Studio ${planDef.name}`,
         amountCents,
@@ -132,7 +134,7 @@ export const studioBillingRouter = router({
       const pack = TOPUP_PACKS.find((p) => p.key === input.packKey);
       if (!pack) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid pack" });
 
-      const amountCents = pack.priceUsd * 100;
+      const amountCents = Math.round(pack.priceUsd * 100); // M7: whole cents
       const priceId = await ensureStudioPrice(`Print Studio Top-up: ${pack.name}`, amountCents);
 
       // Ensure Stripe customer

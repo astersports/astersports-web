@@ -17,9 +17,9 @@ import sharp from "sharp";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { storageGetSignedUrl } from "../../storage";
-import { fetchWithTimeout, TIMEOUT } from "../../fetchTimeout";
+import { TIMEOUT } from "../../fetchTimeout";
 import { assertWithinPixelLimit, decodeSemaphore, maxInputPixels } from "./guards";
-import { assertSafeFetchUrl } from "../net/ssrfGuard";
+import { safeFetchBuffer } from "../net/safeFetch";
 import { ENV } from "../env";
 
 export interface UprightImage {
@@ -37,10 +37,14 @@ interface CacheEntry {
 
 const MAX_CACHE = 8;
 const cache = new Map<string, CacheEntry>();
+// H6: coalesce concurrent decodes of the SAME url so N parallel requests share
+// one decode (one permit, one RGBA frame) instead of N.
+const inflight = new Map<string, Promise<CacheEntry>>();
 
 /** Test/maintenance hook — clears the decode cache. */
 export function clearDecodeCache(): void {
   cache.clear();
+  inflight.clear();
 }
 
 /**
@@ -69,13 +73,17 @@ async function readImageBytes(url: string): Promise<Buffer> {
 }
 
 async function fetchToBuffer(url: string, opts: { trusted?: boolean } = {}): Promise<Buffer> {
-  // M7: validate untrusted http(s) destinations resolve to a public address.
-  if (!opts.trusted) await assertSafeFetchUrl(url);
-  const res = await fetchWithTimeout(url, {}, TIMEOUT.IMAGE_DOWNLOAD);
-  if (!res.ok) {
-    throw new Error(`decodeUpright: failed to download image (${res.status} ${res.statusText})`);
+  // C1/H6: SSRF-validated (untrusted), redirect-revalidated, byte-capped,
+  // body-timeout-covered download. Trusted internal signed URLs skip the SSRF
+  // check but still get the redirect/cap/timeout protections.
+  const { buffer, response } = await safeFetchBuffer(url, {
+    timeoutMs: TIMEOUT.IMAGE_DOWNLOAD,
+    skipSsrf: opts.trusted === true,
+  });
+  if (!response.ok) {
+    throw new Error(`decodeUpright: failed to download image (${response.status} ${response.statusText})`);
   }
-  return Buffer.from(await res.arrayBuffer());
+  return buffer;
 }
 
 async function decodeToEntry(url: string): Promise<CacheEntry> {
@@ -96,8 +104,15 @@ export async function decodeUpright(url: string): Promise<UprightImage> {
   let entry = cache.get(url);
   if (!entry) {
     // H6: bound concurrent decodes so N parallel jobs can't each hold a full
-    // RGBA frame at once. Cache hits skip the semaphore entirely.
-    entry = await decodeSemaphore.run(() => decodeToEntry(url));
+    // RGBA frame at once, AND coalesce duplicate in-flight decodes of one url.
+    // Cache hits skip both the semaphore and the in-flight map entirely.
+    let pending = inflight.get(url);
+    if (!pending) {
+      pending = decodeSemaphore.run(() => decodeToEntry(url));
+      inflight.set(url, pending);
+      void pending.catch(() => {}).finally(() => inflight.delete(url));
+    }
+    entry = await pending;
     cache.set(url, entry);
     // Evict oldest insertion (Map preserves insertion order).
     if (cache.size > MAX_CACHE) {

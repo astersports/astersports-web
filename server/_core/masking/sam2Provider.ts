@@ -25,27 +25,27 @@
  * Manus's verified Replicate client).
  */
 import sharp from "sharp";
-import type { FabricMask, InstanceMask, MaskImageInput, MaskProvider, BBoxNormalized } from "./types";
+import type { FabricMask, InstanceMask, MaskImageInput, MaskProvider, BBoxNormalized, Sam2AuditContext } from "./types";
 import { decodeUpright } from "../image/decodeUpright";
 import { locateFabricRegion } from "./locateFabricRegion";
 import { decodeMaskToRaster, instancesFromMasks } from "./sam2Mask";
 import { defaultSam2Client, type Sam2Client } from "./replicateSam2";
 
-/** Context passed to the provider for audit logging (Requirement 2). */
-export interface Sam2AuditContext {
-  orgId?: string;
-  jobId?: string;
-}
+export type { Sam2AuditContext } from "./types";
 
-/** Module-level audit context — set by the caller before invoking the provider. */
+/**
+ * C5: Deprecated module-level audit context, retained ONLY as a fallback for
+ * legacy call sites and tests. Production callers pass audit context per-request
+ * via `MaskImageInput.audit` (race-free). Do NOT rely on this for new code.
+ */
 let _auditCtx: Sam2AuditContext = {};
 
-/** Set the audit context before calling SAM2 provider methods. */
+/** @deprecated Pass audit context via `MaskImageInput.audit` instead. */
 export function setSam2AuditContext(ctx: Sam2AuditContext): void {
   _auditCtx = { ...ctx };
 }
 
-/** Clear the audit context after the call completes. */
+/** @deprecated Pass audit context via `MaskImageInput.audit` instead. */
 export function clearSam2AuditContext(): void {
   _auditCtx = {};
 }
@@ -81,9 +81,9 @@ async function cropToFabricRegion(
 /**
  * Requirement 2: Log every outbound SAM2 call with org context.
  */
-function logSam2Call(operation: string, cropWidth: number, cropHeight: number): void {
-  const orgId = _auditCtx.orgId ?? "unknown";
-  const jobId = _auditCtx.jobId ?? "unknown";
+function logSam2Call(operation: string, cropWidth: number, cropHeight: number, audit?: Sam2AuditContext): void {
+  const orgId = audit?.orgId ?? _auditCtx.orgId ?? "unknown";
+  const jobId = audit?.jobId ?? _auditCtx.jobId ?? "unknown";
   console.log(
     `[sam2-privacy] outbound SAM2 call: op=${operation} org_id=${orgId} job_id=${jobId} ` +
       `crop_dimensions=${cropWidth}x${cropHeight} timestamp=${new Date().toISOString()}`
@@ -144,7 +144,7 @@ async function cropAndSegment(
   }
   const { buffer, width, height } = await decodeUpright(image.url); // local only
   const { dataUrl, cropWidth, cropHeight } = await cropToFabricRegion(buffer, width, height, bbox); // Req 1
-  logSam2Call("autoSegment", cropWidth, cropHeight); // Req 2
+  logSam2Call("autoSegment", cropWidth, cropHeight, image.audit); // Req 2 (C5: per-request audit)
   const seg = await client.autoSegment(dataUrl);
   return { bbox, confidence, width, height, cropWidth, cropHeight, seg };
 }

@@ -5,6 +5,7 @@
  *   })
  */
 import { ENV } from "./env";
+import { fetchWithTimeout } from "../fetchTimeout";
 
 export type DataApiCallOptions = {
   query?: Record<string, unknown>;
@@ -28,7 +29,7 @@ export async function callDataApi(
   const baseUrl = ENV.forgeApiUrl.endsWith("/") ? ENV.forgeApiUrl : `${ENV.forgeApiUrl}/`;
   const fullUrl = new URL("webdevtoken.v1.WebDevService/CallApi", baseUrl).toString();
 
-  const response = await fetch(fullUrl, {
+  const response = await fetchWithTimeout(fullUrl, {
     method: "POST",
     headers: {
       accept: "application/json",
@@ -43,7 +44,7 @@ export async function callDataApi(
       path_params: options.pathParams,
       multipart_form_data: options.formData,
     }),
-  });
+  }, 30_000);
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");

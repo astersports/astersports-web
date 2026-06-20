@@ -54,6 +54,36 @@ function createMockReqRes(body: object) {
   return { req, res, resData };
 }
 
+/**
+ * Drizzle-shaped mock DB. `.where()` returns an object that is BOTH awaitable
+ * (the UPDATE path: resolves [{affectedRows}]) AND chainable to `.limit()` (the
+ * SELECT path). The first `.limit()` call models the C3 idempotency pre-check
+ * (returns [] = not yet processed); later `.limit()` calls return the client row.
+ */
+function makeWebhookDb({
+  affectedRows = 1,
+  clientRow = { name: "Test Client", email: "client@example.com" } as { name: string; email: string } | null,
+  eventSeen = false,
+} = {}) {
+  const limit = vi.fn();
+  limit.mockResolvedValueOnce(eventSeen ? [{ id: "evt_seen" }] : []); // idempotency pre-check
+  limit.mockResolvedValue(clientRow ? [clientRow] : []); // subsequent client lookups
+  const whereResult: any = {
+    limit,
+    then: (resolve: any, reject?: any) => Promise.resolve([{ affectedRows }]).then(resolve, reject),
+  };
+  return {
+    insert: vi.fn().mockReturnThis(),
+    values: vi.fn().mockResolvedValue([{ insertId: 1 }]),
+    update: vi.fn().mockReturnThis(),
+    set: vi.fn().mockReturnThis(),
+    select: vi.fn().mockReturnThis(),
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn(() => whereResult),
+    delete: vi.fn().mockReturnThis(),
+  };
+}
+
 describe("handleStripeWebhook", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -113,16 +143,7 @@ describe("handleStripeWebhook", () => {
     it("updates existing client and sends notifications", async () => {
       vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(checkoutEvent as any);
 
-      const mockDb = {
-        insert: vi.fn().mockReturnThis(),
-        values: vi.fn().mockResolvedValue([{ insertId: 1 }]),
-        update: vi.fn().mockReturnThis(),
-        set: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue([{ affectedRows: 1 }]),
-        select: vi.fn().mockReturnThis(),
-        from: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue([{ name: "Test Client", email: "client@example.com" }]),
-      };
+      const mockDb = makeWebhookDb({ affectedRows: 1 });
       vi.mocked(getDb).mockResolvedValue(mockDb as any);
 
       const { req, res } = createMockReqRes(checkoutEvent);
@@ -141,16 +162,7 @@ describe("handleStripeWebhook", () => {
       vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(checkoutEvent as any);
 
       // Mock DB: update returns 0 affected rows (no existing client)
-      const mockDb = {
-        update: vi.fn().mockReturnThis(),
-        set: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue([{ affectedRows: 0 }]),
-        insert: vi.fn().mockReturnThis(),
-        values: vi.fn().mockResolvedValue([{ insertId: 1 }]),
-        select: vi.fn().mockReturnThis(),
-        from: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue([]),
-      };
+      const mockDb = makeWebhookDb({ affectedRows: 0, clientRow: null });
       vi.mocked(getDb).mockResolvedValue(mockDb as any);
 
       // Mock Stripe customer retrieval for auto-create
@@ -185,10 +197,7 @@ describe("handleStripeWebhook", () => {
       };
       vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(incompleteEvent as any);
 
-      const mockDb = {
-        insert: vi.fn().mockReturnThis(),
-        values: vi.fn().mockResolvedValue([{ insertId: 1 }]),
-      };
+      const mockDb = makeWebhookDb();
       vi.mocked(getDb).mockResolvedValue(mockDb as any);
 
       const { req, res } = createMockReqRes(incompleteEvent);
@@ -213,14 +222,7 @@ describe("handleStripeWebhook", () => {
       };
       vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(failedEvent as any);
 
-      const mockDb = {
-        insert: vi.fn().mockReturnThis(),
-        values: vi.fn().mockResolvedValue([{ insertId: 1 }]),
-        select: vi.fn().mockReturnThis(),
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue([{ name: "Test Client", email: "client@example.com" }]),
-      };
+      const mockDb = makeWebhookDb();
       vi.mocked(getDb).mockResolvedValue(mockDb as any);
 
       const { req, res } = createMockReqRes(failedEvent);
@@ -255,22 +257,8 @@ describe("handleStripeWebhook", () => {
       };
       vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(deletedEvent as any);
 
-      // The handler calls getDb() multiple times: idempotency insert, update, getClientInfo select
-      const mockDb = {
-        insert: vi.fn().mockReturnThis(),
-        values: vi.fn().mockResolvedValue([{ insertId: 1 }]),
-        update: vi.fn().mockReturnThis(),
-        set: vi.fn().mockReturnThis(),
-        where: vi.fn().mockImplementation(() => {
-          return {
-            limit: vi.fn().mockResolvedValue([{ name: "Test Client", email: "client@example.com" }]),
-            then: (resolve: any) => resolve([{ affectedRows: 1 }]),
-          } as any;
-        }),
-        select: vi.fn().mockReturnThis(),
-        from: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue([{ name: "Test Client", email: "client@example.com" }]),
-      };
+      // The handler runs the idempotency pre-check, the status update, then getClientInfo.
+      const mockDb = makeWebhookDb({ affectedRows: 1 });
       vi.mocked(getDb).mockResolvedValue(mockDb as any);
 
       const { req, res } = createMockReqRes(deletedEvent);
@@ -304,17 +292,12 @@ describe("handleStripeWebhook", () => {
         },
       };
       vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(event as any);
-      // First call for idempotency succeeds, second call for handler throws
-      const mockDb = {
-        insert: vi.fn().mockReturnThis(),
-        values: vi.fn().mockResolvedValue([{ insertId: 1 }]),
-        delete: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue(undefined),
-      };
+      // First getDb (idempotency pre-check) succeeds; the handler's getDb throws.
+      const mockDb = makeWebhookDb();
       let callCount = 0;
       vi.mocked(getDb).mockImplementation(async () => {
         callCount++;
-        if (callCount === 1) return mockDb as any; // idempotency
+        if (callCount === 1) return mockDb as any; // idempotency pre-check
         throw new Error("DB connection failed");
       });
 
@@ -339,16 +322,7 @@ describe("handleStripeWebhook", () => {
       };
       vi.mocked(stripe.webhooks.constructEvent).mockReturnValue(checkoutEvent as any);
 
-      const mockDb = {
-        insert: vi.fn().mockReturnThis(),
-        values: vi.fn().mockResolvedValue([{ insertId: 1 }]),
-        update: vi.fn().mockReturnThis(),
-        set: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue([{ affectedRows: 1 }]),
-        select: vi.fn().mockReturnThis(),
-        from: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue([{ name: "Client", email: "c@e.com" }]),
-      };
+      const mockDb = makeWebhookDb({ affectedRows: 1, clientRow: { name: "Client", email: "c@e.com" } });
       vi.mocked(getDb).mockResolvedValue(mockDb as any);
 
       // notifyOwner throws (simulating TRPCError)

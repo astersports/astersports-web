@@ -53,18 +53,27 @@ export async function handleStripeWebhook(req: Request, res: Response) {
 
   console.log(`[Stripe Webhook] Event received: ${event.type} (${event.id})`);
 
-  // Idempotency: claim this event id. Duplicate delivery is acked and skipped.
+  // C3: idempotency without losing a paid grant on a mid-handler crash.
+  // We RECORD the event only AFTER its handler succeeds, so a crash before the
+  // record leaves the event unrecorded and Stripe re-delivers it — the grant is
+  // retried, never permanently lost. Double-processing on the retry is harmless
+  // because credit grants are idempotent on (refId, reason) (see grantCredits).
+  // A cheap pre-check still short-circuits the common duplicate-delivery case.
   const idemDb = await getDb();
-  if (idemDb) {
-    try {
-      await idemDb.insert(stripeEvents).values({ id: event.id, type: event.type });
-    } catch {
-      console.log(`[Stripe Webhook] Duplicate event ${event.id}, skipping.`);
-      return res.json({ received: true, duplicate: true });
-    }
-  }
 
   try {
+    if (idemDb) {
+      const [seen] = await idemDb
+        .select({ id: stripeEvents.id })
+        .from(stripeEvents)
+        .where(eq(stripeEvents.id, event.id))
+        .limit(1);
+      if (seen) {
+        console.log(`[Stripe Webhook] Duplicate event ${event.id}, skipping.`);
+        return res.json({ received: true, duplicate: true });
+      }
+    }
+
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
@@ -136,13 +145,19 @@ export async function handleStripeWebhook(req: Request, res: Response) {
         console.log(`[Stripe Webhook] Unhandled event type: ${event.type}`);
     }
 
+    // C3: handler succeeded — NOW record the event so future deliveries skip it.
+    if (idemDb) {
+      try {
+        await idemDb.insert(stripeEvents).values({ id: event.id, type: event.type });
+      } catch {
+        // Concurrent delivery already recorded it; the work was idempotent.
+      }
+    }
+
     res.json({ received: true });
   } catch (err) {
-    // Release the claim so Stripe's retry can reprocess a genuine failure.
-    if (idemDb) {
-      try { await idemDb.delete(stripeEvents).where(eq(stripeEvents.id, event.id)); } catch {}
-    }
-    console.error("[Stripe Webhook] Handler error:", (err as Error).message, (err as Error).stack);
+    // Not recorded — Stripe retries; grant idempotency makes the retry safe.
+    console.error("[Stripe Webhook] Handler error:", (err as Error).message);
     res.status(500).json({ error: "Webhook handler failed" });
   }
 }
@@ -503,9 +518,22 @@ async function handleStudioCheckoutCompleted(session: Stripe.Checkout.Session) {
       plan: plan as any,
     });
 
-    // Grant initial credits (multiply by seats for Team plan)
-    if (planDef) {
-      const seats = parseInt(session.metadata?.seats ?? "1", 10) || 1;
+    // C4: never grant credits for an unpaid checkout. Stripe sets payment_status
+    // to "paid" (charged) or "no_payment_required" (trial / 100%-off); "unpaid"
+    // means no money moved and must not grant. NOTE for Architect (money path):
+    // the free-plan / 100%-off-promo credit policy is intentionally a business
+    // decision — this guard only blocks the clearly-unpaid case.
+    if (session.payment_status === "unpaid") {
+      console.warn(`[Studio Webhook] checkout ${session.id} unpaid; skipping credit grant`);
+    } else if (planDef) {
+      // C4: tie credits to the quantity Stripe actually billed, not to
+      // client-supplied checkout metadata which can drift from the line item.
+      let seats = parseInt(session.metadata?.seats ?? "1", 10) || 1;
+      try {
+        const sub = await stripe.subscriptions.retrieve(subscriptionId);
+        const qty = sub.items?.data?.[0]?.quantity;
+        if (typeof qty === "number" && qty > 0) seats = qty;
+      } catch { /* fall back to metadata seats */ }
       const totalCredits = planDef.perSeat ? planDef.creditsPerCycle * seats : planDef.creditsPerCycle;
       await grantCredits(
         tenantId,
@@ -555,6 +583,18 @@ async function handleStudioInvoicePaid(invoice: Stripe.Invoice) {
     return;
   }
 
+  // C4: only grant renewal credits for a genuinely-paid, positive invoice.
+  // A $0 / unpaid / proration-only invoice must not mint a full cycle of credits.
+  const invStatus = (invoice as any).status;
+  const amountPaid = (invoice as any).amount_paid ?? 0;
+  if (invStatus !== "paid" || amountPaid <= 0) {
+    console.log(
+      `[Studio Webhook] invoice ${invoice.id} not a positive paid invoice ` +
+        `(status=${invStatus}, amount_paid=${amountPaid}); skipping credit grant`
+    );
+    return;
+  }
+
   const invSub = (invoice as any).subscription;
   if (!invSub) return;
 
@@ -569,7 +609,10 @@ async function handleStudioInvoicePaid(invoice: Stripe.Invoice) {
 
     const planDef = PLANS[plan as Exclude<PlanKey, "none">];
     if (planDef) {
-      const seats = parseInt(sub.metadata?.seats ?? "1", 10) || 1;
+      // C4: seats from the actual billed line-item quantity, not metadata.
+      let seats = parseInt(sub.metadata?.seats ?? "1", 10) || 1;
+      const qty = sub.items?.data?.[0]?.quantity;
+      if (typeof qty === "number" && qty > 0) seats = qty;
       const totalCredits = planDef.perSeat ? planDef.creditsPerCycle * seats : planDef.creditsPerCycle;
       await grantCredits(
         tenantId,

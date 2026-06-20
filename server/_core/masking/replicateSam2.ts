@@ -26,7 +26,7 @@
  */
 import Replicate from "replicate";
 import { ENV } from "../env";
-import { fetchWithTimeout } from "../../fetchTimeout";
+import { safeFetchBuffer } from "../net/safeFetch";
 import { MaskProviderUnavailableError } from "./types";
 
 /**
@@ -85,9 +85,11 @@ function asUrl(v: unknown): string {
 }
 
 async function fetchBuffer(url: string): Promise<Buffer> {
-  const res = await fetchWithTimeout(url, {}, DOWNLOAD_TIMEOUT_MS);
-  if (!res.ok) throw new Error(`Replicate mask download failed: ${res.status}`);
-  return Buffer.from(await res.arrayBuffer());
+  // H1: mask URLs come from the third-party Replicate response body, so they are
+  // SSRF-validated and redirect-revalidated before download (CLAUDE.md §5).
+  const { buffer, response } = await safeFetchBuffer(url, { timeoutMs: DOWNLOAD_TIMEOUT_MS });
+  if (!response.ok) throw new Error(`Replicate mask download failed: ${response.status}`);
+  return buffer;
 }
 
 /** Tolerant single-mask URL extractor for boxMask (prefer a whole-region mask). */
