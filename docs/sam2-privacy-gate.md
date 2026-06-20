@@ -52,17 +52,25 @@ raster**. After cropping to the bbox before send, the Replicate response is in
 
 **#4 fail-safe must respect the `rasterReady` / D-B / D-C split.** Classical degrade
 is fine for **recolor** (`separationRemap` works off the classical bbox), but
-classical is `rasterReady:false` and returns **no raster**, and scale/density
-**throw without a raster**. The live route passes the `rasterReady === true` gate
-*before* the call (static capability flag), so a mid-job degrade that returns a
-raster-less mask would make the helper throw → **job fails + refund**, not the
-**D-B prompt-path fallback** we specced. Reconciliation the wiring already supports:
-- Degrade returns a mask with **`raster: undefined`** (NOT a fabricated empty
-  raster), or the helper **catches `MaskProviderUnavailableError`**.
-- Live helper: **missing raster → D-B prompt-path fallback + WARN**;
-  **present-but-all-zero raster → D-C no-op throw/refund**. Two distinct
-  conditions — *no raster = provider degraded = prompt path*; *empty raster =
-  genuine no-op = refund*.
+classical is `rasterReady:false` and returns **no raster** / **no instances**, and
+scale/density **throw without them**. A mid-job degrade must end up on the **D-B
+prompt-path fallback**, not a **job-fail + refund**.
+
+> **ARCHITECT CORRECTION (2026-06-20, supersedes the helper-level note below).**
+> Distinguishing "instances `[]` from a fail-safe degrade (→ D-B)" vs "a genuine
+> no-motif print (→ D-C refund)" **at the helper cannot work** — both yield
+> `instances=[]` / `removed=0`, indistinguishable downstream. The robust
+> separation is **at the gate, not the helper**: make `rasterReady` reflect
+> **provisioning**, so an unprovisioned/unreachable SAM2 reports `rasterReady:false`
+> and the route falls to the prompt path **before any op runs**. Then the only way
+> to reach the op is a *provisioned* call, where `instances=[] / removed=0`
+> unambiguously means **D-C no-op refund**. This is encoded in the locked
+> scale/density prompts.
+
+*Superseded helper-level sketch (kept for history):* degrade returns
+`raster: undefined`; live helper treats missing raster → D-B and all-zero raster →
+D-C. Correct intent, wrong layer — the gate-level `rasterReady`-reflects-provisioning
+rule above is the one that ships.
 
 ---
 
