@@ -169,7 +169,7 @@ export const studioRouter = router({
         controls.density.enabled && !controls.scale.enabled &&
         !controls.recolor.enabled && !controls.remove.enabled;
       const useDeterministicDensity = ENV.studioDensityLive && densityOnly;
-<<<<<<< Updated upstream
+
       // D-A (density): reject density combined with other edits, gated on the live
       // flag (pre-deduct; flag off => unchanged). The reason is stronger than scale's:
       // a combined density+other job on the prompt path silently UNMETS the count-based
@@ -181,9 +181,6 @@ export const studioRouter = router({
           message: "Density can't yet combine with other edits — run it separately.",
         });
       }
-=======
-      console.log(`[studio] Density gate: densityOnly=${densityOnly}, studioDensityLive=${ENV.studioDensityLive}, useDeterministicDensity=${useDeterministicDensity}, controls.density.enabled=${controls.density.enabled}, percent=${controls.density.percent}`);
->>>>>>> Stashed changes
 
       // Scale-live route: scale-ONLY jobs go through scalePrintRepeat when
       // STUDIO_SCALE_LIVE is on AND the provider serves rasters. Dark by default.

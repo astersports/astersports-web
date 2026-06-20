@@ -368,3 +368,10 @@
 ## Density D-B Fallback Fix
 - [x] Fix: On provider degradation, reject + refund instead of falling through to prompt path (which produces garbage for count-based operations)
 - [x] All 183 tests passing
+
+## Test Fixes (env-aware assertions)
+- [x] Fix masking.test.ts: Make "defaults to classical floor" test env-aware (respects STUDIO_MASK_PROVIDER)
+- [x] Fix sam2 test: Skip "unavailable until provisioned" test when REPLICATE_API_TOKEN is set
+- [x] Remove diagnostic console.log from studio.ts density gate (deferred until production confirmed)
+- [x] Verify TypeScript compiles clean (0 errors)
+- [x] All 184 tests pass (183 passed + 1 skipped)

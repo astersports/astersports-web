@@ -22,8 +22,10 @@ function llmReturns(obj: unknown) {
 }
 
 describe("getMaskProvider", () => {
-  it("defaults to the classical floor", () => {
-    expect(getMaskProvider().name).toBe("classical");
+  it("respects STUDIO_MASK_PROVIDER env", () => {
+    // When STUDIO_MASK_PROVIDER=sam2 is set, default is sam2; otherwise classical
+    const expected = process.env.STUDIO_MASK_PROVIDER === "sam2" ? "sam2" : "classical";
+    expect(getMaskProvider().name).toBe(expected);
   });
 
   it("selects sam2 when overridden", () => {
@@ -92,9 +94,12 @@ describe("classical provider", () => {
 });
 
 describe("sam2 provider", () => {
-  it("default Replicate client is unavailable until provisioned (no token)", async () => {
-    await expect(
-      defaultSam2Client().autoSegment("data:image/png;base64,xx")
-    ).rejects.toBeInstanceOf(MaskProviderUnavailableError);
-  });
+  it.skipIf(!!process.env.REPLICATE_API_TOKEN)(
+    "default Replicate client is unavailable until provisioned (no token)",
+    async () => {
+      await expect(
+        defaultSam2Client().autoSegment("data:image/png;base64,xx")
+      ).rejects.toBeInstanceOf(MaskProviderUnavailableError);
+    }
+  );
 });
