@@ -608,3 +608,10 @@
 - [x] Show progress indicator during PDF generation (stage-based: Preparing → Fetching → Compressing)
 - [x] Include: cover page with logo/date/tenant name, one landscape spread per item (before/after side-by-side), edit type badge, changes, credits, user attribution
 - [x] Handle errors gracefully (skip failed image fetches, toast notification)
+
+## Lookbook Pre-Generation Dialog
+- [x] Add dialog component with title, subtitle, and client name fields (shadcn Dialog + Input + Label)
+- [x] Pre-fill with sensible defaults ("Design Lookbook", item count + month/year, org name placeholder)
+- [x] Wire "Lookbook PDF" button to open dialog instead of generating immediately
+- [x] Pass custom values to generateLookbookPdf on confirm
+- [x] Add cancel button to dismiss without generating

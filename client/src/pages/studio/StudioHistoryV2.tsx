@@ -42,6 +42,16 @@ import {
   FileText,
 } from "lucide-react";
 import { generateLookbookPdf, type LookbookItem } from "@/lib/lookbookPdf";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -534,6 +544,10 @@ function ArchiveTable({
   const [downloadProgress, setDownloadProgress] = useState("");
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfProgress, setPdfProgress] = useState("");
+  const [showLookbookDialog, setShowLookbookDialog] = useState(false);
+  const [lookbookTitle, setLookbookTitle] = useState("Design Lookbook");
+  const [lookbookSubtitle, setLookbookSubtitle] = useState("Before & After Comparison");
+  const [lookbookClient, setLookbookClient] = useState("");
   const limit = 20;
 
   // Debounce search
@@ -673,8 +687,24 @@ function ArchiveTable({
     }
   };
 
-  // Generate Lookbook PDF
-  const handleGenerateLookbook = async () => {
+  // Open lookbook dialog (validate selection first)
+  const handleOpenLookbookDialog = () => {
+    const selectedJobs = jobs.filter((j) => selectedIds.has(j.id));
+    const hasResults = selectedJobs.some((j) => getResultUrl(j));
+    if (!hasResults) {
+      toast.error("No items with results", { description: "Selected jobs have no result images yet." });
+      return;
+    }
+    // Pre-fill defaults
+    setLookbookTitle("Design Lookbook");
+    setLookbookSubtitle(`${selectedJobs.filter((j) => getResultUrl(j)).length} design${selectedJobs.filter((j) => getResultUrl(j)).length !== 1 ? "s" : ""} · ${new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}`);
+    setLookbookClient("");
+    setShowLookbookDialog(true);
+  };
+
+  // Generate Lookbook PDF (called from dialog confirm)
+  const handleConfirmLookbook = async () => {
+    setShowLookbookDialog(false);
     const selectedJobs = jobs.filter((j) => selectedIds.has(j.id));
     const lookbookItems: LookbookItem[] = selectedJobs
       .filter((j) => {
@@ -692,19 +722,14 @@ function ArchiveTable({
         userName: j.userName || "Unknown",
       }));
 
-    if (lookbookItems.length === 0) {
-      toast.error("No items with results", { description: "Selected jobs have no result images yet." });
-      return;
-    }
-
     setIsGeneratingPdf(true);
     setPdfProgress("Preparing...");
 
     try {
       await generateLookbookPdf({
-        title: "Design Lookbook",
-        subtitle: "Before & After Comparison",
-        tenantName: tenant?.name || undefined,
+        title: lookbookTitle || "Design Lookbook",
+        subtitle: lookbookSubtitle || "Before & After Comparison",
+        tenantName: lookbookClient || tenant?.name || undefined,
         items: lookbookItems,
         onProgress: (current, total, stage) => {
           setPdfProgress(stage);
@@ -747,7 +772,7 @@ function ArchiveTable({
               </button>
               <span className="text-slate-600">|</span>
               <button
-                onClick={handleGenerateLookbook}
+                onClick={handleOpenLookbookDialog}
                 disabled={isGeneratingPdf}
                 className="inline-flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 underline disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -985,6 +1010,68 @@ function ArchiveTable({
           </div>
         </div>
       )}
+
+      {/* Lookbook Pre-Generation Dialog */}
+      <Dialog open={showLookbookDialog} onOpenChange={setShowLookbookDialog}>
+        <DialogContent className="bg-[#0f1629] border-white/10 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-white flex items-center gap-2">
+              <FileText className="w-5 h-5 text-amber-400" />
+              Generate Lookbook
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-sm">
+              Customize your branded PDF presentation before generating.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="lb-title" className="text-xs font-medium text-slate-300 uppercase tracking-wider">Title</Label>
+              <Input
+                id="lb-title"
+                value={lookbookTitle}
+                onChange={(e) => setLookbookTitle(e.target.value)}
+                placeholder="Design Lookbook"
+                className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-amber-500/50 focus:ring-amber-500/20"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lb-subtitle" className="text-xs font-medium text-slate-300 uppercase tracking-wider">Subtitle</Label>
+              <Input
+                id="lb-subtitle"
+                value={lookbookSubtitle}
+                onChange={(e) => setLookbookSubtitle(e.target.value)}
+                placeholder="Before & After Comparison"
+                className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-amber-500/50 focus:ring-amber-500/20"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lb-client" className="text-xs font-medium text-slate-300 uppercase tracking-wider">Client / Brand Name <span className="text-slate-500 normal-case">(optional)</span></Label>
+              <Input
+                id="lb-client"
+                value={lookbookClient}
+                onChange={(e) => setLookbookClient(e.target.value)}
+                placeholder={tenant?.name || "e.g. Nike, Adidas, Under Armour"}
+                className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-amber-500/50 focus:ring-amber-500/20"
+              />
+              <p className="text-xs text-slate-500">Appears on the cover page. Leave blank to use your org name.</p>
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2 sm:gap-2">
+            <button
+              onClick={() => setShowLookbookDialog(false)}
+              className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white border border-white/10 hover:border-white/20 transition-all duration-200"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirmLookbook}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-amber-500 to-orange-500 text-[#0a0e1a] hover:from-amber-400 hover:to-orange-400 transition-all duration-200 active:scale-[0.97]"
+            >
+              Generate PDF
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
