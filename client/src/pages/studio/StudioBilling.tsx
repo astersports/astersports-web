@@ -54,7 +54,7 @@ export default function StudioBilling() {
       {/* Trial section (visible to all when in trial) */}
       {trial.inTrial && !trial.expired && (
         <>
-          <TrialCard trial={trial} plan={status.plan} tenantId={tenant.id} isOwner={isOwner} />
+          <TrialCard trial={trial} plan={status.plan} tenantId={tenant.id} isOwner={isOwner} hasCardOnFile={status.hasCardOnFile} />
           <TrialTimeline trial={trial} />
         </>
       )}

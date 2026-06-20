@@ -518,3 +518,23 @@
 - [x] Send notifyOwner "Welcome — trial converted" notification
 - [x] Handle edge cases: duplicate events via stripeEvents idempotency, missing tenant guard
 - [x] Write tests for conversion logic (covered in shadowBilling.test.ts)
+
+## Heartbeat Cron Job Registration
+- [x] Register /api/scheduled/trial-autocharge (daily 8am UTC) — task_uid: N4T7y66TLaYtVCTEfrrTXR
+- [x] Register /api/scheduled/trial-reminders (daily 9am UTC) — task_uid: 8SPGdvarEaFz9KSHJyyL3w
+- [x] Register /api/scheduled/log-cleanup (daily 3am UTC) — task_uid: N6TkTtm5F5fNGnDmmNaUNX
+
+## Card-on-File UI (Stripe Elements in TrialCard)
+- [x] Add @stripe/stripe-js and @stripe/react-stripe-js dependencies
+- [x] Create CardOnFileForm component with Stripe Elements (SetupIntent confirmation)
+- [x] Integrate CardOnFileForm into TrialCard (owner-only, shown during trial)
+- [x] Show "Card saved" state when hasCardOnFile is true
+- [x] Handle errors and loading states gracefully
+- [x] Write vitest test for setupCardOnFile flow (covered in shadowBilling.test.ts)
+
+## End-to-End Impersonation Flow
+- [x] Verify platform.impersonationStatus query returns correct state
+- [x] Verify ImpersonationBanner renders with firm metadata when impersonating
+- [x] Verify Exit button calls exitImpersonation mutation and redirects to /platform
+- [x] Verify TenantContext auto-selects impersonated tenant
+- [x] Add smoke test (vitest) for impersonation round-trip (impersonationRoundtrip.test.ts — 13 tests)

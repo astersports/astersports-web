@@ -1,14 +1,16 @@
 /**
  * TrialCard — amber gradient trial countdown card.
  * Matches spec Screen 3: Free trial pill, plan/price, big days-left countdown,
- * progress track, and owner-only actions (Start plan now, Cancel trial).
+ * progress track, owner-only actions (Start plan now, Cancel trial),
+ * and Card-on-File form (Stripe Elements) when no card is saved.
  */
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2 } from "lucide-react";
+import { Loader2, CheckCircle2, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { PLANS, TRIAL_DURATION_DAYS } from "@shared/billing";
+import { CardOnFileForm } from "./CardOnFileForm";
 
 interface TrialInfo {
   inTrial: boolean;
@@ -24,9 +26,10 @@ interface TrialCardProps {
   plan: string;
   tenantId: number;
   isOwner: boolean;
+  hasCardOnFile?: boolean;
 }
 
-export function TrialCard({ trial, plan, tenantId, isOwner }: TrialCardProps) {
+export function TrialCard({ trial, plan, tenantId, isOwner, hasCardOnFile = false }: TrialCardProps) {
   const utils = trpc.useUtils();
 
   const cancelMutation = trpc.studioBilling.cancelTrial.useMutation({
@@ -84,6 +87,29 @@ export function TrialCard({ trial, plan, tenantId, isOwner }: TrialCardProps) {
       <p className="text-sm text-muted-foreground">
         Full access now. First charge on day 7 unless you cancel.
       </p>
+
+      {/* Card on file status / form (owner only) */}
+      {isOwner && (
+        <>
+          {hasCardOnFile ? (
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/20">
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-emerald-300">Card on file</p>
+                <p className="text-xs text-muted-foreground">
+                  You'll be charged on Day 7 unless you cancel.
+                </p>
+              </div>
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+            </div>
+          ) : (
+            <CardOnFileForm
+              tenantId={tenantId}
+              onSuccess={() => utils.studioBilling.billingStatus.invalidate()}
+            />
+          )}
+        </>
+      )}
 
       {/* Owner actions */}
       {isOwner && (
