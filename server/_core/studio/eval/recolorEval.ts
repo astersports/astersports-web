@@ -5,9 +5,14 @@
  * Needs Forge creds (the fabric mask uses the vision LLM) and Frank's own sample
  * garments in the manifest. Pre-launch: no customer data.
  *
- * Produces a per-case table, aggregate pass rates, a RASTER-NEEDED list (cases
- * that pass target+lum but FAIL off-target on bbox-only — the D1 recolor signal),
- * a determinism check, and a side-by-side before/after PNG per case.
+ * The op always runs at the FLOOR (bbox) — production behavior. The metric scores
+ * against a TRUTH fabric mask (`truthMaskUrl`, a SAM2-generated mask) so the
+ * background-bleed (D1/raster) signal is real and not structurally 0. Without a
+ * truth mask, offBg is BLIND (the op never touches background, so it reads 0) and
+ * is reported as such — never as evidence.
+ *
+ * Produces a per-case table, aggregate pass rates, a RASTER-NEEDED list (the only
+ * D1 raster signal), a determinism check, and a side-by-side before/after PNG.
  */
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -31,9 +36,31 @@ interface EvalCase {
    * for local sample images.
    */
   bbox?: { x: number; y: number; w: number; h: number };
+  /**
+   * Path/URL to a TRUTH fabric mask (SAM2 eval ground truth): non-near-black =
+   * fabric. The metric classifies background against THIS, decoupled from the
+   * op's floor (bbox) membership. Without it, the background-bleed metric is blind.
+   */
+  truthMaskUrl?: string;
 }
 
 const OUT_DIR = path.resolve("eval/out");
+
+/** Load a mask image into a membership array (fabric where max(r,g,b) > 127). */
+async function loadTruthMask(url: string, width: number, height: number): Promise<Uint8Array> {
+  const img = await decodeUpright(url);
+  if (img.width !== width || img.height !== height) {
+    throw new Error(
+      `truth mask dims ${img.width}x${img.height} != image ${width}x${height} for ${url}`
+    );
+  }
+  const m = new Uint8Array(width * height);
+  for (let i = 0; i < m.length; i++) {
+    const p = i * 4;
+    m[i] = Math.max(img.buffer[p], img.buffer[p + 1], img.buffer[p + 2]) > 127 ? 1 : 0;
+  }
+  return m;
+}
 
 async function rawRGBA(png: Buffer): Promise<{ data: Buffer; width: number; height: number }> {
   const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -69,11 +96,13 @@ async function main() {
   const provider = getMaskProvider();
   const rows: string[] = [];
   const rasterNeeded: string[] = [];
-  let tPass = 0, lPass = 0, oPass = 0, det = 0;
+  const opTuning: string[] = [];
+  let tPass = 0, lPass = 0, oFabPass = 0, det = 0;
+  let truthCount = 0, oBgPassTruth = 0;
 
   for (const c of cases) {
     try {
-      // Manual bbox => fully offline (no vision call); else use the mask provider.
+      // Op ALWAYS runs at the floor (bbox or vision mask) — production behavior.
       const fabric: FabricMask = c.bbox
         ? { bbox: c.bbox, confidence: 1, provider: "classical" }
         : await provider.getFabricMask({ url: c.imageUrl });
@@ -86,8 +115,15 @@ async function main() {
       );
       const out = await rawRGBA(outPng);
 
-      const membership = fabricMembership(fabric, width, height);
-      const m = computeRecolorMetrics(src, out.data, width, height, membership, c.fromColor, c.toColor);
+      // Metric classifies against a TRUTH mask (SAM2) when provided; else falls
+      // back to the op's bbox membership — in which case offBg is BLIND (the op
+      // never touches background, so it reads 0) and is not counted as evidence.
+      const truthAvailable = !!c.truthMaskUrl;
+      const truthMask = truthAvailable
+        ? await loadTruthMask(c.truthMaskUrl!, width, height)
+        : fabricMembership(fabric, width, height);
+
+      const m = computeRecolorMetrics(src, out.data, width, height, truthMask, c.fromColor, c.toColor);
       const v = verdict(m);
 
       // Determinism: identical bytes on re-run.
@@ -102,9 +138,16 @@ async function main() {
 
       if (v.targetPass) tPass++;
       if (v.lumPass) lPass++;
-      if (v.offPass) oPass++;
+      if (v.offFabricPass) oFabPass++;
       if (deterministic) det++;
-      if (v.targetPass && v.lumPass && !v.offPass) rasterNeeded.push(c.id);
+      // Nearby-separation pull is op-tuning (always measurable).
+      if (v.targetPass && v.lumPass && !v.offFabricPass) opTuning.push(c.id);
+      // Background bleed (raster) is only meaningful against a truth mask.
+      if (truthAvailable) {
+        truthCount++;
+        if (v.offBackgroundPass) oBgPassTruth++;
+        if (v.targetPass && v.lumPass && !v.offBackgroundPass) rasterNeeded.push(c.id);
+      }
 
       rows.push(
         [
@@ -114,10 +157,11 @@ async function main() {
           String(c.coverage),
           m.targetDeltaE.toFixed(2),
           m.lumSSIM.toFixed(3),
-          m.offTargetDeltaE.toFixed(2),
+          truthAvailable ? m.offTargetBackgroundDeltaE.toFixed(2) : "blind",
+          m.offTargetFabricDeltaE.toFixed(2),
           v.pass ? "PASS" : "FAIL",
           deterministic ? "det" : "NONDET",
-          `mask:${fabric.provider}${fabric.raster ? "+raster" : "(bbox)"}`,
+          truthAvailable ? "truth:SAM2" : "truth:none",
           path.relative(process.cwd(), file),
         ].join(" | ")
       );
@@ -128,15 +172,24 @@ async function main() {
 
   const n = cases.length;
   console.log("\n=== A1-EVAL: deterministic recolor ===");
-  console.log("id | from | to | cov | targetΔE | lumSSIM | offΔE | verdict | det | mask | artifact");
+  console.log("id | from | to | cov | targetΔE | lumSSIM | offBgΔE | offFabΔE | verdict | det | truth | artifact");
   console.log(rows.join("\n"));
-  console.log("\n--- aggregate ---");
-  console.log(`target ΔE<=5 : ${tPass}/${n}`);
-  console.log(`lum SSIM>=.95: ${lPass}/${n}`);
-  console.log(`off ΔE<=2    : ${oPass}/${n}`);
-  console.log(`deterministic: ${det}/${n}`);
-  console.log("\n--- RASTER-NEEDED (pass target+lum, FAIL off on bbox-only) — D1 recolor signal ---");
-  console.log(rasterNeeded.length ? rasterNeeded.join(", ") : "(none — bbox membership clears off-target on this set)");
+  console.log("\n--- aggregate (verdict = op correctness: target && lum && offFab; offBg is the D1/mask signal) ---");
+  console.log(`target ΔE<=5    : ${tPass}/${n}`);
+  console.log(`lum SSIM>=.95   : ${lPass}/${n}`);
+  console.log(`offFab ΔE<=2     : ${oFabPass}/${n}  (nearby-separation pull — op-tuning)`);
+  console.log(`offBg  ΔE<=2     : ${oBgPassTruth}/${truthCount}  (background bleed — only on cases WITH a SAM2 truth mask)`);
+  console.log(`deterministic   : ${det}/${n}`);
+  console.log("\n--- RASTER-NEEDED (truth-masked cases that pass target+lum, FAIL background bleed) — the D1 raster signal ---");
+  console.log(
+    truthCount === 0
+      ? "(no truth masks supplied — offBg is BLIND; add truthMaskUrl per case to measure the D1 signal)"
+      : rasterNeeded.length ? rasterNeeded.join(", ") : "(none — background bleed under threshold on truth-masked cases)"
+  );
+  console.log("\n--- OP-TUNING: reduce radius at high coverage (pass target+lum, FAIL fabric bleed) — NOT a mask problem ---");
+  console.log(opTuning.length ? opTuning.join(", ") : "(none — no nearby-separation pull on this set)");
+  console.log("\nNOTE: op runs at the floor (bbox); the metric scores against the SAM2 truth mask.");
+  console.log("Without truthMaskUrl, offBg is structurally blind. The PNGs remain primary for interpretation.");
 }
 
 main().catch((e) => {

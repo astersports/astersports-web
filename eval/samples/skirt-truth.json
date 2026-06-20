@@ -1,0 +1,41 @@
+[
+  {
+    "id": "skirt-cov100-truth",
+    "imageUrl": "eval/samples/black-floral-skirt.jpg",
+    "fromColor": "#E6A6B0",
+    "toColor": "#1B2A4A",
+    "coverage": 100,
+    "bbox": { "x": 0.27, "y": 0.16, "w": 0.46, "h": 0.78 },
+    "truthMaskUrl": "eval/samples/black-floral-skirt.mask.png",
+    "note": "Real skirt with SAM2 truth mask — measures real background bleed"
+  },
+  {
+    "id": "skirt-cov40-truth",
+    "imageUrl": "eval/samples/black-floral-skirt.jpg",
+    "fromColor": "#E6A6B0",
+    "toColor": "#1B2A4A",
+    "coverage": 40,
+    "bbox": { "x": 0.27, "y": 0.16, "w": 0.46, "h": 0.78 },
+    "truthMaskUrl": "eval/samples/black-floral-skirt.mask.png",
+    "note": "Real skirt, low coverage, with SAM2 truth mask"
+  },
+  {
+    "id": "skirt-cov100-no-truth",
+    "imageUrl": "eval/samples/black-floral-skirt.jpg",
+    "fromColor": "#E6A6B0",
+    "toColor": "#1B2A4A",
+    "coverage": 100,
+    "bbox": { "x": 0.27, "y": 0.16, "w": 0.46, "h": 0.78 },
+    "note": "Same case WITHOUT truth mask — offBg should be blind"
+  },
+  {
+    "id": "skirt-blue-amber-60-truth",
+    "imageUrl": "eval/samples/black-floral-skirt.jpg",
+    "fromColor": "#7AA0C8",
+    "toColor": "#E0A23C",
+    "coverage": 60,
+    "bbox": { "x": 0.27, "y": 0.16, "w": 0.46, "h": 0.78 },
+    "truthMaskUrl": "eval/samples/black-floral-skirt.mask.png",
+    "note": "Blue beads -> amber, with truth mask"
+  }
+]

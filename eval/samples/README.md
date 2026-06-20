@@ -43,24 +43,50 @@ Artifacts (side-by-side before/after PNGs) are written to `eval/out/` (gitignore
 
 ## Metrics & thresholds
 
+Pixels are split by the **source** color's distance to `fromColor` (op-agnostic),
+into three bands plus the fabric/background split:
+
+- **target** (`ΔE2000(source, fromColor) ≤ near`, default 15) — the separation.
+- **excluded band** (`near < ΔE ≤ far`, default 40) — the op's intended soft
+  antialiased edge. **Scored by neither metric** (else correct antialiasing reads
+  as bleed).
+- **off-target** (`ΔE > far`, or background) — split below because only one half
+  is mask-fixable.
+
+### The op runs at the floor; the metric scores against a TRUTH mask
+
+The op **always** runs at the floor (bbox) — production behavior. The metric
+classifies background against a **TRUTH fabric mask** (`truthMaskUrl`, a
+SAM2-generated mask: non-near-black = fabric), **decoupled from the op's bbox
+membership**. This matters: the op only touches fabric pixels, so scoring
+background against the op's *own* bbox membership makes `offBg` structurally
+`0.00` and hides bbox-included background bleed in the op-tuning bucket. Without a
+`truthMaskUrl` the harness prints `offBg = blind` and does **not** treat it as
+evidence.
+
+Metrics:
 - **target ΔE2000 ≤ 5** — chroma/hue of the remapped separation vs target, measured
   **at each pixel's own L** (A1 preserves luminance, so a flat ΔE to the target
   would falsely fail a correct navy-rose that keeps bright highlights).
-- **luminance SSIM ≥ 0.95** — L channel source vs out over the target set (A1 holds
-  L exactly, so this guards regressions; expect ~1.0).
-- **off-target ΔE2000 ≤ 2** — change on fabric pixels far from the source color +
-  all background. This is the **bleed metric and the raster signal**.
+- **luminance SSIM ≥ 0.95** — L channel source vs out over the target set (~1.0).
+- **offFab ΔE2000 ≤ 2** — change on **truth-fabric** pixels far from `fromColor`
+  (e.g. pink dragging the red rims). A mask can't fix this → **op-tuning** (reduce
+  radius), NOT raster. **Part of the A1 pass verdict.**
+- **offBg ΔE2000 ≤ 2** — op changed a pixel the **truth mask says is background**.
+  A precise mask fixes this → **the only D1 raster signal**. **Excluded from the
+  A1 pass verdict** (it's the mask/tier decision, not op correctness).
 
-The harness splits pixels by the source color's distance to `fromColor`
-(default radius ΔE ≤ 15), independent of the op, so bleed is measured honestly.
+`verdict.pass = target && lum && offFab` — background bleed never fails A1.
 
-## The RASTER-NEEDED list
+## Two lists, two different fixes
 
-Cases that **pass target + lum but FAIL off-target on bbox-only** are the D1
-recolor evidence: they quantify how much the precise fabric mask
-(`rasterReady` / S5) is required for recolor quality, separate from scale/density.
-When `rasterReady` flips (post-S3 GrabCut or SAM2), re-run the same manifest and
-report the off-ΔE delta — no op change (A1 already reads `fabric.raster`).
+- **RASTER-NEEDED** = truth-masked case that passes target+lum but FAILs **offBg**.
+  The D1 recolor evidence for the precise mask (`rasterReady` / S5).
+- **OP-TUNING** = passes target+lum but FAILs **offFab**. Drop the soft radius; do
+  **not** read as needing SAM 2.
+
+One trap no number catches: in-bbox background color-near `fromColor` folds into
+the target set and is silently recolored — **read the PNGs**, they're primary.
 
 ## Acceptance to wire A1 live (at A2)
 

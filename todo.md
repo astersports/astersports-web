@@ -320,4 +320,10 @@
 - [x] TypeScript compiles cleanly (0 errors)
 - [x] All 118 tests pass (13 test files)
 - [x] Synthetic eval: 4/4 PASS, all deterministic, targetΔE=0.11, lumSSIM=1.000, offΔE=0.00
-- [ ] Pending: Run eval on real garment photo (black-floral-skirt.jpg) once provided
+- [x] Run eval on real garment photo (black-floral-skirt.jpg) — PASS at all coverage levels
+
+## Truth-Mask Decoupling + SAM2 Eval
+- [x] Pull Claude's truth-mask decoupling commits (0e94c53)
+- [x] Generate SAM2 truth mask for black-floral-skirt via Replicate (meta/sam-2)
+- [x] Run eval with truth mask: pink→navy PASS (offBg=1.18), blue→amber RASTER-NEEDED (offBg=2.14)
+- [x] Verify structural blindness fix: no-truth case correctly shows "blind" instead of 0.00

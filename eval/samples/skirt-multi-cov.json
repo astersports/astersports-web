@@ -1,0 +1,29 @@
+[
+  {
+    "id": "skirt-cov100-pink-to-navy",
+    "imageUrl": "eval/samples/black-floral-skirt.jpg",
+    "fromColor": "#e3a3b4",
+    "toColor": "#1f2d5a",
+    "coverage": 100,
+    "bbox": { "x": 0.27, "y": 0.16, "w": 0.46, "h": 0.78 },
+    "note": "Real skirt, full coverage"
+  },
+  {
+    "id": "skirt-cov40-pink-to-navy",
+    "imageUrl": "eval/samples/black-floral-skirt.jpg",
+    "fromColor": "#e3a3b4",
+    "toColor": "#1f2d5a",
+    "coverage": 40,
+    "bbox": { "x": 0.27, "y": 0.16, "w": 0.46, "h": 0.78 },
+    "note": "Real skirt, low coverage (40) — previously failed with old semantics"
+  },
+  {
+    "id": "skirt-cov70-pink-to-navy",
+    "imageUrl": "eval/samples/black-floral-skirt.jpg",
+    "fromColor": "#e3a3b4",
+    "toColor": "#1f2d5a",
+    "coverage": 70,
+    "bbox": { "x": 0.27, "y": 0.16, "w": 0.46, "h": 0.78 },
+    "note": "Real skirt, medium coverage"
+  }
+]

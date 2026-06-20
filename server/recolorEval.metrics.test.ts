@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { computeRecolorMetrics, verdict, ssim } from "./_core/studio/eval/metrics";
-import { rgb255ToLab, labToRgb255, hexToLab } from "./_core/studio/ops/color";
+import { rgb255ToLab, labToRgb255, hexToLab, deltaE2000 } from "./_core/studio/ops/color";
 
 const W = 32, H = 32;
 
@@ -42,44 +42,69 @@ describe("computeRecolorMetrics", () => {
   const toRgb = labToRgb255(toLab);
   const toColor = `rgb(${toRgb.r}, ${toRgb.g}, ${toRgb.b})`;
 
-  it("passes all three metrics for an ideal L-preserving remap", () => {
+  const FAR = [230, 220, 40]; // yellow — clearly > far(40) ΔE from the blue source
+
+  it("passes all metrics for an ideal L-preserving remap", () => {
     const source = rgba(() => [SRC[0], SRC[1], SRC[2]]);
     const out = rgba(() => [toRgb.r, toRgb.g, toRgb.b]); // a/b -> target, L preserved (same L)
     const m = computeRecolorMetrics(source, out, W, H, FULL, fromColor, toColor);
     expect(m.targetDeltaE).toBeLessThanOrEqual(5);
     expect(m.lumSSIM).toBeGreaterThanOrEqual(0.95);
-    expect(m.offTargetDeltaE).toBeLessThanOrEqual(2);
+    expect(m.offTargetBackgroundDeltaE).toBeLessThanOrEqual(2);
+    expect(m.offTargetFabricDeltaE).toBeLessThanOrEqual(2);
     expect(verdict(m).pass).toBe(true);
   });
 
-  it("flags bleed: an off-target color that changed raises off-target ΔE", () => {
-    // Left half = target separation, right half = a far-off color that we corrupt in `out`.
-    const OFF = [60, 140, 70];
-    const source = rgba((x) => (x < W / 2 ? (SRC as [number, number, number]) : (OFF as [number, number, number])));
-    const out = rgba((x) => {
-      if (x < W / 2) return [toRgb.r, toRgb.g, toRgb.b];
-      return [120, 60, 160]; // off-target pixels wrongly changed -> bleed
-    });
+  it("routes nearby-separation pull to FABRIC bleed (op-tuning), not background", () => {
+    // Left = target separation; right = a far distinct color, IN fabric, wrongly changed.
+    const source = rgba((x) => (x < W / 2 ? (SRC as [number, number, number]) : (FAR as [number, number, number])));
+    const out = rgba((x) => (x < W / 2 ? [toRgb.r, toRgb.g, toRgb.b] : [120, 60, 160]));
     const m = computeRecolorMetrics(source, out, W, H, FULL, fromColor, toColor);
-    expect(m.offTargetDeltaE).toBeGreaterThan(2);
-    expect(verdict(m).offPass).toBe(false);
+    expect(m.offTargetFabricDeltaE).toBeGreaterThan(2);
+    expect(m.offTargetBackgroundDeltaE).toBe(0); // no background pixels
+    const v = verdict(m);
+    expect(v.offFabricPass).toBe(false);
+    expect(v.offBackgroundPass).toBe(true);
+  });
+
+  it("routes background bleed to BACKGROUND (raster-fixable), not fabric", () => {
+    // Right half is background (membership 0) and gets wrongly changed.
+    const half = new Uint8Array(W * H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) half[y * W + x] = x < W / 2 ? 1 : 0;
+    const source = rgba((x) => (x < W / 2 ? (SRC as [number, number, number]) : (FAR as [number, number, number])));
+    const out = rgba((x) => (x < W / 2 ? [toRgb.r, toRgb.g, toRgb.b] : [120, 60, 160]));
+    const m = computeRecolorMetrics(source, out, W, H, half, fromColor, toColor);
+    expect(m.offTargetBackgroundDeltaE).toBeGreaterThan(2);
+    expect(m.offTargetFabricDeltaE).toBe(0); // no far-from-source fabric pixels
+    const v = verdict(m);
+    expect(v.offBackgroundPass).toBe(false);
+    expect(v.offFabricPass).toBe(true);
+    // A1 op correctness PASSES despite background bleed — that's the mask/D1 decision.
+    expect(v.pass).toBe(true);
+  });
+
+  it("excludes the intended soft-edge band from both off-target metrics", () => {
+    // A mid-band color (near < ΔE <= far from fromColor) that the op changed must
+    // be scored by neither metric.
+    const near = 10, far = 60;
+    const bandRgb = labToRgb255({ l: srcLab.l, a: srcLab.a + 22, b: srcLab.b - 22 });
+    const band = [bandRgb.r, bandRgb.g, bandRgb.b];
+    const source = rgba((x) => (x < W / 2 ? (SRC as [number, number, number]) : (band as [number, number, number])));
+    const out = rgba((x) => (x < W / 2 ? [toRgb.r, toRgb.g, toRgb.b] : [120, 60, 160]));
+    const m = computeRecolorMetrics(source, out, W, H, FULL, fromColor, toColor, { near, far });
+    // Confirm the band color actually lands in (near, far) so the test is meaningful.
+    const dFrom = deltaE2000(rgb255ToLab(band[0], band[1], band[2]), hexToLab(fromColor));
+    expect(dFrom).toBeGreaterThan(near);
+    expect(dFrom).toBeLessThanOrEqual(far);
+    expect(m.bandCount).toBe((W / 2) * H);
+    expect(m.offTargetFabricDeltaE).toBe(0);
+    expect(m.offTargetBackgroundDeltaE).toBe(0);
   });
 
   it("fails luminance when L is not preserved", () => {
     const source = rgba(() => [SRC[0], SRC[1], SRC[2]]);
-    // Push everything dark -> L collapses -> SSIM drops.
-    const out = rgba(() => [10, 10, 10]);
+    const out = rgba(() => [10, 10, 10]); // L collapses -> SSIM drops
     const m = computeRecolorMetrics(source, out, W, H, FULL, fromColor, toColor);
     expect(m.lumSSIM).toBeLessThan(0.95);
-  });
-
-  it("counts background (membership 0) into the off-target/bleed set", () => {
-    const half = new Uint8Array(W * H);
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) half[y * W + x] = x < W / 2 ? 1 : 0;
-    const source = rgba(() => [SRC[0], SRC[1], SRC[2]]);
-    const out = rgba(() => [SRC[0], SRC[1], SRC[2]]); // nothing changed
-    const m = computeRecolorMetrics(source, out, W, H, half, fromColor, toColor);
-    expect(m.fabricCount).toBe((W / 2) * H);
-    expect(m.offTargetDeltaE).toBeCloseTo(0, 5);
   });
 });

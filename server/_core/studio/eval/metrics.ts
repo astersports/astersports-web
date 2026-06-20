@@ -3,19 +3,31 @@
  *
  * Pure functions over raw RGBA buffers — no I/O, fully unit-testable.
  *
- * Set definition:
- *   - target set  = pixels the op ACTUALLY REMAPPED (change-based: ΔE(source,out) > delta)
- *   - off-target background = background pixels (membership==0) — bleed into non-fabric
- *   - off-target fabric     = fabric pixels FAR from fromColor (ΔE2000 > far) — bleed
- *                             into other separations
- *   - near..far band        = excluded from off-target (transition zone)
+ * Set definition (op-agnostic): the harness splits pixels by the SOURCE color's
+ * perceptual distance to `fromColor`, NOT by whether the op changed them.
  *
- * Target metric is CHROMA/HUE at the pixel's OWN luminance (A1 preserves L by
+ * CRITICAL — the classification mask MUST be a TRUTH fabric mask (SAM2), NOT the
+ * op's floor (bbox) membership. The op only modifies fabric pixels, so scoring
+ * background against the op's OWN bbox membership makes offTargetBackgroundDeltaE
+ * structurally 0.00 (those pixels are byte-identical) and hides bbox-included
+ * background bleed in the op-tuning bucket. Decouple them: the op runs at the
+ * floor (bbox); the metric classifies against the SAM2 truth mask passed here.
+ *
+ * Three bands by source distance to fromColor, plus the truth fabric/background split:
+ *   - target        = truth-fabric & ΔE2000(s, fromColor) <= near   (the separation)
+ *   - excluded band = truth-fabric & near < ΔE2000 <= far           (op's soft edge)
+ *   - off-target    = (truth-fabric & ΔE2000 > far)  OR  truth-background
+ *
+ * off-target is split because only one half is raster-fixable:
+ *   - offTargetBackgroundDeltaE (truth==0): the op changed a pixel the TRUTH mask
+ *     says is background — a precise mask would exclude it. THE D1 raster signal.
+ *     (NOT part of the A1 pass verdict; background bleed is the mask/D1 decision.)
+ *   - offTargetFabricDeltaE (truth-fabric & far): a nearby separation getting
+ *     pulled. A mask cannot fix this (both inside the fabric). OP-TUNING signal.
+ *
+ * target metric is CHROMA/HUE at the pixel's OWN luminance (A1 preserves L by
  * design, so a flat ΔE to the target color would falsely fail correct output —
  * a navy rose keeps the rose's bright highlights).
- *
- * Coverage-independent: because the target set is change-based, it measures only
- * what the op committed to remapping, not a fixed source-distance band.
  */
 import { rgb255ToLab, hexToLab, deltaE2000 } from "../ops/color";
 
@@ -24,23 +36,22 @@ export interface RecolorMetrics {
   targetDeltaE: number;
   /** SSIM of the L channel (source vs out) over the target set. ~1.0 when L is held. */
   lumSSIM: number;
-  /** Mean ΔE2000 (source vs out) over off-target background pixels (membership==0). */
+  /** Mean ΔE2000 (source vs out) over background pixels. Raster signal -> RASTER-NEEDED. */
   offTargetBackgroundDeltaE: number;
-  /** Mean ΔE2000 (source vs out) over off-target fabric pixels (dFrom > far). */
+  /** Mean ΔE2000 (source vs out) over far-from-source fabric pixels. Op-tuning signal. */
   offTargetFabricDeltaE: number;
-  /** Legacy combined off-target (max of background and fabric). */
-  offTargetDeltaE: number;
   targetCount: number;
-  offTargetBackgroundCount: number;
-  offTargetFabricCount: number;
-  offTargetCount: number;
+  /** Pixels in the excluded soft-edge band (diagnostic). */
+  bandCount: number;
+  offBackgroundCount: number;
+  offFabricCount: number;
   fabricCount: number;
 }
 
 export interface MetricThresholds {
-  /** ΔE2000 change threshold: pixels with ΔE(source,out) > delta are "remapped". Default 3. */
-  delta?: number;
-  /** ΔE2000 distance from fromColor beyond which fabric pixels count as off-target. Default 30. */
+  /** ΔE2000 radius around fromColor that counts a source pixel as "the target separation". */
+  near?: number;
+  /** ΔE2000 above which a fabric pixel is a distinct separation (beyond the op's soft reach). */
   far?: number;
 }
 
@@ -68,19 +79,21 @@ export function computeRecolorMetrics(
   out: Buffer,
   width: number,
   height: number,
-  membership: Uint8Array,
+  /** TRUTH fabric mask (SAM2 eval ground truth) — NOT the op's bbox membership. */
+  truthMask: Uint8Array,
   fromColor: string,
   toColor: string,
   thresholds: MetricThresholds = {}
 ): RecolorMetrics {
-  const delta = thresholds.delta ?? 3;
-  const far = thresholds.far ?? 30;
+  const near = thresholds.near ?? 15;
+  const far = thresholds.far ?? 40;
   const fromLab = hexToLab(fromColor);
   const toLab = hexToLab(toColor);
 
   let targetSum = 0, targetCount = 0;
+  let bandCount = 0;
   let offBgSum = 0, offBgCount = 0;
-  let offFabricSum = 0, offFabricCount = 0;
+  let offFabSum = 0, offFabCount = 0;
   let fabricCount = 0;
   const srcL: number[] = [];
   const outL: number[] = [];
@@ -90,64 +103,69 @@ export function computeRecolorMetrics(
     const p = i * 4;
     const s = rgb255ToLab(source[p], source[p + 1], source[p + 2]);
     const o = rgb255ToLab(out[p], out[p + 1], out[p + 2]);
-    const inFabric = membership[i] === 1;
-    if (inFabric) fabricCount++;
+    const inFabric = truthMask[i] === 1;
 
-    // TARGET set: pixels the op actually remapped (change-based).
-    const changed = deltaE2000(s, o) > delta;
-    if (changed && inFabric) {
-      // Measure chroma/hue match at the pixel's own L.
-      targetSum += deltaE2000({ l: o.l, a: o.a, b: o.b }, { l: o.l, a: toLab.a, b: toLab.b });
-      targetCount++;
-      srcL.push(s.l);
-      outL.push(o.l);
-    }
-
-    // OFF-TARGET BACKGROUND: membership==0, any change is bleed into non-fabric.
-    if (!inFabric) {
+    if (inFabric) {
+      fabricCount++;
+      const dFrom = deltaE2000(s, fromLab);
+      if (dFrom <= near) {
+        // Target separation: measure chroma/hue match at the pixel's own L.
+        targetSum += deltaE2000({ l: o.l, a: o.a, b: o.b }, { l: o.l, a: toLab.a, b: toLab.b });
+        targetCount++;
+        srcL.push(s.l);
+        outL.push(o.l);
+      } else if (dFrom <= far) {
+        // Intended soft-edge band — the op antialiases here. Score nothing.
+        bandCount++;
+      } else {
+        // Distinct separation inside the fabric — nearby-separation pull (op-tuning).
+        offFabSum += deltaE2000(s, o);
+        offFabCount++;
+      }
+    } else {
+      // Background — a precise fabric mask would exclude it (raster signal).
       offBgSum += deltaE2000(s, o);
       offBgCount++;
     }
-
-    // OFF-TARGET FABRIC: fabric pixels far from fromColor — bleed into other separations.
-    if (inFabric) {
-      const dFrom = deltaE2000(s, fromLab);
-      if (dFrom > far) {
-        offFabricSum += deltaE2000(s, o);
-        offFabricCount++;
-      }
-      // near..far band: excluded from off-target (transition zone)
-    }
   }
-
-  const offTargetBackgroundDeltaE = offBgCount > 0 ? offBgSum / offBgCount : 0;
-  const offTargetFabricDeltaE = offFabricCount > 0 ? offFabricSum / offFabricCount : 0;
-  const offTargetCount = offBgCount + offFabricCount;
-  const offTargetDeltaE = Math.max(offTargetBackgroundDeltaE, offTargetFabricDeltaE);
 
   return {
     targetDeltaE: targetCount > 0 ? targetSum / targetCount : 0,
     lumSSIM: ssim(srcL, outL),
-    offTargetBackgroundDeltaE,
-    offTargetFabricDeltaE,
-    offTargetDeltaE,
+    offTargetBackgroundDeltaE: offBgCount > 0 ? offBgSum / offBgCount : 0,
+    offTargetFabricDeltaE: offFabCount > 0 ? offFabSum / offFabCount : 0,
     targetCount,
-    offTargetBackgroundCount: offBgCount,
-    offTargetFabricCount: offFabricCount,
-    offTargetCount,
+    bandCount,
+    offBackgroundCount: offBgCount,
+    offFabricCount: offFabCount,
     fabricCount,
   };
 }
 
-/** A1 acceptance verdict per the spec thresholds. */
+/**
+ * A1 acceptance verdict.
+ * `pass` is OP correctness only: target && lum && offFabric. offBackground is the
+ * MASK/D1 decision (drives RASTER-NEEDED) and is deliberately EXCLUDED from pass —
+ * background bleed is fixed by the mask tier, not by the op.
+ * - offBackgroundPass: raster-fixable bleed -> drives RASTER-NEEDED.
+ * - offFabricPass: nearby-separation pull -> op-tuning (reduce radius), NOT raster.
+ */
 export function verdict(m: RecolorMetrics): {
   targetPass: boolean;
   lumPass: boolean;
-  offPass: boolean;
+  offBackgroundPass: boolean;
+  offFabricPass: boolean;
   pass: boolean;
 } {
   const targetPass = m.targetDeltaE <= 5;
   const lumPass = m.lumSSIM >= 0.95;
-  const offPass = m.offTargetDeltaE <= 2;
-  return { targetPass, lumPass, offPass, pass: targetPass && lumPass && offPass };
+  const offBackgroundPass = m.offTargetBackgroundDeltaE <= 2;
+  const offFabricPass = m.offTargetFabricDeltaE <= 2;
+  return {
+    targetPass,
+    lumPass,
+    offBackgroundPass,
+    offFabricPass,
+    pass: targetPass && lumPass && offFabricPass,
+  };
 }
