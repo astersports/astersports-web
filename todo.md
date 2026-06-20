@@ -364,3 +364,7 @@
 - [x] Write densityLive.test.ts (5 tests: success path, URL signing, no-raster degradation, no-instances degradation, hard error propagation)
 - [x] TypeScript compiles cleanly (0 errors)
 - [x] All 183 tests passing
+
+## Density D-B Fallback Fix
+- [x] Fix: On provider degradation, reject + refund instead of falling through to prompt path (which produces garbage for count-based operations)
+- [x] All 183 tests passing

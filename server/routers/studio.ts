@@ -280,11 +280,14 @@ export const studioRouter = router({
             return { url, key };
           }
           // D-C: deterministic density path. On degrade / no-op, FAIL + REFUND —
-          // density never prompt-falls (the prompt path cannot do count-based removal).
+          // density never prompt-falls (the prompt path cannot do count-based
+          // removal and would return garbage). The rejection triggers the existing
+          // pro-rated refund.
           if (useDeterministicDensity) {
             const densityResult = await generateDensityImage(job.originalUrl, controls.density.percent);
             if (!densityResult) {
-              throw new Error("density temporarily unavailable");
+              console.warn(`[studio] Density provider degraded / no-op for job ${job.id}; rejecting (D-B).`);
+              throw new Error("Density processing is temporarily unavailable. Please try again in a moment.");
             }
             const key = `studio/${ctx.tenant.id}/${job.id}/density-${nextRound}.png`;
             const { url } = await storagePut(key, densityResult.png, "image/png");
