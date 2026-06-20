@@ -1,18 +1,21 @@
 /**
  * Base-cloth infill primitive (Phase B/C shared erase).
  *
- * Replaces a masked region with base cloth that FOLLOWS the garment's existing
- * shading: each pixel's chroma (a,b) becomes the base-cloth anchor while its own
- * luminance (L) is preserved — so fold shadows survive and the erased area reads
- * as bare cloth, not a flat patch. The erase primitive shared by scale-shrink,
- * density, and remove.
+ * Replaces a masked region with base cloth. Two modes:
+ *  - default (L-preserve): each pixel's chroma (a,b) becomes the base-cloth
+ *    anchor while its own luminance (L) is kept, so fold shadows survive and the
+ *    erased area reads as bare cloth. Correct for ISO-LUMINANT occluders (recolor
+ *    / scale tile boundaries) where the existing L already matches the cloth.
+ *  - flatten=true: also replace L with baseClothLab.L (full base-cloth fill).
+ *    Needed when erasing an OPAQUE motif whose L differs from the cloth (density /
+ *    remove) — otherwise the motif's luminance survives as a ghost.
+ * The erase primitive shared by scale, density, and remove.
  *
  * Pure + deterministic: no provider call, no model call, no randomness. Same
  * inputs -> identical bytes. `baseClothLab` is a CALLER input (not derived here)
  * because base-cloth sourcing is op-specific — density samples between survivors,
- * scale-shrink samples the freed gaps. The primitive stays pure; the op computes
- * the anchor. `baseClothLab.L` is intentionally unused: L is taken per-pixel from
- * the original image to keep the existing shading.
+ * scale samples the freed gaps. The primitive stays pure; the op computes the
+ * anchor. `baseClothLab.L` is used only when `flatten` is set.
  *
  * Returns RAW RGBA pixels so the consuming op can compose without re-decoding.
  */

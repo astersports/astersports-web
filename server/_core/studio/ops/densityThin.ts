@@ -92,13 +92,32 @@ export async function densityThin(input: DensityInput): Promise<DensityResult> {
   const selected = stratifiedSelect(input.instances, removeN, input.fabric.bbox, width, height);
   const baseClothLab = baseClothAnchor(buffer, width, height, raster, input.instances);
 
-  // Removal region = selected instances, dilated, clipped to the fabric raster.
+  // Removal region = selected instances, dilated, clipped to the fabric raster
+  // AND to NOT any non-selected instance — so the dilation can never erase a
+  // survivor that sits within ~2px of a removed motif (survivor-clip).
   const sel = new Uint8Array(width * height);
   for (const idx of selected) markInstance(sel, input.instances[idx], width, height);
   const grown = dilate(sel, width, height, 2);
+  const survivors = new Uint8Array(width * height);
+  const selectedSet = new Set(selected);
+  for (let i = 0; i < input.instances.length; i++) {
+    if (!selectedSet.has(i)) markInstance(survivors, input.instances[i], width, height);
+  }
   const region: RasterMask = { width, height, data: new Uint8Array(width * height) };
-  for (let i = 0; i < width * height; i++) region.data[i] = grown[i] && raster.data[i] > 127 ? 255 : 0;
+  for (let i = 0; i < width * height; i++) {
+    region.data[i] = grown[i] && raster.data[i] > 127 && !survivors[i] ? 255 : 0;
+  }
 
   const erased = await infillBaseCloth({ image: input.image, region, baseClothLab, featherPx: 1, flatten: true });
-  return { data: erased.data, width: erased.width, height: erased.height, removed: selected.length };
+
+  // The infill feather can graze survivor-motif pixels at a shared boundary;
+  // restore them to the original so survivors stay byte-identical (the feather is
+  // for clean edges against GROUND, not against survivors).
+  const out = erased.data;
+  for (let i = 0; i < width * height; i++) {
+    if (!survivors[i]) continue;
+    const p = i * 4;
+    out[p] = buffer[p]; out[p + 1] = buffer[p + 1]; out[p + 2] = buffer[p + 2];
+  }
+  return { data: out, width, height, removed: selected.length };
 }

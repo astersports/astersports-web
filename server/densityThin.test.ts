@@ -102,6 +102,33 @@ describe("densityThin", () => {
   });
 });
 
+describe("densityThin survivor-clip", () => {
+  it("a survivor edge adjacent to a removed motif stays byte-identical", async () => {
+    const w = 80, h = 64;
+    const src = Buffer.alloc(w * h * 4);
+    for (let i = 0; i < w * h; i++) { const p = i * 4; const g = groundRGB(i); src[p] = g[0]; src[p + 1] = g[1]; src[p + 2] = g[2]; src[p + 3] = 255; }
+    const blob = (cx: number, cy: number): Uint8Array => {
+      const data = new Uint8Array(w * h);
+      for (let y = cy - 8; y <= cy + 8; y++) for (let x = cx - 8; x <= cx + 8; x++)
+        if ((x - cx) ** 2 + (y - cy) ** 2 <= 64) { data[y * w + x] = 255; const p = (y * w + x) * 4; src[p] = MOTIF[0]; src[p + 1] = MOTIF[1]; src[p + 2] = MOTIF[2]; }
+      return data;
+    };
+    const masks: InstanceMask[] = [ // centres 18px apart -> a removed one's 2px dilation reaches the other's edge
+      { bbox: { x: 20 / w, y: 24 / h, w: 17 / w, h: 17 / h }, raster: { width: w, height: h, data: blob(28, 32) } },
+      { bbox: { x: 38 / w, y: 24 / h, w: 17 / w, h: 17 / h }, raster: { width: w, height: h, data: blob(46, 32) } },
+    ];
+    const fab: FabricMask = { bbox: { x: 0, y: 0, w: 1, h: 1 }, confidence: 1, provider: "sam2", raster: { width: w, height: h, data: new Uint8Array(w * h).fill(255) } };
+    mockDecode.mockImplementation(async () => ({ buffer: Buffer.from(src), width: w, height: h }));
+
+    const sel = stratifiedSelect(masks, 1, fab.bbox, w, h);
+    const survivor = masks[sel[0] === 0 ? 1 : 0].raster!.data;
+    const out = (await densityThin({ image: { url: "x" }, fabric: fab, instances: masks, percent: 50 })).data;
+    let changed = 0;
+    for (let i = 0; i < w * h; i++) if (survivor[i] > 127) { const p = i * 4; if (out[p] !== src[p] || out[p + 1] !== src[p + 1] || out[p + 2] !== src[p + 2]) changed++; }
+    expect(changed).toBe(0);
+  });
+});
+
 describe("stratifiedSelect", () => {
   // 16 instances on a 4x4 grid in [0,1].
   const grid: InstanceMask[] = [];
