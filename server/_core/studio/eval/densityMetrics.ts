@@ -23,6 +23,9 @@ export interface DensityMetrics {
   survivorIntegrity: number;
   /** Index of dispersion of removed centroids over a K-cell grid (1≈Poisson, <1 even). */
   evenness: number;
+  /** Nearest-Neighbor Index R over survivor centroids within fabric area.
+   *  R=1 random, R>1 dispersed, R<1 clustered. Backs evenness for the highest-risk defect. */
+  nniDispersion: number;
   /** Residual edge energy in removed regions / bare-ground baseline. Op metric. */
   infillCleanliness: number;
   /** Change over truth-background pixels. Mask/D1 signal; excluded from pass. */
@@ -35,6 +38,7 @@ export interface DensityThresholds {
   countError?: number;        // default 0.10
   survivorIntegrity?: number; // default 2
   evenness?: number;          // default 1.5 (index of dispersion)
+  nniDispersion?: number;     // default 1.0 (R >= 1 means dispersed)
   infillCleanliness?: number; // default 2.5 (× ground baseline)
   bgDeltaE?: number;          // default 2
   removedTau?: number;        // default 5 — ΔE to ground that counts a motif "erased"
@@ -123,6 +127,56 @@ function meanGradient(buf: Buffer, w: number, h: number, pixels: number[] | null
   return n ? s / n : 0;
 }
 
+/**
+ * Nearest-Neighbor Index (Clark & Evans 1954) with Donnelly (1978) boundary correction.
+ * R = observedMeanNN / expectedMeanNN. R=1 random, R>1 dispersed, R<1 clustered.
+ * Returns 1.0 (neutral) when fewer than 2 points exist.
+ */
+function computeNNI(
+  centroids: Array<[number, number]>,
+  fabricMask: Uint8Array,
+  width: number,
+  height: number
+): number {
+  const n = centroids.length;
+  if (n < 2) return 1.0; // degenerate — neutral
+
+  // Compute fabric area (number of fabric pixels)
+  let fabricArea = 0;
+  for (let i = 0; i < fabricMask.length; i++) {
+    if (fabricMask[i]) fabricArea++;
+  }
+  if (fabricArea < 1) return 1.0;
+
+  // Observed mean nearest-neighbor distance
+  let nnSum = 0;
+  for (let i = 0; i < n; i++) {
+    let minDist = Infinity;
+    for (let j = 0; j < n; j++) {
+      if (i === j) continue;
+      const dx = centroids[i][0] - centroids[j][0];
+      const dy = centroids[i][1] - centroids[j][1];
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < minDist) minDist = d;
+    }
+    nnSum += minDist;
+  }
+  const observedMean = nnSum / n;
+
+  // Expected mean NN distance for a random pattern in area A with n points:
+  // E(r) = 1 / (2 * sqrt(density)) where density = n / A
+  // Donnelly correction adds boundary term: + (0.0514 + 0.041/sqrt(n)) * P/n
+  // We approximate perimeter P from fabric area as P ≈ 4 * sqrt(A) (square approx)
+  const density = n / fabricArea;
+  const expectedBase = 1 / (2 * Math.sqrt(density));
+  const perimeter = 4 * Math.sqrt(fabricArea); // approximate
+  const donnellyCorrection = (0.0514 + 0.041 / Math.sqrt(n)) * perimeter / n;
+  const expectedMean = expectedBase + donnellyCorrection;
+
+  if (expectedMean <= 0) return 1.0;
+  return observedMean / expectedMean;
+}
+
 export function computeDensityMetrics(input: DensityMetricInput): DensityMetrics {
   const t = input.thresholds ?? {};
   const tau = t.removedTau ?? 5;
@@ -159,9 +213,29 @@ export function computeDensityMetrics(input: DensityMetricInput): DensityMetrics
     }
   }
 
+  // Compute survivor centroids for NNI
+  const survivorCentroids: Array<[number, number]> = [];
+  for (const [id, pixels] of Array.from(groups.entries())) {
+    const wasMotif = meanInstanceDeltaToGround(input.source, pixels, ground) > tau;
+    const nowGround = meanInstanceDeltaToGround(input.out, pixels, ground) <= tau;
+    if (wasMotif && !nowGround) {
+      // This is a survivor
+      let cx = 0, cy = 0;
+      for (const i of pixels) { cx += i % input.width; cy += Math.floor(i / input.width); }
+      survivorCentroids.push([cx / pixels.length, cy / pixels.length]);
+    }
+  }
+
   const measuredRemoval = total > 0 ? removed / total : 0;
   const k = Math.max(1, Math.round(total * input.targetRemovalFraction));
   const evenness = evennessScore(removedCentroids, { x0, y0, x1, y1 }, k);
+
+  // NNI (Nearest-Neighbor Index) over survivor centroids within fabric area.
+  // R = observed mean NN distance / expected mean NN distance for random pattern.
+  // Expected = 1 / (2 * sqrt(density)), where density = n / area.
+  // With boundary correction (Donnelly 1978): expected = 1/(2*sqrt(d)) + (0.0514 + 0.041/sqrt(n)) * P/n
+  // where P = perimeter, d = n/A.
+  const nniDispersion = computeNNI(survivorCentroids, input.truthMask, input.width, input.height);
 
   const groundBaseline = meanGradient(input.out, input.width, input.height, null, (i) => input.truthMask[i] === 1 && input.truthInstanceLabels[i] < 0);
   const removedEnergy = removedPixels.length ? meanGradient(input.out, input.width, input.height, removedPixels) : 0;
@@ -179,6 +253,7 @@ export function computeDensityMetrics(input: DensityMetricInput): DensityMetrics
     countError: Math.abs(measuredRemoval - input.targetRemovalFraction),
     survivorIntegrity: survivorN ? survivorSum / survivorN : 0,
     evenness,
+    nniDispersion,
     infillCleanliness,
     bgDeltaE: bgN ? bgSum / bgN : 0,
     totalInstances: total,
@@ -194,7 +269,8 @@ export function densityVerdict(m: DensityMetrics, thresholds: DensityThresholds 
   const countPass = m.countError <= (thresholds.countError ?? 0.10);
   const survivorPass = m.survivorIntegrity <= (thresholds.survivorIntegrity ?? 2);
   const evennessPass = m.evenness <= (thresholds.evenness ?? 1.5);
+  const nniPass = m.nniDispersion >= (thresholds.nniDispersion ?? 1.0);
   const infillPass = m.infillCleanliness <= (thresholds.infillCleanliness ?? 2.5);
   const bgPass = m.bgDeltaE <= (thresholds.bgDeltaE ?? 2);
-  return { countPass, survivorPass, evennessPass, infillPass, bgPass, pass: countPass && survivorPass && evennessPass && infillPass };
+  return { countPass, survivorPass, evennessPass, nniPass, infillPass, bgPass, pass: countPass && survivorPass && evennessPass && nniPass && infillPass };
 }

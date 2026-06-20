@@ -6,10 +6,11 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router } from "../_core/trpc";
 import { tenantProcedure } from "../tenancy";
-import { storagePut } from "../storage";
+import { storagePut, storageGetSignedUrl } from "../storage";
 import { detectPrintElements, generateEditedImage, generateRecoloredImage, generateDensityImage, generateScaledImage, NON_REPEAT_SCALE_ERROR } from "../aiEngine";
 import { ENV } from "../_core/env";
 import { getMaskProvider } from "../_core/masking";
+import { checkUpscaleDpi } from "../_core/studio/guards/dpiGuard";
 import {
   createJob,
   updateJobStatus,
@@ -219,6 +220,25 @@ export const studioRouter = router({
         console.warn(
           `[studio] scale-live on but provider not rasterReady; prompt-path fallback. job=${job.id} org=${ctx.tenant.id}`
         );
+      }
+
+      // Upscale DPI guard (Decision 2, § 2.7): pre-deduct enforcement when source
+      // DPI metadata is present; warn-only when absent. Only fires on enlarge (f > 1).
+      if (useDeterministicScale && controls.scale.percent > 0) {
+        const f = (100 + controls.scale.percent) / 100;
+        const resolveUrl = async (url: string) => {
+          if (url.startsWith("/manus-storage/")) {
+            return storageGetSignedUrl(url.replace("/manus-storage/", ""));
+          }
+          return url;
+        };
+        const dpiCheck = await checkUpscaleDpi(job.originalUrl, f, resolveUrl);
+        if (dpiCheck.reject) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: dpiCheck.message! });
+        }
+        if (dpiCheck.warn && dpiCheck.message) {
+          console.warn(`[studio] DPI advisory: ${dpiCheck.message} job=${job.id}`);
+        }
       }
 
       const creditCost = computeCredits(controls, CREDIT_COST);

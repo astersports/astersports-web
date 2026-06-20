@@ -106,4 +106,29 @@ describe("computeDensityMetrics", () => {
     const out = eraseOut(b, (c) => c.col % 2 === 0 && c.row % 2 === 0);
     expect(computeDensityMetrics(base(b, out))).toEqual(computeDensityMetrics(base(b, out)));
   });
+
+  it("NNI >= 1.0 for stratified (dispersed) survivors", () => {
+    const b = buildGrid();
+    // Remove every other in a checkerboard pattern -> survivors are evenly spaced
+    const out = eraseOut(b, (c) => c.col % 2 === 0 && c.row % 2 === 0);
+    const m = computeDensityMetrics(base(b, out));
+    expect(m.nniDispersion).toBeGreaterThanOrEqual(1.0);
+    const v = densityVerdict(m);
+    expect(v.nniPass).toBe(true);
+  });
+
+  it("NNI < 1.0 for clustered survivors (all survivors in one corner)", () => {
+    const b = buildGrid();
+    // Remove everything except the top-left 2x2 block (4 survivors, 60 removed)
+    // This means survivors are clustered in one corner
+    const out = eraseOut(b, (c) => !(c.col < 2 && c.row < 2));
+    const m = computeDensityMetrics({
+      ...base(b, out),
+      targetRemovalFraction: 60 / 64, // match the actual removal
+    });
+    // With only 4 survivors clustered in a corner, NNI should be < 1
+    expect(m.nniDispersion).toBeLessThan(1.0);
+    const v = densityVerdict(m);
+    expect(v.nniPass).toBe(false);
+  });
 });
