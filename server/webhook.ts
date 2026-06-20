@@ -10,6 +10,7 @@ import type Stripe from "stripe";
 import { grantCredits, updateTenantStripe } from "./studioDb";
 import { PLANS, TOPUP_PACKS, type PlanKey } from "../shared/billing";
 import { tenants, stripeEvents } from "../drizzle/schema";
+import { handleSetupIntentSucceeded, convertTrialToPaid, restoreFrozenCreditsIfEligible } from "./shadowBilling";
 
 /**
  * Stripe webhook handler.
@@ -119,6 +120,17 @@ export async function handleStripeWebhook(req: Request, res: Response) {
       case "invoice.payment_failed":
         await handlePaymentFailed(event.data.object as Stripe.Invoice);
         break;
+
+      case "setup_intent.succeeded": {
+        const si = event.data.object as Stripe.SetupIntent;
+        if (si.metadata?.product === "print-studio" && si.metadata?.tenantId) {
+          const pmId = typeof si.payment_method === "string" ? si.payment_method : si.payment_method?.id;
+          if (pmId) {
+            await handleSetupIntentSucceeded(si.id, pmId, parseInt(si.metadata.tenantId, 10));
+          }
+        }
+        break;
+      }
 
       default:
         console.log(`[Stripe Webhook] Unhandled event type: ${event.type}`);
@@ -503,12 +515,15 @@ async function handleStudioCheckoutCompleted(session: Stripe.Checkout.Session) {
       );
     }
 
-    console.log(`[Studio Webhook] Subscription activated for tenant ${tenantId}: ${plan}`);
+    // Restore frozen credits if re-subscribing within 90 days
+    const restored = await restoreFrozenCreditsIfEligible(tenantId);
+
+    console.log(`[Studio Webhook] Subscription activated for tenant ${tenantId}: ${plan}${restored ? ` (+${restored} restored)` : ""}`);
 
     try {
       await notifyOwner({
         title: "Print Studio Subscription",
-        content: `Tenant #${tenantId} subscribed to ${plan} plan. Subscription: ${subscriptionId}`,
+        content: `Tenant #${tenantId} subscribed to ${plan} plan. Subscription: ${subscriptionId}${restored ? `. Restored ${restored} frozen credits.` : ""}`,
       });
     } catch { /* ignore */ }
   }

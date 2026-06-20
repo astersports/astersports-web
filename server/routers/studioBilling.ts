@@ -9,6 +9,7 @@ import { tenantProcedure, tenantAdminProcedure, tenantOwnerProcedure } from "../
 import { stripe } from "../stripe";
 import { getCreditHistory, updateTenantStripe, grantCredits, getTrialStatus } from "../studioDb";
 import { PLANS, TOPUP_PACKS, type PlanKey } from "../../shared/billing";
+import { createOrgSetupIntent, cancelTrialAndFreezeCredits } from "../shadowBilling";
 
 // ─── Stripe Product/Price cache for Studio ───────────────────────────────────
 
@@ -209,6 +210,8 @@ export const studioBillingRouter = router({
       seats: ctx.tenant.seats,
       stripeCustomerId: ctx.tenant.stripeCustomerId,
       stripeSubscriptionId: ctx.tenant.stripeSubscriptionId,
+      hasCardOnFile: !!ctx.tenant.stripePaymentMethodId,
+      frozenCredits: ctx.tenant.trialFrozenCredits ?? 0,
       trial: {
         inTrial: trial.inTrial,
         daysRemaining: trial.daysRemaining,
@@ -220,17 +223,29 @@ export const studioBillingRouter = router({
     };
   }),
 
-  /** Cancel trial — owner only. Cancels the Stripe subscription if exists. */
+  /** Create a SetupIntent to collect org-level card on file (owner only). */
+  setupCardOnFile: tenantOwnerProcedure.mutation(async ({ ctx }) => {
+    const result = await createOrgSetupIntent(
+      ctx.tenant.id,
+      ctx.tenant.name,
+      ctx.user.email ?? "unknown@org"
+    );
+    return { clientSecret: result.clientSecret };
+  }),
+
+  /** Cancel trial — owner only. Freezes credits, clears card on file. */
   cancelTrial: tenantOwnerProcedure.mutation(async ({ ctx }) => {
-    if (!ctx.tenant.stripeSubscriptionId) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "No active subscription to cancel" });
+    // If there's an active subscription, cancel it
+    if (ctx.tenant.stripeSubscriptionId) {
+      await stripe.subscriptions.cancel(ctx.tenant.stripeSubscriptionId);
+      await updateTenantStripe(ctx.tenant.id, {
+        stripeSubscriptionId: undefined,
+        plan: "none",
+      });
     }
-    await stripe.subscriptions.cancel(ctx.tenant.stripeSubscriptionId);
-    await updateTenantStripe(ctx.tenant.id, {
-      stripeSubscriptionId: undefined,
-      plan: "none",
-    });
-    return { success: true };
+    // Freeze trial credits
+    const { frozenCredits } = await cancelTrialAndFreezeCredits(ctx.tenant.id);
+    return { success: true, frozenCredits };
   }),
 
   /** Start plan now — owner only. Ends trial immediately and activates the plan. */

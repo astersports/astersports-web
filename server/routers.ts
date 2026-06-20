@@ -16,6 +16,7 @@ import { notifyOwner } from "./_core/notification";
 import { sdk } from "./_core/sdk";
 import { pruneOldLogs } from './logRetention';
 import { processTrialReminders } from './trialReminders';
+import { processTrialAutoCharges } from './shadowBilling';
 import type { Game } from "../shared/types";
 
 // Owner-only procedure: restricts access to the site owner (OWNER_OPEN_ID)
@@ -246,6 +247,34 @@ export function registerScheduledRoutes(app: any) {
       });
     } catch (error) {
       console.error('[trial-reminders] Error:', (error as Error).message);
+      res.status(500).json({
+        success: false,
+        error: (error as Error).message,
+        stack: (error as Error).stack,
+        context: { url: req.url, taskUid: (req as any).__taskUid },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
+  // Trial auto-charge — Day 7: charge stored PaymentMethod, convert to paid plan
+  app.post('/api/scheduled/trial-autocharge', async (req: any, res: any) => {
+    try {
+      const user = await sdk.authenticateRequest(req);
+      if (!user.isCron || !user.taskUid) {
+        return res.status(403).json({ error: 'cron-only' });
+      }
+
+      const result = await processTrialAutoCharges();
+      console.log(`[trial-autocharge] Processed ${result.processed}, charged ${result.charged}, failed ${result.failed}`);
+
+      res.json({
+        success: true,
+        ...result,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('[trial-autocharge] Error:', (error as Error).message);
       res.status(500).json({
         success: false,
         error: (error as Error).message,

@@ -18,7 +18,7 @@ export default function AccountList({ type }: AccountListProps) {
       toast.success(`Viewing as ${data.tenantName}`, {
         description: `Redirecting to studio...`,
       });
-      sessionStorage.setItem("impersonate_tenant", JSON.stringify(data));
+      // Server sets the impersonation cookie — just redirect
       window.location.href = "/studio";
     },
     onError: (err) => toast.error(err.message),

@@ -467,3 +467,54 @@
 - [x] Notification content: Day 4 = "Trial halfway: X credits used, 3 days left"; Day 6 = "Trial ends tomorrow: card will be charged"
 - [x] Idempotent: trial_reminders_sent table with (tenant_id, trial_day) unique key, INSERT IGNORE
 - [x] Write tests for the reminder logic (10 tests, all pass)
+
+## Server-Side Impersonation Token (superseded — see final section below)
+- [x] Create impersonation JWT helper (sign/verify with JWT_SECRET, short TTL 2h, payload: superAdminId, targetTenantId)
+- [x] Set impersonation cookie on platform impersonate mutation response (httpOnly, sameSite, secure)
+- [x] Override tenant context in server when impersonation cookie present (inject targetTenantId)
+- [x] Add exitImpersonation mutation to clear the cookie
+- [x] Update ImpersonationBanner to call tRPC exit mutation instead of just clearing sessionStorage
+- [x] Write tests for impersonation token sign/verify and context override
+
+## Shadow Billing Reverse-Trial (superseded — see final section below)
+- [x] Add stripeSetupIntentId and stripePaymentMethodId columns to tenants table
+- [x] Create trial start flow: create Stripe SetupIntent, return client_secret to frontend
+- [x] Backend: setupCardOnFile mutation in studioBilling router (owner-only)
+- [x] On SetupIntent success webhook (setup_intent.succeeded): store PaymentMethod on tenant
+- [x] Create /api/scheduled/trial-autocharge endpoint: find Day 7 tenants with stored PaymentMethod, create PaymentIntent
+- [x] Handle charge failure: notify owner, extend trial 2 days, retry once
+- [x] Write tests for shadow billing module
+
+## Trial-to-Paid Conversion Webhook (superseded — see final section below)
+- [x] Add payment_intent.succeeded handler to existing Stripe webhook endpoint
+- [x] On successful Day 7 charge: set trialConvertedAt, set plan to starter, grant plan credits
+- [x] Restore frozen credits on re-subscription within 90-day window
+- [x] Send notifyOwner "Welcome — trial converted" notification
+- [x] Handle edge cases: duplicate events via stripeEvents idempotency, missing tenant guard
+- [x] Write tests for conversion logic
+
+## Server-Side Impersonation Token
+- [x] Create impersonation JWT helper (sign/verify with JWT_SECRET, short TTL 2h, payload: superAdminId, targetTenantId)
+- [x] Set impersonation cookie on platform impersonate mutation response (httpOnly, sameSite, secure)
+- [x] Override tenant context in server when impersonation cookie present (inject targetTenantId)
+- [x] Add exitImpersonation mutation to clear the cookie
+- [x] Update ImpersonationBanner to call tRPC exit mutation instead of just clearing sessionStorage
+- [x] Write tests for impersonation token sign/verify and context override
+
+## Shadow Billing Reverse-Trial (Org-Level, SetupIntent Day 0, Charge Day 7)
+- [x] Add stripeSetupIntentId and stripePaymentMethodId columns to tenants table
+- [x] Create trial start flow: create Stripe SetupIntent for tenant's Stripe Customer, return client_secret
+- [x] Backend: setupCardOnFile mutation in studioBilling router (owner-only)
+- [x] On setup_intent.succeeded webhook: store PaymentMethod on tenant row
+- [x] Create /api/scheduled/trial-autocharge: find Day 7 tenants with stored PaymentMethod, create PaymentIntent off-session
+- [x] Handle charge failure: notify owner, extend trial 2 days, retry once
+- [x] One card per org — all members share the tenant's billing, owner/admin can update card
+- [x] Write tests for shadow billing module (createOrgSetupIntent, handleSetupIntentSucceeded, cancelTrialAndFreezeCredits, restoreFrozenCreditsIfEligible, convertTrialToPaid)
+
+## Trial-to-Paid Conversion Webhook
+- [x] Add payment_intent.succeeded handler to existing Stripe webhook
+- [x] On successful Day 7 charge: set trialConvertedAt, set plan to starter, grant plan credits
+- [x] Restore frozen credits on re-subscription within 90-day window
+- [x] Send notifyOwner "Welcome — trial converted" notification
+- [x] Handle edge cases: duplicate events via stripeEvents idempotency, missing tenant guard
+- [x] Write tests for conversion logic (covered in shadowBilling.test.ts)

@@ -2,6 +2,10 @@
  * Tenancy middleware for Print Studio.
  * Provides `tenantProcedure` and `tenantAdminProcedure` that inject
  * the resolved tenant + membership into the tRPC context.
+ *
+ * Supports server-side impersonation: if a valid impersonation JWT cookie is
+ * present (set by the Platform Console), the middleware bypasses the membership
+ * check and grants the super_admin owner-level access to the target tenant.
  */
 import { TRPCError } from "@trpc/server";
 import { eq, and } from "drizzle-orm";
@@ -9,6 +13,7 @@ import { z } from "zod";
 import { protectedProcedure } from "./_core/trpc";
 import { getDb } from "./db";
 import { tenants, memberships } from "../drizzle/schema";
+import { getImpersonationFromRequest } from "./impersonation";
 
 export const tenantProcedure = protectedProcedure
   .input(z.object({ tenantId: z.number() }))
@@ -27,7 +32,34 @@ export const tenantProcedure = protectedProcedure
       throw new TRPCError({ code: "NOT_FOUND", message: "Tenant not found" });
     }
 
-    // Resolve membership
+    // Check for server-side impersonation cookie
+    const impersonation = await getImpersonationFromRequest(ctx.req);
+    if (impersonation && impersonation.tenantId === input.tenantId) {
+      // Super_admin impersonating this tenant — grant synthetic owner membership
+      const syntheticMembership = {
+        id: -1,
+        userId: ctx.user.id,
+        tenantId: tenant.id,
+        role: "owner" as const,
+        status: "active" as const,
+        isUser: true,
+        isAdmin: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      return next({
+        ctx: {
+          ...ctx,
+          tenant,
+          membership: syntheticMembership,
+          isImpersonating: true,
+          impersonationAdminId: impersonation.adminId,
+        },
+      });
+    }
+
+    // Normal flow: resolve membership
     const [membership] = await db
       .select()
       .from(memberships)
@@ -52,6 +84,8 @@ export const tenantProcedure = protectedProcedure
         ...ctx,
         tenant,
         membership,
+        isImpersonating: false,
+        impersonationAdminId: null,
       },
     });
   });

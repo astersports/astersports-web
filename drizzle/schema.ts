@@ -135,6 +135,16 @@ export const tenants = mysqlTable("tenants", {
   stripeCustomerId: varchar("stripeCustomerId", { length: 128 }),
   /** Stripe Subscription ID for the active plan. */
   stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 128 }),
+  /** Stripe SetupIntent ID (used during trial to collect card on file). */
+  stripeSetupIntentId: varchar("stripeSetupIntentId", { length: 128 }),
+  /** Stripe PaymentMethod ID (stored after SetupIntent succeeds — used for Day 7 auto-charge). */
+  stripePaymentMethodId: varchar("stripePaymentMethodId", { length: 128 }),
+  /** When the trial was converted to a paid plan (null = still in trial or never converted). */
+  trialConvertedAt: timestamp("trialConvertedAt"),
+  /** Credits frozen on trial cancel (restored if re-subscribe within 90 days). */
+  trialFrozenCredits: int("trialFrozenCredits").default(0).notNull(),
+  /** When credits were frozen (for 90-day expiry calculation). */
+  trialFrozenAt: timestamp("trialFrozenAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

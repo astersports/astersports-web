@@ -9,6 +9,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { tenants, memberships, platformAdmins, users, creditLedger } from "../../drizzle/schema";
 import { grantCredits, createTenant, createMembership } from "../studioDb";
+import { signImpersonationToken, setImpersonationCookie, clearImpersonationCookie, getImpersonationFromRequest } from "../impersonation";
 
 // ─── Super Admin Middleware ──────────────────────────────────────────────────
 
@@ -246,10 +247,10 @@ export const platformRouter = router({
       return { newBalance };
     }),
 
-  /** Impersonate — returns a session token scoped to the target account. */
+  /** Impersonate — sets a signed JWT cookie scoped to the target account. */
   impersonate: superAdminProcedure
     .input(z.object({ tenantId: z.number().int() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -263,7 +264,12 @@ export const platformRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Account not found" });
       }
 
-      // Return the tenant info — the frontend will use this to switch context
+      // Sign a short-lived impersonation JWT and set it as an httpOnly cookie
+      const token = await signImpersonationToken(ctx.user.id, tenant.id, tenant.name);
+      const isSecure = ctx.req.protocol === "https" ||
+        (ctx.req.headers["x-forwarded-proto"] as string)?.includes("https");
+      setImpersonationCookie(ctx.res, token, isSecure);
+
       return {
         tenantId: tenant.id,
         tenantName: tenant.name,
@@ -273,6 +279,26 @@ export const platformRouter = router({
         creditBalance: tenant.creditBalance,
       };
     }),
+
+  /** Exit impersonation — clears the impersonation cookie. */
+  exitImpersonation: protectedProcedure.mutation(async ({ ctx }) => {
+    const isSecure = ctx.req.protocol === "https" ||
+      (ctx.req.headers["x-forwarded-proto"] as string)?.includes("https");
+    clearImpersonationCookie(ctx.res, isSecure);
+    return { success: true };
+  }),
+
+  /** Check current impersonation state (for the banner). */
+  impersonationStatus: protectedProcedure.query(async ({ ctx }) => {
+    const impersonation = await getImpersonationFromRequest(ctx.req);
+    if (!impersonation) return { active: false as const };
+    return {
+      active: true as const,
+      tenantId: impersonation.tenantId,
+      tenantName: impersonation.tenantName,
+      adminId: impersonation.adminId,
+    };
+  }),
 
   /** Check if the current user is a platform admin. */
   whoami: superAdminProcedure.query(async ({ ctx }) => {

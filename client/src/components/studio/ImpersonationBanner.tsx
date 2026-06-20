@@ -1,49 +1,41 @@
 /**
  * ImpersonationBanner — persistent amber bar shown when a super_admin
- * is impersonating a firm. Displays the firm name and an Exit button
- * that clears the impersonation context and returns to /platform.
+ * is impersonating a firm via server-side JWT cookie.
+ * Reads state from `platform.impersonationStatus` and clears via
+ * `platform.exitImpersonation` mutation.
  */
-import { useEffect, useState } from "react";
 import { Eye, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-interface ImpersonateData {
-  tenantId: number;
-  tenantName: string;
-  tenantSlug: string;
-  type: string;
-  plan: string;
-  creditBalance: number;
-}
-
-const STORAGE_KEY = "impersonate_tenant";
+import { trpc } from "@/lib/trpc";
 
 export function useImpersonation() {
-  const [data, setData] = useState<ImpersonateData | null>(null);
+  const { data, isLoading } = trpc.platform.impersonationStatus.useQuery(
+    undefined,
+    { refetchOnWindowFocus: false, retry: false }
+  );
 
-  useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        setData(JSON.parse(raw));
-      }
-    } catch {
-      // Ignore parse errors
-    }
-  }, []);
+  const utils = trpc.useUtils();
+  const exitMutation = trpc.platform.exitImpersonation.useMutation({
+    onSuccess: () => {
+      // Clear cached state and redirect
+      utils.platform.impersonationStatus.invalidate();
+      window.location.href = "/platform";
+    },
+  });
 
-  const exitImpersonation = () => {
-    sessionStorage.removeItem(STORAGE_KEY);
-    window.location.href = "/platform";
+  return {
+    impersonating: data?.active ? data : null,
+    isLoading,
+    exitImpersonation: () => exitMutation.mutate(),
+    isExiting: exitMutation.isPending,
   };
-
-  return { impersonating: data, exitImpersonation };
 }
 
 export default function ImpersonationBanner() {
-  const { impersonating, exitImpersonation } = useImpersonation();
+  const { impersonating, isLoading, exitImpersonation, isExiting } = useImpersonation();
 
-  if (!impersonating) return null;
+  // Don't render anything while loading or if not impersonating
+  if (isLoading || !impersonating) return null;
 
   return (
     <div className="sticky top-0 z-[60] w-full bg-gradient-to-r from-amber-600 to-amber-500 text-black shadow-lg shadow-amber-500/20">
@@ -56,7 +48,7 @@ export default function ImpersonationBanner() {
             <span className="font-bold">{impersonating.tenantName}</span>
           </span>
           <span className="hidden sm:inline text-xs opacity-70 font-medium">
-            ({impersonating.type} · {impersonating.plan || "No plan"} · {impersonating.creditBalance.toLocaleString()} credits)
+            (Impersonating · Tenant #{impersonating.tenantId})
           </span>
         </div>
 
@@ -65,10 +57,11 @@ export default function ImpersonationBanner() {
           variant="outline"
           size="sm"
           onClick={exitImpersonation}
+          disabled={isExiting}
           className="shrink-0 bg-black/10 border-black/20 text-black hover:bg-black/20 hover:text-black font-semibold text-xs gap-1.5 transition-transform duration-160 active:scale-[0.97]"
         >
           <X className="w-3.5 h-3.5" />
-          Exit
+          {isExiting ? "Exiting..." : "Exit"}
         </Button>
       </div>
     </div>
