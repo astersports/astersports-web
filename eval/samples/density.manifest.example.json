@@ -1,0 +1,18 @@
+[
+  {
+    "id": "skirt-thin30",
+    "imageUrl": "eval/samples/black-floral-skirt.jpg",
+    "percent": 30,
+    "maskUrl": "eval/samples/black-floral-skirt.mask.png",
+    "labelUrl": "eval/samples/black-floral-skirt.instances.png",
+    "note": "Real skirt, remove 30% of motif instances; label-map = one distinct colour per motif"
+  },
+  {
+    "id": "skirt-thin50",
+    "imageUrl": "eval/samples/black-floral-skirt.jpg",
+    "percent": 50,
+    "maskUrl": "eval/samples/black-floral-skirt.mask.png",
+    "labelUrl": "eval/samples/black-floral-skirt.instances.png",
+    "note": "Real skirt, remove 50% of motif instances"
+  }
+]
