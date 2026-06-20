@@ -9,6 +9,7 @@
  */
 
 import type { Game, GameStatus } from '../shared/types';
+import { safeFetch } from './_core/net/safeFetch';
 
 // ─── Tournament Registry ───
 export const TOURNAMENT_REGISTRY = [
@@ -295,14 +296,19 @@ async function fetchTournamentGames(tournament: typeof TOURNAMENT_REGISTRY[0]): 
   }
 
   try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Cache-Control': 'no-cache',
+    // C1: route through the SSRF-safe fetch boundary. Even though the URL is
+    // built from a hardcoded registry, a redirect from the upstream page would
+    // otherwise be auto-followed to an arbitrary (possibly internal) host.
+    const response = await safeFetch(url, {
+      timeoutMs: 15000,
+      init: {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Cache-Control': 'no-cache',
+        },
       },
-      signal: AbortSignal.timeout(15000),
     });
 
     if (!response.ok) {

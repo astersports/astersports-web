@@ -48,9 +48,24 @@ export interface InstanceMask {
   raster?: RasterMask;
 }
 
+/**
+ * Per-call audit context (privacy gate Requirement 2). Stamped on every outbound
+ * SAM2 call so the audit log attributes the request to the right tenant/job.
+ */
+export interface Sam2AuditContext {
+  orgId?: string;
+  jobId?: string;
+}
+
 /** Reference to the image to segment (storage path like /manus-storage/... or a URL). */
 export interface MaskImageInput {
   url: string;
+  /**
+   * C5: audit context carried with the request itself, so concurrent jobs across
+   * tenants cannot mis-attribute each other's outbound SAM2 calls (a module-level
+   * global would race under `Promise.allSettled` / multi-tenant concurrency).
+   */
+  audit?: Sam2AuditContext;
 }
 
 /**

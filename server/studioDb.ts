@@ -20,6 +20,15 @@ import {
   type InsertCreditLedgerEntry,
 } from "../drizzle/schema";
 
+/**
+ * M6: escape LIKE metacharacters in user-supplied search terms so `%`/`_` are
+ * matched literally instead of acting as wildcards (LIKE-injection → full scans).
+ * `\` is MySQL's default LIKE escape character.
+ */
+function escapeLike(s: string): string {
+  return s.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
 // ─── Categories ──────────────────────────────────────────────────────────────
 
 export async function listCategories() {
@@ -206,6 +215,23 @@ export async function grantCredits(
   if (!db) throw new Error("DB unavailable");
 
   return db.transaction(async (tx) => {
+    // C3: idempotent on (refId, reason). Stripe delivers at-least-once and can
+    // re-deliver the same economic event under a new event id; a refund path can
+    // also fire twice. If a ledger row already exists for this (refId, reason),
+    // this grant is a no-op that returns the current balance. The unique index on
+    // (refId, reason) is the hard backstop for the concurrent-delivery race.
+    if (refId) {
+      const [existing] = await tx
+        .select({ id: creditLedger.id })
+        .from(creditLedger)
+        .where(and(eq(creditLedger.refId, refId), eq(creditLedger.reason, reason)))
+        .limit(1);
+      if (existing) {
+        const [t] = await tx.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+        return t?.creditBalance ?? 0;
+      }
+    }
+
     const res = await tx
       .update(tenants)
       .set({ creditBalance: sql`${tenants.creditBalance} + ${amount}` })
@@ -290,7 +316,7 @@ export async function listTenantJobsEnhanced(
     conditions.push(sql`${jobs.status} = ${opts.status}`);
   }
   if (opts.search) {
-    const term = `%${opts.search}%`;
+    const term = `%${escapeLike(opts.search)}%`;
     conditions.push(
       sql`(${jobs.title} LIKE ${term} OR ${jobs.detectedElements} LIKE ${term} OR ${jobs.instruction} LIKE ${term})`
     );
@@ -329,7 +355,8 @@ export async function listTenantJobsEnhanced(
         createdAt: jobVariations.createdAt,
       })
       .from(jobVariations)
-      .where(sql`${jobVariations.jobId} IN (${sql.raw(jobIds.join(","))})`);
+      // Parameterized IN list (matches getUserTenants) — no raw string interpolation.
+      .where(sql`${jobVariations.jobId} IN (${sql.join(jobIds.map((id) => sql`${id}`), sql`, `)})`);
     for (const v of allVariations) {
       if (!variationsMap[v.jobId]) variationsMap[v.jobId] = [];
       variationsMap[v.jobId].push({ id: v.id, resultUrl: v.resultUrl, round: v.round, createdAt: v.createdAt });
@@ -404,7 +431,7 @@ export async function listCreditLedger(
     conditions.push(sql`${creditLedger.createdAt} <= ${new Date(opts.to)}`);
   }
   if (opts.search) {
-    const searchTerm = `%${opts.search}%`;
+    const searchTerm = `%${escapeLike(opts.search)}%`;
     conditions.push(
       sql`(${creditLedger.refId} LIKE ${searchTerm} OR ${creditLedger.note} LIKE ${searchTerm})`
     );

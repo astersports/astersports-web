@@ -15,6 +15,21 @@ interface EmailPayload {
 }
 
 /**
+ * M5: escape HTML metacharacters so client-controlled fields (name/email) can't
+ * inject markup into the owner's mail client (stored-XSS / content spoofing).
+ */
+function escapeHtml(s: string): string {
+  return String(s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[c]
+  );
+}
+
+/** M5: collapse CR/LF so an interpolated value can't break the subject line. */
+function oneLine(s: string): string {
+  return String(s).replace(/[\r\n]+/g, " ").trim();
+}
+
+/**
  * Send an email notification via Resend API.
  * Falls back gracefully if Resend API key is not configured.
  */
@@ -72,7 +87,7 @@ export async function emailPaymentFailed({
   invoiceId: string;
 }): Promise<boolean> {
   return sendEmail({
-    subject: `⚠️ Payment Failed — ${clientName} ($${amount})`,
+    subject: oneLine(`⚠️ Payment Failed — ${clientName} ($${amount})`),
     text: `Payment failed for ${clientName} (${clientEmail}).\n\nAmount: $${amount}\nInvoice: ${invoiceId}\n\nLog in to your billing dashboard to follow up:\nhttps://astersports.io/admin/billing`,
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px;">
@@ -81,10 +96,10 @@ export async function emailPaymentFailed({
           <p style="margin: 0; color: #666; font-size: 14px;">A client's payment could not be processed.</p>
         </div>
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
-          <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Client</td><td style="padding: 8px 0; font-size: 14px; font-weight: 500;">${clientName}</td></tr>
-          <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Email</td><td style="padding: 8px 0; font-size: 14px;">${clientEmail}</td></tr>
-          <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Amount</td><td style="padding: 8px 0; font-size: 14px; font-weight: 500; color: #e74c3c;">$${amount}</td></tr>
-          <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Invoice</td><td style="padding: 8px 0; font-size: 14px; font-family: monospace;">${invoiceId}</td></tr>
+          <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Client</td><td style="padding: 8px 0; font-size: 14px; font-weight: 500;">${escapeHtml(clientName)}</td></tr>
+          <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Email</td><td style="padding: 8px 0; font-size: 14px;">${escapeHtml(clientEmail)}</td></tr>
+          <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Amount</td><td style="padding: 8px 0; font-size: 14px; font-weight: 500; color: #e74c3c;">$${escapeHtml(amount)}</td></tr>
+          <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Invoice</td><td style="padding: 8px 0; font-size: 14px; font-family: monospace;">${escapeHtml(invoiceId)}</td></tr>
         </table>
         <a href="https://astersports.io/admin/billing" style="display: inline-block; padding: 10px 20px; background: #f5b731; color: #0a0e1a; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 600;">View Billing Dashboard</a>
         <p style="margin-top: 24px; font-size: 12px; color: #999;">Aster Sports Billing System</p>
@@ -106,7 +121,7 @@ export async function emailSubscriptionCanceled({
   subscriptionId: string;
 }): Promise<boolean> {
   return sendEmail({
-    subject: `🚫 Subscription Canceled — ${clientName}`,
+    subject: oneLine(`🚫 Subscription Canceled — ${clientName}`),
     text: `${clientName} (${clientEmail}) has canceled their subscription.\n\nSubscription: ${subscriptionId}\n\nLog in to your billing dashboard:\nhttps://astersports.io/admin/billing`,
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px;">
@@ -115,9 +130,9 @@ export async function emailSubscriptionCanceled({
           <p style="margin: 0; color: #666; font-size: 14px;">A client has canceled their recurring subscription.</p>
         </div>
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
-          <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Client</td><td style="padding: 8px 0; font-size: 14px; font-weight: 500;">${clientName}</td></tr>
-          <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Email</td><td style="padding: 8px 0; font-size: 14px;">${clientEmail}</td></tr>
-          <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Subscription</td><td style="padding: 8px 0; font-size: 14px; font-family: monospace;">${subscriptionId}</td></tr>
+          <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Client</td><td style="padding: 8px 0; font-size: 14px; font-weight: 500;">${escapeHtml(clientName)}</td></tr>
+          <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Email</td><td style="padding: 8px 0; font-size: 14px;">${escapeHtml(clientEmail)}</td></tr>
+          <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Subscription</td><td style="padding: 8px 0; font-size: 14px; font-family: monospace;">${escapeHtml(subscriptionId)}</td></tr>
         </table>
         <a href="https://astersports.io/admin/billing" style="display: inline-block; padding: 10px 20px; background: #f5b731; color: #0a0e1a; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 600;">View Billing Dashboard</a>
         <p style="margin-top: 24px; font-size: 12px; color: #999;">Aster Sports Billing System</p>
@@ -139,7 +154,7 @@ export async function emailSubscriptionActivated({
   subscriptionId: string;
 }): Promise<boolean> {
   return sendEmail({
-    subject: `✅ New Subscription — ${clientName}`,
+    subject: oneLine(`✅ New Subscription — ${clientName}`),
     text: `${clientName} (${clientEmail}) has activated a subscription.\n\nSubscription: ${subscriptionId}\n\nView in your billing dashboard:\nhttps://astersports.io/admin/billing`,
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px;">
@@ -148,9 +163,9 @@ export async function emailSubscriptionActivated({
           <p style="margin: 0; color: #666; font-size: 14px;">A client has started a new recurring subscription.</p>
         </div>
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
-          <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Client</td><td style="padding: 8px 0; font-size: 14px; font-weight: 500;">${clientName}</td></tr>
-          <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Email</td><td style="padding: 8px 0; font-size: 14px;">${clientEmail}</td></tr>
-          <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Subscription</td><td style="padding: 8px 0; font-size: 14px; font-family: monospace;">${subscriptionId}</td></tr>
+          <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Client</td><td style="padding: 8px 0; font-size: 14px; font-weight: 500;">${escapeHtml(clientName)}</td></tr>
+          <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Email</td><td style="padding: 8px 0; font-size: 14px;">${escapeHtml(clientEmail)}</td></tr>
+          <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Subscription</td><td style="padding: 8px 0; font-size: 14px; font-family: monospace;">${escapeHtml(subscriptionId)}</td></tr>
         </table>
         <a href="https://astersports.io/admin/billing" style="display: inline-block; padding: 10px 20px; background: #f5b731; color: #0a0e1a; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 600;">View Billing Dashboard</a>
         <p style="margin-top: 24px; font-size: 12px; color: #999;">Aster Sports Billing System</p>

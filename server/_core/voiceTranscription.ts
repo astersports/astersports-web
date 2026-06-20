@@ -26,6 +26,7 @@
  * ```
  */
 import { ENV } from "./env";
+import { safeFetchBuffer } from "./net/safeFetch";
 
 export type TranscribeOptions = {
   audioUrl: string; // URL to the audio file (e.g., S3 URL)
@@ -90,11 +91,29 @@ export async function transcribeAudio(
       };
     }
 
-    // Step 2: Download audio from URL
+    // Step 2: Download audio from URL.
+    // H2: audioUrl is caller-supplied — restrict to https and route through the
+    // SSRF-safe, byte-capped, redirect-revalidated downloader so it cannot be
+    // pointed at internal services or the cloud metadata endpoint.
     let audioBuffer: Buffer;
     let mimeType: string;
+    {
+      let scheme: string;
+      try {
+        scheme = new URL(options.audioUrl).protocol;
+      } catch {
+        return { error: "Invalid audio URL", code: "INVALID_FORMAT", details: "Unparseable audioUrl" };
+      }
+      if (scheme !== "https:") {
+        return { error: "Invalid audio URL", code: "INVALID_FORMAT", details: "audioUrl must be https" };
+      }
+    }
+    const MAX_AUDIO_BYTES = 16 * 1024 * 1024;
     try {
-      const response = await fetch(options.audioUrl);
+      const { buffer, response } = await safeFetchBuffer(options.audioUrl, {
+        timeoutMs: 30_000,
+        maxBytes: MAX_AUDIO_BYTES,
+      });
       if (!response.ok) {
         return {
           error: "Failed to download audio file",
@@ -102,19 +121,8 @@ export async function transcribeAudio(
           details: `HTTP ${response.status}: ${response.statusText}`
         };
       }
-      
-      audioBuffer = Buffer.from(await response.arrayBuffer());
+      audioBuffer = buffer;
       mimeType = response.headers.get('content-type') || 'audio/mpeg';
-      
-      // Check file size (16MB limit)
-      const sizeMB = audioBuffer.length / (1024 * 1024);
-      if (sizeMB > 16) {
-        return {
-          error: "Audio file exceeds maximum size limit",
-          code: "FILE_TOO_LARGE",
-          details: `File size is ${sizeMB.toFixed(2)}MB, maximum allowed is 16MB`
-        };
-      }
     } catch (error) {
       return {
         error: "Failed to fetch audio file",
@@ -162,11 +170,13 @@ export async function transcribeAudio(
     });
 
     if (!response.ok) {
+      // H4: log the upstream body server-side; return only a status code.
       const errorText = await response.text().catch(() => "");
+      console.error(`[voiceTranscription] upstream error ${response.status} ${response.statusText}: ${errorText}`);
       return {
         error: "Transcription service request failed",
         code: "TRANSCRIPTION_FAILED",
-        details: `${response.status} ${response.statusText}${errorText ? `: ${errorText}` : ""}`
+        details: `${response.status} ${response.statusText}`
       };
     }
 

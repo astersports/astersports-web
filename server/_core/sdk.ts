@@ -39,7 +39,30 @@ class OAuthService {
   }
 
   private decodeState(state: string): string {
-    const redirectUri = atob(state);
+    // H2: `state` carries the OAuth redirect target. Without validation an
+    // attacker-crafted `state` could redirect the code exchange to a host they
+    // control (authorization-code interception / open redirect). Enforce that the
+    // decoded value is an absolute http(s) URL and, when an allowlist is
+    // configured, that its host is on it.
+    let redirectUri: string;
+    try {
+      redirectUri = atob(state);
+    } catch {
+      throw new Error("invalid OAuth state encoding");
+    }
+    let parsed: URL;
+    try {
+      parsed = new URL(redirectUri);
+    } catch {
+      throw new Error("invalid OAuth redirect target");
+    }
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      throw new Error(`disallowed OAuth redirect scheme: ${parsed.protocol}`);
+    }
+    const allow = ENV.oauthAllowedRedirectHosts;
+    if (allow.length > 0 && !allow.includes(parsed.host)) {
+      throw new Error(`OAuth redirect host not allowed: ${parsed.host}`);
+    }
     return redirectUri;
   }
 

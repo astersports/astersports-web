@@ -48,6 +48,18 @@ export const ENV = {
   /** H6: max concurrent sharp decodes. Each decode holds a full RGBA frame in
    *  memory; without a cap, N simultaneous jobs multiply the peak. Default 4. */
   studioMaxConcurrentDecodes: Math.max(1, Number(process.env.STUDIO_MAX_CONCURRENT_DECODES ?? "4")),
+  /** H2: allowlist of host[:port] values the OAuth redirect target may use. When
+   *  set (comma-separated), a decoded `state` redirect whose host is not on the
+   *  list is rejected — the anti-code-interception control. Empty = scheme/format
+   *  validation only. */
+  oauthAllowedRedirectHosts: (process.env.OAUTH_ALLOWED_REDIRECT_HOSTS ?? "")
+    .split(",")
+    .map((h) => h.trim())
+    .filter(Boolean),
+  /** H3: shared secret for server-to-server scheduled (cron) endpoints. When set,
+   *  /api/scheduled/* requires a matching `x-cron-secret` header IN ADDITION to the
+   *  existing session check. Backward-compatible: unset = no extra gate. */
+  cronSecret: process.env.CRON_SECRET ?? "",
 };
 
 /**

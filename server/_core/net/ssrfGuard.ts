@@ -50,14 +50,55 @@ function isPrivateV4(addr: string): boolean {
   return false;
 }
 
+/**
+ * Expand any IPv6 textual form (compressed `::`, embedded dotted IPv4, mixed
+ * hex) into its 8 canonical 16-bit groups. Returns null when the literal is
+ * not parseable as IPv6 — callers treat null as unsafe.
+ */
+function expandV6(input: string): number[] | null {
+  let addr = input;
+
+  // Embedded IPv4 in the final 32 bits (e.g. ::ffff:1.2.3.4, 64:ff9b::1.2.3.4).
+  const lastColon = addr.lastIndexOf(":");
+  const tail = addr.slice(lastColon + 1);
+  if (tail.includes(".")) {
+    const parts = tail.split(".").map((n) => Number(n));
+    if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return null;
+    const hi = ((parts[0] << 8) | parts[1]).toString(16);
+    const lo = ((parts[2] << 8) | parts[3]).toString(16);
+    addr = `${addr.slice(0, lastColon + 1)}${hi}:${lo}`;
+  }
+
+  const halves = addr.split("::");
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(":") : [];
+  let groups: string[];
+  if (halves.length === 2) {
+    const back = halves[1] ? halves[1].split(":") : [];
+    const missing = 8 - head.length - back.length;
+    if (missing < 0) return null;
+    groups = [...head, ...Array(missing).fill("0"), ...back];
+  } else {
+    groups = head;
+  }
+  if (groups.length !== 8) return null;
+  const nums = groups.map((g) => (g === "" ? NaN : parseInt(g, 16)));
+  if (nums.some((n) => !Number.isInteger(n) || n < 0 || n > 0xffff)) return null;
+  return nums;
+}
+
 function isPrivateV6(addr: string): boolean {
-  if (addr === "::" || addr === "::1") return true; // unspecified, loopback
-  // IPv4-mapped (::ffff:a.b.c.d) — validate the embedded v4.
-  const mapped = addr.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-  if (mapped) return isPrivateV4(mapped[1]);
-  if (addr.startsWith("fe8") || addr.startsWith("fe9") || addr.startsWith("fea") || addr.startsWith("feb"))
-    return true; // fe80::/10 link-local
-  if (addr.startsWith("fc") || addr.startsWith("fd")) return true; // fc00::/7 unique-local
+  const g = expandV6(addr);
+  if (!g) return true; // unparseable literal — fail closed
+  const embeddedV4 = () => `${g[6] >> 8}.${g[6] & 0xff}.${g[7] >> 8}.${g[7] & 0xff}`;
+  if (g.every((x) => x === 0)) return true; // :: unspecified
+  if (g.slice(0, 7).every((x) => x === 0) && g[7] === 1) return true; // ::1 loopback
+  // IPv4-mapped ::ffff:0:0/96 and deprecated IPv4-compatible ::/96 — check the v4.
+  if (g.slice(0, 5).every((x) => x === 0) && (g[5] === 0xffff || g[5] === 0)) return isPrivateV4(embeddedV4());
+  // NAT64 well-known prefix 64:ff9b::/96 — the embedded v4 is the real target.
+  if (g[0] === 0x64 && g[1] === 0xff9b && g.slice(2, 6).every((x) => x === 0)) return isPrivateV4(embeddedV4());
+  if ((g[0] & 0xffc0) === 0xfe80) return true; // fe80::/10 link-local
+  if ((g[0] & 0xfe00) === 0xfc00) return true; // fc00::/7 unique-local
   return false;
 }
 
@@ -81,6 +122,14 @@ export async function assertSafeFetchUrl(url: string): Promise<void> {
   if (isIP(host)) {
     if (isPrivateAddress(host)) throw new BlockedUrlError(`private literal ${host}`);
     return;
+  }
+
+  // Numeric/hex hosts that are NOT valid dotted IPs (decimal `2130706433`,
+  // octal `0177.0.0.1`, hex `0x7f.1`) are IPv4 obfuscation. getaddrinfo may
+  // resolve them to a private address inconsistently across platforms, so
+  // reject them outright rather than trusting the later resolution.
+  if (/^(0x[0-9a-f]+|[0-9]+)$/i.test(host) || /(^|\.)0x[0-9a-f]+(\.|$)/i.test(host) || /(^|\.)0\d+(\.|$)/.test(host)) {
+    throw new BlockedUrlError(`numeric host ${host}`);
   }
 
   let addrs: Array<{ address: string }>;

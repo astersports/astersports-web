@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, json, bigint, index } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, json, bigint, index, uniqueIndex } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -182,6 +182,11 @@ export const creditLedger = mysqlTable("credit_ledger", {
   tenantCreatedIdx: index("idx_credit_ledger_tenant_created").on(t.tenantId, t.createdAt),
   // H5: ledger<->jobs correlation joins on refId.
   refIdIdx: index("idx_credit_ledger_refId").on(t.refId),
+  // C3: hard idempotency backstop — at most one ledger row per (refId, reason).
+  // MySQL allows multiple NULL refIds, so manual adjustments without a refId are
+  // unaffected. grantCredits also checks-first, so the common retry path never
+  // hits this constraint; it only catches the concurrent-delivery race.
+  refReasonUniq: uniqueIndex("uniq_credit_ledger_ref_reason").on(t.refId, t.reason),
 }));
 
 export type CreditLedgerEntry = typeof creditLedger.$inferSelect;

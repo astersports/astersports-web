@@ -411,10 +411,12 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
-    );
+    // H4: the upstream LLM body can echo internal hosts/request content — log it
+    // server-side only; the thrown message (which propagates into serverLogs and
+    // can reach clients) stays generic.
+    const errorText = await response.text().catch(() => "");
+    console.error(`[llm] invoke failed ${response.status} ${response.statusText}: ${errorText}`);
+    throw new Error(`LLM invoke failed: ${response.status}`);
   }
 
   return (await response.json()) as InvokeResult;

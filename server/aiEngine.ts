@@ -20,7 +20,7 @@ import { densityThin } from "./_core/studio/ops/densityThin";
 import { scalePrintRepeat } from "./_core/studio/ops/scaleRepeat";
 import { checkRepeat, MIN_REPEAT_CONFIDENCE } from "./_core/studio/ops/repeatGuard";
 import { decodeUpright } from "./_core/image/decodeUpright";
-import type { RasterMask } from "./_core/masking/types";
+import type { RasterMask, Sam2AuditContext } from "./_core/masking/types";
 
 /**
  * Deterministic density (D-C): SAM2 fabric raster + instance masks -> densityThin -> PNG.
@@ -33,14 +33,15 @@ import type { RasterMask } from "./_core/masking/types";
  */
 export async function generateDensityImage(
   originalImageUrl: string,
-  percent: number
+  percent: number,
+  audit?: Sam2AuditContext
 ): Promise<{ png: Buffer; removed: number } | null> {
   const srcUrl = originalImageUrl.startsWith("/manus-storage/")
     ? await storageGetSignedUrl(originalImageUrl.replace("/manus-storage/", ""))
     : originalImageUrl;
 
-  // Single SAM2 call -> fabric + instances.
-  const { fabric, instances } = await getMaskProvider().getSegmentation({ url: srcUrl });
+  // Single SAM2 call -> fabric + instances. (C5: stamp audit on the outbound call.)
+  const { fabric, instances } = await getMaskProvider().getSegmentation({ url: srcUrl, audit });
   if (!fabric.raster || !hasAnyPixel(fabric.raster) || instances.length === 0) {
     // Degrade (no/empty raster or 0 instances) -> fail + refund (not prompt-fall).
     console.warn(`[density-live] Provider degraded (no/empty raster or 0 instances); fail + refund.`);
@@ -70,12 +71,13 @@ export async function generateDensityImage(
  *  call, no no-op guard (the op always applies). */
 export async function generateRecoloredImage(
   originalImageUrl: string,
-  params: { fromColor: string; toColor: string; coverage: number }
+  params: { fromColor: string; toColor: string; coverage: number },
+  audit?: Sam2AuditContext
 ): Promise<Buffer> {
   const srcUrl = originalImageUrl.startsWith("/manus-storage/")
     ? await storageGetSignedUrl(originalImageUrl.replace("/manus-storage/", ""))
     : originalImageUrl;
-  const fabric = await getMaskProvider().getFabricMask({ url: srcUrl }); // classical floor (bbox)
+  const fabric = await getMaskProvider().getFabricMask({ url: srcUrl, audit }); // classical floor (bbox)
   return separationRemap({ url: srcUrl }, fabric, params);
 }
 
@@ -101,12 +103,13 @@ export const NON_REPEAT_SCALE_ERROR = "NON_REPEAT_SCALE";
  *  so the caller rejects pre-deduct with an honest message. */
 export async function generateScaledImage(
   originalImageUrl: string,
-  params: { targetFraction: number }
+  params: { targetFraction: number },
+  audit?: Sam2AuditContext
 ): Promise<Buffer> {
   const srcUrl = originalImageUrl.startsWith("/manus-storage/")
     ? await storageGetSignedUrl(originalImageUrl.replace("/manus-storage/", ""))
     : originalImageUrl;
-  const fabric = await getMaskProvider().getFabricMask({ url: srcUrl }); // SAM2 raster (combined_mask)
+  const fabric = await getMaskProvider().getFabricMask({ url: srcUrl, audit }); // SAM2 raster (combined_mask)
   if (!fabric.raster || !hasAnyPixel(fabric.raster)) {
     throw new Error(NO_OP_SCALE_ERROR);
   }
