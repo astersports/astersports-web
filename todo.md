@@ -380,3 +380,12 @@
 - [x] Flag 1: Scale no-op refund parity — scalePrintRepeat signals `changed`, generateScaledImage refunds byte-identical results
 - [x] Flag 2: Non-repeat guard — pre-deduct rejection when periodConfidence < threshold (honest message instead of tiling a logo)
 - [x] Tests for both flags (10 scale tests + 5 repeatGuard tests, 208 total pass)
+
+## Architect v3 Spec + PLANNED builds (2026-06-20)
+- [x] Commit v3 STUDIO_OPS_SPEC.md (replaces blob 1053497f)
+- [x] Remove stale non-repeat TODO in studio.ts
+- [x] Build: scale 50-200 clamp (zod schema, mirrors density's 0-90)
+- [ ] Build: upscale DPI guard (pre-deduct, metadata-based enforce with warn fallback)
+- [ ] Build: NNI R >= 1.0 gate in densityMetrics
+- [ ] Build: min-feature advisory (non-blocking)
+- [ ] Build: FFT + autocorrelation detector with labeled-garment calibration report

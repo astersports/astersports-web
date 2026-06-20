@@ -105,7 +105,10 @@ export const studioRouter = router({
       z.object({
         jobId: z.number(),
         controls: z.object({
-          scale: z.object({ enabled: z.boolean(), percent: z.number() }),
+          scale: z.object({
+            enabled: z.boolean(),
+            percent: z.number().transform((v) => Math.max(-50, Math.min(100, v))),
+          }),
           density: z.object({
             enabled: z.boolean(),
             percent: z.number().transform((v) => Math.max(0, Math.min(90, v))),
@@ -217,11 +220,6 @@ export const studioRouter = router({
           `[studio] scale-live on but provider not rasterReady; prompt-path fallback. job=${job.id} org=${ctx.tenant.id}`
         );
       }
-      // TODO(locked scale prompt + IoU): Decision 1 non-repeat guard — reject
-      // pre-deduct when periodConfidence < the eval-set threshold ("Scale supports
-      // repeating prints; this reads as a single placed graphic"). Exact placement
-      // (pre-deduct segmentation reuse) + threshold are pinned by the locked prompt;
-      // deferred while the route is dark.
 
       const creditCost = computeCredits(controls, CREDIT_COST);
 

@@ -47,7 +47,7 @@ export interface ControlSettings {
 }
 
 export const SCALE_MIN = -50;
-export const SCALE_MAX = 50;
+export const SCALE_MAX = 100;
 export const DENSITY_MIN = 0;
 export const DENSITY_MAX = 90;
 export const REMOVE_MIN = 0;
