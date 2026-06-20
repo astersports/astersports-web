@@ -7,7 +7,8 @@ import { TRPCError } from "@trpc/server";
 import { router } from "../_core/trpc";
 import { tenantProcedure } from "../tenancy";
 import { storagePut } from "../storage";
-import { detectPrintElements, generateEditedImage } from "../aiEngine";
+import { detectPrintElements, generateEditedImage, generateRecoloredImage } from "../aiEngine";
+import { ENV } from "../_core/env";
 import {
   createJob,
   updateJobStatus,
@@ -24,7 +25,7 @@ import {
   getTrialStatus,
   analyzeTrialUsage,
 } from "../studioDb";
-import { buildInstruction, computeCredits, describeExpectedChange, type ControlSettings } from "../../shared/controls";
+import { buildInstruction, computeCredits, describeExpectedChange, resolveTargetColorHex, type ControlSettings } from "../../shared/controls";
 import { CREDIT_COST, LOW_BALANCE_THRESHOLD, PLANS, TRIAL_DURATION_DAYS, TRIAL_RECOMMENDATION_START_DAY } from "../../shared/billing";
 import { sanitizeElementName, sanitizeColorValue, MAX_ELEMENT_NAME_LENGTH } from "../../shared/sanitize";
 
@@ -108,6 +109,7 @@ export const studioRouter = router({
           recolor: z.object({
             enabled: z.boolean(),
             element: z.string().max(MAX_ELEMENT_NAME_LENGTH).transform(sanitizeElementName),
+            fromColor: z.string().max(30).default(""),
             targetColor: z.string().max(30).transform(sanitizeColorValue),
             coverage: z.number().min(10).max(100),
           }),
@@ -141,6 +143,20 @@ export const studioRouter = router({
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Target color is required and must contain valid characters.",
+        });
+      }
+
+      // A2 live route: recolor-ONLY jobs go through the deterministic op (classical
+      // provider, no SAM2) when STUDIO_RECOLOR_LIVE is on. Everything else (combined
+      // or non-recolor) stays on the existing prompt path.
+      const recolorOnly =
+        controls.recolor.enabled && !controls.scale.enabled &&
+        !controls.density.enabled && !controls.remove.enabled;
+      const useDeterministicRecolor = ENV.studioRecolorLive && recolorOnly;
+      if (useDeterministicRecolor && !controls.recolor.fromColor) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Source color is required for recolor. Click the print color to sample it.",
         });
       }
 
@@ -198,6 +214,17 @@ export const studioRouter = router({
       const settled = await Promise.allSettled(
         Array.from({ length: controls.variations }, async (_unused, i) => {
           console.log(`[studio] Generating variation ${i + 1} for job ${job.id}`);
+          if (useDeterministicRecolor) {
+            const png = await generateRecoloredImage(job.originalUrl, {
+              fromColor: controls.recolor.fromColor,
+              toColor: resolveTargetColorHex(controls.recolor.targetColor),
+              coverage: controls.recolor.coverage,
+            });
+            const key = `studio/${ctx.tenant.id}/${job.id}/recolor-${nextRound}.png`;
+            const { url } = await storagePut(key, png, "image/png");
+            await addVariation({ jobId: job.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: nextRound });
+            return { url, key };
+          }
           const resultUrl = await generateEditedImage(job.originalUrl, instruction, "image/jpeg", expectation);
           await addVariation({
             jobId: job.id,

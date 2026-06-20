@@ -13,6 +13,22 @@ import { generateImage } from "./_core/imageGeneration";
 import { storageGetSignedUrl } from "./storage";
 import { fetchWithTimeout, TIMEOUT } from "./fetchTimeout";
 import { ENV } from "./_core/env";
+import { getMaskProvider } from "./_core/masking";
+import { separationRemap } from "./_core/studio/ops/separationRemap";
+
+/** Deterministic recolor (A2): classical fabric mask + separationRemap -> PNG bytes.
+ *  Caller (studio.generate) stores the buffer + records the variation. No model
+ *  call, no no-op guard (the op always applies). */
+export async function generateRecoloredImage(
+  originalImageUrl: string,
+  params: { fromColor: string; toColor: string; coverage: number }
+): Promise<Buffer> {
+  const srcUrl = originalImageUrl.startsWith("/manus-storage/")
+    ? await storageGetSignedUrl(originalImageUrl.replace("/manus-storage/", ""))
+    : originalImageUrl;
+  const fabric = await getMaskProvider().getFabricMask({ url: srcUrl }); // classical floor (bbox)
+  return separationRemap({ url: srcUrl }, fabric, params);
+}
 
 /** Sentinel error: the model returned an image that did not apply the requested edit. */
 export const NO_OP_EDIT_ERROR = "NO_OP_EDIT";

@@ -28,6 +28,9 @@ export interface RecolorControl {
   enabled: boolean;
   /** Natural-language element name to recolor, e.g. "pink blossoms". */
   element: string;
+  /** Source print color (hex) sampled via the swatch/eyedropper; identifies the
+   *  separation to recolor for the deterministic op. */
+  fromColor: string;
   /** Target color name or hex code, e.g. "coral", "deep navy", "#2A4B7C". */
   targetColor: string;
   /** Optional: coverage percentage — what percent of the selected element to recolor (default 100). */
@@ -73,12 +76,36 @@ export const RECOLOR_PRESETS = [
   { name: "Champagne Gold", value: "champagne gold" },
 ] as const;
 
+/** Pinned hex for the descriptive preset names (not CSS colors). v1 swatches. */
+export const RECOLOR_PRESET_HEX: Record<string, string> = {
+  "coral": "#FF7F50",
+  "deep navy": "#14233A",
+  "sage green": "#9CAF88",
+  "dusty rose": "#C4979B",
+  "ivory": "#FFFFF0",
+  "burnt sienna": "#E97451",
+  "cobalt blue": "#0047AB",
+  "chartreuse": "#7FFF00",
+  "mauve": "#E0B0FF",
+  "terracotta": "#E2725B",
+  "midnight black": "#0B0B0B",
+  "champagne gold": "#F7E7CE",
+};
+
+/**
+ * Resolve a recolor target (preset name | CSS name | hex) to a string the op's
+ * hexToLab can parse. Presets map to pinned hex; everything else passes through.
+ */
+export function resolveTargetColorHex(input: string): string {
+  return RECOLOR_PRESET_HEX[input.trim().toLowerCase()] ?? input;
+}
+
 export function defaultControls(): ControlSettings {
   return {
     scale: { enabled: false, percent: 0 },
     density: { enabled: false, percent: 0 },
     remove: { enabled: false, element: "", percent: 0 },
-    recolor: { enabled: false, element: "", targetColor: "", coverage: 100 },
+    recolor: { enabled: false, element: "", fromColor: "", targetColor: "", coverage: 100 },
     variations: 1,
   };
 }

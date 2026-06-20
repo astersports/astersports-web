@@ -10,8 +10,12 @@ import {
   computeCredits,
   defaultControls,
   describeExpectedChange,
+  resolveTargetColorHex,
+  RECOLOR_PRESET_HEX,
+  RECOLOR_PRESETS,
   type ControlSettings,
 } from "../shared/controls";
+import { hexToLab } from "./_core/studio/ops/color";
 import { CREDIT_COST, PLANS, TOPUP_PACKS } from "../shared/billing";
 import { emailAllowedForDomain } from "../shared/domain";
 
@@ -214,6 +218,31 @@ describe("describeExpectedChange", () => {
     controls.remove.element = "";
     controls.remove.percent = 50;
     expect(describeExpectedChange(controls)).toBe("");
+  });
+});
+
+describe("resolveTargetColorHex (A2)", () => {
+  it("maps every preset to a pinned 6-digit hex", () => {
+    for (const p of RECOLOR_PRESETS) {
+      expect(resolveTargetColorHex(p.value)).toBe(RECOLOR_PRESET_HEX[p.value]);
+      expect(resolveTargetColorHex(p.value)).toMatch(/^#[0-9A-Fa-f]{6}$/);
+    }
+  });
+
+  it("passes hex and non-preset CSS names through unchanged", () => {
+    expect(resolveTargetColorHex("#2A4B7C")).toBe("#2A4B7C");
+    expect(resolveTargetColorHex("teal")).toBe("teal");
+  });
+
+  it("is case/whitespace insensitive for presets", () => {
+    expect(resolveTargetColorHex("  Deep Navy ")).toBe("#14233A");
+  });
+
+  it("resolved presets/hex/CSS parse via hexToLab; garbage surfaces the throw", () => {
+    expect(() => hexToLab(resolveTargetColorHex("deep navy"))).not.toThrow();
+    expect(() => hexToLab(resolveTargetColorHex("#2A4B7C"))).not.toThrow();
+    expect(() => hexToLab(resolveTargetColorHex("teal"))).not.toThrow();
+    expect(() => hexToLab(resolveTargetColorHex("xyz-not-a-color"))).toThrow();
   });
 });
 

@@ -187,6 +187,44 @@ export default function ControlPanel({
               </Select>
             </div>
 
+            {/* Source print color — identifies the separation (deterministic recolor) */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Source print color</Label>
+              <div className="flex items-center gap-2">
+                <span
+                  className="inline-block h-6 w-6 shrink-0 rounded border border-border"
+                  style={{ backgroundColor: controls.recolor.fromColor || "transparent" }}
+                  aria-label="Selected source color"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    const ED = (window as unknown as { EyeDropper?: new () => { open: () => Promise<{ sRGBHex: string }> } }).EyeDropper;
+                    if (!ED) return;
+                    try {
+                      const { sRGBHex } = await new ED().open();
+                      update({ recolor: { ...controls.recolor, fromColor: sRGBHex } });
+                    } catch {
+                      /* user cancelled the eyedropper */
+                    }
+                  }}
+                >
+                  Pick from image
+                </Button>
+                <Input
+                  value={controls.recolor.fromColor}
+                  onChange={(e) => update({ recolor: { ...controls.recolor, fromColor: e.target.value } })}
+                  placeholder="#RRGGBB"
+                  className="bg-background flex-1"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Click the print color to recolor (eyedropper), or enter a hex.
+              </p>
+            </div>
+
             {/* Target color */}
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Target color</Label>

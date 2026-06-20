@@ -35,6 +35,9 @@ export const ENV = {
   studioDeterministicScale: process.env.STUDIO_DETERMINISTIC_SCALE === "true",
   /** Route Density through the deterministic thinDensity op. Eval-only; default off. */
   studioDeterministicDensity: process.env.STUDIO_DETERMINISTIC_DENSITY === "true",
+  /** LIVE route: recolor-only jobs go through deterministic separationRemap in
+   *  generate (money path). Default off — lands dark; Frank flips to go live. */
+  studioRecolorLive: process.env.STUDIO_RECOLOR_LIVE === "true",
   /** Replicate SAM2 (D1 = Option 2). Token + model-version id for the hosted mask source. */
   replicateApiToken: process.env.REPLICATE_API_TOKEN ?? "",
   replicateSam2Model: process.env.REPLICATE_SAM2_MODEL ?? "",
