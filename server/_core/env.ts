@@ -31,4 +31,7 @@ export const ENV = {
    * the fallback until A1 clears its eval gate. Requires a source color input.
    */
   studioDeterministicRecolor: process.env.STUDIO_DETERMINISTIC_RECOLOR === "true",
+  /** Replicate SAM2 (D1 = Option 2). Token + model-version id for the hosted mask source. */
+  replicateApiToken: process.env.REPLICATE_API_TOKEN ?? "",
+  replicateSam2Model: process.env.REPLICATE_SAM2_MODEL ?? "",
 };

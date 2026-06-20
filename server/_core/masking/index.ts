@@ -12,6 +12,9 @@ import { sam2Provider } from "./sam2Provider";
 export * from "./types";
 export { locateFabricRegion } from "./locateFabricRegion";
 export type { FabricRegionResult } from "./locateFabricRegion";
+export { createSam2Provider } from "./sam2Provider";
+export { defaultSam2Client, type Sam2Client } from "./replicateSam2";
+export { decodeMaskToRaster, rasterBBox, instancesFromMasks } from "./sam2Mask";
 
 const REGISTRY: Record<MaskProviderName, MaskProvider> = {
   classical: classicalProvider,
