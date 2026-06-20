@@ -1,13 +1,11 @@
-# M16 — mechanical gate for audit-class regressions.
-# Phase 1 (this PR): typecheck only. `tsc --noEmit` is fully green and has caught
-# real regressions all session, so it's a meaningful, blocking gate today.
+# M16 — mechanical gate for audit-class regressions. Runs the two checks we rely
+# on by hand all session: the TypeScript type-check and the vitest suite. A red
+# check blocks the merge button, so a type error or a broken test can't ride into
+# main unnoticed.
 #
-# The vitest suite is intentionally NOT run here yet: several pre-existing tests
-# require live secrets (RESEND/REPLICATE/OWNER_OPEN_ID/STRIPE) or fail on unrelated
-# mock debt (webhook signature tests), so a test step would be red for reasons
-# orthogonal to a PR's changes — a gate that doesn't gate. A follow-up
-# suite-hardening PR makes the suite CI-green (skipIf credential-dependent tests,
-# repair the webhook mocks, lazy Stripe init) and then adds the test step here.
+# Credential-dependent tests (live RESEND/REPLICATE/OWNER/STRIPE) skip themselves
+# when their secret is absent (it.skipIf), so the suite is green in a clean CI
+# environment and still runs fully where the secrets exist.
 name: CI
 
 on:
@@ -16,8 +14,8 @@ on:
     branches: [main]
 
 jobs:
-  typecheck:
-    name: typecheck
+  check:
+    name: typecheck + tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,3 +36,6 @@ jobs:
 
       - name: Typecheck
         run: pnpm run check
+
+      - name: Tests
+        run: pnpm run test

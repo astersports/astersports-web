@@ -2,9 +2,13 @@ import Stripe from "stripe";
 
 /**
  * Stripe client singleton.
- * Uses STRIPE_SECRET_KEY injected by the platform.
+ * Uses STRIPE_SECRET_KEY injected by the platform. When the key is absent
+ * (dev/test/CI), construct with a non-empty placeholder so importing this module
+ * doesn't throw ("Neither apiKey nor config.authenticator provided") — any actual
+ * API call still fails auth, which is correct. In production the real key is
+ * present, so behavior is unchanged.
  */
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "", {
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_unconfigured_placeholder", {
   apiVersion: "2026-05-27.dahlia",
   typescript: true,
 });

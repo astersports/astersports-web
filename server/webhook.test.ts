@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import type { Request, Response } from "express";
 
 // Mock dependencies before importing the module under test
@@ -29,6 +29,7 @@ vi.mock("./email", () => ({
 
 import { handleStripeWebhook } from "./webhook";
 import { stripe } from "./stripe";
+import { ENV } from "./_core/env";
 import { getDb } from "./db";
 import { notifyOwner } from "./_core/notification";
 import { emailSubscriptionActivated, emailPaymentFailed, emailSubscriptionCanceled } from "./email";
@@ -59,6 +60,13 @@ describe("handleStripeWebhook", () => {
   });
 
   describe("signature verification", () => {
+    // These cases assert the constructEvent (signature) branch, which the handler
+    // only takes when a webhook secret is configured. Set one for the block so the
+    // path is exercised regardless of the ambient env; restore after.
+    let prevSecret: string;
+    beforeEach(() => { prevSecret = ENV.stripeWebhookSecret; ENV.stripeWebhookSecret = "whsec_test_secret"; });
+    afterEach(() => { ENV.stripeWebhookSecret = prevSecret; });
+
     it("returns verified: true for test events (evt_test_ prefix)", async () => {
       const testEvent = { id: "evt_test_abc123", type: "checkout.session.completed", data: {} };
       const { req, res } = createMockReqRes(testEvent);
