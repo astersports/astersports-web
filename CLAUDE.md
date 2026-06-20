@@ -11,29 +11,34 @@ conventions so any lane can pick up work without re-deriving them.
 
 ---
 
-## 1. Flip Authority (HARD RULE)
+## 1. Flip Authority (single authority, env-verified) — HARD RULE
+
+> Verbatim from the Architect's 2026-06-20 incident ruling. The Architect amends
+> this clause; that version wins.
 
 A "flip" is any change that moves a feature from dark to live: setting,
 changing, or deploying a `*_LIVE` flag, `STUDIO_MASK_PROVIDER`, or any
 production secret that moves the **money/credit path**, the **mask provider**,
 or a **sub-processor**.
 
-1. **Only Frank flips, and only on an Architect-verified SHA after gates clear.**
-   No lane (CC, Manus, any agent) sets/changes/deploys any of the above except
-   as Frank's explicit flip.
-2. **A flip is a deliberate act, never a side effect.** It is an env change
-   Frank makes or directs by name — never a byproduct of a builder checkpoint,
-   deploy, or "while I was in there" change.
-3. **Builders may PREPARE a flip, never SET it.** Preparing = documenting the
-   exact secret, target value, and the SHA it applies to. Setting = forbidden.
-4. **Every flip is logged**: flag, old → new value, SHA, who, and the
-   gate-clearance reference. One flip per change, smoke-tested, attributable.
-5. **Default posture: dark.** Every `*_LIVE` flag ships dark and stays dark
-   until the flip ritual. No lane assumes another lane will or won't flip.
-
-Corollary: if you believe a feature is "already dark" or "already live", that is
-an **inference** until verified by a production env read (see G0). Do not act on
-inferred env state.
+1. No lane (CC, Manus, any agent) sets, changes, or deploys any `*_LIVE` flag,
+   `STUDIO_MASK_PROVIDER`, or any prod secret that moves the money/credit path,
+   the mask provider, or a sub-processor. Sole exception: Frank's explicit flip
+   on an Architect-verified SHA after all gates clear.
+2. The flip is a deliberate env change Frank makes or names by hand. It is never
+   a side effect of a builder checkpoint, deploy, or PR merge.
+3. Builders may PREPARE a flip (document the exact secret, value, and target
+   SHA). Builders never SET it.
+4. Every flip is logged: flag, old to new, SHA, who, gate-clearance ref. One
+   flip per change, smoke-tested after. Never batch flips.
+5. Default posture: every `*_LIVE` flag ships dark and stays dark until the flip
+   ritual. No lane assumes another lane has flipped or will. "Dark" is true only
+   when verified against the live deployment env (G0), never inferred.
+6. Gate order before any flip: G0 prod env verified dark (Vercel evidence) →
+   G1 Architect verifies live-candidate SHA → G2 credentialed SAM2 privacy
+   re-confirm → G3 real-garment per-route eval on fixed runners → G4
+   live-surface hardening merged and verified. Re-flip sequence: recolor
+   (classical) → SAM2 provider (own flip, gated on G2) → scale → density.
 
 ---
 
