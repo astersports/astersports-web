@@ -1,6 +1,6 @@
 /**
  * Admin Server Logs page — queryable production logs for debugging.
- * Shows log entries with filtering by level, source, time range, and search.
+ * Shows log entries with filtering by level, source, time range, tenant, job, and search.
  */
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
@@ -43,6 +43,10 @@ export default function AdminLogs() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [hours, setHours] = useState(24);
+  const [tenantId, setTenantId] = useState<string>("");
+  const [tenantIdInput, setTenantIdInput] = useState("");
+  const [jobId, setJobId] = useState<string>("");
+  const [jobIdInput, setJobIdInput] = useState("");
 
   const filters = useMemo(() => ({
     limit: PAGE_SIZE,
@@ -51,7 +55,9 @@ export default function AdminLogs() {
     source: source !== "all" ? source : undefined,
     search: search || undefined,
     from: Date.now() - hours * 60 * 60 * 1000,
-  }), [offset, level, source, search, hours]);
+    tenantId: tenantId ? Number(tenantId) : undefined,
+    jobId: jobId ? Number(jobId) : undefined,
+  }), [offset, level, source, search, hours, tenantId, jobId]);
 
   const { data, isLoading, refetch } = trpc.adminLogs.list.useQuery(filters, {
     refetchInterval: 10000, // Auto-refresh every 10s
@@ -62,6 +68,16 @@ export default function AdminLogs() {
 
   const handleSearch = () => {
     setSearch(searchInput);
+    setOffset(0);
+  };
+
+  const handleTenantFilter = () => {
+    setTenantId(tenantIdInput);
+    setOffset(0);
+  };
+
+  const handleJobFilter = () => {
+    setJobId(jobIdInput);
     setOffset(0);
   };
 
@@ -121,6 +137,7 @@ export default function AdminLogs() {
       <Card>
         <CardContent className="pt-4 pb-4">
           <div className="flex flex-wrap gap-3 items-end">
+            {/* Search */}
             <div className="flex-1 min-w-[200px]">
               <label className="text-xs text-muted-foreground mb-1 block">Search</label>
               <div className="flex gap-2">
@@ -136,6 +153,7 @@ export default function AdminLogs() {
                 </Button>
               </div>
             </div>
+            {/* Level */}
             <div className="w-[130px]">
               <label className="text-xs text-muted-foreground mb-1 block">Level</label>
               <Select value={level} onValueChange={(v) => { setLevel(v); setOffset(0); }}>
@@ -151,6 +169,7 @@ export default function AdminLogs() {
                 </SelectContent>
               </Select>
             </div>
+            {/* Source */}
             <div className="w-[150px]">
               <label className="text-xs text-muted-foreground mb-1 block">Source</label>
               <Select value={source} onValueChange={(v) => { setSource(v); setOffset(0); }}>
@@ -165,6 +184,7 @@ export default function AdminLogs() {
                 </SelectContent>
               </Select>
             </div>
+            {/* Time range */}
             <div className="w-[130px]">
               <label className="text-xs text-muted-foreground mb-1 block">Time range</label>
               <Select value={String(hours)} onValueChange={(v) => { setHours(Number(v)); setOffset(0); }}>
@@ -181,6 +201,77 @@ export default function AdminLogs() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Second row: Tenant ID and Job ID */}
+          <div className="flex flex-wrap gap-3 items-end mt-3 pt-3 border-t border-border/50">
+            <div className="w-[160px]">
+              <label className="text-xs text-muted-foreground mb-1 block">Tenant ID</label>
+              <div className="flex gap-1">
+                <Input
+                  type="number"
+                  placeholder="e.g. 7"
+                  value={tenantIdInput}
+                  onChange={(e) => setTenantIdInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleTenantFilter()}
+                  className="h-9"
+                  min={1}
+                />
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleTenantFilter}
+                  className="h-9 px-2"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </div>
+            <div className="w-[160px]">
+              <label className="text-xs text-muted-foreground mb-1 block">Job ID</label>
+              <div className="flex gap-1">
+                <Input
+                  type="number"
+                  placeholder="e.g. 42"
+                  value={jobIdInput}
+                  onChange={(e) => setJobIdInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleJobFilter()}
+                  className="h-9"
+                  min={1}
+                />
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleJobFilter}
+                  className="h-9 px-2"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </div>
+            {/* Active filter badges */}
+            {(tenantId || jobId) && (
+              <div className="flex items-center gap-2 ml-2">
+                {tenantId && (
+                  <Badge
+                    variant="secondary"
+                    className="cursor-pointer hover:bg-destructive/20 transition-colors"
+                    onClick={() => { setTenantId(""); setTenantIdInput(""); setOffset(0); }}
+                  >
+                    tenant:{tenantId} ×
+                  </Badge>
+                )}
+                {jobId && (
+                  <Badge
+                    variant="secondary"
+                    className="cursor-pointer hover:bg-destructive/20 transition-colors"
+                    onClick={() => { setJobId(""); setJobIdInput(""); setOffset(0); }}
+                  >
+                    job:{jobId} ×
+                  </Badge>
+                )}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -221,12 +312,20 @@ export default function AdminLogs() {
                             {entry.source}
                           </Badge>
                           {entry.jobId && (
-                            <span className="text-[10px] text-muted-foreground">
+                            <span
+                              className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                              onClick={() => { setJobIdInput(String(entry.jobId)); setJobId(String(entry.jobId)); setOffset(0); }}
+                              title="Click to filter by this job"
+                            >
                               job:{entry.jobId}
                             </span>
                           )}
                           {entry.tenantId && (
-                            <span className="text-[10px] text-muted-foreground">
+                            <span
+                              className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                              onClick={() => { setTenantIdInput(String(entry.tenantId)); setTenantId(String(entry.tenantId)); setOffset(0); }}
+                              title="Click to filter by this tenant"
+                            >
                               tenant:{entry.tenantId}
                             </span>
                           )}
