@@ -40,10 +40,10 @@ const reqFor = (key: string) => ({ params: { 0: key }, headers: {} }) as any;
 describe("storageProxy authorization", () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
-  it("401 when unauthenticated (any key)", async () => {
+  it("401 when unauthenticated on a private studio/ key", async () => {
     auth.mockRejectedValue(new Error("no session"));
     const res = mockRes();
-    await getHandler()(reqFor("generated/abc.png"), res);
+    await getHandler()(reqFor("studio/42/orig.png"), res);
     expect(res.statusCode).toBe(401);
   });
 
@@ -56,13 +56,15 @@ describe("storageProxy authorization", () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it("generated/ key with no matching variation: 404 (fail closed)", async () => {
-    auth.mockResolvedValue({ id: 7 });
+  it("public asset (non-studio, non-variation key): served WITHOUT auth", async () => {
+    // The marketing logo + AAU highlight videos flow through /manus-storage/ at
+    // root keys and must stay public. They are not variations.
     variationByKey.mockResolvedValue(undefined);
     const res = mockRes();
-    await getHandler()(reqFor("generated/xyz.png"), res);
-    expect(variationByKey).toHaveBeenCalledWith("generated/xyz.png");
-    expect(res.statusCode).toBe(404);
+    await getHandler()(reqFor("aster_sports_logo_high_res_2b537f86.png"), res);
+    expect(auth).not.toHaveBeenCalled(); // never required auth
+    expect(variationByKey).toHaveBeenCalledWith("aster_sports_logo_high_res_2b537f86.png");
+    expect(res.statusCode).toBe(500); // reaches the config gate (forge env unset in test)
   });
 
   it("generated/ key owned by another tenant: 403 (cross-tenant IDOR closed)", async () => {

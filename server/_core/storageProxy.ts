@@ -11,40 +11,38 @@ export function registerStorageProxy(app: Express) {
       return;
     }
 
-    // C1: this proxy presigns ANY key with the Forge service key. Require an
-    // authenticated session, and for tenant-scoped keys (studio/<tenantId>/...)
-    // require the caller be a member of that tenant — otherwise any party who
-    // learns a key (keys appear in API URLs) can read another tenant's images.
-    let userId: number;
-    try {
-      const user = await sdk.authenticateRequest(req);
-      userId = user.id;
-    } catch {
-      res.status(401).send("Authentication required");
-      return;
-    }
+    // C1 — protect CUSTOMER images, not the public site. This proxy presigns any
+    // key with the Forge service key, and keys travel in URLs, so customer images
+    // must be membership-scoped. Two kinds of key are private:
+    //   - studio/<tenantId>/...  : originals + deterministic outputs (tenant in path)
+    //   - any key recorded as a job variation : prompt-path outputs under generated/*
+    //     (the generative path), whose tenant is NOT in the path
+    // Everything else through /manus-storage/ is a PUBLIC asset (marketing logo on
+    // Privacy/Terms/Home, AAU highlight videos) and is served without auth, exactly
+    // as before C1. Confirmed taxonomy: only customer images are studio/* or
+    // variation-backed; nothing else customer-owned flows through this proxy. (A
+    // future hardening could migrate public assets under an explicit prefix and make
+    // the private rule fail-closed for unknown keys.)
     const tenantMatch = key.match(/^studio\/(\d+)\//);
+    let ownerTenantId: number | null = null;
     if (tenantMatch) {
-      // Originals (and any future tenant-prefixed key) carry the tenant in the
-      // path: require membership directly.
-      const tenantId = Number(tenantMatch[1]);
-      const membership = await getMembership(tenantId, userId);
-      if (!membership) {
-        res.status(403).send("Forbidden");
-        return;
-      }
+      ownerTenantId = Number(tenantMatch[1]);
     } else {
-      // C1 (generated/* scope): prompt-path outputs (generated/...) are customer
-      // image context recorded as variations with a resultKey + tenantId, but the
-      // tenant isn't in the path. Resolve the owning tenant by the key and require
-      // membership — same IDOR guard as originals. Fail closed: a key that maps to
-      // no owned variation has no legitimate reader.
       const variation = await getVariationByResultKey(key);
-      if (!variation) {
-        res.status(404).send("Not found");
+      if (variation) ownerTenantId = variation.tenantId;
+    }
+
+    if (ownerTenantId !== null) {
+      // Private customer image: require an authenticated member of the owning tenant.
+      let userId: number;
+      try {
+        const user = await sdk.authenticateRequest(req);
+        userId = user.id;
+      } catch {
+        res.status(401).send("Authentication required");
         return;
       }
-      const membership = await getMembership(variation.tenantId, userId);
+      const membership = await getMembership(ownerTenantId, userId);
       if (!membership) {
         res.status(403).send("Forbidden");
         return;
