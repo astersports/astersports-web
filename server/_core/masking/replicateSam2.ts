@@ -55,6 +55,18 @@ export interface Sam2Client {
 const SAM2_MODEL = "meta/sam-2";
 const DOWNLOAD_TIMEOUT_MS = 30_000;
 
+/**
+ * Resolve REPLICATE_SAM2_MODEL into a ref the SDK's `run()` accepts.
+ * `run()` wants `owner/model` or `owner/model:version` — NOT a bare version hash.
+ * So a configured value WITH a slash is used as-is; a bare version hash (no slash,
+ * e.g. the confirmed `fe97b45...`) is pinned to `meta/sam-2:<hash>`; empty -> slug.
+ */
+export function resolveModelRef(configured?: string): `${string}/${string}` {
+  const v = (configured ?? "").trim();
+  if (!v) return SAM2_MODEL;
+  return (v.includes("/") ? v : `${SAM2_MODEL}:${v}`) as `${string}/${string}`;
+}
+
 /** Coerce a Replicate output entry to a URL string (tolerates SDK FileOutput). */
 function asUrl(v: unknown): string {
   if (typeof v === "string") return v;
@@ -92,8 +104,7 @@ export function defaultSam2Client(): Sam2Client {
         stability_score_thresh: options?.stabilityScoreThresh ?? 0.88,
         use_m2m: options?.useM2M ?? true,
       };
-      const model = (ENV.replicateSam2Model || SAM2_MODEL) as `${string}/${string}`;
-      const output = (await replicate.run(model, { input })) as Record<string, unknown>;
+      const output = (await replicate.run(resolveModelRef(ENV.replicateSam2Model), { input })) as Record<string, unknown>;
 
       const combinedUrl = asUrl(output?.combined_mask);
       const individualUrls = Array.isArray(output?.individual_masks)
