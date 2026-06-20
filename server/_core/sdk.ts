@@ -221,6 +221,15 @@ class SDKServer {
         return null;
       }
 
+      // H3: enforce the token audience. With a JWT secret shared across
+      // Manus-template apps, a session minted for another app would otherwise
+      // authenticate here. Only enforce when this app's id is configured (env
+      // fail-fast guarantees it in prod) so dev without VITE_APP_ID still works.
+      if (ENV.appId && appId !== ENV.appId) {
+        console.warn("[Auth] Session appId does not match this app");
+        return null;
+      }
+
       return {
         openId,
         appId,

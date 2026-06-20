@@ -414,7 +414,9 @@ export async function listCreditLedger(
       .from(creditLedger)
       .leftJoin(
         jobs,
-        sql`${creditLedger.refId} IS NOT NULL AND ${jobs.id} = CAST(REPLACE(REPLACE(${creditLedger.refId}, 'job-', ''), '-failed', '') AS UNSIGNED)`
+        // M1: tenant-scope the join — without jobs.tenantId = ledger.tenantId a
+        // numeric refId collision could surface another tenant's job metadata.
+        sql`${creditLedger.refId} IS NOT NULL AND ${jobs.tenantId} = ${creditLedger.tenantId} AND ${jobs.id} = CAST(REPLACE(REPLACE(${creditLedger.refId}, 'job-', ''), '-failed', '') AS UNSIGNED)`
       )
       .where(condition)
       .orderBy(desc(creditLedger.createdAt))

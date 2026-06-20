@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sanitizeElementName, sanitizeColorValue, validateElementName, MAX_ELEMENT_NAME_LENGTH } from "../shared/sanitize";
+import { sanitizeElementName, sanitizeColorValue, validateElementName, sanitizeFileName, MAX_ELEMENT_NAME_LENGTH } from "../shared/sanitize";
 
 describe("sanitizeElementName", () => {
   it("passes through normal element names unchanged", () => {
@@ -125,5 +125,33 @@ describe("validateElementName", () => {
 
   it("returns null for input that is only special characters", () => {
     expect(validateElementName("{}[]<>")).toBeNull();
+  });
+});
+
+describe("sanitizeFileName (C2 — storage key cannot escape the tenant prefix)", () => {
+  it("passes a normal name through", () => {
+    expect(sanitizeFileName("garment.jpg")).toBe("garment.jpg");
+    expect(sanitizeFileName("my-photo_2.png")).toBe("my-photo_2.png");
+  });
+  it("strips path traversal and separators", () => {
+    expect(sanitizeFileName("../999/evil.png")).toBe("evil.png");
+    expect(sanitizeFileName("../../etc/passwd")).toBe("passwd");
+    expect(sanitizeFileName("a/b/c.jpg")).toBe("c.jpg");
+    expect(sanitizeFileName("..\\..\\win.png")).toBe("win.png");
+  });
+  it("strips leading dots (no dotfiles / '..')", () => {
+    expect(sanitizeFileName("..")).toBe("upload");
+    expect(sanitizeFileName(".hidden")).toBe("hidden");
+  });
+  it("collapses disallowed chars and never returns empty", () => {
+    expect(sanitizeFileName("a b$c.png")).toBe("a_b_c.png");
+    expect(sanitizeFileName("///")).toBe("upload");
+    expect(sanitizeFileName("")).toBe("upload");
+  });
+  it("the resulting key stays under the tenant prefix", () => {
+    const key = `studio/42/${Date.now()}-${sanitizeFileName("../7/x.png")}`;
+    expect(key.startsWith("studio/42/")).toBe(true);
+    expect(key.includes("..")).toBe(false);
+    expect(key.split("/").length).toBe(3);
   });
 });

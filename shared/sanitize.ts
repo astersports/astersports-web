@@ -115,3 +115,19 @@ export function sanitizeColorValue(input: string): string {
 
   return sanitized;
 }
+
+/**
+ * C2: Sanitize an uploaded file name before it becomes part of a storage key.
+ * Storage keys are `studio/<tenantId>/<ts>-<fileName>`; an unsanitized name with
+ * `../` or `/` could escape the tenant prefix and overwrite/read other tenants'
+ * objects. Take the basename only, allow a conservative charset, strip leading
+ * dots, and bound the length. Never returns an empty string.
+ */
+export function sanitizeFileName(input: string): string {
+  // basename: drop any path component (handles ../, nested dirs, backslashes).
+  const base = String(input).replace(/\\/g, "/").split("/").pop() ?? "";
+  // allowlist; collapse the rest to underscore; strip leading dots (no dotfiles / "..").
+  let safe = base.replace(/[^A-Za-z0-9._-]/g, "_").replace(/^\.+/, "");
+  if (safe.length > 100) safe = safe.slice(0, 100);
+  return safe.length > 0 ? safe : "upload";
+}

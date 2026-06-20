@@ -28,7 +28,7 @@ import {
 } from "../studioDb";
 import { buildInstruction, computeCredits, describeExpectedChange, resolveTargetColorHex, type ControlSettings } from "../../shared/controls";
 import { CREDIT_COST, LOW_BALANCE_THRESHOLD, PLANS, TRIAL_DURATION_DAYS, TRIAL_RECOMMENDATION_START_DAY } from "../../shared/billing";
-import { sanitizeElementName, sanitizeColorValue, MAX_ELEMENT_NAME_LENGTH } from "../../shared/sanitize";
+import { sanitizeElementName, sanitizeColorValue, sanitizeFileName, MAX_ELEMENT_NAME_LENGTH } from "../../shared/sanitize";
 
 export const studioRouter = router({
   /** Upload an image and create a new job. Returns the job with storage URL. */
@@ -62,7 +62,12 @@ export const studioRouter = router({
         });
       }
 
-      const key = `studio/${ctx.tenant.id}/${Date.now()}-${input.fileName}`;
+      // C2: sanitize the file name so it cannot escape the tenant key prefix.
+      const safeFileName = sanitizeFileName(input.fileName);
+      const key = `studio/${ctx.tenant.id}/${Date.now()}-${safeFileName}`;
+      if (!key.startsWith(`studio/${ctx.tenant.id}/`)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid file name." });
+      }
       const { key: storageKey, url } = await storagePut(key, buffer, input.mimeType);
 
       const job = await createJob({
@@ -471,6 +476,13 @@ export const studioRouter = router({
   toggleFavorite: tenantProcedure
     .input(z.object({ jobId: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      // C3: verify the job belongs to this tenant before favoriting (mirror the
+      // ownership check every other jobId-taking procedure performs) — otherwise
+      // a member could favorite arbitrary cross-tenant job IDs.
+      const job = await getJob(input.jobId);
+      if (!job || job.tenantId !== ctx.tenant.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Job not found" });
+      }
       const isFavorited = await toggleFavorite(ctx.tenant.id, input.jobId);
       return { favorited: isFavorited };
     }),
