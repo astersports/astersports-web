@@ -1,7 +1,14 @@
+# DEPRECATED — Superseded by `docs/STUDIO_OPS_SPEC.md`
+
+> This document is retained for historical reference only. Its wiring-gap table is stale (all items listed as missing are now built and merged on `main`). The canonical source of truth for Scale and Density semantics, algorithms, acceptance thresholds, and live-wiring rules is **`docs/STUDIO_OPS_SPEC.md`**.
+
+---
+
 # Scale & Density Deterministic Build Assessment
 
 **Date:** 2026-06-20  
 **Assessor:** Manus AI (on behalf of the Architect lane)  
+**Status:** DEPRECATED  
 **Scope:** Evaluate the current state of the deterministic Scale and Density ops on Manus `main` at checkpoint `83559a42` — implementation quality, test coverage, eval-gate readiness, production-wiring gaps, and alignment with Claude's locked live-wiring spec (`docs/scale-density-live-wiring-spec.md`).
 
 ---
