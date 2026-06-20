@@ -149,21 +149,52 @@ async function cropAndSegment(
   return { bbox, confidence, width, height, cropWidth, cropHeight, seg };
 }
 
-/** Provisional fabric raster = combined_mask, remapped to full image (rule pinned
- *  in the locked prompt; boxMask whole-crop is the reserve fallback in the client). */
+/**
+ * Fabric raster = FULL CROP REGION (bbox-fill). The locateFabricRegion vision-LLM
+ * already identified the fabric area; everything inside that bbox IS fabric.
+ *
+ * Previous approach used combined_mask, but for dense print patterns SAM2's
+ * combined_mask is sparse (only the motif union) — leaving almost no bare ground
+ * for densityThin's base-cloth sampling. Using the full crop as fabric ensures
+ * adequate bare-ground pixels between motifs.
+ */
 async function fabricFromSegment(s: CropSegment): Promise<FabricMask> {
-  const cropRaster =
-    s.seg.combined.length > 0
-      ? (await decodeMaskToRaster(s.seg.combined, s.cropWidth, s.cropHeight)).data
-      : new Uint8Array(s.cropWidth * s.cropHeight);
+  // Fill the entire crop region as "fabric" (all pixels = 255)
+  const cropRaster = new Uint8Array(s.cropWidth * s.cropHeight).fill(255);
   const fullRaster = remapRasterToFullImage(cropRaster, s.cropWidth, s.cropHeight, s.width, s.height, s.bbox);
   return { bbox: s.bbox, confidence: s.confidence, raster: { width: s.width, height: s.height, data: fullRaster }, provider: "sam2" };
 }
 
-/** Instance masks from individual_masks, area-filtered, remapped to full image. */
+/**
+ * Instance masks from individual_masks, area-filtered, remapped to full image.
+ *
+ * Giant-instance filter: any segment whose pixel area exceeds MAX_INSTANCE_FRACTION
+ * of the crop is treated as "background/ground" (not a motif) and excluded. SAM2
+ * auto-segmentation on dense prints often detects the ground itself as one large
+ * segment — including it would leave zero bare-ground for base-cloth sampling.
+ */
+const MAX_INSTANCE_FRACTION = 0.20; // 20% of crop area
+
 async function instancesFromSegment(s: CropSegment): Promise<InstanceMask[]> {
   const instances = await instancesFromMasks(s.seg.individuals, s.cropWidth, s.cropHeight);
-  return instances.map((inst) => ({
+  const cropArea = s.cropWidth * s.cropHeight;
+  const maxPx = cropArea * MAX_INSTANCE_FRACTION;
+
+  // Filter: exclude instances larger than 20% of the crop (those are ground, not motifs)
+  const filtered = instances.filter((inst) => {
+    if (!inst.raster) return true;
+    let px = 0;
+    for (let i = 0; i < inst.raster.data.length; i++) {
+      if (inst.raster.data[i] > 127) px++;
+    }
+    if (px > maxPx) {
+      console.log(`[sam2] Filtering out giant instance (${px}px > ${Math.round(maxPx)}px max) — likely ground, not motif`);
+      return false;
+    }
+    return true;
+  });
+
+  return filtered.map((inst) => ({
     bbox: {
       x: s.bbox.x + inst.bbox.x * s.bbox.w,
       y: s.bbox.y + inst.bbox.y * s.bbox.h,

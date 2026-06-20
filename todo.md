@@ -615,3 +615,11 @@
 - [x] Wire "Lookbook PDF" button to open dialog instead of generating immediately
 - [x] Pass custom values to generateLookbookPdf on confirm
 - [x] Add cancel button to dismiss without generating
+
+## Density Pipeline Fix (SAM2 Fabric Raster + Giant Instance Filter)
+- [x] Diagnosed root cause: combined_mask too sparse (2.6%) + giant background instance covering everything
+- [x] Fix fabricFromSegment: use full crop bbox as fabric raster (not sparse combined_mask)
+- [x] Fix instancesFromSegment: filter out instances > 20% of crop area (background, not motifs)
+- [x] Verified: 30% test removes 63 motifs, 60% test removes 126 motifs
+- [x] Diff visualization confirms clean infill with correct base-cloth color
+- [x] All 347 tests pass after the fix
