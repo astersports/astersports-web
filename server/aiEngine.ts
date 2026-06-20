@@ -39,9 +39,9 @@ export async function generateDensityImage(
 
   // Single SAM2 call -> fabric + instances.
   const { fabric, instances } = await getMaskProvider().getSegmentation({ url: srcUrl });
-  if (!fabric.raster || instances.length === 0) {
-    // Degrade (no raster / no instances) -> fail + refund (not prompt-fall).
-    console.warn(`[density-live] Provider degraded (no raster or 0 instances); fail + refund.`);
+  if (!fabric.raster || !hasAnyPixel(fabric.raster) || instances.length === 0) {
+    // Degrade (no/empty raster or 0 instances) -> fail + refund (not prompt-fall).
+    console.warn(`[density-live] Provider degraded (no/empty raster or 0 instances); fail + refund.`);
     return null;
   }
 

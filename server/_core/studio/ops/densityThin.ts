@@ -58,7 +58,7 @@ function dilate(src: Uint8Array, w: number, h: number, rad: number): Uint8Array 
 }
 
 /** Dominant LAB cluster of the bare ground (in-fabric, not covered by any instance). */
-function baseClothAnchor(buffer: Buffer, w: number, h: number, raster: RasterMask, instances: InstanceMask[]): { L: number; a: number; b: number } {
+function baseClothAnchor(buffer: Buffer, w: number, h: number, raster: RasterMask, instances: InstanceMask[]): { L: number; a: number; b: number } | null {
   const inAny = new Uint8Array(w * h);
   for (const inst of instances) markInstance(inAny, inst, w, h);
   const pts: Vec3[] = [];
@@ -69,7 +69,7 @@ function baseClothAnchor(buffer: Buffer, w: number, h: number, raster: RasterMas
       pts.push([l.l, l.a, l.b]);
     }
   }
-  if (pts.length === 0) return { L: 0, a: 0, b: 0 };
+  if (pts.length === 0) return null;
   const { centroids, assignments } = kmeans(pts, 3, { seed: 1 });
   const counts = new Array(centroids.length).fill(0);
   for (let j = 0; j < assignments.length; j++) counts[assignments[j]]++;
@@ -89,8 +89,24 @@ export async function densityThin(input: DensityInput): Promise<DensityResult> {
   const removeN = clamp(Math.round((n * input.percent) / 100), 0, n);
   if (removeN === 0) return { data: buffer, width, height, removed: 0 };
 
+  // F3: instance rasters must match image dims or markInstance falls back to a
+  // full bbox rectangle (gross over-erase). Warn once if any drift so it is
+  // diagnosable; normalization is a provider-side follow-up after the credentialed run.
+  const dimDrift = input.instances.filter(
+    (m) => !m.raster || m.raster.width !== width || m.raster.height !== height
+  ).length;
+  if (dimDrift > 0) {
+    console.warn(`[density] ${dimDrift}/${input.instances.length} instance rasters not at ${width}x${height}; bbox fallback in effect.`);
+  }
+
   const selected = stratifiedSelect(input.instances, removeN, input.fabric.bbox, width, height);
   const baseClothLab = baseClothAnchor(buffer, width, height, raster, input.instances);
+  // F2: no bare-ground pixels to sample (fully-covered fabric / empty raster).
+  // Refuse to smear black — signal a no-op so the caller refunds.
+  if (!baseClothLab) {
+    console.warn("[density] no bare-ground pixels to sample base cloth; no-op -> refund");
+    return { data: buffer, width, height, removed: 0 };
+  }
 
   // Removal region = selected instances, dilated, clipped to the fabric raster
   // AND to NOT any non-selected instance — so the dilation can never erase a
@@ -104,9 +120,17 @@ export async function densityThin(input: DensityInput): Promise<DensityResult> {
     if (!selectedSet.has(i)) markInstance(survivors, input.instances[i], width, height);
   }
   const region: RasterMask = { width, height, data: new Uint8Array(width * height) };
+  let regionCount = 0;
   for (let i = 0; i < width * height; i++) {
-    region.data[i] = grown[i] && raster.data[i] > 127 && !survivors[i] ? 255 : 0;
+    const on = grown[i] && raster.data[i] > 127 && !survivors[i];
+    region.data[i] = on ? 255 : 0;
+    if (on) regionCount++;
   }
+  // F1: removed must reflect EFFECT. If the selected instances clip to an empty
+  // region (degenerate/empty fabric raster, or fully overlapped by survivors),
+  // nothing is erased — report removed:0 so the caller's no-op guard refunds
+  // instead of billing for a byte-identical image.
+  if (regionCount === 0) return { data: buffer, width, height, removed: 0 };
 
   const erased = await infillBaseCloth({ image: input.image, region, baseClothLab, featherPx: 1, flatten: true });
 

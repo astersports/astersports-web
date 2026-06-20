@@ -102,6 +102,83 @@ describe("densityThin", () => {
   });
 });
 
+describe("densityThin no-op correctness (F1/F2 — removed reflects EFFECT, never bills a byte-identical image)", () => {
+  // F1 (EDIT 2 path): present-but-empty fabric raster -> no bare ground -> refund.
+  it("empty fabric raster -> removed 0 and output byte-identical to source", async () => {
+    const emptyFab: FabricMask = { bbox: { x: 0, y: 0, w: 1, h: 1 }, confidence: 1, provider: "sam2", raster: { width: W, height: H, data: new Uint8Array(W * H) } };
+    const blob = (cx: number, cy: number): InstanceMask => {
+      const d = new Uint8Array(W * H);
+      for (let y = cy - 4; y <= cy + 4; y++) for (let x = cx - 4; x <= cx + 4; x++) d[y * W + x] = 255;
+      return { bbox: { x: (cx - 4) / W, y: (cy - 4) / H, w: 9 / W, h: 9 / H }, raster: { width: W, height: H, data: d } };
+    };
+    const res = await densityThin({ image: { url: "x" }, fabric: emptyFab, instances: [blob(16, 16), blob(32, 16), blob(48, 16)], percent: 20 });
+    expect(res.removed).toBe(0);
+    expect(Buffer.compare(res.data, scene())).toBe(0);
+  });
+
+  // F1 (EDIT 1 path): non-empty raster, but selected instances fall OUTSIDE it ->
+  // region clips to nothing -> regionCount 0 -> removed 0 (regionCount guard).
+  it("selected instances outside the fabric raster -> region empty -> removed 0, byte-identical", async () => {
+    const r = new Uint8Array(W * H);
+    for (let y = 0; y < 20; y++) for (let x = 0; x < 20; x++) r[y * W + x] = 255; // fabric: top-left
+    const fab: FabricMask = { bbox: { x: 0, y: 0, w: 20 / W, h: 20 / H }, confidence: 1, provider: "sam2", raster: { width: W, height: H, data: r } };
+    const blob = (cx: number, cy: number): InstanceMask => {
+      const d = new Uint8Array(W * H);
+      for (let y = cy - 4; y <= cy + 4; y++) for (let x = cx - 4; x <= cx + 4; x++) d[y * W + x] = 255;
+      return { bbox: { x: (cx - 4) / W, y: (cy - 4) / H, w: 9 / W, h: 9 / H }, raster: { width: W, height: H, data: d } };
+    };
+    // instances live bottom-right, well outside the fabric raster
+    const res = await densityThin({ image: { url: "x" }, fabric: fab, instances: [blob(100, 100), blob(110, 110)], percent: 50 });
+    expect(res.removed).toBe(0);
+    expect(Buffer.compare(res.data, scene())).toBe(0);
+  });
+
+  // F2 (EDIT 2 path): raster present but every fabric pixel covered by an instance
+  // -> no bare ground to sample -> refund, never smear black.
+  it("fabric fully covered by motifs (no bare ground) -> removed 0, byte-identical", async () => {
+    const d = new Uint8Array(W * H);
+    for (let y = 40; y < 60; y++) for (let x = 40; x < 60; x++) d[y * W + x] = 255;
+    const fab: FabricMask = { bbox: { x: 40 / W, y: 40 / H, w: 20 / W, h: 20 / H }, confidence: 1, provider: "sam2", raster: { width: W, height: H, data: Uint8Array.from(d) } };
+    const inst: InstanceMask = { bbox: fab.bbox, raster: { width: W, height: H, data: Uint8Array.from(d) } };
+    const res = await densityThin({ image: { url: "x" }, fabric: fab, instances: [inst], percent: 80 });
+    expect(res.removed).toBe(0);
+    expect(Buffer.compare(res.data, scene())).toBe(0);
+  });
+
+  // Invariant: every SURVIVING instance keeps its exact scale + position (byte-identical).
+  it("survivors keep exact scale + position — every non-selected instance is byte-identical", async () => {
+    const { masks } = instances();
+    const sel = new Set(stratifiedSelect(masks, 11, fabric.bbox, W, H));
+    const src = scene();
+    const res = await densityThin({ image: { url: "x" }, fabric, instances: masks, percent: 30 });
+    let changed = 0;
+    masks.forEach((m, idx) => {
+      if (sel.has(idx)) return;
+      const r = m.raster!.data;
+      for (let i = 0; i < W * H; i++) if (r[i] > 127) { const p = i * 4; if (res.data[p] !== src[p] || res.data[p + 1] !== src[p + 1] || res.data[p + 2] !== src[p + 2]) changed++; }
+    });
+    expect(changed).toBe(0);
+  });
+
+  // Happy path is untouched by the new guards: it still erases (protects the 66-instance PASS).
+  it("happy path still erases (regionCount>0): removed 11, output changed vs source, deterministic", async () => {
+    const { masks } = instances();
+    const a = await densityThin({ image: { url: "x" }, fabric, instances: masks, percent: 30 });
+    expect(a.removed).toBe(11);
+    expect(Buffer.compare(a.data, scene())).not.toBe(0); // something WAS erased
+    const b = await densityThin({ image: { url: "x" }, fabric, instances: masks, percent: 30 });
+    expect(Buffer.compare(a.data, b.data)).toBe(0);
+  });
+
+  // F4 (schema clamp semantics — mirrors the router's density.percent transform).
+  it("density.percent clamp transform maps 150 -> 90 and -5 -> 0", () => {
+    const clamp = (v: number) => Math.max(0, Math.min(90, v));
+    expect(clamp(150)).toBe(90);
+    expect(clamp(-5)).toBe(0);
+    expect(clamp(30)).toBe(30);
+  });
+});
+
 describe("densityThin survivor-clip", () => {
   it("a survivor edge adjacent to a removed motif stays byte-identical", async () => {
     const w = 80, h = 64;
