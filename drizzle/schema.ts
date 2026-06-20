@@ -120,6 +120,8 @@ export const tenants = mysqlTable("tenants", {
   name: varchar("name", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 128 }).notNull().unique(),
   categoryId: int("categoryId").notNull(),
+  /** Account type: firm (multi-seat) or individual (single seat). */
+  type: mysqlEnum("type", ["firm", "individual"]).default("firm").notNull(),
   plan: mysqlEnum("plan", ["none", "starter", "pro", "team"]).default("none").notNull(),
   creditBalance: int("creditBalance").default(0).notNull(),
   seats: int("seats").default(1).notNull(),
@@ -297,3 +299,16 @@ export const serverLogs = mysqlTable("server_logs", {
 
 export type ServerLog = typeof serverLogs.$inferSelect;
 export type InsertServerLog = typeof serverLogs.$inferInsert;
+
+/**
+ * Platform administrators — super_admin users who operate above all tenant accounts.
+ * Kept separate from memberships so they never appear in customer member lists.
+ */
+export const platformAdmins = mysqlTable("platform_admins", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PlatformAdmin = typeof platformAdmins.$inferSelect;
+export type InsertPlatformAdmin = typeof platformAdmins.$inferInsert;

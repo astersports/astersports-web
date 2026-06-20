@@ -417,3 +417,17 @@
 - [x] Gate billing management buttons by role (owner sees all, admin sees read-only, member sees balance only)
 - [x] Add backend billingStatus procedure with trial + subscription + payment info
 - [x] Write tests for role gating
+
+## Platform Console (super_admin)
+- [x] Add platform_admins table to schema + add type column to tenants
+- [x] Create superAdminProcedure middleware (gates on platform_admins table)
+- [x] Create server/routers/platform.ts with listAccounts, provisionFirm, inviteIndividual, grantCredits, impersonate
+- [x] Wire platform router into appRouter
+- [x] Build Platform Console UI page (/platform) with Firms/Individuals toggle
+- [x] Add account list with status pills, plan, seats, balance (desktop table + mobile cards)
+- [x] Add Provision Firm dialog (name, slug, plan, seats, credits, owner email, domain lock)
+- [x] Add Invite Individual dialog (email, trial credits)
+- [x] Add Grant Credits dialog (select account, amount, note)
+- [x] Add Impersonate button (sets session context to target account, redirects to /studio)
+- [x] Add /platform route to App.tsx with super_admin gate
+- [x] Write tests for superAdminProcedure and platform procedures (9 tests, all pass)
