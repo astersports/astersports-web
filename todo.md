@@ -544,3 +544,52 @@
 - [x] Remove the /studio/history-v2 temporary route
 - [x] Clean up old StudioHistory.tsx file (archived as StudioHistoryLegacy.tsx)
 - [x] Sidebar nav link unchanged (already points to /studio/history)
+
+## Full History Page Redesign (10/10 Experience)
+
+### Backend Enhancements
+- [x] Add user name join to historyArchive query (show who created each job)
+- [x] Add date range filter (startDate/endDate) to historyArchive
+- [x] Add historyStats summary endpoint (total jobs, credits spent, success rate, most active type)
+- [x] Add "Created by" member filter option
+
+### Recent Strip (Hero Section)
+- [x] Show last 8-12 completed jobs as large cards with hover before/after reveal
+- [x] Type badge (Recolor/Scale/Density/Remove) with color coding
+- [x] Hover: smooth crossfade between original and result
+- [x] Click: opens detail slideshow at that position
+
+### Archive Section
+- [x] Tabular layout with inline before/after thumbnail comparison
+- [x] Column: Preview (hover-expandable), Title, Type (pill), Changes, Created by (avatar+name), Date, Credits, Status, Actions
+- [x] Search with debounce across title, elements, prompt text
+- [x] Filter: Status (All/Done/Failed/Processing), Type (All/Recolor/Scale/Density/Remove), Date range picker, Created by member
+- [x] Sort: Date (newest/oldest), Credits (high/low), Title (A-Z)
+- [x] Pagination with "Showing X-Y of Z" and prev/next + page numbers
+
+### Detail Slideshow (Full-Screen Modal)
+- [x] Full-screen overlay with before/after side-by-side comparison
+- [x] Arrow keys / swipe to navigate between jobs
+- [x] Metadata panel: timestamp, credits used, changes applied, detected elements, user
+- [x] Actions: Download, Favorite
+- [x] Keyboard: Esc to close, ←/→ to navigate, F to favorite, Space to toggle
+
+### Batch Operations
+- [x] Multi-select mode with checkboxes
+- [x] Batch favorite/unfavorite
+- [x] Select all on current page
+
+### Stats Dashboard (Top Cards)
+- [x] Total generations count
+- [x] Credits spent (all time)
+- [x] Success rate percentage
+- [x] Most used edit type
+
+### Micro-interactions & Polish
+- [x] Smooth staggered entrance animation for table rows (fadeIn with delay)
+- [x] Hover: thumbnail scales up with shadow
+- [x] Type badge color coding per edit type
+- [x] Status badge pulse for "processing" items
+- [x] Empty state with illustration and CTA to Editor
+- [x] Skeleton loading states for strip and table
+- [x] Responsive: mobile collapses to card list, desktop shows full table

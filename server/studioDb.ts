@@ -12,6 +12,7 @@ import {
   jobs,
   jobVariations,
   jobFavorites,
+  users,
   type Tenant,
   type InsertTenant,
   type InsertMembership,
@@ -303,7 +304,18 @@ export async function listTenantJobs(tenantId: number, limit = 50) {
  */
 export async function listTenantJobsEnhanced(
   tenantId: number,
-  opts: { limit?: number; offset?: number; status?: string; search?: string; favoritesOnly?: boolean } = {}
+  opts: {
+    limit?: number;
+    offset?: number;
+    status?: string;
+    search?: string;
+    favoritesOnly?: boolean;
+    startDate?: number; // unix ms
+    endDate?: number;   // unix ms
+    userId?: number;    // filter by creator
+    sortBy?: "date" | "credits" | "title";
+    sortDir?: "asc" | "desc";
+  } = {}
 ) {
   const db = await getDb();
   if (!db) return { jobs: [], total: 0 };
@@ -326,14 +338,37 @@ export async function listTenantJobsEnhanced(
       sql`${jobs.id} IN (SELECT ${jobFavorites.jobId} FROM ${jobFavorites} WHERE ${jobFavorites.tenantId} = ${tenantId})`
     );
   }
+  if (opts.startDate) {
+    conditions.push(sql`${jobs.createdAt} >= ${new Date(opts.startDate)}`);
+  }
+  if (opts.endDate) {
+    conditions.push(sql`${jobs.createdAt} <= ${new Date(opts.endDate)}`);
+  }
+  if (opts.userId) {
+    conditions.push(eq(jobs.userId, opts.userId));
+  }
   const condition = and(...conditions);
+
+  // Determine sort order
+  let orderClause;
+  const dir = opts.sortDir ?? "desc";
+  switch (opts.sortBy) {
+    case "credits":
+      orderClause = dir === "asc" ? sql`${jobs.creditsUsed} ASC` : sql`${jobs.creditsUsed} DESC`;
+      break;
+    case "title":
+      orderClause = dir === "asc" ? sql`${jobs.title} ASC` : sql`${jobs.title} DESC`;
+      break;
+    default:
+      orderClause = dir === "asc" ? sql`${jobs.createdAt} ASC` : sql`${jobs.createdAt} DESC`;
+  }
 
   const [jobRows, countResult] = await Promise.all([
     db
       .select()
       .from(jobs)
       .where(condition)
-      .orderBy(desc(jobs.createdAt))
+      .orderBy(orderClause)
       .limit(limit)
       .offset(offset),
     db
@@ -363,12 +398,105 @@ export async function listTenantJobsEnhanced(
     }
   }
 
+  // Fetch user names for attribution
+  const userIds = Array.from(new Set(jobRows.map((j) => j.userId)));
+  let userMap: Record<number, { name: string | null; email: string | null }> = {};
+  if (userIds.length > 0) {
+    const userRows = await db
+      .select({ id: users.id, name: users.name, email: users.email })
+      .from(users)
+      .where(sql`${users.id} IN (${sql.raw(userIds.join(","))})`);
+    for (const u of userRows) {
+      userMap[u.id] = { name: u.name, email: u.email };
+    }
+  }
+
   const enrichedJobs = jobRows.map((j) => ({
     ...j,
     variations: variationsMap[j.id] || [],
+    userName: userMap[j.userId]?.name || userMap[j.userId]?.email?.split("@")[0] || "Unknown",
   }));
 
   return { jobs: enrichedJobs, total: countResult[0]?.count ?? 0 };
+}
+
+/**
+ * Get summary stats for the History page dashboard cards.
+ */
+export async function getHistoryStats(tenantId: number) {
+  const db = await getDb();
+  if (!db) return { totalJobs: 0, creditsSpent: 0, successRate: 0, topType: "none" };
+
+  // Total jobs
+  const [totalResult] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(jobs)
+    .where(eq(jobs.tenantId, tenantId));
+  const totalJobs = totalResult?.count ?? 0;
+
+  // Credits spent (all time)
+  const [creditsResult] = await db
+    .select({ total: sql<number>`COALESCE(SUM(${jobs.creditsUsed}), 0)` })
+    .from(jobs)
+    .where(eq(jobs.tenantId, tenantId));
+  const creditsSpent = creditsResult?.total ?? 0;
+
+  // Success rate
+  const [doneResult] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(jobs)
+    .where(and(eq(jobs.tenantId, tenantId), eq(jobs.status, "done")));
+  const doneCount = doneResult?.count ?? 0;
+  const successRate = totalJobs > 0 ? Math.round((doneCount / totalJobs) * 100) : 0;
+
+  // Most used edit type (parse controls JSON to determine)
+  // We'll do a simple approach: count by checking controls text patterns
+  const [recolorCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(jobs)
+    .where(and(eq(jobs.tenantId, tenantId), sql`${jobs.controls} LIKE '%"recolor":%"enabled":true%'`));
+  const [scaleCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(jobs)
+    .where(and(eq(jobs.tenantId, tenantId), sql`${jobs.controls} LIKE '%"scale":%"enabled":true%'`));
+  const [densityCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(jobs)
+    .where(and(eq(jobs.tenantId, tenantId), sql`${jobs.controls} LIKE '%"density":%"enabled":true%'`));
+  const [removeCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(jobs)
+    .where(and(eq(jobs.tenantId, tenantId), sql`${jobs.controls} LIKE '%"remove":%"enabled":true%'`));
+
+  const typeCounts = [
+    { type: "Recolor", count: recolorCount?.count ?? 0 },
+    { type: "Scale", count: scaleCount?.count ?? 0 },
+    { type: "Density", count: densityCount?.count ?? 0 },
+    { type: "Remove", count: removeCount?.count ?? 0 },
+  ];
+  typeCounts.sort((a, b) => b.count - a.count);
+  const topType = typeCounts[0]?.count > 0 ? typeCounts[0].type : "None";
+
+  // Members who have generated (for the "Created by" filter)
+  const memberRows = await db
+    .select({ userId: jobs.userId })
+    .from(jobs)
+    .where(eq(jobs.tenantId, tenantId))
+    .groupBy(jobs.userId);
+  const memberIds = memberRows.map((m) => m.userId);
+  let members: Array<{ id: number; name: string }> = [];
+  if (memberIds.length > 0) {
+    const memberUsers = await db
+      .select({ id: users.id, name: users.name, email: users.email })
+      .from(users)
+      .where(sql`${users.id} IN (${sql.raw(memberIds.join(","))})`);
+    members = memberUsers.map((u) => ({
+      id: u.id,
+      name: u.name || u.email?.split("@")[0] || "Unknown",
+    }));
+  }
+
+  return { totalJobs, creditsSpent, successRate, topType, members };
 }
 
 // ─── Job Variations ──────────────────────────────────────────────────────────

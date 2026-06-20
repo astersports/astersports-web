@@ -27,6 +27,7 @@ import {
   getTenantFavoriteJobIds,
   getTrialStatus,
   analyzeTrialUsage,
+  getHistoryStats,
 } from "../studioDb";
 import { buildInstruction, computeCredits, describeExpectedChange, resolveTargetColorHex, type ControlSettings } from "../../shared/controls";
 import { CREDIT_COST, LOW_BALANCE_THRESHOLD, PLANS, TRIAL_DURATION_DAYS, TRIAL_RECOMMENDATION_START_DAY } from "../../shared/billing";
@@ -527,6 +528,11 @@ export const studioRouter = router({
         status: z.string().optional(),
         search: z.string().max(200).optional(),
         favoritesOnly: z.boolean().optional(),
+        startDate: z.number().optional(),
+        endDate: z.number().optional(),
+        userId: z.number().optional(),
+        sortBy: z.enum(["date", "credits", "title"]).optional(),
+        sortDir: z.enum(["asc", "desc"]).optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -536,6 +542,11 @@ export const studioRouter = router({
         status: input.status,
         search: input.search,
         favoritesOnly: input.favoritesOnly,
+        startDate: input.startDate,
+        endDate: input.endDate,
+        userId: input.userId,
+        sortBy: input.sortBy,
+        sortDir: input.sortDir,
       });
       return {
         jobs: result.jobs.map((j) => ({
@@ -546,6 +557,11 @@ export const studioRouter = router({
         total: result.total,
       };
     }),
+
+  /** Summary stats for the History page dashboard cards. */
+  historyStats: tenantProcedure.query(async ({ ctx }) => {
+    return getHistoryStats(ctx.tenant.id);
+  }),
 
   /** Get tenant credit balance and low-balance warning. */
   balance: tenantProcedure.query(async ({ ctx }) => {
