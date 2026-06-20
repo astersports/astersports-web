@@ -9,6 +9,9 @@ import { getTrialStatus } from "./studioDb";
 import { notifyOwner } from "./_core/notification";
 import { and, isNotNull, sql } from "drizzle-orm";
 
+/** Trial-day thresholds (1-indexed) at which a reminder should fire. */
+const REMINDER_THRESHOLDS = [4, 6] as const;
+
 export interface ReminderResult {
   tenantId: number;
   tenantName: string;
@@ -44,20 +47,33 @@ export async function processTrialReminders(): Promise<{
 
   for (const tenant of trialTenants) {
     const status = getTrialStatus(tenant);
+    if (!status.inTrial) {
+      continue;
+    }
 
-    // Only process Day 4 and Day 6
-    if (!status.inTrial || (status.trialDay !== 4 && status.trialDay !== 6)) {
+    // Catch-up semantics: send the most-advanced reminder the tenant has
+    // reached that hasn't been sent yet — at most one reminder per tenant per
+    // run, deduped on the threshold day. A missed cron run no longer skips the
+    // critical final warning permanently; but once a later threshold is due we
+    // never send a now-stale earlier one (e.g. no "halfway" notice on Day 6).
+    let target: number | null = null;
+    for (const threshold of REMINDER_THRESHOLDS) {
+      if (status.trialDay >= threshold) {
+        target = threshold;
+      }
+    }
+    if (target === null) {
       continue;
     }
 
     // Check idempotency — has this reminder already been sent?
-    const alreadySent = await checkReminderSent(db, tenant.id, status.trialDay);
+    const alreadySent = await checkReminderSent(db, tenant.id, target);
     if (alreadySent) {
       skipped++;
       results.push({
         tenantId: tenant.id,
         tenantName: tenant.name,
-        trialDay: status.trialDay,
+        trialDay: target,
         sent: false,
         error: "already_sent",
       });
@@ -67,7 +83,7 @@ export async function processTrialReminders(): Promise<{
     // Build notification content
     const { title, content } = buildReminderContent(
       tenant.name,
-      status.trialDay,
+      target,
       status.daysRemaining,
       status.creditsUsed ?? 0,
       tenant.trialCredits
@@ -77,19 +93,19 @@ export async function processTrialReminders(): Promise<{
       const success = await notifyOwner({ title, content });
       if (success) {
         // Mark as sent
-        await markReminderSent(db, tenant.id, status.trialDay);
+        await markReminderSent(db, tenant.id, target);
         sent++;
         results.push({
           tenantId: tenant.id,
           tenantName: tenant.name,
-          trialDay: status.trialDay,
+          trialDay: target,
           sent: true,
         });
       } else {
         results.push({
           tenantId: tenant.id,
           tenantName: tenant.name,
-          trialDay: status.trialDay,
+          trialDay: target,
           sent: false,
           error: "notification_service_unavailable",
         });
@@ -98,7 +114,7 @@ export async function processTrialReminders(): Promise<{
       results.push({
         tenantId: tenant.id,
         tenantName: tenant.name,
-        trialDay: status.trialDay,
+        trialDay: target,
         sent: false,
         error: (error as Error).message,
       });

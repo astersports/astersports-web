@@ -61,6 +61,33 @@ export interface Sam2Client {
 
 const SAM2_MODEL = "meta/sam-2";
 const DOWNLOAD_TIMEOUT_MS = 30_000;
+/**
+ * Caller-side deadline for replicate.run(). The SDK long-polls until the
+ * prediction settles; without a ceiling a stuck/queued prediction hangs the
+ * request indefinitely. 120s covers a normal cold-start + segmentation run.
+ */
+const RUN_TIMEOUT_MS = 120_000;
+
+/**
+ * Race a replicate.run() promise against a RUN_TIMEOUT_MS deadline so a stuck or
+ * queued prediction can't hang the request forever. Rejects with a clear error on
+ * timeout. (The in-flight prediction is abandoned, not cancelled — acceptable; the
+ * alternative is an unbounded hang.)
+ */
+async function runWithTimeout<T>(label: string, p: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`SAM2 ${label} timed out after ${RUN_TIMEOUT_MS}ms`)),
+      RUN_TIMEOUT_MS
+    );
+  });
+  try {
+    return await Promise.race([p, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 /**
  * Resolve REPLICATE_SAM2_MODEL into a ref the SDK's `run()` accepts.
@@ -133,7 +160,10 @@ export function defaultSam2Client(): Sam2Client {
         stability_score_thresh: options?.stabilityScoreThresh ?? 0.88,
         use_m2m: options?.useM2M ?? true,
       };
-      const output = (await replicate.run(resolveModelRef(ENV.replicateSam2Model), { input })) as Record<string, unknown>;
+      const output = (await runWithTimeout(
+        "autoSegment",
+        replicate.run(resolveModelRef(ENV.replicateSam2Model), { input })
+      )) as Record<string, unknown>;
 
       const combinedUrl = asUrl(output?.combined_mask);
       const individualUrls = Array.isArray(output?.individual_masks)
@@ -153,9 +183,12 @@ export function defaultSam2Client(): Sam2Client {
     async boxMask(imageDataUrl, box) {
       const token = requireToken();
       const replicate = new Replicate({ auth: token, useFileOutput: false });
-      const output = await replicate.run(resolveModelRef(ENV.replicateSam2Model), {
-        input: { image: imageDataUrl, box },
-      });
+      const output = await runWithTimeout(
+        "boxMask",
+        replicate.run(resolveModelRef(ENV.replicateSam2Model), {
+          input: { image: imageDataUrl, box },
+        })
+      );
       const url = firstMaskUrl(output);
       if (!url) throw new Error("SAM2 boxMask returned no mask");
       return fetchBuffer(url);

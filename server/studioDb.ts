@@ -20,6 +20,7 @@ import {
   type InsertJobVariation,
   type InsertCreditLedgerEntry,
 } from "../drizzle/schema";
+import { TRIAL_DURATION_DAYS } from "../shared/billing";
 
 /**
  * M6: escape LIKE metacharacters in user-supplied search terms so `%`/`_` are
@@ -221,6 +222,8 @@ export async function grantCredits(
     // also fire twice. If a ledger row already exists for this (refId, reason),
     // this grant is a no-op that returns the current balance. The unique index on
     // (refId, reason) is the hard backstop for the concurrent-delivery race.
+    // (Reconciliation: #11 proposed (tenantId, refId, reason); we keep
+    // (refId, reason) to match the unique index already shipped in #10/0010.)
     if (refId) {
       const [existing] = await tx
         .select({ id: creditLedger.id })
@@ -654,8 +657,8 @@ export function getTrialStatus(tenant: Tenant) {
   const elapsed = now - started;
   const elapsedDays = Math.floor(elapsed / (1000 * 60 * 60 * 24));
   const trialDay = elapsedDays + 1; // 1-indexed
-  const daysRemaining = Math.max(0, 7 - elapsedDays);
-  const expired = daysRemaining === 0;
+  const daysRemaining = Math.max(0, TRIAL_DURATION_DAYS - elapsedDays);
+  const expired = elapsedDays >= TRIAL_DURATION_DAYS;
   const creditsUsed = tenant.trialCredits - tenant.creditBalance;
 
   return { inTrial: true, daysRemaining, trialDay, expired, creditsUsed };

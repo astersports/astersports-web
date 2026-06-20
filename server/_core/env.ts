@@ -79,6 +79,9 @@ export function validateEnv(): { errors: string[]; warnings: string[] } {
     ["DATABASE_URL", ENV.databaseUrl],
     ["OAUTH_SERVER_URL", ENV.oAuthServerUrl],
     ["VITE_APP_ID", ENV.appId],
+    // Required so owner-only routes fail closed at boot rather than silently
+    // downgrading to "any admin" at runtime (see ownerProcedure in routers.ts).
+    ["OWNER_OPEN_ID", ENV.ownerOpenId],
   ];
   for (const [name, val] of required) {
     if (!val) errors.push(`${name} is required but missing`);
