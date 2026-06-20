@@ -8,6 +8,7 @@ import { billingRouter } from "./billing";
 import { tenantsRouter } from "./routers/tenants";
 import { studioRouter } from "./routers/studio";
 import { studioBillingRouter } from "./routers/studioBilling";
+import { adminLogsRouter } from "./routers/adminLogs";
 import { fetchAllGames, invalidateAllCaches, getTournamentRegistry } from "./scraper";
 import { notifyOwner } from "./_core/notification";
 import { sdk } from "./_core/sdk";
@@ -88,6 +89,8 @@ export const appRouter = router({
       };
     }),
   }),
+
+  adminLogs: adminLogsRouter,
 
   leaderboard: router({
     get: ownerProcedure.query(async () => {

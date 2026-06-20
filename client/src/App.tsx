@@ -9,6 +9,7 @@ import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import AAUBasketball from "./pages/AAUBasketball";
 import BillingDashboard from "./pages/admin/Billing";
+import AdminLogs from "./pages/admin/Logs";
 
 // Studio pages (lazy-ish but simple imports for now)
 import StudioLayout from "./pages/studio/StudioLayout";
@@ -25,6 +26,7 @@ function Router() {
       <Route path={"/"} component={Home} />
       <Route path={"/aau"} component={AAUBasketball} />
       <Route path={"/admin/billing"} component={BillingDashboard} />
+      <Route path={"/admin/logs"} component={AdminLogs} />
       <Route path={"/privacy"} component={Privacy} />
       <Route path={"/terms"} component={Terms} />
 

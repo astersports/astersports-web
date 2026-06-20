@@ -389,3 +389,10 @@
 - [x] Build: NNI R >= 1.0 gate in densityMetrics (Clark & Evans 1954 + Donnelly boundary correction)
 - [x] Build: min-feature advisory (non-blocking, checkScaleDownAdvisory in dpiGuard.ts)
 - [x] Build: FFT + autocorrelation detector with labeled-garment calibration report (repeatDetector.ts, 10 tests)
+
+## Production Logging
+- [x] Add server_logs table (level, source, message, metadata JSON, jobId, tenantId, timestamp)
+- [x] Create structured logger utility (serverLog.ts)
+- [x] Wire logger into density, scale, recolor, and error paths in studio router
+- [x] Add admin tRPC procedure to query logs (paginated, filterable by level/source/job/tenant/time/search)
+- [x] Add Admin Logs page at /admin/logs (stats cards, filters, paginated log viewer, auto-refresh)

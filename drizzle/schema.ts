@@ -263,3 +263,37 @@ export const jobFavorites = mysqlTable("studio_job_favorites", {
 
 export type JobFavorite = typeof jobFavorites.$inferSelect;
 export type InsertJobFavorite = typeof jobFavorites.$inferInsert;
+
+/**
+ * Server-side structured logs for production debugging.
+ * Captures generation pipeline events, errors, and audit trail.
+ */
+export const serverLogs = mysqlTable("server_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Log level: info, warn, error, debug */
+  level: mysqlEnum("level", ["debug", "info", "warn", "error"]).default("info").notNull(),
+  /** Source module/function (e.g. "density", "scale", "sam2", "recolor", "webhook") */
+  source: varchar("source", { length: 64 }).notNull(),
+  /** Human-readable message */
+  message: varchar("message", { length: 1024 }).notNull(),
+  /** Structured metadata (error details, timings, input params) */
+  metadata: json("metadata"),
+  /** Associated job ID (nullable for non-job events) */
+  jobId: int("jobId"),
+  /** Associated tenant ID (nullable for system events) */
+  tenantId: int("tenantId"),
+  /** Associated user ID */
+  userId: int("userId"),
+  /** Duration in ms (for timing events) */
+  durationMs: int("durationMs"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({
+  // Query patterns: filter by tenant, source, level; sort by recency
+  tenantCreatedIdx: index("idx_server_logs_tenant_created").on(t.tenantId, t.createdAt),
+  sourceIdx: index("idx_server_logs_source").on(t.source, t.createdAt),
+  levelIdx: index("idx_server_logs_level").on(t.level, t.createdAt),
+  jobIdx: index("idx_server_logs_job").on(t.jobId),
+}));
+
+export type ServerLog = typeof serverLogs.$inferSelect;
+export type InsertServerLog = typeof serverLogs.$inferInsert;

@@ -11,6 +11,7 @@ import { detectPrintElements, generateEditedImage, generateRecoloredImage, gener
 import { ENV } from "../_core/env";
 import { getMaskProvider } from "../_core/masking";
 import { checkUpscaleDpi } from "../_core/studio/guards/dpiGuard";
+import { log } from "../serverLog";
 import {
   createJob,
   updateJobStatus,
@@ -294,7 +295,7 @@ export const studioRouter = router({
 
       const settled = await Promise.allSettled(
         Array.from({ length: controls.variations }, async (_unused, i) => {
-          console.log(`[studio] Generating variation ${i + 1} for job ${job.id}`);
+          log.info("studio", `Generating variation ${i + 1}`, { jobId: job.id, tenantId: ctx.tenant.id, userId: ctx.user.id, metadata: { round: nextRound, path: useDeterministicRecolor ? "recolor" : useDeterministicDensity ? "density" : useDeterministicScale ? "scale" : "prompt" } });
           if (useDeterministicRecolor) {
             const png = await generateRecoloredImage(job.originalUrl, {
               fromColor: controls.recolor.fromColor,
@@ -313,13 +314,13 @@ export const studioRouter = router({
           if (useDeterministicDensity) {
             const densityResult = await generateDensityImage(job.originalUrl, controls.density.percent);
             if (!densityResult) {
-              console.warn(`[studio] Density provider degraded / no-op for job ${job.id}; rejecting (D-B).`);
+              log.warn("density", `Provider degraded / no-op; rejecting (D-B)`, { jobId: job.id, tenantId: ctx.tenant.id, userId: ctx.user.id });
               throw new Error("Density processing is temporarily unavailable. Please try again in a moment.");
             }
             const key = `studio/${ctx.tenant.id}/${job.id}/density-${nextRound}.png`;
             const { url } = await storagePut(key, densityResult.png, "image/png");
             await addVariation({ jobId: job.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: nextRound });
-            console.log(`[studio] Density op removed ${densityResult.removed} instances for job ${job.id}`);
+            log.info("density", `Removed ${densityResult.removed} instances`, { jobId: job.id, tenantId: ctx.tenant.id, userId: ctx.user.id, metadata: { removed: densityResult.removed, percent: controls.density.percent } });
             return { url, key };
           }
           if (useDeterministicScale) {
@@ -352,12 +353,14 @@ export const studioRouter = router({
 
       settled.forEach((r, i) => {
         if (r.status === "rejected") {
-          console.error(`[studio] Variation ${i + 1} failed:`, r.reason?.message || r.reason);
+          const errMsg = r.reason?.message || String(r.reason);
+          log.error("studio", `Variation ${i + 1} failed: ${errMsg}`, { jobId: job.id, tenantId: ctx.tenant.id, userId: ctx.user.id, metadata: { variationIndex: i, error: errMsg } });
         }
       });
 
       if (results.length === 0) {
         // All generations failed — refund the full charge.
+        log.error("studio", `All generations failed, refunding ${creditCost} credits`, { jobId: job.id, tenantId: ctx.tenant.id, userId: ctx.user.id, metadata: { creditCost, controls } });
         await grantCredits(
           ctx.tenant.id,
           creditCost,
