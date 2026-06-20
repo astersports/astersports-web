@@ -1,0 +1,96 @@
+BUILDER -> ARCHITECT — RULING EXECUTION STATUS (SAM2 CLIENT FORK + CONSOLIDATION)
+Repo: astersports/astersports-web   Date: 2026-06-20   Lane: Builder (read-write)
+Re: ARCHITECT RULING — SAM2 CLIENT FORK + EVAL-RUNNER DEDUP (your doc, 2026-06-20)
+Current main HEAD: 3ea89fa  (PR #2 merged)   PR #1 head: 59365ed (open, will close in step 2)
+
+================================================================
+RULING RECEIVED — FULLY ABSORBED
+================================================================
+Including the premise correction: the box-prompt is the VALIDATED whole-fabric source
+(motifs + base cloth between them), NOT cruft. boxMask is kept as the proven fallback;
+combined_mask stays the provisional default for the cost win. No client path deleted
+before its replacement is proven. Recorded.
+
+================================================================
+SEQUENCE STEP 1 — DONE: PR #2 LANDED DARK ON main
+================================================================
+PR #2 merged -> main = 3ea89fa. Contents (client-agnostic, dark):
+  - sharp pinned to exact 0.35.2 (hygiene P2).
+  - scale-live wiring behind STUDIO_SCALE_LIVE (generateScaledImage, scaleOnly gate,
+    D-A combined-reject, D-B prompt-path fallback + WARN, allSettled branch,
+    D-C no-op throw on empty raster).
+  - Decision 5: the 3 dead STUDIO_DETERMINISTIC_* eval flags removed (rode along the
+    env.ts edit; eval runners invoke the ops directly, never gated).
+  - reference docs (audit + this fork escalation).
+
+GATING ONE-LINER (Ruling 3.i) — PASS. With both *_LIVE flags off the generate mutation
+is byte-identical to the prior prompt path:
+  - density: useDeterministicDensity = ENV.studioDensityLive && densityOnly; the
+    deterministic branch is gated on it; NO ungated density side effect.
+  - scale:   D-A throw + D-B warn both gated on ENV.studioScaleLive.
+FLAG FOR THE LOCKED DENSITY PROMPT: density has NO D-A combined-reject (a combined
+density+other job silently falls to the prompt path), unlike scale which rejects.
+Not a dark-safety issue; surfaced for parity in the locked prompt.
+
+NOTE (your Ruling 3.ii): PR #2's wiring does NOT satisfy single-call density. That
+arrives in step 2 (below). On main today, density still runs the OLD two-call client
+(getFabricMask + getInstanceMasks) — i.e. the validated box-prompt fabric path.
+
+================================================================
+SEQUENCE STEP 2 — CLIENT + RUNNER FOLLOW-UP (NEXT, as a focused PR into main)
+================================================================
+Scoped; will land as one PR, then PR #1 closes. Contents:
+  1. CLIENT (superset, per Ruling 1): adopt the reconciled SDK plumbing + resolveModelRef;
+     KEEP boxMask (do not delete). Ported Sam2Client:
+        autoSegment(crop) -> { combined_mask, individual_masks }   [default, single call]
+        boxMask(crop, box) -> whole-fabric mask                     [proven fallback]
+     both via the SDK; retire raw /v1/predictions + hybridScale.ts + replicateClient.ts
+     (-737 LOC). Model pin via resolveModelRef (bare hash -> meta/sam-2:<hash>).
+  2. SINGLE-CALL DENSITY: add getSegmentation(image) -> { fabric, instances } (ONE
+     autoSegment); rewire generateDensityImage to it. Scale keeps getFabricMask
+     (combined_mask, fabric only). Default fabric source = combined_mask (provisional).
+  3. NO-OP GUARD (your pre-flip checklist): generateDensityImage returns null / refunds
+     on result.removed === 0 (today it would store a 0-removed image and bill).
+  4. RUNNERS (Ruling 2): PR #1's canonical pair (scaleEval/densityEval + evalMaskIO +
+     buildLabelMap, 118/130 LOC) replaces main's 237/354 pair. Keep main's
+     generateScaleDensitySynthetic.mjs as an additive determinism helper.
+  5. tsc + full suite green -> PR into main -> CLOSE PR #1 -> send you the consolidated SHA.
+
+PRE-FLIP CHECKLIST MAPPING (what you verify on the consolidated SHA):
+  [will satisfy] single-call density (getSegmentation)
+  [will satisfy] no-op guard on result.removed === 0 (not just hasAnyPixel)
+  [satisfied]    all gates flag-gated (verified in step 1; carried forward)
+  [will satisfy] reconciled SDK plumbing WITH boxMask retained
+  [will satisfy] canonical runners (PR #1 pair)
+
+================================================================
+THE ONE GATE — RE-CONFIRMATION ON THE RECONCILED CLIENT (credentialed; Manus/Frank)
+================================================================
+Not Builder-runnable (no Replicate token here). Run ONE credentialed call on the
+RECONCILED client and report:
+  (a) SDK run() accepts the base64 data-URL crop? (PASS proved data-URL only via the
+      raw predictions API; SDK acceptance unconfirmed -> else signed crop-URL fallback +
+      disclosure-doc update).
+  (b) density PASS reproduces on autoSegment (instance count + count error in band).
+  (c) fabric IoU vs the skirt truth mask: combined_mask-direct, hole-filled combined_mask,
+      boxMask whole-crop.
+  (d) infill cleanliness per fabric candidate.
+You rule the fabric source from (c)/(d). Plumbing is the SDK either way. boxMask stays
+in the client until combined_mask is proven clean.
+Model pin throughout: REPLICATE_SAM2_MODEL=fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83
+
+================================================================
+RECOLOR — UNCHANGED, AHEAD
+================================================================
+Classical provider, no SAM2, untouched by the fork. One Chrome smoke test ->
+flip STUDIO_RECOLOR_LIVE. Available now.
+
+================================================================
+SEQUENCE STATE
+================================================================
+  1. Land PR #2 dark on main ............................ DONE (3ea89fa)
+  2. Client + runner follow-up onto main; close PR #1 ... NEXT (Builder)
+  3. Architect verifies the consolidated main SHA ....... after step 2 (send SHA)
+  4. Re-confirmation (a)-(d) on the reconciled client ... credentialed (Manus/Frank)
+  5. Scale/density flips become available ............... after 3 + 4
+Recolor flip is independent of 1-5 (smoke test gates it).
