@@ -30,6 +30,42 @@ Going live with SAM2 means **customers' proprietary print artwork leaves our clo
 
 ---
 
+## Integration notes for the consumer seam (Builder → Manus)
+The scale/density ops and the live wiring (`docs/scale-density-live-wiring-spec.md`)
+consume the mask contract in `server/_core/masking/types.ts`. Two of the four
+requirements change behavior the consumers depend on — handle them here so they
+land clean, not at integration:
+
+**#1 crop-to-fabric needs a coordinate round-trip, not just a crop.** Today
+`sam2Provider` sends the full upright image and everything returns in **full-image
+space**: `decodeMaskToRaster(maskPng, width, height)` builds the raster at
+full-image dims, and `instancesFromMasks(masks, width, height)` returns instance
+bboxes normalized to the full image. The ops composite into that **full-image
+raster**. After cropping to the bbox before send, the Replicate response is in
+**crop space** and must be translated back before returning:
+- Place the fabric raster into a **full-image-sized raster at the crop origin**
+  (zero-padded outside the crop) — do not return it at crop dims.
+- **Re-normalize instance bboxes to the full image** (scale by crop fraction + add
+  crop offset).
+- Skipping this misaligns masks against the image the ops edit → scale/density
+  composite garbage, silently, with no error.
+
+**#4 fail-safe must respect the `rasterReady` / D-B / D-C split.** Classical degrade
+is fine for **recolor** (`separationRemap` works off the classical bbox), but
+classical is `rasterReady:false` and returns **no raster**, and scale/density
+**throw without a raster**. The live route passes the `rasterReady === true` gate
+*before* the call (static capability flag), so a mid-job degrade that returns a
+raster-less mask would make the helper throw → **job fails + refund**, not the
+**D-B prompt-path fallback** we specced. Reconciliation the wiring already supports:
+- Degrade returns a mask with **`raster: undefined`** (NOT a fabricated empty
+  raster), or the helper **catches `MaskProviderUnavailableError`**.
+- Live helper: **missing raster → D-B prompt-path fallback + WARN**;
+  **present-but-all-zero raster → D-C no-op throw/refund**. Two distinct
+  conditions — *no raster = provider degraded = prompt path*; *empty raster =
+  genuine no-op = refund*.
+
+---
+
 ## Clearance criteria — the gate is CLEARED when ALL of:
 1. The four requirements above are checked and built by **Manus**.
 2. The **Architect** reviews `sam2Provider` (at `005260c` or its successor SHA) and confirms all four are met — the formal sign-off.
