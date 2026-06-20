@@ -30,6 +30,13 @@ export interface InfillInput {
   baseClothLab: { L: number; a: number; b: number };
   /** Boundary feather in image-space px. Default 1. */
   featherPx?: number;
+  /**
+   * When true, also replace luminance with baseClothLab.L (full base-cloth fill).
+   * Needed when erasing an OPAQUE motif whose L differs from the cloth (else the
+   * motif's luminance survives as a ghost). Default false = preserve pixel L
+   * (correct for iso-luminant occluders: recolor/scale boundaries).
+   */
+  flatten?: boolean;
 }
 
 export interface InfillResult {
@@ -77,9 +84,11 @@ export async function infillBaseCloth(input: InfillInput): Promise<InfillResult>
     if (a <= 0) continue;
     const p = i * 4;
     const lab = rgb255ToLab(buffer[p], buffer[p + 1], buffer[p + 2]);
+    const targetL = input.flatten ? base.L : lab.l; // flatten replaces L too
+    const newL = lab.l + (targetL - lab.l) * a;
     const newA = lab.a + (base.a - lab.a) * a;
     const newB = lab.b + (base.b - lab.b) * a;
-    const rgb = labToRgb255({ l: lab.l, a: newA, b: newB });
+    const rgb = labToRgb255({ l: newL, a: newA, b: newB });
     buffer[p] = rgb.r;
     buffer[p + 1] = rgb.g;
     buffer[p + 2] = rgb.b;

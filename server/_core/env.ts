@@ -33,6 +33,8 @@ export const ENV = {
   studioDeterministicRecolor: process.env.STUDIO_DETERMINISTIC_RECOLOR === "true",
   /** Route Scale through the deterministic scalePrintRepeat op. Eval-only; default off. */
   studioDeterministicScale: process.env.STUDIO_DETERMINISTIC_SCALE === "true",
+  /** Route Density through the deterministic thinDensity op. Eval-only; default off. */
+  studioDeterministicDensity: process.env.STUDIO_DETERMINISTIC_DENSITY === "true",
   /** Replicate SAM2 (D1 = Option 2). Token + model-version id for the hosted mask source. */
   replicateApiToken: process.env.REPLICATE_API_TOKEN ?? "",
   replicateSam2Model: process.env.REPLICATE_SAM2_MODEL ?? "",
