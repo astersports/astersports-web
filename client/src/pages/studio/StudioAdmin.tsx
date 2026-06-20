@@ -1,5 +1,7 @@
 /**
- * Studio Admin page — manage members/seats, view credit usage, invite users.
+ * Studio Admin page — Firm Detail (Spec Screen 2).
+ * Pooled balance, spend-by-member bars, User/Admin role toggles,
+ * invite with domain lock, transfer ownership.
  */
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
@@ -8,182 +10,549 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, UserPlus, Users, CreditCard, BarChart3 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import {
+  Loader2,
+  UserPlus,
+  Users,
+  CreditCard,
+  BarChart3,
+  Crown,
+  Shield,
+  ArrowRightLeft,
+  Lock,
+  Unlock,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 
 export default function StudioAdmin() {
   const { tenant } = useTenant();
-  const [inviteEmail, setInviteEmail] = useState("");
 
-  const { data: members, isLoading: membersLoading } = trpc.tenants.members.useQuery(
-    { tenantId: tenant?.id ?? 0 },
-    { enabled: !!tenant }
+  if (!tenant) return null;
+
+  const isOwner = tenant.role === "owner";
+  const isAdmin = tenant.role === "admin" || isOwner;
+
+  if (!isAdmin) {
+    return (
+      <div className="max-w-4xl mx-auto py-12 text-center">
+        <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+        <h2 className="text-xl font-semibold">Admin Access Required</h2>
+        <p className="text-muted-foreground mt-2">
+          This page is restricted to account admins and owners.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Admin</h1>
+        <p className="text-muted-foreground text-sm mt-1">
+          Manage {tenant.name} — members, roles, and credit usage.
+        </p>
+      </div>
+
+      <MetricCards tenantId={tenant.id} tenant={tenant} />
+      <SpendByMember tenantId={tenant.id} />
+      <MembersList tenantId={tenant.id} isOwner={isOwner} />
+      <InviteCard tenantId={tenant.id} tenant={tenant} />
+      {isOwner && <FirmSettings tenantId={tenant.id} tenant={tenant} />}
+    </div>
+  );
+}
+
+/* ─── Metric Cards ─────────────────────────────────────────────────────────── */
+
+function MetricCards({ tenantId, tenant }: { tenantId: number; tenant: any }) {
+  const { data: spend } = trpc.firmAdmin.spendByMember.useQuery(
+    { tenantId },
+    { enabled: !!tenantId }
   );
 
-  const { data: creditHistory, isLoading: creditsLoading } = trpc.studioBilling.creditHistory.useQuery(
-    { tenantId: tenant?.id ?? 0 },
-    { enabled: !!tenant }
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <Card>
+        <CardContent className="p-4 flex items-center gap-3">
+          <div className="rounded-lg bg-amber-500/10 p-2.5">
+            <CreditCard className="h-5 w-5 text-amber-500" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold tabular-nums">
+              {tenant.creditBalance.toLocaleString()}
+            </p>
+            <p className="text-xs text-muted-foreground">Pool balance</p>
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4 flex items-center gap-3">
+          <div className="rounded-lg bg-amber-500/10 p-2.5">
+            <BarChart3 className="h-5 w-5 text-amber-500" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold tabular-nums">
+              {(spend?.totalSpent7d ?? 0).toLocaleString()}
+            </p>
+            <p className="text-xs text-muted-foreground">Spent (7 days)</p>
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4 flex items-center gap-3">
+          <div className="rounded-lg bg-primary/10 p-2.5">
+            <Users className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold tabular-nums">
+              {spend?.members.length ?? 0}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Active / {tenant.seats} seats
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+/* ─── Spend by Member ──────────────────────────────────────────────────────── */
+
+function SpendByMember({ tenantId }: { tenantId: number }) {
+  const { data, isLoading } = trpc.firmAdmin.spendByMember.useQuery(
+    { tenantId },
+    { enabled: !!tenantId }
   );
 
-  const inviteMutation = trpc.tenants.invite.useMutation({
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6 flex justify-center">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const members = data?.members ?? [];
+  const maxSpent = Math.max(...members.map((m) => m.spent7d), 1);
+  const total7d = data?.totalSpent7d ?? 1;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <BarChart3 className="h-4 w-4" />
+          Spend by Member (7 days)
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {members.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No credit usage yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {members.map((m) => {
+              const pct = total7d > 0 ? Math.round((m.spent7d / total7d) * 100) : 0;
+              const barWidth = maxSpent > 0 ? (m.spent7d / maxSpent) * 100 : 0;
+              return (
+                <div key={m.userId} className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium truncate max-w-[200px]">
+                      {m.name}
+                    </span>
+                    <span className="text-muted-foreground tabular-nums">
+                      {m.spent7d.toLocaleString()} credits ({pct}%)
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-500"
+                      style={{ width: `${barWidth}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ─── Members List with Role Toggles ──────────────────────────────────────── */
+
+function MembersList({ tenantId, isOwner }: { tenantId: number; isOwner: boolean }) {
+  const utils = trpc.useUtils();
+  const { data: members, isLoading } = trpc.tenants.members.useQuery(
+    { tenantId },
+    { enabled: !!tenantId }
+  );
+
+  const toggleMutation = trpc.firmAdmin.toggleRole.useMutation({
     onSuccess: () => {
-      toast.success("Invitation sent");
-      setInviteEmail("");
+      utils.tenants.members.invalidate({ tenantId });
+      toast.success("Role updated");
     },
     onError: (err) => toast.error(err.message),
   });
 
-  const handleInvite = () => {
-    if (!tenant || !inviteEmail) return;
-    inviteMutation.mutate({ tenantId: tenant.id, email: inviteEmail, role: "member" });
-  };
+  const removeMutation = trpc.firmAdmin.removeMember.useMutation({
+    onSuccess: () => {
+      utils.tenants.members.invalidate({ tenantId });
+      toast.success("Member removed");
+    },
+    onError: (err) => toast.error(err.message),
+  });
 
-  if (!tenant) return null;
+  const transferMutation = trpc.firmAdmin.transferOwnership.useMutation({
+    onSuccess: () => {
+      utils.tenants.members.invalidate({ tenantId });
+      toast.success("Ownership transferred");
+    },
+    onError: (err) => toast.error(err.message),
+  });
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Manage {tenant.name} — members, seats, and credit usage.
-        </p>
-      </div>
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Users className="h-4 w-4" />
+          Members
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        ) : !members || members.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No members yet.</p>
+        ) : (
+          <div className="space-y-1">
+            {/* Header row */}
+            <div className="hidden sm:grid grid-cols-[1fr_80px_80px_40px] gap-2 px-2 py-1 text-xs text-muted-foreground font-medium">
+              <span>Member</span>
+              <span className="text-center">Admin</span>
+              <span className="text-center">Role</span>
+              <span />
+            </div>
+            {members.map((m) => {
+              const isOwnerRow = m.role === "owner";
+              const isAdminRow = m.role === "admin" || m.role === "owner";
+              const displayName = m.user?.name || m.invitedEmail || "Unknown";
+              const displayEmail = m.user?.email || m.invitedEmail || "";
 
-      {/* Stats row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="rounded-lg bg-primary/10 p-2.5">
-              <Users className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{members?.length ?? 0}</p>
-              <p className="text-xs text-muted-foreground">Members / {tenant.seats} seats</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="rounded-lg bg-primary/10 p-2.5">
-              <CreditCard className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold tabular-nums">{tenant.creditBalance.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground">Credits remaining</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="rounded-lg bg-primary/10 p-2.5">
-              <BarChart3 className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold capitalize">{tenant.plan}</p>
-              <p className="text-xs text-muted-foreground">Current plan</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Invite member */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Invite Member</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2">
-            <Input
-              placeholder={tenant.allowedEmailDomain ? `name@${tenant.allowedEmailDomain}` : "email@example.com"}
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              type="email"
-            />
-            <Button onClick={handleInvite} disabled={!inviteEmail || inviteMutation.isPending}>
-              {inviteMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <UserPlus className="h-4 w-4 mr-1.5" />
-              )}
-              Invite
-            </Button>
-          </div>
-          {tenant.allowedEmailDomain && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Only @{tenant.allowedEmailDomain} emails can be invited.
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Members list */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Members</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {membersLoading ? (
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          ) : (
-            <div className="space-y-2">
-              {members?.map((m) => (
-                <div key={m.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                  <div>
-                    <p className="text-sm font-medium">{m.user?.name || m.invitedEmail || "Unknown"}</p>
-                    <p className="text-xs text-muted-foreground">{m.user?.email || m.invitedEmail}</p>
+              return (
+                <div
+                  key={m.id}
+                  className="grid grid-cols-1 sm:grid-cols-[1fr_80px_80px_40px] gap-2 items-center px-2 py-2.5 rounded-lg hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0"
+                >
+                  {/* Name + email */}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-medium truncate">
+                          {displayName}
+                        </span>
+                        {isOwnerRow && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0 border-amber-500/50 text-amber-500"
+                          >
+                            <Crown className="h-2.5 w-2.5 mr-0.5" />
+                            Owner
+                          </Badge>
+                        )}
+                        {m.status === "invited" && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                            Invited
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {displayEmail}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="capitalize text-xs">
+
+                  {/* Admin toggle (amber) */}
+                  <div className="flex justify-center">
+                    <Switch
+                      checked={isAdminRow}
+                      disabled={isOwnerRow || toggleMutation.isPending}
+                      onCheckedChange={(checked) => {
+                        if (isOwnerRow) return;
+                        toggleMutation.mutate({
+                          tenantId,
+                          membershipId: m.id,
+                          field: "role",
+                          value: checked ? "admin" : "member",
+                        });
+                      }}
+                      className="data-[state=checked]:bg-amber-500"
+                    />
+                  </div>
+
+                  {/* Role badge */}
+                  <div className="flex justify-center">
+                    <Badge
+                      variant={isAdminRow ? "default" : "secondary"}
+                      className={`text-[10px] capitalize ${
+                        isOwnerRow
+                          ? "bg-amber-500/20 text-amber-500 border-amber-500/30"
+                          : isAdminRow
+                          ? "bg-amber-500/10 text-amber-400"
+                          : "bg-[#4a8fd4]/10 text-[#4a8fd4]"
+                      }`}
+                    >
                       {m.role}
                     </Badge>
-                    <Badge
-                      variant={m.status === "active" ? "default" : "outline"}
-                      className="capitalize text-xs"
-                    >
-                      {m.status}
-                    </Badge>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Credit history */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Recent Credit Activity</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {creditsLoading ? (
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          ) : !creditHistory || creditHistory.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No credit activity yet.</p>
-          ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {creditHistory.map((entry) => (
-                <div key={entry.id} className="flex items-center justify-between py-1.5 text-sm">
-                  <div>
-                    <span className="font-medium capitalize">{entry.reason}</span>
-                    <span className="text-muted-foreground ml-2 text-xs">
-                      {new Date(entry.createdAt).toLocaleDateString()}
-                    </span>
+                  {/* Actions */}
+                  <div className="flex justify-end">
+                    {!isOwnerRow && m.status === "active" && (
+                      <div className="flex gap-1">
+                        {isOwner && (
+                          <button
+                            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                            title="Remove member"
+                            onClick={() => {
+                              if (confirm(`Remove ${displayName} from this firm?`)) {
+                                removeMutation.mutate({ tenantId, membershipId: m.id });
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <span
-                    className={`font-semibold tabular-nums ${
-                      entry.delta > 0 ? "text-green-600" : "text-destructive"
-                    }`}
-                  >
-                    {entry.delta > 0 ? "+" : ""}
-                    {entry.delta}
-                  </span>
                 </div>
-              ))}
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ─── Invite Card ──────────────────────────────────────────────────────────── */
+
+function InviteCard({ tenantId, tenant }: { tenantId: number; tenant: any }) {
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<"member" | "admin">("member");
+  const utils = trpc.useUtils();
+
+  const inviteMutation = trpc.tenants.invite.useMutation({
+    onSuccess: () => {
+      toast.success("Invitation sent");
+      setEmail("");
+      utils.tenants.members.invalidate({ tenantId });
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <UserPlus className="h-4 w-4" />
+          Invite Member
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Input
+            placeholder={
+              tenant.allowedEmailDomain
+                ? `name@${tenant.allowedEmailDomain}`
+                : "email@example.com"
+            }
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            type="email"
+            className="flex-1"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && email) {
+                inviteMutation.mutate({ tenantId, email, role });
+              }
+            }}
+          />
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value as "member" | "admin")}
+            className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+          >
+            <option value="member">Member</option>
+            <option value="admin">Admin</option>
+          </select>
+          <Button
+            onClick={() => inviteMutation.mutate({ tenantId, email, role })}
+            disabled={!email || inviteMutation.isPending}
+            className="bg-amber-500 hover:bg-amber-600 text-black"
+          >
+            {inviteMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <UserPlus className="h-4 w-4 mr-1.5" />
+            )}
+            Invite
+          </Button>
+        </div>
+        {tenant.allowedEmailDomain && (
+          <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+            <Lock className="h-3 w-3" />
+            Domain restricted: only @{tenant.allowedEmailDomain} emails can join.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ─── Firm Settings (Owner only) ───────────────────────────────────────────── */
+
+function FirmSettings({ tenantId, tenant }: { tenantId: number; tenant: any }) {
+  const [domain, setDomain] = useState(tenant.allowedEmailDomain ?? "");
+  const [transferEmail, setTransferEmail] = useState("");
+  const utils = trpc.useUtils();
+
+  const domainMutation = trpc.firmAdmin.updateDomainLock.useMutation({
+    onSuccess: (data) => {
+      toast.success(
+        data.allowedEmailDomain
+          ? `Domain locked to @${data.allowedEmailDomain}`
+          : "Domain lock removed"
+      );
+      utils.tenants.myTenants.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const { data: members } = trpc.tenants.members.useQuery(
+    { tenantId },
+    { enabled: !!tenantId }
+  );
+
+  const transferMutation = trpc.firmAdmin.transferOwnership.useMutation({
+    onSuccess: () => {
+      toast.success("Ownership transferred successfully");
+      utils.tenants.members.invalidate({ tenantId });
+      utils.tenants.myTenants.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const eligibleMembers = members?.filter(
+    (m) => m.role !== "owner" && m.status === "active"
+  );
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Shield className="h-4 w-4" />
+          Firm Settings
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Domain Lock */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium flex items-center gap-1.5">
+            {tenant.allowedEmailDomain ? (
+              <Lock className="h-3.5 w-3.5 text-amber-500" />
+            ) : (
+              <Unlock className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+            Domain Lock
+          </label>
+          <div className="flex gap-2">
+            <Input
+              placeholder="e.g. jayallc.com"
+              value={domain}
+              onChange={(e) => setDomain(e.target.value)}
+              className="flex-1"
+            />
+            <Button
+              variant="outline"
+              onClick={() =>
+                domainMutation.mutate({
+                  tenantId,
+                  allowedEmailDomain: domain.trim() || null,
+                })
+              }
+              disabled={domainMutation.isPending}
+            >
+              {domainMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Save"
+              )}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            When set, only emails from this domain can be invited. Leave empty to allow any email.
+          </p>
+        </div>
+
+        {/* Transfer Ownership */}
+        <div className="space-y-2 border-t border-border pt-4">
+          <label className="text-sm font-medium flex items-center gap-1.5">
+            <ArrowRightLeft className="h-3.5 w-3.5 text-amber-500" />
+            Transfer Ownership
+          </label>
+          <p className="text-xs text-muted-foreground">
+            Transfer the owner role to another active member. You will become an admin.
+          </p>
+          {eligibleMembers && eligibleMembers.length > 0 ? (
+            <div className="flex gap-2">
+              <select
+                value={transferEmail}
+                onChange={(e) => setTransferEmail(e.target.value)}
+                className="h-9 flex-1 rounded-md border border-input bg-transparent px-3 text-sm"
+              >
+                <option value="">Select member...</option>
+                {eligibleMembers.map((m) => (
+                  <option key={m.id} value={String(m.id)}>
+                    {m.user?.name || m.user?.email || m.invitedEmail} ({m.role})
+                  </option>
+                ))}
+              </select>
+              <Button
+                variant="destructive"
+                disabled={!transferEmail || transferMutation.isPending}
+                onClick={() => {
+                  if (
+                    confirm(
+                      "Are you sure? This will transfer ownership and you will become an admin."
+                    )
+                  ) {
+                    transferMutation.mutate({
+                      tenantId,
+                      targetMembershipId: Number(transferEmail),
+                    });
+                  }
+                }}
+              >
+                {transferMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Transfer"
+                )}
+              </Button>
             </div>
+          ) : (
+            <p className="text-xs text-muted-foreground italic">
+              No eligible members to transfer to. Invite someone first.
+            </p>
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

@@ -10,6 +10,7 @@ import { studioRouter } from "./routers/studio";
 import { studioBillingRouter } from "./routers/studioBilling";
 import { adminLogsRouter } from "./routers/adminLogs";
 import { platformRouter } from "./routers/platform";
+import { firmAdminRouter } from "./routers/firmAdmin";
 import { fetchAllGames, invalidateAllCaches, getTournamentRegistry } from "./scraper";
 import { notifyOwner } from "./_core/notification";
 import { sdk } from "./_core/sdk";
@@ -49,6 +50,9 @@ export const appRouter = router({
   tenants: tenantsRouter,
   studio: studioRouter,
   studioBilling: studioBillingRouter,
+
+  // Firm Admin (admin tab)
+  firmAdmin: firmAdminRouter,
 
   // Platform Console (super_admin)
   platform: platformRouter,

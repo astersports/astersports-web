@@ -431,3 +431,17 @@
 - [x] Add Impersonate button (sets session context to target account, redirects to /studio)
 - [x] Add /platform route to App.tsx with super_admin gate
 - [x] Write tests for superAdminProcedure and platform procedures (9 tests, all pass)
+
+## Firm Detail Admin Tab (Spec Screen 2)
+- [x] Add backend: spendByMember query (ledger grouped by userId, last 7d and all-time)
+- [x] Add backend: toggleRole mutation (promote/demote admin/member, blocks owner change)
+- [x] Add backend: transferOwnership mutation (owner-only, reassigns owner badge, old owner→admin)
+- [x] Add backend: updateDomainLock mutation (admin-only, set/clear allowedEmailDomain)
+- [x] Add backend: removeMember mutation (admin-only, sets status=disabled, blocks owner removal)
+- [x] Rebuild StudioAdmin.tsx with pooled balance + spent-7d metric cards
+- [x] Add spend-by-member bar chart (horizontal bars, amber gradient, credits + percent)
+- [x] Add members list with Admin toggle (amber switch), Owner badge locked, role badges
+- [x] Add invite member card with domain hint + role selector (member/admin)
+- [x] Add firm settings card (domain lock input + transfer ownership dropdown)
+- [x] Gate: member sees 'Admin Access Required' shield, admin sees members/invite, owner sees transfer
+- [x] Write tests for firmAdmin procedures (13 tests, all pass)
