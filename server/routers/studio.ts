@@ -138,6 +138,11 @@ export const studioRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Job not found" });
       }
 
+      const trial = getTrialStatus(ctx.tenant);
+      if (trial.inTrial && trial.expired) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Your free trial has ended. Choose a plan to continue generating." });
+      }
+
       const controls = input.controls as ControlSettings;
 
       // Validate sanitized element names are non-empty when controls are active
@@ -380,7 +385,7 @@ export const studioRouter = router({
             code: "BAD_REQUEST",
             message:
               "Scale works on repeating prints (ditsy, allover, geometric). " +
-              "This image reads as a single placed graphic — scale isn\u2019t supported for it yet. Credits refunded.",
+              "This image reads as a single placed graphic — scale isn’t supported for it yet. Credits refunded.",
           });
         }
 
@@ -540,6 +545,10 @@ export const studioRouter = router({
       if (!originalJob || originalJob.tenantId !== ctx.tenant.id) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Job not found" });
       }
+      const trial = getTrialStatus(ctx.tenant);
+      if (trial.inTrial && trial.expired) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Your free trial has ended. Choose a plan to continue generating." });
+      }
       if (!originalJob.controls || !originalJob.originalUrl) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Job has no controls to re-run" });
       }
@@ -549,7 +558,7 @@ export const studioRouter = router({
 
       // Deduct credits
       try {
-        await deductCredits(ctx.tenant.id, ctx.user?.id ?? 0, cost, `rerun-${originalJob.id}`);
+        await deductCredits(ctx.tenant.id, ctx.user?.id ?? 0, cost, "generation", `rerun-${originalJob.id}`);
       } catch {
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Insufficient credits" });
       }
@@ -579,11 +588,23 @@ export const studioRouter = router({
           await addVariation({ jobId: newJob.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: 1 });
           await updateJobStatus(newJob.id, "done");
         } catch (err) {
-          await updateJobStatus(newJob.id, "failed");
-          // Refund credits on failure
-          await grantCredits(ctx.tenant.id, cost, "refund", `job-${newJob.id}-failed`, ctx.user?.id);
+          // Refund + status update must not themselves escape as an unhandled
+          // rejection (customer charged, no refund). Guard each call.
+          try {
+            await updateJobStatus(newJob.id, "failed");
+          } catch (statusErr) {
+            log.error("studio", `rerun: failed to mark job failed`, { jobId: newJob.id, tenantId: ctx.tenant.id, userId: ctx.user?.id, metadata: { error: (statusErr as any)?.message || String(statusErr) } });
+          }
+          try {
+            // Refund credits on failure
+            await grantCredits(ctx.tenant.id, cost, "refund", `job-${newJob.id}-failed`, ctx.user?.id);
+          } catch (refundErr) {
+            log.error("studio", `rerun: failed to refund credits`, { jobId: newJob.id, tenantId: ctx.tenant.id, userId: ctx.user?.id, metadata: { cost, error: (refundErr as any)?.message || String(refundErr) } });
+          }
         }
-      })();
+      })().catch((escapedErr) => {
+        log.error("studio", `rerun: background task escaped`, { jobId: newJob.id, tenantId: ctx.tenant.id, userId: ctx.user?.id, metadata: { error: (escapedErr as any)?.message || String(escapedErr) } });
+      });
 
       return { jobId: newJob.id, creditsUsed: cost };
     }),
