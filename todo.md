@@ -459,3 +459,11 @@
 - [x] Wire into StudioLayout above AppShell (reads sessionStorage impersonate_tenant)
 - [x] On Exit: clear sessionStorage, redirect to /platform
 - [x] Responsive: truncates metadata on mobile, full info on desktop (z-60, sticky top-0)
+
+## Trial Reminder Notifications (Day 4 + Day 6)
+- [x] Create trialReminders.ts module: query tenants in trial at Day 4 and Day 6, send notifyOwner
+- [x] Register /api/scheduled/trial-reminders endpoint in registerScheduledRoutes
+- [x] Handler: find tenants where trialStartedAt puts them at Day 4 or Day 6 today, send notification per tenant
+- [x] Notification content: Day 4 = "Trial halfway: X credits used, 3 days left"; Day 6 = "Trial ends tomorrow: card will be charged"
+- [x] Idempotent: trial_reminders_sent table with (tenant_id, trial_day) unique key, INSERT IGNORE
+- [x] Write tests for the reminder logic (10 tests, all pass)

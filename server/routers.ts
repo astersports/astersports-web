@@ -14,7 +14,8 @@ import { firmAdminRouter } from "./routers/firmAdmin";
 import { fetchAllGames, invalidateAllCaches, getTournamentRegistry } from "./scraper";
 import { notifyOwner } from "./_core/notification";
 import { sdk } from "./_core/sdk";
-import { pruneOldLogs } from "./logRetention";
+import { pruneOldLogs } from './logRetention';
+import { processTrialReminders } from './trialReminders';
 import type { Game } from "../shared/types";
 
 // Owner-only procedure: restricts access to the site owner (OWNER_OPEN_ID)
@@ -217,6 +218,34 @@ export function registerScheduledRoutes(app: any) {
       });
     } catch (error) {
       console.error('[log-cleanup] Error:', (error as Error).message);
+      res.status(500).json({
+        success: false,
+        error: (error as Error).message,
+        stack: (error as Error).stack,
+        context: { url: req.url, taskUid: (req as any).__taskUid },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
+  // Trial reminder notifications — Day 4 and Day 6
+  app.post('/api/scheduled/trial-reminders', async (req: any, res: any) => {
+    try {
+      const user = await sdk.authenticateRequest(req);
+      if (!user.isCron || !user.taskUid) {
+        return res.status(403).json({ error: 'cron-only' });
+      }
+
+      const result = await processTrialReminders();
+      console.log(`[trial-reminders] Processed ${result.processed} trial tenants, sent ${result.sent}, skipped ${result.skipped}`);
+
+      res.json({
+        success: true,
+        ...result,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('[trial-reminders] Error:', (error as Error).message);
       res.status(500).json({
         success: false,
         error: (error as Error).message,
