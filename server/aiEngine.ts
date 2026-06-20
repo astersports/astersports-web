@@ -18,6 +18,8 @@ import { getMaskProvider } from "./_core/masking";
 import { separationRemap } from "./_core/studio/ops/separationRemap";
 import { densityThin } from "./_core/studio/ops/densityThin";
 import { scalePrintRepeat } from "./_core/studio/ops/scaleRepeat";
+import { checkRepeat, MIN_REPEAT_CONFIDENCE } from "./_core/studio/ops/repeatGuard";
+import { decodeUpright } from "./_core/image/decodeUpright";
 import type { RasterMask } from "./_core/masking/types";
 
 /**
@@ -86,10 +88,17 @@ function hasAnyPixel(raster: RasterMask): boolean {
 /** Sentinel: scale found no fabric region, so the op would be a no-op. */
 export const NO_OP_SCALE_ERROR = "NO_OP_SCALE";
 
+/** Sentinel: scale rejected because the print doesn't read as a repeat. */
+export const NON_REPEAT_SCALE_ERROR = "NON_REPEAT_SCALE";
+
 /** Deterministic scale (scale-live): SAM2 fabric raster + scalePrintRepeat -> PNG.
  *  Throws NO_OP_SCALE_ERROR on an empty fabric raster so the caller's refund path
  *  fires (D-C; scalePrintRepeat itself passes through on an empty mask, which would
- *  otherwise bill for a no-op). No model call, no generative no-op guard. */
+ *  otherwise bill for a no-op). No model call, no generative no-op guard.
+ *
+ *  Non-repeat guard (Flag 2): before running the op, estimates periodConfidence
+ *  on the source image. If below MIN_REPEAT_CONFIDENCE, throws NON_REPEAT_SCALE_ERROR
+ *  so the caller rejects pre-deduct with an honest message. */
 export async function generateScaledImage(
   originalImageUrl: string,
   params: { targetFraction: number }
@@ -101,7 +110,28 @@ export async function generateScaledImage(
   if (!fabric.raster || !hasAnyPixel(fabric.raster)) {
     throw new Error(NO_OP_SCALE_ERROR);
   }
+
+  // Non-repeat guard: decode the source, run periodConfidence check.
+  // This runs BEFORE the expensive scale op to fail fast.
+  const decoded = await decodeUpright(srcUrl);
+  const repeatCheck = checkRepeat(
+    decoded.buffer, decoded.width, decoded.height, fabric.raster.data
+  );
+  if (!repeatCheck.isRepeat) {
+    console.warn(
+      `[scale-live] non-repeat guard fired: confidence=${repeatCheck.confidence.toFixed(3)} ` +
+      `(threshold=${MIN_REPEAT_CONFIDENCE}); axes=${JSON.stringify(repeatCheck.axes)}`
+    );
+    throw new Error(NON_REPEAT_SCALE_ERROR);
+  }
+
   const r = await scalePrintRepeat({ image: { url: srcUrl }, fabric, targetFraction: params.targetFraction });
+  // Second-layer no-op guard (parity with density's `removed === 0` check):
+  // scalePrintRepeat ran but didn't change pixels (f===1 or degenerate mask).
+  if (!r.changed) {
+    console.warn(`[scale-live] scalePrintRepeat ran but changed:false (f=${params.targetFraction}); no-op -> fail + refund.`);
+    throw new Error(NO_OP_SCALE_ERROR);
+  }
   return sharp(r.data, { raw: { width: r.width, height: r.height, channels: 4 } }).png().toBuffer();
 }
 

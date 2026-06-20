@@ -375,3 +375,8 @@
 - [x] Remove diagnostic console.log from studio.ts density gate (deferred until production confirmed)
 - [x] Verify TypeScript compiles clean (0 errors)
 - [x] All 184 tests pass (183 passed + 1 skipped)
+
+## Architect Scale Flags (pre-live blockers)
+- [x] Flag 1: Scale no-op refund parity — scalePrintRepeat signals `changed`, generateScaledImage refunds byte-identical results
+- [x] Flag 2: Non-repeat guard — pre-deduct rejection when periodConfidence < threshold (honest message instead of tiling a logo)
+- [x] Tests for both flags (10 scale tests + 5 repeatGuard tests, 208 total pass)

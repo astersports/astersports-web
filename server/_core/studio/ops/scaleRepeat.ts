@@ -30,6 +30,8 @@ export interface ScaleResult {
   data: Buffer; // raw RGBA, same dims, alpha preserved
   width: number;
   height: number;
+  /** True if the op actually modified pixels. False on empty-mask passthrough or f===1. */
+  changed: boolean;
 }
 
 export async function scalePrintRepeat(input: ScaleInput): Promise<ScaleResult> {
@@ -53,7 +55,7 @@ export async function scalePrintRepeat(input: ScaleInput): Promise<ScaleResult> 
       }
     }
   }
-  if (xmax < 0) return { data: buffer, width, height }; // empty mask -> passthrough
+  if (xmax < 0) return { data: buffer, width, height, changed: false }; // empty mask -> passthrough
   const bw = xmax - xmin + 1, bh = ymax - ymin + 1;
   const f = input.targetFraction;
 
@@ -100,5 +102,7 @@ export async function scalePrintRepeat(input: ScaleInput): Promise<ScaleResult> 
     out[p + 2] = Math.round(buffer[p + 2] + (scaledFull[p + 2] - buffer[p + 2]) * a);
     // alpha channel (p + 3) preserved from the original copy
   }
-  return { data: out, width, height };
+  // f===1 is a near-passthrough (the composite still runs but pixels are identical).
+  // Signal changed:false so the caller's no-op guard can refund.
+  return { data: out, width, height, changed: f !== 1 };
 }

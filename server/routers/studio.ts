@@ -7,7 +7,7 @@ import { TRPCError } from "@trpc/server";
 import { router } from "../_core/trpc";
 import { tenantProcedure } from "../tenancy";
 import { storagePut } from "../storage";
-import { detectPrintElements, generateEditedImage, generateRecoloredImage, generateDensityImage, generateScaledImage } from "../aiEngine";
+import { detectPrintElements, generateEditedImage, generateRecoloredImage, generateDensityImage, generateScaledImage, NON_REPEAT_SCALE_ERROR } from "../aiEngine";
 import { ENV } from "../_core/env";
 import { getMaskProvider } from "../_core/masking";
 import {
@@ -348,6 +348,21 @@ export const studioRouter = router({
           ctx.user.id
         );
         await updateJobStatus(job.id, "failed");
+
+        // Non-repeat guard: surface an honest, actionable message instead of
+        // a generic "all failed" error. The user can't fix this by retrying.
+        const nonRepeatFail = settled.find(
+          (r) => r.status === "rejected" && r.reason?.message === NON_REPEAT_SCALE_ERROR
+        );
+        if (nonRepeatFail) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "Scale works on repeating prints (ditsy, allover, geometric). " +
+              "This image reads as a single placed graphic — scale isn\u2019t supported for it yet. Credits refunded.",
+          });
+        }
+
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "All image generations failed. Credits have been refunded.",

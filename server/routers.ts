@@ -30,14 +30,6 @@ const lastKnownStatuses: Map<string, string> = new Map();
 
 export const appRouter = router({
   system: systemRouter,
-  // G0 diagnostic: temporary env-check (remove after verification)
-  envCheck: publicProcedure.query(() => ({
-    studioDensityLive: ENV.studioDensityLive,
-    maskProvider: ENV.maskProvider,
-    appIdSet: !!ENV.appId,
-    replicateTokenSet: !!ENV.replicateApiToken,
-  })),
-
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
