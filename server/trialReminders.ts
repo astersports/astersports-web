@@ -9,6 +9,9 @@ import { getTrialStatus } from "./studioDb";
 import { notifyOwner } from "./_core/notification";
 import { and, isNotNull, sql } from "drizzle-orm";
 
+/** Trial-day thresholds (1-indexed) at which a reminder should fire. */
+const REMINDER_THRESHOLDS = [4, 6] as const;
+
 export interface ReminderResult {
   tenantId: number;
   tenantName: string;
@@ -44,64 +47,72 @@ export async function processTrialReminders(): Promise<{
 
   for (const tenant of trialTenants) {
     const status = getTrialStatus(tenant);
-
-    // Only process Day 4 and Day 6
-    if (!status.inTrial || (status.trialDay !== 4 && status.trialDay !== 6)) {
+    if (!status.inTrial) {
       continue;
     }
 
-    // Check idempotency — has this reminder already been sent?
-    const alreadySent = await checkReminderSent(db, tenant.id, status.trialDay);
-    if (alreadySent) {
-      skipped++;
-      results.push({
-        tenantId: tenant.id,
-        tenantName: tenant.name,
-        trialDay: status.trialDay,
-        sent: false,
-        error: "already_sent",
-      });
-      continue;
-    }
+    // Catch-up semantics: for each threshold the tenant has reached or passed,
+    // send the reminder unless it has already been sent. A missed cron run no
+    // longer skips a reminder permanently — the next run fires the still-pending
+    // threshold(s). Dedup keyed on the threshold day keeps each at most once.
+    for (const threshold of REMINDER_THRESHOLDS) {
+      if (status.trialDay < threshold) {
+        continue;
+      }
 
-    // Build notification content
-    const { title, content } = buildReminderContent(
-      tenant.name,
-      status.trialDay,
-      status.daysRemaining,
-      status.creditsUsed ?? 0,
-      tenant.trialCredits
-    );
-
-    try {
-      const success = await notifyOwner({ title, content });
-      if (success) {
-        // Mark as sent
-        await markReminderSent(db, tenant.id, status.trialDay);
-        sent++;
+      // Check idempotency — has this reminder already been sent?
+      const alreadySent = await checkReminderSent(db, tenant.id, threshold);
+      if (alreadySent) {
+        skipped++;
         results.push({
           tenantId: tenant.id,
           tenantName: tenant.name,
-          trialDay: status.trialDay,
-          sent: true,
-        });
-      } else {
-        results.push({
-          tenantId: tenant.id,
-          tenantName: tenant.name,
-          trialDay: status.trialDay,
+          trialDay: threshold,
           sent: false,
-          error: "notification_service_unavailable",
+          error: "already_sent",
+        });
+        continue;
+      }
+
+      // Build notification content
+      const { title, content } = buildReminderContent(
+        tenant.name,
+        threshold,
+        status.daysRemaining,
+        status.creditsUsed ?? 0,
+        tenant.trialCredits
+      );
+
+      try {
+        const success = await notifyOwner({ title, content });
+        if (success) {
+          // Mark as sent
+          await markReminderSent(db, tenant.id, threshold);
+          sent++;
+          results.push({
+            tenantId: tenant.id,
+            tenantName: tenant.name,
+            trialDay: threshold,
+            sent: true,
+          });
+        } else {
+          results.push({
+            tenantId: tenant.id,
+            tenantName: tenant.name,
+            trialDay: threshold,
+            sent: false,
+            error: "notification_service_unavailable",
+          });
+        }
+      } catch (error) {
+        results.push({
+          tenantId: tenant.id,
+          tenantName: tenant.name,
+          trialDay: threshold,
+          sent: false,
+          error: (error as Error).message,
         });
       }
-    } catch (error) {
-      results.push({
-        tenantId: tenant.id,
-        tenantName: tenant.name,
-        trialDay: status.trialDay,
-        sent: false,
-        error: (error as Error).message,
-      });
     }
   }
 
