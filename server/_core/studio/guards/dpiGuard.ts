@@ -11,6 +11,8 @@
  */
 
 import sharp from "sharp";
+import { assertSafeFetchUrl } from "../../net/ssrfGuard";
+import { fetchWithTimeout, TIMEOUT } from "../../../fetchTimeout";
 
 /**
  * Resolve a /manus-storage/ path to a fetchable URL, or return the input unchanged.
@@ -62,10 +64,14 @@ export async function checkUpscaleDpi(
     if (typeof imageSource === "string" && resolveUrl) {
       input = await resolveUrl(imageSource);
     }
-    // For URLs, fetch the image buffer first (sharp can't read remote URLs directly)
+    // For URLs, fetch the image buffer first (sharp can't read remote URLs directly).
+    // Route through the SSRF guard + timeout helper like every other server-side
+    // image fetch, so this path can't be coerced into reaching internal hosts and
+    // can't hang indefinitely on an unresponsive origin.
     let sharpInput: Buffer | string;
     if (typeof input === "string" && (input.startsWith("http://") || input.startsWith("https://"))) {
-      const resp = await fetch(input);
+      await assertSafeFetchUrl(input);
+      const resp = await fetchWithTimeout(input, {}, TIMEOUT.IMAGE_DOWNLOAD);
       if (!resp.ok) throw new Error(`Failed to fetch image: ${resp.status}`);
       sharpInput = Buffer.from(await resp.arrayBuffer());
     } else {
