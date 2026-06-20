@@ -39,10 +39,19 @@ export function getSessionCookieOptions(
   //       ? hostname
   //       : undefined;
 
+  // M11 (CSRF): "lax" stops the session cookie from riding cross-site POSTs
+  // (the CSRF vector) while still sending it on same-origin XHR and on the
+  // top-level OAuth redirect back to the app. The app is a same-origin SPA
+  // (tRPC at /api/trpc on its own origin) with a top-level OAuth flow, so "lax"
+  // is functionally transparent here. The ONLY thing it would break is loading
+  // the app inside a cross-origin iframe — which this app does not do (no
+  // frame-ancestors/X-Frame-Options/iframe embedding in the tree). If a future
+  // embedded surface is added, that context needs its own CSRF-token scheme
+  // rather than reverting to "none".
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
+    sameSite: "lax",
     secure: isSecureRequest(req),
   };
 }
