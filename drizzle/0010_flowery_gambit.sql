@@ -1,0 +1,11 @@
+-- C3: hard idempotency backstop for credit grants — at most one ledger row per
+-- (refId, reason). MySQL permits multiple NULL refIds, so manual adjustments
+-- without a refId are unaffected. grantCredits also checks-first, so the common
+-- retry path never hits this constraint; it only catches the concurrent race.
+--
+-- PRE-FLIGHT (Architect, money path per CLAUDE.md §4): this ALTER fails if any
+-- duplicate (refId, reason) rows already exist. Before applying, run:
+--   SELECT refId, reason, COUNT(*) c FROM credit_ledger
+--   WHERE refId IS NOT NULL GROUP BY refId, reason HAVING c > 1;
+-- Resolve any duplicates first, then migrate.
+ALTER TABLE `credit_ledger` ADD CONSTRAINT `uniq_credit_ledger_ref_reason` UNIQUE(`refId`,`reason`);
