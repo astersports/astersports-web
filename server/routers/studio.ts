@@ -162,12 +162,24 @@ export const studioRouter = router({
       }
 
       // D-C live route: density-ONLY jobs go through the deterministic densityThin
-      // op (SAM2 raster + instances) when STUDIO_DENSITY_LIVE is on. If the provider
-      // degrades (no raster or no instances), falls back to the prompt path (D-B).
+      // op (SAM2 raster + instances) when STUDIO_DENSITY_LIVE is on. On a provider
+      // degrade, density FAILS + REFUNDS — it never prompt-falls (the generative
+      // path cannot do count-based removal, so it would silently ignore the ask).
       const densityOnly =
         controls.density.enabled && !controls.scale.enabled &&
         !controls.recolor.enabled && !controls.remove.enabled;
       const useDeterministicDensity = ENV.studioDensityLive && densityOnly;
+      // D-A (density): reject density combined with other edits, gated on the live
+      // flag (pre-deduct; flag off => unchanged). The reason is stronger than scale's:
+      // a combined density+other job on the prompt path silently UNMETS the count-based
+      // density intent, so reject honestly rather than return a generative result that
+      // ignored it. Mirrors scale's D-A.
+      if (ENV.studioDensityLive && controls.density.enabled && controls.density.percent > 0 && !densityOnly) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Density can't yet combine with other edits — run it separately.",
+        });
+      }
 
       // Scale-live route: scale-ONLY jobs go through scalePrintRepeat when
       // STUDIO_SCALE_LIVE is on AND the provider serves rasters. Dark by default.
@@ -267,18 +279,18 @@ export const studioRouter = router({
             await addVariation({ jobId: job.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: nextRound });
             return { url, key };
           }
-          // D-C: deterministic density path. Falls back to prompt path if provider degrades.
+          // D-C: deterministic density path. On degrade / no-op, FAIL + REFUND —
+          // density never prompt-falls (the prompt path cannot do count-based removal).
           if (useDeterministicDensity) {
             const densityResult = await generateDensityImage(job.originalUrl, controls.density.percent);
-            if (densityResult) {
-              const key = `studio/${ctx.tenant.id}/${job.id}/density-${nextRound}.png`;
-              const { url } = await storagePut(key, densityResult.png, "image/png");
-              await addVariation({ jobId: job.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: nextRound });
-              console.log(`[studio] Density op removed ${densityResult.removed} instances for job ${job.id}`);
-              return { url, key };
+            if (!densityResult) {
+              throw new Error("density temporarily unavailable");
             }
-            // Provider degraded (D-B): fall through to prompt path below.
-            console.warn(`[studio] Density provider degraded for job ${job.id}; falling back to prompt path.`);
+            const key = `studio/${ctx.tenant.id}/${job.id}/density-${nextRound}.png`;
+            const { url } = await storagePut(key, densityResult.png, "image/png");
+            await addVariation({ jobId: job.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: nextRound });
+            console.log(`[studio] Density op removed ${densityResult.removed} instances for job ${job.id}`);
+            return { url, key };
           }
           if (useDeterministicScale) {
             const png = await generateScaledImage(job.originalUrl, {

@@ -32,4 +32,14 @@ export const classicalProvider: MaskProvider = {
       "classical instance localization (template-matching) requires raster ops via `sharp` — gated on spike S3/S5"
     );
   },
+
+  /** No raster + no instances — the density helper reads this as a degrade and
+   *  fails + refunds (density never prompt-falls). */
+  async getSegmentation(image: MaskImageInput): Promise<{ fabric: FabricMask; instances: InstanceMask[] }> {
+    const region = await locateFabricRegion(image.url);
+    return {
+      fabric: { bbox: region.bbox, confidence: region.confidence, provider: "classical" },
+      instances: [],
+    };
+  },
 };

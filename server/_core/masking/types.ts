@@ -65,6 +65,13 @@ export interface MaskProvider {
   getFabricMask(image: MaskImageInput): Promise<FabricMask>;
   /** Localize individual motif instances within the fabric region (density). */
   getInstanceMasks(image: MaskImageInput, fabric: FabricMask): Promise<InstanceMask[]>;
+  /**
+   * Fabric + instances from a SINGLE segmentation call (density's single-call path
+   * — avoids the double SAM2 call of getFabricMask + getInstanceMasks). A
+   * non-raster-ready provider returns a raster-less fabric + [] instances, which
+   * the density helper treats as a degrade (fail + refund).
+   */
+  getSegmentation(image: MaskImageInput): Promise<{ fabric: FabricMask; instances: InstanceMask[] }>;
 }
 
 /** Thrown when an operation is defined but its raster backend is not wired yet. */

@@ -1,8 +1,9 @@
 /**
  * D-C deterministic density helper test. Verifies generateDensityImage resolves
- * the source URL, calls the SAM2 provider for fabric raster + instances, runs
- * densityThin, encodes to PNG, and returns { png, removed }. Also verifies the
- * null-return degradation paths (no raster, no instances).
+ * the source URL, calls the provider's SINGLE getSegmentation (fabric + instances
+ * from one SAM2 call), runs densityThin, encodes to PNG, returns { png, removed }.
+ * Also verifies null on degrade (no raster / no instances) and the removed===0
+ * no-op guard — all of which the caller turns into FAIL + REFUND (never prompt-fall).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -45,23 +46,19 @@ const instances = [
   { bbox: { x: 0.7, y: 0.3, w: 0.1, h: 0.1 }, raster: { width: 10, height: 10, data: new Uint8Array(100).fill(255) } },
 ];
 
-beforeEach(() => {
-  vi.clearAllMocks();
-});
+/** Provider whose single getSegmentation returns the given fabric + instances. */
+function providerWith(fabric: unknown, insts: unknown) {
+  return { getSegmentation: vi.fn().mockResolvedValue({ fabric, instances: insts }) };
+}
 
-describe("generateDensityImage", () => {
-  it("signs a /manus-storage url, runs SAM2 + densityThin, returns PNG + removed count", async () => {
+beforeEach(() => vi.clearAllMocks());
+
+describe("generateDensityImage (single-call getSegmentation)", () => {
+  it("signs a /manus-storage url, runs ONE getSegmentation + densityThin, returns PNG + removed", async () => {
     mockSign.mockResolvedValue("https://signed/garment.jpg");
-    mockProvider.mockReturnValue({
-      getFabricMask: vi.fn().mockResolvedValue(fabricWithRaster),
-      getInstanceMasks: vi.fn().mockResolvedValue(instances),
-    });
-    mockDensityThin.mockResolvedValue({
-      width: 100,
-      height: 100,
-      data: new Uint8Array(40000), // RGBA
-      removed: 1,
-    });
+    const provider = providerWith(fabricWithRaster, instances);
+    mockProvider.mockReturnValue(provider);
+    mockDensityThin.mockResolvedValue({ width: 100, height: 100, data: new Uint8Array(40000), removed: 1 });
 
     const result = await generateDensityImage("/manus-storage/skirt.jpg", 30);
 
@@ -69,6 +66,8 @@ describe("generateDensityImage", () => {
     expect(result!.png).toBeInstanceOf(Buffer);
     expect(result!.removed).toBe(1);
     expect(mockSign).toHaveBeenCalledWith("skirt.jpg");
+    expect(provider.getSegmentation).toHaveBeenCalledTimes(1); // single SAM2 call
+    expect(provider.getSegmentation).toHaveBeenCalledWith({ url: "https://signed/garment.jpg" });
     expect(mockDensityThin).toHaveBeenCalledWith({
       image: { url: "https://signed/garment.jpg" },
       fabric: fabricWithRaster,
@@ -78,63 +77,40 @@ describe("generateDensityImage", () => {
   });
 
   it("passes a non-storage url through unsigned", async () => {
-    mockProvider.mockReturnValue({
-      getFabricMask: vi.fn().mockResolvedValue(fabricWithRaster),
-      getInstanceMasks: vi.fn().mockResolvedValue(instances),
-    });
-    mockDensityThin.mockResolvedValue({
-      width: 100,
-      height: 100,
-      data: new Uint8Array(40000),
-      removed: 2,
-    });
+    mockProvider.mockReturnValue(providerWith(fabricWithRaster, instances));
+    mockDensityThin.mockResolvedValue({ width: 100, height: 100, data: new Uint8Array(40000), removed: 2 });
 
     const result = await generateDensityImage("https://cdn.example.com/dress.jpg", 50);
 
     expect(result).not.toBeNull();
     expect(result!.removed).toBe(2);
     expect(mockSign).not.toHaveBeenCalled();
-    expect(mockDensityThin).toHaveBeenCalledWith(
-      expect.objectContaining({ image: { url: "https://cdn.example.com/dress.jpg" } })
-    );
   });
 
-  it("returns null when provider has no raster (D-B degradation)", async () => {
-    mockSign.mockResolvedValue("https://signed/garment.jpg");
-    mockProvider.mockReturnValue({
-      getFabricMask: vi.fn().mockResolvedValue(fabricNoRaster),
-      getInstanceMasks: vi.fn(),
-    });
-
-    const result = await generateDensityImage("/manus-storage/skirt.jpg", 20);
-
+  it("returns null when the fabric has no raster (degrade -> fail+refund)", async () => {
+    mockProvider.mockReturnValue(providerWith(fabricNoRaster, instances));
+    const result = await generateDensityImage("https://x/y.jpg", 20);
     expect(result).toBeNull();
     expect(mockDensityThin).not.toHaveBeenCalled();
   });
 
-  it("returns null when provider returns empty instances (D-B degradation)", async () => {
-    mockSign.mockResolvedValue("https://signed/garment.jpg");
-    mockProvider.mockReturnValue({
-      getFabricMask: vi.fn().mockResolvedValue(fabricWithRaster),
-      getInstanceMasks: vi.fn().mockResolvedValue([]), // empty = degraded
-    });
-
-    const result = await generateDensityImage("/manus-storage/skirt.jpg", 20);
-
+  it("returns null when there are no instances (degrade -> fail+refund)", async () => {
+    mockProvider.mockReturnValue(providerWith(fabricWithRaster, []));
+    const result = await generateDensityImage("https://x/y.jpg", 20);
     expect(result).toBeNull();
     expect(mockDensityThin).not.toHaveBeenCalled();
+  });
+
+  it("returns null when densityThin removed 0 (no-op guard -> fail+refund)", async () => {
+    mockProvider.mockReturnValue(providerWith(fabricWithRaster, instances));
+    mockDensityThin.mockResolvedValue({ width: 100, height: 100, data: new Uint8Array(40000), removed: 0 });
+    const result = await generateDensityImage("https://x/y.jpg", 5);
+    expect(result).toBeNull();
   });
 
   it("propagates hard errors from densityThin", async () => {
-    mockSign.mockResolvedValue("https://signed/garment.jpg");
-    mockProvider.mockReturnValue({
-      getFabricMask: vi.fn().mockResolvedValue(fabricWithRaster),
-      getInstanceMasks: vi.fn().mockResolvedValue(instances),
-    });
+    mockProvider.mockReturnValue(providerWith(fabricWithRaster, instances));
     mockDensityThin.mockRejectedValue(new Error("Image decode failed"));
-
-    await expect(generateDensityImage("/manus-storage/skirt.jpg", 20)).rejects.toThrow(
-      "Image decode failed"
-    );
+    await expect(generateDensityImage("https://x/y.jpg", 20)).rejects.toThrow("Image decode failed");
   });
 });

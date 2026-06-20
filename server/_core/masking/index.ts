@@ -102,6 +102,31 @@ function withFailSafe(primary: MaskProvider, fallback: MaskProvider): MaskProvid
         throw err;
       }
     },
+
+    async getSegmentation(image: MaskImageInput): Promise<{ fabric: FabricMask; instances: InstanceMask[] }> {
+      try {
+        return await primary.getSegmentation(image);
+      } catch (err: any) {
+        const isSafe = err instanceof MaskProviderUnavailableError ||
+          err?.message?.includes("timed out") ||
+          err?.message?.includes("fetch failed") ||
+          err?.message?.includes("Replicate") ||
+          err?.code === "ECONNREFUSED" ||
+          err?.code === "ETIMEDOUT";
+
+        if (isSafe) {
+          console.warn(
+            `[sam2-privacy] FAIL-SAFE: ${primary.name} provider failed on getSegmentation, ` +
+            `degrading to ${fallback.name}. error="${err.message}" timestamp=${new Date().toISOString()}`
+          );
+          // Classical fallback returns a raster-less fabric + [] instances; the
+          // density helper reads that as a degrade and FAILS + REFUNDS (density
+          // never prompt-falls — the prompt path cannot do count-based removal).
+          return fallback.getSegmentation(image);
+        }
+        throw err;
+      }
+    },
   };
 }
 

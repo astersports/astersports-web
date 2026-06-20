@@ -7,8 +7,16 @@
  *  - Requirement 2: ORG_ID LOGGING — every outbound SAM2 call is logged with
  *    tenant/org context for audit trail.
  *
- * getFabricMask: vision-LLM bbox (locateFabricRegion) -> crop -> SAM2 box-prompt -> raster.
- * getInstanceMasks: crop -> SAM2 automatic masks -> area-filtered InstanceMask[].
+ * One auto-segmentation call per crop returns both halves (Architect ruling,
+ * pre-prompt reconciliation): fabric raster <- combined_mask, instances <-
+ * individual_masks. The degenerate box-prompt is dropped (it was never exercised
+ * on meta/sam-2). The exact fabric-selection rule over combined_mask
+ * (interior-restricted vs largest-connected-component) is PINNED + fabric-IoU
+ * validated in the locked scale/density prompt; this provider uses combined_mask
+ * directly as the provisional fabric raster.
+ *
+ * getFabricMask: vision-LLM bbox (locateFabricRegion) -> crop -> SAM2 auto -> combined_mask raster.
+ * getInstanceMasks: crop -> SAM2 auto -> individual_masks -> area-filtered InstanceMask[].
  * rasterReady is true (capability). The Replicate call lives behind the Sam2Client
  * seam; the default client throws MaskProviderUnavailableError until provisioned,
  * so STUDIO_MASK_PROVIDER=sam2 fails safe when unconfigured.
@@ -105,84 +113,87 @@ function remapRasterToFullImage(
   return fullRaster;
 }
 
+/** Result of one locate + crop + autoSegment call (the single-call primitive). */
+interface CropSegment {
+  bbox: BBoxNormalized;
+  confidence: number;
+  width: number;
+  height: number;
+  cropWidth: number;
+  cropHeight: number;
+  seg: { combined: Buffer; individuals: Buffer[] };
+}
+
+/** locate (or reuse) fabric region -> crop -> ONE autoSegment call. The shared
+ *  primitive so density gets fabric + instances from a SINGLE SAM2 call. Pass
+ *  `known` to skip the vision-LLM locate (e.g. getInstanceMasks with a fabric hint). */
+async function cropAndSegment(
+  client: Sam2Client,
+  image: MaskImageInput,
+  known?: BBoxNormalized
+): Promise<CropSegment> {
+  let bbox: BBoxNormalized;
+  let confidence: number;
+  if (known) {
+    bbox = known;
+    confidence = 1;
+  } else {
+    const region = await locateFabricRegion(image.url); // vision LLM bbox; no data leaves
+    bbox = region.bbox;
+    confidence = region.confidence;
+  }
+  const { buffer, width, height } = await decodeUpright(image.url); // local only
+  const { dataUrl, cropWidth, cropHeight } = await cropToFabricRegion(buffer, width, height, bbox); // Req 1
+  logSam2Call("autoSegment", cropWidth, cropHeight); // Req 2
+  const seg = await client.autoSegment(dataUrl);
+  return { bbox, confidence, width, height, cropWidth, cropHeight, seg };
+}
+
+/** Provisional fabric raster = combined_mask, remapped to full image (rule pinned
+ *  in the locked prompt; boxMask whole-crop is the reserve fallback in the client). */
+async function fabricFromSegment(s: CropSegment): Promise<FabricMask> {
+  const cropRaster =
+    s.seg.combined.length > 0
+      ? (await decodeMaskToRaster(s.seg.combined, s.cropWidth, s.cropHeight)).data
+      : new Uint8Array(s.cropWidth * s.cropHeight);
+  const fullRaster = remapRasterToFullImage(cropRaster, s.cropWidth, s.cropHeight, s.width, s.height, s.bbox);
+  return { bbox: s.bbox, confidence: s.confidence, raster: { width: s.width, height: s.height, data: fullRaster }, provider: "sam2" };
+}
+
+/** Instance masks from individual_masks, area-filtered, remapped to full image. */
+async function instancesFromSegment(s: CropSegment): Promise<InstanceMask[]> {
+  const instances = await instancesFromMasks(s.seg.individuals, s.cropWidth, s.cropHeight);
+  return instances.map((inst) => ({
+    bbox: {
+      x: s.bbox.x + inst.bbox.x * s.bbox.w,
+      y: s.bbox.y + inst.bbox.y * s.bbox.h,
+      w: inst.bbox.w * s.bbox.w,
+      h: inst.bbox.h * s.bbox.h,
+    },
+    raster: inst.raster
+      ? { width: s.width, height: s.height, data: remapRasterToFullImage(inst.raster.data, s.cropWidth, s.cropHeight, s.width, s.height, s.bbox) }
+      : undefined,
+  }));
+}
+
 export function createSam2Provider(client: Sam2Client): MaskProvider {
   return {
     name: "sam2",
     rasterReady: true,
 
     async getFabricMask(image: MaskImageInput): Promise<FabricMask> {
-      // Step 1: Get the fabric region bbox via vision LLM (no data leaves)
-      const region = await locateFabricRegion(image.url);
-
-      // Step 2: Decode the full image upright (local only)
-      const { buffer, width, height } = await decodeUpright(image.url);
-
-      // Step 3: PRIVACY — crop to fabric region only (Requirement 1)
-      const { dataUrl: croppedDataUrl, cropWidth, cropHeight } = await cropToFabricRegion(
-        buffer, width, height, region.bbox
-      );
-
-      // Step 4: AUDIT — log the outbound call (Requirement 2)
-      logSam2Call("boxMask", cropWidth, cropHeight);
-
-      // Step 5: Send ONLY the cropped region to Replicate
-      // Box prompt covers the entire crop (the crop IS the fabric region)
-      const box: [number, number, number, number] = [0, 0, cropWidth, cropHeight];
-      const maskPng = await client.boxMask(croppedDataUrl, box);
-
-      // Step 6: Decode the mask and remap back to full-image coordinates
-      const cropRaster = await decodeMaskToRaster(maskPng, cropWidth, cropHeight);
-      const fullRaster = remapRasterToFullImage(
-        cropRaster.data, cropWidth, cropHeight, width, height, region.bbox
-      );
-
-      return {
-        bbox: region.bbox,
-        confidence: region.confidence,
-        raster: { width, height, data: fullRaster },
-        provider: "sam2",
-      };
+      return fabricFromSegment(await cropAndSegment(client, image));
     },
 
     async getInstanceMasks(image: MaskImageInput, fabric?: FabricMask): Promise<InstanceMask[]> {
-      // Step 1: Get or reuse the fabric region
-      const region = fabric?.bbox ?? (await locateFabricRegion(image.url)).bbox;
+      return instancesFromSegment(await cropAndSegment(client, image, fabric?.bbox));
+    },
 
-      // Step 2: Decode the full image upright (local only)
-      const { buffer, width, height } = await decodeUpright(image.url);
-
-      // Step 3: PRIVACY — crop to fabric region only (Requirement 1)
-      const { dataUrl: croppedDataUrl, cropWidth, cropHeight } = await cropToFabricRegion(
-        buffer, width, height, region
-      );
-
-      // Step 4: AUDIT — log the outbound call (Requirement 2)
-      logSam2Call("autoMasks", cropWidth, cropHeight);
-
-      // Step 5: Send ONLY the cropped region to Replicate
-      const masks = await client.autoMasks(croppedDataUrl);
-
-      // Step 6: Process masks — they're in crop coordinates, remap to full image
-      const instances = await instancesFromMasks(masks, cropWidth, cropHeight);
-
-      // Remap each instance bbox from crop-relative to full-image-relative (normalized)
-      return instances.map((inst) => ({
-        bbox: {
-          x: region.x + inst.bbox.x * region.w,
-          y: region.y + inst.bbox.y * region.h,
-          w: inst.bbox.w * region.w,
-          h: inst.bbox.h * region.h,
-        },
-        raster: inst.raster
-          ? {
-              width,
-              height,
-              data: remapRasterToFullImage(
-                inst.raster.data, cropWidth, cropHeight, width, height, region
-              ),
-            }
-          : undefined,
-      }));
+    /** SINGLE SAM2 call -> fabric + instances (density's single-call path). */
+    async getSegmentation(image: MaskImageInput): Promise<{ fabric: FabricMask; instances: InstanceMask[] }> {
+      const s = await cropAndSegment(client, image);
+      const [fabric, instances] = await Promise.all([fabricFromSegment(s), instancesFromSegment(s)]);
+      return { fabric, instances };
     },
   };
 }
