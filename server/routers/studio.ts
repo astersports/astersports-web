@@ -267,7 +267,9 @@ export const studioRouter = router({
             await addVariation({ jobId: job.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: nextRound });
             return { url, key };
           }
-          // D-C: deterministic density path. Falls back to prompt path if provider degrades.
+          // D-C: deterministic density path. On provider degradation, FAIL + refund
+          // rather than falling through to the prompt path (which produces garbage
+          // for count-based operations like density reduction).
           if (useDeterministicDensity) {
             const densityResult = await generateDensityImage(job.originalUrl, controls.density.percent);
             if (densityResult) {
@@ -277,8 +279,12 @@ export const studioRouter = router({
               console.log(`[studio] Density op removed ${densityResult.removed} instances for job ${job.id}`);
               return { url, key };
             }
-            // Provider degraded (D-B): fall through to prompt path below.
-            console.warn(`[studio] Density provider degraded for job ${job.id}; falling back to prompt path.`);
+            // Provider degraded (D-B): reject with a retryable error instead of
+            // falling through to the prompt path that cannot do count-based removal.
+            console.warn(`[studio] Density provider degraded for job ${job.id}; rejecting (D-B).`);
+            throw new Error(
+              "Density processing is temporarily unavailable. Please try again in a moment."
+            );
           }
           if (useDeterministicScale) {
             const png = await generateScaledImage(job.originalUrl, {
