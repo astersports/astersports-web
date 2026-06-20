@@ -445,3 +445,11 @@
 - [x] Add firm settings card (domain lock input + transfer ownership dropdown)
 - [x] Gate: member sees 'Admin Access Required' shield, admin sees members/invite, owner sees transfer
 - [x] Write tests for firmAdmin procedures (13 tests, all pass)
+
+## Credit Ledger Per-Member Grouping
+- [x] Add "Group by member" toggle button to the Credit Ledger header (Timeline | By Member pill toggle)
+- [x] Create MemberGroupView component: spend bars per member with expandable transaction list
+- [x] Reuse firmAdmin.spendByMember data for the bar chart, link to filtered transactions
+- [x] Add userId filter to creditLedger backend query (listCreditLedger + studio router)
+- [x] Show member avatar/name, amber spend bar, and collapsible recent 10 transactions per member
+- [x] Maintain all existing filters (type, date range, search) in chronological view; grouped view uses spendByMember

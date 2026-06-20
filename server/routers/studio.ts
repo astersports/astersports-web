@@ -493,6 +493,7 @@ export const studioRouter = router({
         from: z.number().optional(),
         to: z.number().optional(),
         search: z.string().max(100).optional(),
+        userId: z.number().optional(),
       }).default({ limit: 25, offset: 0 })
     )
     .query(async ({ ctx, input }) => {
@@ -503,6 +504,7 @@ export const studioRouter = router({
         from: input.from,
         to: input.to,
         search: input.search,
+        userId: input.userId,
       });
     }),
 

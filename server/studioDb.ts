@@ -384,7 +384,7 @@ export async function getVariationByResultKey(resultKey: string) {
 
 export async function listCreditLedger(
   tenantId: number,
-  opts: { limit?: number; offset?: number; reason?: string; from?: number; to?: number; search?: string } = {}
+  opts: { limit?: number; offset?: number; reason?: string; from?: number; to?: number; search?: string; userId?: number } = {}
 ) {
   const db = await getDb();
   if (!db) return { entries: [], total: 0 };
@@ -408,6 +408,9 @@ export async function listCreditLedger(
     conditions.push(
       sql`(${creditLedger.refId} LIKE ${searchTerm} OR ${creditLedger.note} LIKE ${searchTerm})`
     );
+  }
+  if (opts.userId) {
+    conditions.push(eq(creditLedger.userId, opts.userId));
   }
   const condition = and(...conditions);
 

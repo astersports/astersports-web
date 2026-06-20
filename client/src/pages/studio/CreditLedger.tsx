@@ -1,7 +1,9 @@
 /**
  * CreditLedger — Combined layout:
  * - Summary stat cards (Balance, Spent, Earned) with inline sparkline
+ * - Toggle between chronological view and "Group by Member" view
  * - Compact grouped-by-date transaction list with colored left-edge bars
+ * - Per-member grouping: spend bars with expandable transaction lists
  * - Server-side type filtering and pagination
  */
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
@@ -36,6 +38,9 @@ import {
   Palette,
   Clock,
   Hash,
+  Users,
+  User,
+  List,
 } from "lucide-react";
 
 const PAGE_SIZE = 30;
@@ -68,7 +73,6 @@ function getReasonBarColor(reason: string): string {
 function BalanceSparkline({ entries }: { entries: Array<{ balanceAfter: number }> }) {
   const points = useMemo(() => {
     if (entries.length < 2) return null;
-    // Reverse so oldest is first (entries come newest-first from API)
     const sorted = [...entries].reverse();
     const balances = sorted.map((e) => e.balanceAfter);
     const min = Math.min(...balances);
@@ -129,6 +133,8 @@ function getDateRangeMs(range: DateRange): { from?: number; to?: number } {
   }
 }
 
+type ViewMode = "chronological" | "by-member";
+
 export default function CreditLedger() {
   const { tenant } = useTenant();
   const [page, setPage] = useState(0);
@@ -137,6 +143,7 @@ export default function CreditLedger() {
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("chronological");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Debounce search input by 400ms
@@ -161,7 +168,7 @@ export default function CreditLedger() {
       to: rangeMs.to,
       search: searchQuery || undefined,
     },
-    { enabled: !!tenant }
+    { enabled: !!tenant && viewMode === "chronological" }
   );
 
   const entries = data?.entries ?? [];
@@ -190,7 +197,7 @@ export default function CreditLedger() {
     return groups;
   }, [entries]);
 
-  if (isLoading) {
+  if (isLoading && viewMode === "chronological") {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -201,11 +208,38 @@ export default function CreditLedger() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Credit Ledger</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Account statement for your workspace.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Credit Ledger</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Account statement for your workspace.
+          </p>
+        </div>
+        {/* View mode toggle */}
+        <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+          <button
+            onClick={() => setViewMode("chronological")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+              viewMode === "chronological"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <List className="w-3.5 h-3.5" />
+            Timeline
+          </button>
+          <button
+            onClick={() => setViewMode("by-member")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+              viewMode === "by-member"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            By Member
+          </button>
+        </div>
       </div>
 
       {/* Summary stat cards with sparkline */}
@@ -263,6 +297,66 @@ export default function CreditLedger() {
         </Card>
       </div>
 
+      {/* Conditional view rendering */}
+      {viewMode === "chronological" ? (
+        <ChronologicalView
+          entries={entries}
+          grouped={grouped}
+          totalPages={totalPages}
+          page={page}
+          setPage={setPage}
+          filter={filter}
+          setFilter={setFilter}
+          dateRange={dateRange}
+          setDateRange={setDateRange}
+          searchInput={searchInput}
+          setSearchInput={setSearchInput}
+          expandedId={expandedId}
+          setExpandedId={setExpandedId}
+          total={data?.total ?? 0}
+        />
+      ) : (
+        <MemberGroupView tenantId={tenant?.id ?? 0} />
+      )}
+    </div>
+  );
+}
+
+/* ─── Chronological View ───────────────────────────────────────────────────── */
+
+function ChronologicalView({
+  entries,
+  grouped,
+  totalPages,
+  page,
+  setPage,
+  filter,
+  setFilter,
+  dateRange,
+  setDateRange,
+  searchInput,
+  setSearchInput,
+  expandedId,
+  setExpandedId,
+  total,
+}: {
+  entries: any[];
+  grouped: Record<string, any[]>;
+  totalPages: number;
+  page: number;
+  setPage: (p: number | ((p: number) => number)) => void;
+  filter: ReasonFilter;
+  setFilter: (f: ReasonFilter) => void;
+  dateRange: DateRange;
+  setDateRange: (d: DateRange) => void;
+  searchInput: string;
+  setSearchInput: (s: string) => void;
+  expandedId: number | null;
+  setExpandedId: (id: number | null) => void;
+  total: number;
+}) {
+  return (
+    <>
       {/* Search + Filter bar */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative w-full sm:w-[220px]">
@@ -303,7 +397,7 @@ export default function CreditLedger() {
           </SelectContent>
         </Select>
         <span className="text-xs text-muted-foreground">
-          {data?.total ?? 0} total entries
+          {total} total entries
         </span>
         <div className="ml-auto">
           <Button
@@ -357,170 +451,14 @@ export default function CreditLedger() {
 
                 {/* Compact rows with colored left bar */}
                 <div className="divide-y divide-border/40">
-                  {dayEntries.map((entry) => {
-                    const isPositive = entry.delta > 0;
-                    const isExpanded = expandedId === entry.id;
-                    const hasMetadata = entry.jobInstruction || entry.jobControls || entry.jobTitle;
-                    return (
-                      <div key={entry.id}>
-                        <div
-                          className={`flex items-center gap-0 transition-colors cursor-pointer ${
-                            isExpanded ? "bg-accent/30" : "hover:bg-accent/20"
-                          }`}
-                          onClick={() => setExpandedId(isExpanded ? null : entry.id)}
-                        >
-                          {/* Colored left edge bar */}
-                          <div className={`w-1 self-stretch shrink-0 ${getReasonBarColor(entry.reason)}`} />
-
-                          <div className="flex items-center justify-between flex-1 px-4 py-3">
-                            <div className="flex items-center gap-3 min-w-0">
-                              {/* +/- circle */}
-                              <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
-                                isPositive ? "bg-green-500/10" : "bg-red-500/10"
-                              }`}>
-                                {isPositive ? (
-                                  <Plus className="w-3.5 h-3.5 text-green-500" />
-                                ) : (
-                                  <Minus className="w-3.5 h-3.5 text-red-400" />
-                                )}
-                              </div>
-
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium truncate">
-                                  {REASON_LABELS[entry.reason] ?? entry.reason}
-                                </p>
-                                <p className="text-[11px] text-muted-foreground truncate">
-                                  {entry.refId || entry.note || "\u2014"} &middot;{" "}
-                                  {new Date(entry.createdAt).toLocaleTimeString(undefined, {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                              <div className="text-right shrink-0">
-                                <p className={`text-sm font-bold tabular-nums ${
-                                  isPositive ? "text-green-500" : "text-red-400"
-                                }`}>
-                                  {isPositive ? "+" : ""}{entry.delta}
-                                </p>
-                                <p className="text-[10px] text-muted-foreground tabular-nums">
-                                  {entry.balanceAfter.toLocaleString()}
-                                </p>
-                              </div>
-                              <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${
-                                isExpanded ? "rotate-180" : ""
-                              }`} />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Expanded detail panel */}
-                        <div className={`overflow-hidden transition-all duration-250 ease-out ${
-                          isExpanded ? "max-h-[400px] opacity-100" : "max-h-0 opacity-0"
-                        }`}>
-                          <div className="px-5 py-4 ml-1 bg-accent/10 border-t border-border/30">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                              {/* Full timestamp */}
-                              <div className="flex items-start gap-2">
-                                <Clock className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                                <div>
-                                  <p className="text-muted-foreground font-medium">Timestamp</p>
-                                  <p className="text-foreground">{new Date(entry.createdAt).toLocaleString()}</p>
-                                </div>
-                              </div>
-
-                              {/* Reference ID */}
-                              {entry.refId && (
-                                <div className="flex items-start gap-2">
-                                  <Hash className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                                  <div>
-                                    <p className="text-muted-foreground font-medium">Reference</p>
-                                    <p className="text-foreground font-mono">{entry.refId}</p>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Job title */}
-                              {entry.jobTitle && (
-                                <div className="flex items-start gap-2">
-                                  <FileText className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                                  <div>
-                                    <p className="text-muted-foreground font-medium">Job Title</p>
-                                    <p className="text-foreground">{entry.jobTitle}</p>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Job status */}
-                              {entry.jobStatus && (
-                                <div className="flex items-start gap-2">
-                                  <Activity className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                                  <div>
-                                    <p className="text-muted-foreground font-medium">Status</p>
-                                    <p className={`font-medium capitalize ${
-                                      entry.jobStatus === "done" ? "text-green-500" :
-                                      entry.jobStatus === "failed" ? "text-red-400" :
-                                      "text-yellow-500"
-                                    }`}>{entry.jobStatus}</p>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Controls used */}
-                              {entry.jobControls && (
-                                <div className="flex items-start gap-2 sm:col-span-2">
-                                  <Palette className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                                  <div className="min-w-0">
-                                    <p className="text-muted-foreground font-medium">Controls Used</p>
-                                    <p className="text-foreground text-[11px] font-mono break-all whitespace-pre-wrap max-h-20 overflow-y-auto">
-                                      {(() => {
-                                        try {
-                                          const ctrl = JSON.parse(entry.jobControls!);
-                                          const active: string[] = [];
-                                          if (ctrl.scale?.enabled) active.push(`Scale: ${ctrl.scale.percent > 0 ? "+" : ""}${ctrl.scale.percent}%`);
-                                          if (ctrl.density?.enabled) active.push(`Density: -${ctrl.density.percent}%`);
-                                          if (ctrl.remove?.enabled) active.push(`Remove: ${ctrl.remove.percent}% of "${ctrl.remove.element}"`);
-                                          if (ctrl.recolor?.enabled) active.push(`Recolor: "${ctrl.recolor.element}" → ${ctrl.recolor.targetColor}`);
-                                          return active.length > 0 ? active.join(" · ") : "No active controls";
-                                        } catch { return entry.jobControls; }
-                                      })()}
-                                    </p>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* AI Instruction */}
-                              {entry.jobInstruction && (
-                                <div className="flex items-start gap-2 sm:col-span-2">
-                                  <FileText className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                                  <div className="min-w-0">
-                                    <p className="text-muted-foreground font-medium">AI Prompt</p>
-                                    <p className="text-foreground text-[11px] leading-relaxed max-h-32 overflow-y-auto whitespace-pre-wrap break-words">
-                                      {entry.jobInstruction}
-                                    </p>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Note (for non-job entries) */}
-                              {!hasMetadata && entry.note && (
-                                <div className="flex items-start gap-2 sm:col-span-2">
-                                  <FileText className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                                  <div>
-                                    <p className="text-muted-foreground font-medium">Note</p>
-                                    <p className="text-foreground">{entry.note}</p>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {dayEntries.map((entry) => (
+                    <TransactionRow
+                      key={entry.id}
+                      entry={entry}
+                      isExpanded={expandedId === entry.id}
+                      onToggle={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
+                    />
+                  ))}
                 </div>
               </div>
             ))}
@@ -633,6 +571,351 @@ export default function CreditLedger() {
           </div>
         </div>
       )}
+    </>
+  );
+}
+
+/* ─── Member Group View ────────────────────────────────────────────────────── */
+
+function MemberGroupView({ tenantId }: { tenantId: number }) {
+  const [expandedMember, setExpandedMember] = useState<number | null>(null);
+
+  const { data: spendData, isLoading } = trpc.firmAdmin.spendByMember.useQuery(
+    { tenantId },
+    { enabled: !!tenantId }
+  );
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6 flex justify-center">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const members = spendData?.members ?? [];
+  const maxSpent = Math.max(...members.map((m) => m.spent7d), 1);
+  const total7d = spendData?.totalSpent7d ?? 1;
+  const totalAll = spendData?.totalSpentAll ?? 0;
+
+  if (members.length === 0) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+          <Users className="h-10 w-10 text-muted-foreground/40 mb-3" />
+          <p className="text-sm text-muted-foreground">No member activity recorded yet.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Summary bar */}
+      <div className="flex items-center justify-between px-1">
+        <p className="text-xs text-muted-foreground">
+          {members.length} member{members.length !== 1 ? "s" : ""} with activity
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Total: <span className="font-medium text-foreground">{totalAll.toLocaleString()}</span> all-time
+          {" · "}
+          <span className="font-medium text-foreground">{total7d.toLocaleString()}</span> last 7d
+        </p>
+      </div>
+
+      {members.map((member) => {
+        const pct7d = total7d > 0 ? Math.round((member.spent7d / total7d) * 100) : 0;
+        const barWidth = maxSpent > 0 ? (member.spent7d / maxSpent) * 100 : 0;
+        const isExpanded = expandedMember === member.userId;
+
+        return (
+          <Card key={member.userId} className="overflow-hidden">
+            {/* Member header with spend bar */}
+            <div
+              className={`cursor-pointer transition-colors ${
+                isExpanded ? "bg-accent/20" : "hover:bg-accent/10"
+              }`}
+              onClick={() => setExpandedMember(isExpanded ? null : member.userId)}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
+                      <User className="w-4 h-4 text-amber-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{member.name}</p>
+                      {member.email && (
+                        <p className="text-[11px] text-muted-foreground">{member.email}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-sm font-bold tabular-nums text-red-400">
+                        -{member.spent7d.toLocaleString()}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {pct7d}% of 7d · {member.spentAll.toLocaleString()} total
+                      </p>
+                    </div>
+                    <ChevronDown
+                      className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${
+                        isExpanded ? "rotate-180" : ""
+                      }`}
+                    />
+                  </div>
+                </div>
+                {/* Spend bar */}
+                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-500"
+                    style={{ width: `${barWidth}%` }}
+                  />
+                </div>
+              </CardContent>
+            </div>
+
+            {/* Expanded: recent transactions for this member */}
+            <div
+              className={`overflow-hidden transition-all duration-300 ease-out ${
+                isExpanded ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0"
+              }`}
+            >
+              <div className="border-t border-border">
+                <MemberTransactions tenantId={tenantId} userId={member.userId} />
+              </div>
+            </div>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─── Member Transactions (loaded on expand) ───────────────────────────────── */
+
+function MemberTransactions({ tenantId, userId }: { tenantId: number; userId: number }) {
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  const { data, isLoading } = trpc.studio.creditLedger.useQuery(
+    { tenantId, userId, limit: 10, offset: 0 },
+    { enabled: !!tenantId && !!userId }
+  );
+
+  if (isLoading) {
+    return (
+      <div className="p-4 flex justify-center">
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const entries = data?.entries ?? [];
+
+  if (entries.length === 0) {
+    return (
+      <div className="p-4 text-center">
+        <p className="text-xs text-muted-foreground">No transactions found.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="divide-y divide-border/40">
+      <div className="px-4 py-2 bg-muted/30">
+        <p className="text-[11px] text-muted-foreground font-medium">
+          Recent transactions ({data?.total ?? 0} total)
+        </p>
+      </div>
+      {entries.map((entry) => (
+        <TransactionRow
+          key={entry.id}
+          entry={entry}
+          isExpanded={expandedId === entry.id}
+          onToggle={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
+          compact
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ─── Shared Transaction Row ───────────────────────────────────────────────── */
+
+function TransactionRow({
+  entry,
+  isExpanded,
+  onToggle,
+  compact = false,
+}: {
+  entry: any;
+  isExpanded: boolean;
+  onToggle: () => void;
+  compact?: boolean;
+}) {
+  const isPositive = entry.delta > 0;
+  const hasMetadata = entry.jobInstruction || entry.jobControls || entry.jobTitle;
+
+  return (
+    <div>
+      <div
+        className={`flex items-center gap-0 transition-colors cursor-pointer ${
+          isExpanded ? "bg-accent/30" : "hover:bg-accent/20"
+        }`}
+        onClick={onToggle}
+      >
+        {/* Colored left edge bar */}
+        <div className={`w-1 self-stretch shrink-0 ${getReasonBarColor(entry.reason)}`} />
+
+        <div className={`flex items-center justify-between flex-1 ${compact ? "px-3 py-2" : "px-4 py-3"}`}>
+          <div className="flex items-center gap-3 min-w-0">
+            {/* +/- circle */}
+            <div className={`${compact ? "w-6 h-6" : "w-7 h-7"} rounded-full flex items-center justify-center shrink-0 ${
+              isPositive ? "bg-green-500/10" : "bg-red-500/10"
+            }`}>
+              {isPositive ? (
+                <Plus className={`${compact ? "w-3 h-3" : "w-3.5 h-3.5"} text-green-500`} />
+              ) : (
+                <Minus className={`${compact ? "w-3 h-3" : "w-3.5 h-3.5"} text-red-400`} />
+              )}
+            </div>
+
+            <div className="min-w-0">
+              <p className={`${compact ? "text-xs" : "text-sm"} font-medium truncate`}>
+                {REASON_LABELS[entry.reason] ?? entry.reason}
+              </p>
+              <p className="text-[11px] text-muted-foreground truncate">
+                {entry.refId || entry.note || "\u2014"} &middot;{" "}
+                {new Date(entry.createdAt).toLocaleTimeString(undefined, {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="text-right shrink-0">
+              <p className={`${compact ? "text-xs" : "text-sm"} font-bold tabular-nums ${
+                isPositive ? "text-green-500" : "text-red-400"
+              }`}>
+                {isPositive ? "+" : ""}{entry.delta}
+              </p>
+              <p className="text-[10px] text-muted-foreground tabular-nums">
+                {entry.balanceAfter.toLocaleString()}
+              </p>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${
+              isExpanded ? "rotate-180" : ""
+            }`} />
+          </div>
+        </div>
+      </div>
+
+      {/* Expanded detail panel */}
+      <div className={`overflow-hidden transition-all duration-250 ease-out ${
+        isExpanded ? "max-h-[400px] opacity-100" : "max-h-0 opacity-0"
+      }`}>
+        <div className="px-5 py-4 ml-1 bg-accent/10 border-t border-border/30">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            {/* Full timestamp */}
+            <div className="flex items-start gap-2">
+              <Clock className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+              <div>
+                <p className="text-muted-foreground font-medium">Timestamp</p>
+                <p className="text-foreground">{new Date(entry.createdAt).toLocaleString()}</p>
+              </div>
+            </div>
+
+            {/* Reference ID */}
+            {entry.refId && (
+              <div className="flex items-start gap-2">
+                <Hash className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-muted-foreground font-medium">Reference</p>
+                  <p className="text-foreground font-mono">{entry.refId}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Job title */}
+            {entry.jobTitle && (
+              <div className="flex items-start gap-2">
+                <FileText className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-muted-foreground font-medium">Job Title</p>
+                  <p className="text-foreground">{entry.jobTitle}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Job status */}
+            {entry.jobStatus && (
+              <div className="flex items-start gap-2">
+                <Activity className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-muted-foreground font-medium">Status</p>
+                  <p className={`font-medium capitalize ${
+                    entry.jobStatus === "done" ? "text-green-500" :
+                    entry.jobStatus === "failed" ? "text-red-400" :
+                    "text-yellow-500"
+                  }`}>{entry.jobStatus}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Controls used */}
+            {entry.jobControls && (
+              <div className="flex items-start gap-2 sm:col-span-2">
+                <Palette className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-muted-foreground font-medium">Controls Used</p>
+                  <p className="text-foreground text-[11px] font-mono break-all whitespace-pre-wrap max-h-20 overflow-y-auto">
+                    {(() => {
+                      try {
+                        const ctrl = JSON.parse(entry.jobControls!);
+                        const active: string[] = [];
+                        if (ctrl.scale?.enabled) active.push(`Scale: ${ctrl.scale.percent > 0 ? "+" : ""}${ctrl.scale.percent}%`);
+                        if (ctrl.density?.enabled) active.push(`Density: -${ctrl.density.percent}%`);
+                        if (ctrl.remove?.enabled) active.push(`Remove: ${ctrl.remove.percent}% of "${ctrl.remove.element}"`);
+                        if (ctrl.recolor?.enabled) active.push(`Recolor: "${ctrl.recolor.element}" → ${ctrl.recolor.targetColor}`);
+                        return active.length > 0 ? active.join(" · ") : "No active controls";
+                      } catch { return entry.jobControls; }
+                    })()}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* AI Instruction */}
+            {entry.jobInstruction && (
+              <div className="flex items-start gap-2 sm:col-span-2">
+                <FileText className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-muted-foreground font-medium">AI Prompt</p>
+                  <p className="text-foreground text-[11px] leading-relaxed max-h-32 overflow-y-auto whitespace-pre-wrap break-words">
+                    {entry.jobInstruction}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Note (for non-job entries) */}
+            {!hasMetadata && entry.note && (
+              <div className="flex items-start gap-2 sm:col-span-2">
+                <FileText className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-muted-foreground font-medium">Note</p>
+                  <p className="text-foreground">{entry.note}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
