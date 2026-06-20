@@ -339,3 +339,12 @@
 - [x] Merged cluster selection fix (separationRemap latest)
 - [x] All 170 tests passing, TypeScript clean
 - [x] All features dark-launched behind flags (defaults OFF)
+
+## SAM2 Privacy Gate (4 Requirements)
+- [x] Req 1: Crop-to-fabric minimization — only fabric bbox crop sent to Replicate, with full coordinate round-trip (remapRasterToFullImage + bbox re-normalization)
+- [x] Req 2: org_id audit logging — structured log on every outbound SAM2 call (op, org_id, job_id, crop_dimensions, timestamp)
+- [x] Req 3: Retention/sub-processor documentation (docs/replicate-sub-processor-disclosure.md)
+- [x] Req 4: Fail-safe fallback — SAM2 → classical on infra error; getInstanceMasks returns empty array (D-B signal) when classical can't serve rasters
+- [x] Fix: getInstanceMasks fail-safe returns empty array (D-B prompt-path fallback signal) when classical can't serve rasters
+- [x] Privacy gate test suite (server/privacyGate.test.ts) — 8 tests covering all 4 requirements
+- [x] All 178 tests passing, TypeScript clean

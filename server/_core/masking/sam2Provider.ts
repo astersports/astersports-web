@@ -1,8 +1,14 @@
 /**
  * SAM2 mask provider — the best-in-class tier (D1 = Option 2).
  *
- * getFabricMask: vision-LLM bbox (locateFabricRegion) -> SAM2 box-prompt -> raster.
- * getInstanceMasks: SAM2 automatic masks -> area-filtered InstanceMask[].
+ * Privacy gate (docs/sam2-privacy-gate.md):
+ *  - Requirement 1: CROP-TO-FABRIC MINIMIZATION — only the fabric bbox crop is
+ *    sent to Replicate, never the full customer image.
+ *  - Requirement 2: ORG_ID LOGGING — every outbound SAM2 call is logged with
+ *    tenant/org context for audit trail.
+ *
+ * getFabricMask: vision-LLM bbox (locateFabricRegion) -> crop -> SAM2 box-prompt -> raster.
+ * getInstanceMasks: crop -> SAM2 automatic masks -> area-filtered InstanceMask[].
  * rasterReady is true (capability). The Replicate call lives behind the Sam2Client
  * seam; the default client throws MaskProviderUnavailableError until provisioned,
  * so STUDIO_MASK_PROVIDER=sam2 fails safe when unconfigured.
@@ -11,17 +17,92 @@
  * Manus's verified Replicate client).
  */
 import sharp from "sharp";
-import type { FabricMask, InstanceMask, MaskImageInput, MaskProvider } from "./types";
+import type { FabricMask, InstanceMask, MaskImageInput, MaskProvider, BBoxNormalized } from "./types";
 import { decodeUpright } from "../image/decodeUpright";
 import { locateFabricRegion } from "./locateFabricRegion";
 import { decodeMaskToRaster, instancesFromMasks } from "./sam2Mask";
 import { defaultSam2Client, type Sam2Client } from "./replicateSam2";
 
-/** Re-encode the upright image as a PNG data URL for the hosted model. */
-async function uprightDataUrl(url: string): Promise<{ dataUrl: string; width: number; height: number }> {
-  const { buffer, width, height } = await decodeUpright(url);
-  const png = await sharp(buffer, { raw: { width, height, channels: 4 } }).png().toBuffer();
-  return { dataUrl: `data:image/png;base64,${png.toString("base64")}`, width, height };
+/** Context passed to the provider for audit logging (Requirement 2). */
+export interface Sam2AuditContext {
+  orgId?: string;
+  jobId?: string;
+}
+
+/** Module-level audit context — set by the caller before invoking the provider. */
+let _auditCtx: Sam2AuditContext = {};
+
+/** Set the audit context before calling SAM2 provider methods. */
+export function setSam2AuditContext(ctx: Sam2AuditContext): void {
+  _auditCtx = { ...ctx };
+}
+
+/** Clear the audit context after the call completes. */
+export function clearSam2AuditContext(): void {
+  _auditCtx = {};
+}
+
+/**
+ * Requirement 1: Crop the upright image to the fabric bbox region.
+ * Only this cropped region is sent to Replicate — never the full image.
+ * Returns the cropped PNG as a data URL plus the crop dimensions.
+ */
+async function cropToFabricRegion(
+  buffer: Buffer,
+  width: number,
+  height: number,
+  bbox: BBoxNormalized
+): Promise<{ dataUrl: string; cropWidth: number; cropHeight: number }> {
+  const left = Math.max(0, Math.round(bbox.x * width));
+  const top = Math.max(0, Math.round(bbox.y * height));
+  const cropWidth = Math.min(width - left, Math.round(bbox.w * width));
+  const cropHeight = Math.min(height - top, Math.round(bbox.h * height));
+
+  const cropped = await sharp(buffer, { raw: { width, height, channels: 4 } })
+    .extract({ left, top, width: cropWidth, height: cropHeight })
+    .png()
+    .toBuffer();
+
+  return {
+    dataUrl: `data:image/png;base64,${cropped.toString("base64")}`,
+    cropWidth,
+    cropHeight,
+  };
+}
+
+/**
+ * Requirement 2: Log every outbound SAM2 call with org context.
+ */
+function logSam2Call(operation: string, cropWidth: number, cropHeight: number): void {
+  const orgId = _auditCtx.orgId ?? "unknown";
+  const jobId = _auditCtx.jobId ?? "unknown";
+  console.log(
+    `[sam2-privacy] outbound SAM2 call: op=${operation} org_id=${orgId} job_id=${jobId} ` +
+      `crop_dimensions=${cropWidth}x${cropHeight} timestamp=${new Date().toISOString()}`
+  );
+}
+
+/**
+ * Map a mask produced from a cropped region back to full-image coordinates.
+ */
+function remapRasterToFullImage(
+  cropRaster: Uint8Array,
+  cropWidth: number,
+  cropHeight: number,
+  fullWidth: number,
+  fullHeight: number,
+  bbox: BBoxNormalized
+): Uint8Array {
+  const fullRaster = new Uint8Array(fullWidth * fullHeight);
+  const left = Math.max(0, Math.round(bbox.x * fullWidth));
+  const top = Math.max(0, Math.round(bbox.y * fullHeight));
+
+  for (let cy = 0; cy < cropHeight && (top + cy) < fullHeight; cy++) {
+    for (let cx = 0; cx < cropWidth && (left + cx) < fullWidth; cx++) {
+      fullRaster[(top + cy) * fullWidth + (left + cx)] = cropRaster[cy * cropWidth + cx];
+    }
+  }
+  return fullRaster;
 }
 
 export function createSam2Provider(client: Sam2Client): MaskProvider {
@@ -30,23 +111,78 @@ export function createSam2Provider(client: Sam2Client): MaskProvider {
     rasterReady: true,
 
     async getFabricMask(image: MaskImageInput): Promise<FabricMask> {
+      // Step 1: Get the fabric region bbox via vision LLM (no data leaves)
       const region = await locateFabricRegion(image.url);
-      const { dataUrl, width, height } = await uprightDataUrl(image.url);
-      const box: [number, number, number, number] = [
-        Math.round(region.bbox.x * width),
-        Math.round(region.bbox.y * height),
-        Math.round((region.bbox.x + region.bbox.w) * width),
-        Math.round((region.bbox.y + region.bbox.h) * height),
-      ];
-      const maskPng = await client.boxMask(dataUrl, box);
-      const raster = await decodeMaskToRaster(maskPng, width, height);
-      return { bbox: region.bbox, confidence: region.confidence, raster, provider: "sam2" };
+
+      // Step 2: Decode the full image upright (local only)
+      const { buffer, width, height } = await decodeUpright(image.url);
+
+      // Step 3: PRIVACY — crop to fabric region only (Requirement 1)
+      const { dataUrl: croppedDataUrl, cropWidth, cropHeight } = await cropToFabricRegion(
+        buffer, width, height, region.bbox
+      );
+
+      // Step 4: AUDIT — log the outbound call (Requirement 2)
+      logSam2Call("boxMask", cropWidth, cropHeight);
+
+      // Step 5: Send ONLY the cropped region to Replicate
+      // Box prompt covers the entire crop (the crop IS the fabric region)
+      const box: [number, number, number, number] = [0, 0, cropWidth, cropHeight];
+      const maskPng = await client.boxMask(croppedDataUrl, box);
+
+      // Step 6: Decode the mask and remap back to full-image coordinates
+      const cropRaster = await decodeMaskToRaster(maskPng, cropWidth, cropHeight);
+      const fullRaster = remapRasterToFullImage(
+        cropRaster.data, cropWidth, cropHeight, width, height, region.bbox
+      );
+
+      return {
+        bbox: region.bbox,
+        confidence: region.confidence,
+        raster: { width, height, data: fullRaster },
+        provider: "sam2",
+      };
     },
 
-    async getInstanceMasks(image: MaskImageInput): Promise<InstanceMask[]> {
-      const { dataUrl, width, height } = await uprightDataUrl(image.url);
-      const masks = await client.autoMasks(dataUrl);
-      return instancesFromMasks(masks, width, height);
+    async getInstanceMasks(image: MaskImageInput, fabric?: FabricMask): Promise<InstanceMask[]> {
+      // Step 1: Get or reuse the fabric region
+      const region = fabric?.bbox ?? (await locateFabricRegion(image.url)).bbox;
+
+      // Step 2: Decode the full image upright (local only)
+      const { buffer, width, height } = await decodeUpright(image.url);
+
+      // Step 3: PRIVACY — crop to fabric region only (Requirement 1)
+      const { dataUrl: croppedDataUrl, cropWidth, cropHeight } = await cropToFabricRegion(
+        buffer, width, height, region
+      );
+
+      // Step 4: AUDIT — log the outbound call (Requirement 2)
+      logSam2Call("autoMasks", cropWidth, cropHeight);
+
+      // Step 5: Send ONLY the cropped region to Replicate
+      const masks = await client.autoMasks(croppedDataUrl);
+
+      // Step 6: Process masks — they're in crop coordinates, remap to full image
+      const instances = await instancesFromMasks(masks, cropWidth, cropHeight);
+
+      // Remap each instance bbox from crop-relative to full-image-relative (normalized)
+      return instances.map((inst) => ({
+        bbox: {
+          x: region.x + inst.bbox.x * region.w,
+          y: region.y + inst.bbox.y * region.h,
+          w: inst.bbox.w * region.w,
+          h: inst.bbox.h * region.h,
+        },
+        raster: inst.raster
+          ? {
+              width,
+              height,
+              data: remapRasterToFullImage(
+                inst.raster.data, cropWidth, cropHeight, width, height, region
+              ),
+            }
+          : undefined,
+      }));
     },
   };
 }
