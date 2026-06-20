@@ -538,3 +538,9 @@
 - [x] Verify Exit button calls exitImpersonation mutation and redirects to /platform
 - [x] Verify TenantContext auto-selects impersonated tenant
 - [x] Add smoke test (vitest) for impersonation round-trip (impersonationRoundtrip.test.ts — 13 tests)
+
+## Replace History Page with Hybrid V2
+- [x] Replace StudioHistory with StudioHistoryV2 as the main /studio/history route
+- [x] Remove the /studio/history-v2 temporary route
+- [x] Clean up old StudioHistory.tsx file (archived as StudioHistoryLegacy.tsx)
+- [x] Sidebar nav link unchanged (already points to /studio/history)

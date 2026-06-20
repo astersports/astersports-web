@@ -14,7 +14,7 @@ import AdminLogs from "./pages/admin/Logs";
 // Studio pages (lazy-ish but simple imports for now)
 import StudioLayout from "./pages/studio/StudioLayout";
 import StudioEditor from "./pages/studio/StudioEditor";
-import StudioHistory from "./pages/studio/StudioHistory";
+import StudioHistory from "./pages/studio/StudioHistoryV2";
 import StudioAdmin from "./pages/studio/StudioAdmin";
 import StudioBilling from "./pages/studio/StudioBilling";
 import CreditLedger from "./pages/studio/CreditLedger";
