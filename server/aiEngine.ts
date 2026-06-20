@@ -23,14 +23,11 @@ import type { RasterMask } from "./_core/masking/types";
 /**
  * Deterministic density (D-C): SAM2 fabric raster + instance masks -> densityThin -> PNG.
  *
- * Contract:
- *  - Returns { png, removed } on success (the op always applies when instances > 0).
- *  - Returns null when the provider degrades (fail-safe returns [] instances) — caller
- *    should fall back to the prompt path (D-B) or refund.
- *  - Throws on hard errors (bad input, image decode failure).
- *
- * The op is deterministic: same image + same percent + same instances = identical bytes.
- * No model call, no no-op guard needed.
+ * SINGLE-CALL: one getSegmentation() yields both fabric + instances (no double SAM2
+ * call). Returns null on a DEGRADE (no raster / no instances) OR a genuine no-op
+ * (removed === 0). The caller (studio.generate) treats null as FAIL + REFUND —
+ * density NEVER prompt-falls, because the generative path cannot do count-based
+ * removal (it would silently ignore the density ask). Deterministic; no model call.
  */
 export async function generateDensityImage(
   originalImageUrl: string,
@@ -40,33 +37,23 @@ export async function generateDensityImage(
     ? await storageGetSignedUrl(originalImageUrl.replace("/manus-storage/", ""))
     : originalImageUrl;
 
-  const provider = getMaskProvider();
-
-  // Step 1: Get fabric mask (must include raster for density).
-  const fabric = await provider.getFabricMask({ url: srcUrl });
-  if (!fabric.raster) {
-    // Provider degraded to classical (no raster) — signal prompt-path fallback.
-    console.warn(`[density-live] Provider returned no raster; degrading to prompt path (D-B).`);
+  // Single SAM2 call -> fabric + instances.
+  const { fabric, instances } = await getMaskProvider().getSegmentation({ url: srcUrl });
+  if (!fabric.raster || instances.length === 0) {
+    // Degrade (no raster / no instances) -> fail + refund (not prompt-fall).
+    console.warn(`[density-live] Provider degraded (no raster or 0 instances); fail + refund.`);
     return null;
   }
 
-  // Step 2: Get instance masks.
-  const instances = await provider.getInstanceMasks({ url: srcUrl }, fabric);
-  if (instances.length === 0) {
-    // Provider degraded or image has no detectable motifs — signal prompt-path fallback.
-    console.warn(`[density-live] Provider returned 0 instances; degrading to prompt path (D-B).`);
+  const result = await densityThin({ image: { url: srcUrl }, fabric, instances, percent });
+
+  // D-C no-op guard: the op ran but removed nothing (e.g. too few motifs for the
+  // requested percent) — refund rather than bill for an unchanged image.
+  if (result.removed === 0) {
+    console.warn(`[density-live] densityThin removed 0 motifs; no-op -> fail + refund.`);
     return null;
   }
 
-  // Step 3: Run the deterministic op.
-  const result = await densityThin({
-    image: { url: srcUrl },
-    fabric,
-    instances,
-    percent,
-  });
-
-  // Step 4: Encode raw RGBA to PNG.
   const png = await sharp(result.data, {
     raw: { width: result.width, height: result.height, channels: 4 },
   })

@@ -162,12 +162,24 @@ export const studioRouter = router({
       }
 
       // D-C live route: density-ONLY jobs go through the deterministic densityThin
-      // op (SAM2 raster + instances) when STUDIO_DENSITY_LIVE is on. If the provider
-      // degrades (no raster or no instances), falls back to the prompt path (D-B).
+      // op (SAM2 raster + instances) when STUDIO_DENSITY_LIVE is on. On a provider
+      // degrade, density FAILS + REFUNDS — it never prompt-falls (the generative
+      // path cannot do count-based removal, so it would silently ignore the ask).
       const densityOnly =
         controls.density.enabled && !controls.scale.enabled &&
         !controls.recolor.enabled && !controls.remove.enabled;
       const useDeterministicDensity = ENV.studioDensityLive && densityOnly;
+      // D-A (density): reject density combined with other edits, gated on the live
+      // flag (pre-deduct; flag off => unchanged). The reason is stronger than scale's:
+      // a combined density+other job on the prompt path silently UNMETS the count-based
+      // density intent, so reject honestly rather than return a generative result that
+      // ignored it. Mirrors scale's D-A.
+      if (ENV.studioDensityLive && controls.density.enabled && controls.density.percent > 0 && !densityOnly) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Density can't yet combine with other edits — run it separately.",
+        });
+      }
 
       // Scale-live route: scale-ONLY jobs go through scalePrintRepeat when
       // STUDIO_SCALE_LIVE is on AND the provider serves rasters. Dark by default.
@@ -267,24 +279,21 @@ export const studioRouter = router({
             await addVariation({ jobId: job.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: nextRound });
             return { url, key };
           }
-          // D-C: deterministic density path. On provider degradation, FAIL + refund
-          // rather than falling through to the prompt path (which produces garbage
-          // for count-based operations like density reduction).
+          // D-C: deterministic density path. On degrade / no-op, FAIL + REFUND —
+          // density never prompt-falls (the prompt path cannot do count-based
+          // removal and would return garbage). The rejection triggers the existing
+          // pro-rated refund.
           if (useDeterministicDensity) {
             const densityResult = await generateDensityImage(job.originalUrl, controls.density.percent);
-            if (densityResult) {
-              const key = `studio/${ctx.tenant.id}/${job.id}/density-${nextRound}.png`;
-              const { url } = await storagePut(key, densityResult.png, "image/png");
-              await addVariation({ jobId: job.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: nextRound });
-              console.log(`[studio] Density op removed ${densityResult.removed} instances for job ${job.id}`);
-              return { url, key };
+            if (!densityResult) {
+              console.warn(`[studio] Density provider degraded / no-op for job ${job.id}; rejecting (D-B).`);
+              throw new Error("Density processing is temporarily unavailable. Please try again in a moment.");
             }
-            // Provider degraded (D-B): reject with a retryable error instead of
-            // falling through to the prompt path that cannot do count-based removal.
-            console.warn(`[studio] Density provider degraded for job ${job.id}; rejecting (D-B).`);
-            throw new Error(
-              "Density processing is temporarily unavailable. Please try again in a moment."
-            );
+            const key = `studio/${ctx.tenant.id}/${job.id}/density-${nextRound}.png`;
+            const { url } = await storagePut(key, densityResult.png, "image/png");
+            await addVariation({ jobId: job.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: nextRound });
+            console.log(`[studio] Density op removed ${densityResult.removed} instances for job ${job.id}`);
+            return { url, key };
           }
           if (useDeterministicScale) {
             const png = await generateScaledImage(job.originalUrl, {

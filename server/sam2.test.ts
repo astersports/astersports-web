@@ -13,6 +13,7 @@ import { decodeUpright } from "./_core/image/decodeUpright";
 import { decodeMaskToRaster, rasterBBox, instancesFromMasks } from "./_core/masking/sam2Mask";
 import { createSam2Provider } from "./_core/masking/sam2Provider";
 import type { Sam2Client } from "./_core/masking/replicateSam2";
+import { resolveModelRef } from "./_core/masking/replicateSam2";
 
 const mockLLM = invokeLLM as unknown as ReturnType<typeof vi.fn>;
 const mockDecode = decodeUpright as unknown as ReturnType<typeof vi.fn>;
@@ -23,6 +24,21 @@ async function maskPng(W: number, H: number, x0: number, y0: number, x1: number,
   for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) buf[y * W + x] = 255;
   return sharp(buf, { raw: { width: W, height: H, channels: 1 } }).png().toBuffer();
 }
+
+describe("resolveModelRef (REPLICATE_SAM2_MODEL -> run() ref)", () => {
+  it("pins a bare version hash to meta/sam-2:<hash>", () => {
+    expect(resolveModelRef("fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83"))
+      .toBe("meta/sam-2:fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83");
+  });
+  it("passes a slug or owner/model:version through unchanged", () => {
+    expect(resolveModelRef("meta/sam-2")).toBe("meta/sam-2");
+    expect(resolveModelRef("meta/sam-2:abc123")).toBe("meta/sam-2:abc123");
+  });
+  it("defaults to the meta/sam-2 slug when unset", () => {
+    expect(resolveModelRef("")).toBe("meta/sam-2");
+    expect(resolveModelRef(undefined)).toBe("meta/sam-2");
+  });
+});
 
 describe("sam2Mask utilities", () => {
   it("decodes a mask PNG to a binary RasterMask at target dims", async () => {
@@ -57,12 +73,24 @@ describe("createSam2Provider (mocked client)", () => {
   });
 
   const client: Sam2Client = {
+    autoSegment: async () => ({
+      combined: await maskPng(W, H, 8, 8, 40, 40),
+      individuals: [await maskPng(W, H, 4, 4, 20, 20), await maskPng(W, H, 28, 28, 44, 44)],
+    }),
     boxMask: async () => maskPng(W, H, 8, 8, 40, 40),
-    autoMasks: async () => [await maskPng(W, H, 4, 4, 20, 20), await maskPng(W, H, 28, 28, 44, 44)],
   };
 
   it("reports rasterReady", () => {
     expect(createSam2Provider(client).rasterReady).toBe(true);
+  });
+
+  it("getSegmentation returns fabric + instances from ONE autoSegment call", async () => {
+    mockLLM.mockResolvedValue({ choices: [{ message: { content: JSON.stringify({ x: 0, y: 0, w: 1, h: 1, confidence: 0.9 }) } }] });
+    const spy = vi.fn(client.autoSegment);
+    const seg = await createSam2Provider({ ...client, autoSegment: spy }).getSegmentation({ url: "http://x/g.png" });
+    expect(spy).toHaveBeenCalledTimes(1); // single SAM2 call for both halves
+    expect(seg.fabric.raster).toBeDefined();
+    expect(seg.instances.length).toBe(2);
   });
 
   it("getFabricMask returns a raster mask tagged sam2", async () => {
