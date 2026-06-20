@@ -1,7 +1,7 @@
 # Scale-live / Density-live router wiring — Builder draft spec
 
-**Date:** 2026-06-20 · **Branch:** `claude/jolly-pascal-k9tw4r` · **Status:** DRAFT for the Architect to finalize.
-**Not buildable yet.** Both routes are Rule 19 money-path changes and depend on SAM2 being live, which is gated on the privacy work (4 requirements + the `sam2Provider` review at `005260c`). This draft gives the Architect a head start; the Architect issues the locked prompts and Frank GOes each before build.
+**Date:** 2026-06-20 · **Branch:** `claude/jolly-pascal-k9tw4r` · **Status:** Builder draft; **D-A..D-D RULED & LOCKED** by the Architect (verified at `7c36d8f`). Locked build prompts are **held until the SAM2 privacy gate clears** (so they pin against verified raster + instance-mask shapes).
+**Not buildable yet.** Both routes are Rule 19 money-path changes and depend on SAM2 being live, which is gated on the privacy work (4 requirements + the `sam2Provider` review at `005260c`).
 
 Models the proven **A2** pattern (`afac00a`): a deterministic helper in `aiEngine.ts`, a distinct **live** flag, a *control-only* route gate inside `generate`, reuse of the existing deduct/refund/status logic, no-op guard skipped, no pricing change.
 
@@ -29,8 +29,9 @@ export async function generateScaledImage(
 ): Promise<Buffer> {
   const srcUrl = resolveSigned(originalImageUrl);
   const fabric = await getMaskProvider().getFabricMask({ url: srcUrl }); // SAM2 -> raster
-  const { data } = await scalePrintRepeat({ image: { url: srcUrl }, fabric, targetFraction: params.targetFraction });
-  return encodePng(data, fabric);   // scalePrintRepeat returns raw RGBA -> PNG for storage
+  if (!hasAnyPixel(fabric.raster)) throw new Error("NO_OP: empty fabric raster"); // D-C
+  const r = await scalePrintRepeat({ image: { url: srcUrl }, fabric, targetFraction: params.targetFraction });
+  return sharp(r.data, { raw: { width: r.width, height: r.height, channels: 4 } }).png().toBuffer();
 }
 
 export async function generateThinnedImage(
@@ -40,13 +41,19 @@ export async function generateThinnedImage(
   const provider = getMaskProvider();
   const fabric = await provider.getFabricMask({ url: srcUrl });            // SAM2 raster
   const instances = await provider.getInstanceMasks({ url: srcUrl }, fabric); // SAM2 instances
-  const { data } = await densityThin({ image: { url: srcUrl }, fabric, instances, percent: params.percent });
-  return encodePng(data, fabric);
+  const r = await densityThin({ image: { url: srcUrl }, fabric, instances, percent: params.percent });
+  if (r.removed === 0) throw new Error("NO_OP: no motifs removed"); // D-C (covers 0 instances / removeN 0)
+  return sharp(r.data, { raw: { width: r.width, height: r.height, channels: 4 } }).png().toBuffer();
 }
 ```
-NB: `scalePrintRepeat`/`densityThin` return **raw RGBA** (`{data,width,height}`),
-not PNG — the helper must `sharp(...).png()` before `storagePut`. (Recolor's
-`separationRemap` returns PNG already; this is the one shape difference.)
+**RGBA shape (verified):** `scalePrintRepeat`/`densityThin` return **raw RGBA**
+`{data,width,height}`; encode to PNG using the **op result's** width/height (NOT
+the fabric bbox) before `storagePut`. Recolor's `separationRemap` already returns
+PNG — this is the one shape difference.
+**D-C no-op-billing guard (verified):** both ops passthrough on a degenerate mask;
+the helper THROWS on that so the existing refund path fires (no paid no-op). Density
+floor (`removed===0`) ships now; the absurdly-many-instances ceiling waits for real
+SAM2 data.
 
 ---
 
@@ -58,6 +65,18 @@ const densityOnly = controls.density.enabled && !recolor && !scale   && !remove 
 const rasterReady = getMaskProvider().rasterReady;
 const useDeterministicScale   = ENV.studioScaleLive   && scaleOnly   && rasterReady;
 const useDeterministicDensity = ENV.studioDensityLive && densityOnly && rasterReady;
+
+// D-A (ruled): reject combined scale/density ONLY when the live flag is on AND
+// rasterReady — pre-deduct validation (no credit touched). Flag off => unchanged.
+if (ENV.studioScaleLive && rasterReady && controls.scale.enabled && controls.scale.percent !== 0 && !scaleOnly)
+  throw new TRPCError({ code: "BAD_REQUEST", message: "Scale can't yet combine with other edits — run it separately." });
+if (ENV.studioDensityLive && rasterReady && controls.density.enabled && controls.density.percent > 0 && !densityOnly)
+  throw new TRPCError({ code: "BAD_REQUEST", message: "Density can't yet combine with other edits — run it separately." });
+
+// D-B (ruled): live flag on but provider not rasterReady => fall back to the prompt
+// path, and WARN (deploy misconfig: SAM2 not serving rasters).
+if ((ENV.studioScaleLive || ENV.studioDensityLive) && !rasterReady && (scaleOnly || densityOnly))
+  console.warn(`[studio] live flag on but provider not rasterReady; prompt-path fallback. job=${job.id} org=${ctx.tenant.id}`);
 ```
 Inside the `allSettled` task, branch (same shape as A2):
 ```ts
@@ -75,38 +94,34 @@ Reuses deduct/refund/partial/status untouched. No-op guard skipped (never calls
 
 ---
 
-## OPEN DECISIONS for the Architect
+## DECISIONS — RULED & LOCKED by the Architect (at `7c36d8f`)
 
-**D-A. Combined controls (the report's "❌ not done").** The deterministic ops are
-single-purpose; a job with scale+recolor (etc.) can't run one op. Options:
-- **(a) Combined → existing prompt path** (consistent with A2's recolor-only gate).
-  Simplest. BUT the prompt path is broken for scale/density, so a combined job that
-  *includes* scale or density gets a no-op on those controls → the no-op guard
-  refunds and fails the job. Net: combined-with-scale/density effectively can't
-  succeed until chaining lands. *(Builder lean for v1, with a clear message.)*
-- **(b) Reject combined-with-scale/density** with a BAD_REQUEST ("Scale/Density
-  can't yet combine with other edits — run them separately") until chaining lands.
-  Most honest UX; no silent refund.
-- **(c) Deterministic chaining** (recolor→scale→density, threading the intermediate
-  image + recomputing masks). Best-in-class, real build. Deferred enhancement.
+**D-A. Combined controls → (b) REJECT-WITH-MESSAGE, scoped to the live flag.**
+A job that includes scale or density alongside any other edit is rejected with a
+`BAD_REQUEST` ("Scale/Density can't yet combine with other edits — run them
+separately"), but **only when the live flag is on AND the provider is rasterReady**
+— it is pre-deduct validation, so no credit is touched and a flag-off prod is
+unchanged. Option (a) was rejected (it re-introduces the paid no-op via the broken
+prompt path); option (c) deterministic chaining is the flagged follow-up enhancement.
+*Wired above in the route gate (the two pre-deduct `throw new TRPCError` guards).*
 
-  *Builder recommendation: (b) for v1* (honest, no surprise refund), with (c) as the
-  flagged follow-up. (a) risks the exact "paid no-op" we just removed.
+**D-B. rasterReady-false → FALL BACK, NOT SILENT.** If a `*_LIVE` flag is on but the
+provider isn't rasterReady (misconfig / SAM2 down), fall back to the existing prompt
+path **and WARN** so the deploy misconfig is observable. The ops WARN line includes
+the **job id + org_id** (`job=${job.id} org=${ctx.tenant.id}`). A flag/provider
+mismatch must not fail user jobs, but it must not be silent either.
+*Wired above as the `console.warn` in the route gate.*
 
-**D-B. rasterReady-false behavior.** If a `*_LIVE` flag is on but the provider isn't
-rasterReady (misconfig / SAM2 down), fall back to the prompt path (recommended) vs
-BAD_REQUEST. Builder lean: **silent fall-back** — a flag/provider mismatch
-shouldn't fail user jobs.
+**D-C. Instance-quality guard = no-op-billing guard.** The degenerate-mask case is
+covered by the existing refund path: the helper THROWS on passthrough so no paid
+no-op ships. **Density floor** (`r.removed === 0` → throw) ships **now** — it covers
+0 instances and `removeN === 0`. **Scale floor** (empty fabric raster → throw) ships
+now. The absurdly-many-instances **ceiling** is deferred until real SAM2/S5 data
+exists for the Architect to set the bound. *Wired above in both helpers.*
 
-**D-C. Density instance-quality guard.** SAM2 auto-masks on real prints are
-unvalidated. If `getInstanceMasks` returns 0 (or absurdly many) instances,
-`densityThin` passthroughs (0) or over/under-removes. Add a sanity guard
-(min/max instance count → fall back to prompt path or error)? Architect to set the
-bounds once S5/real-garment data exists.
-
-**D-D. Pricing.** Deterministic ops are ~free vs a generative call. Keep
-`computeCredits` unchanged for now (as A2 did); revisit deterministic credit cost
-as a separate decision once all three are live.
+**D-D. Pricing — UNCHANGED, AGREED.** `computeCredits` stays as-is (as A2 did);
+deterministic credit cost is revisited as a separate decision once all three ops are
+live. No pricing change in either route.
 
 ---
 
