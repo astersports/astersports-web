@@ -9,6 +9,7 @@ import { appRouter, registerScheduledRoutes } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { handleStripeWebhook } from "../webhook";
+import { assertEnvOrExit } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -30,6 +31,9 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  // M15: fail fast on missing required config before binding a port.
+  assertEnvOrExit();
+
   const app = express();
   const server = createServer(app);
 

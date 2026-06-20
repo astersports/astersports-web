@@ -43,6 +43,13 @@
       "when": 1781901590961,
       "tag": "0005_slow_dragon_man",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1781959279304,
+      "tag": "0006_kind_vector",
+      "breakpoints": true
     }
   ]
 }

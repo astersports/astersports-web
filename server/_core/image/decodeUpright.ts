@@ -18,6 +18,9 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { storageGetSignedUrl } from "../../storage";
 import { fetchWithTimeout, TIMEOUT } from "../../fetchTimeout";
+import { assertWithinPixelLimit, decodeSemaphore, maxInputPixels } from "./guards";
+import { assertSafeFetchUrl } from "../net/ssrfGuard";
+import { ENV } from "../env";
 
 export interface UprightImage {
   /** Raw RGBA pixels, length = width * height * 4. */
@@ -47,20 +50,27 @@ export function clearDecodeCache(): void {
  */
 async function readImageBytes(url: string): Promise<Buffer> {
   if (url.startsWith("file://")) {
+    // M7: file:// is an eval-only offline convenience. Reading the local FS from
+    // a request-reachable code path is an LFI vector, so it is closed in prod.
+    if (ENV.isProduction) throw new Error("decodeUpright: file:// sources are not allowed in production");
     return readFile(fileURLToPath(url));
   }
   if (url.startsWith("/manus-storage/")) {
+    // Internal storage key -> Forge-signed URL (trusted host); no SSRF check needed.
     const signed = await storageGetSignedUrl(url.replace("/manus-storage/", ""));
-    return fetchToBuffer(signed);
+    return fetchToBuffer(signed, { trusted: true });
   }
   if (url.startsWith("http://") || url.startsWith("https://")) {
     return fetchToBuffer(url);
   }
-  // Treat anything else as a local filesystem path.
+  // Bare filesystem path — eval-only, same LFI reasoning as file:// above.
+  if (ENV.isProduction) throw new Error("decodeUpright: local-path sources are not allowed in production");
   return readFile(url);
 }
 
-async function fetchToBuffer(url: string): Promise<Buffer> {
+async function fetchToBuffer(url: string, opts: { trusted?: boolean } = {}): Promise<Buffer> {
+  // M7: validate untrusted http(s) destinations resolve to a public address.
+  if (!opts.trusted) await assertSafeFetchUrl(url);
   const res = await fetchWithTimeout(url, {}, TIMEOUT.IMAGE_DOWNLOAD);
   if (!res.ok) {
     throw new Error(`decodeUpright: failed to download image (${res.status} ${res.statusText})`);
@@ -71,18 +81,23 @@ async function fetchToBuffer(url: string): Promise<Buffer> {
 async function decodeToEntry(url: string): Promise<CacheEntry> {
   const input = await readImageBytes(url);
   // `.rotate()` with no args bakes the EXIF orientation tag into the pixels.
-  const { data, info } = await sharp(input)
+  // H6: `limitInputPixels` makes sharp reject an oversized image before it
+  // allocates the raw RGBA frame; the post-decode assert is a second line.
+  const { data, info } = await sharp(input, { limitInputPixels: maxInputPixels() })
     .rotate()
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
+  assertWithinPixelLimit(info.width, info.height);
   return { buffer: data, width: info.width, height: info.height };
 }
 
 export async function decodeUpright(url: string): Promise<UprightImage> {
   let entry = cache.get(url);
   if (!entry) {
-    entry = await decodeToEntry(url);
+    // H6: bound concurrent decodes so N parallel jobs can't each hold a full
+    // RGBA frame at once. Cache hits skip the semaphore entirely.
+    entry = await decodeSemaphore.run(() => decodeToEntry(url));
     cache.set(url, entry);
     // Evict oldest insertion (Map preserves insertion order).
     if (cache.size > MAX_CACHE) {

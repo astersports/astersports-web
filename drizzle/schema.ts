@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, json, bigint } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, json, bigint, index } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -152,7 +152,11 @@ export const memberships = mysqlTable("memberships", {
   /** For invited stubs where the user hasn't signed up yet. */
   invitedEmail: varchar("invitedEmail", { length: 320 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => ({
+  // H5: getMembership(tenantId, userId) is on the auth hot path (storage-proxy
+  // access checks, every tenant-scoped mutation).
+  tenantUserIdx: index("idx_memberships_tenant_user").on(t.tenantId, t.userId),
+}));
 
 export type Membership = typeof memberships.$inferSelect;
 export type InsertMembership = typeof memberships.$inferInsert;
@@ -173,7 +177,12 @@ export const creditLedger = mysqlTable("credit_ledger", {
   refId: varchar("refId", { length: 128 }),
   note: text("note"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => ({
+  // H5: every ledger read is tenant-scoped and ordered by recency.
+  tenantCreatedIdx: index("idx_credit_ledger_tenant_created").on(t.tenantId, t.createdAt),
+  // H5: ledger<->jobs correlation joins on refId.
+  refIdIdx: index("idx_credit_ledger_refId").on(t.refId),
+}));
 
 export type CreditLedgerEntry = typeof creditLedger.$inferSelect;
 export type InsertCreditLedgerEntry = typeof creditLedger.$inferInsert;
@@ -198,7 +207,10 @@ export const jobs = mysqlTable("studio_jobs", {
   creditsUsed: int("creditsUsed").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (t) => ({
+  // H5: tenant job lists filter by tenantId and sort by createdAt DESC.
+  tenantCreatedIdx: index("idx_studio_jobs_tenant_created").on(t.tenantId, t.createdAt),
+}));
 
 export type Job = typeof jobs.$inferSelect;
 export type InsertJob = typeof jobs.$inferInsert;
@@ -214,7 +226,10 @@ export const jobVariations = mysqlTable("studio_job_variations", {
   resultUrl: varchar("resultUrl", { length: 1024 }).notNull(),
   round: int("round").default(1).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => ({
+  // H5: variations are always fetched by their parent jobId.
+  jobIdx: index("idx_studio_job_variations_jobId").on(t.jobId),
+}));
 
 export type JobVariation = typeof jobVariations.$inferSelect;
 export type InsertJobVariation = typeof jobVariations.$inferInsert;
@@ -241,7 +256,10 @@ export const jobFavorites = mysqlTable("studio_job_favorites", {
   jobId: int("jobId").notNull(),
   tenantId: int("tenantId").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => ({
+  // H5: favorites are listed per tenant and toggled by (tenantId, jobId).
+  tenantJobIdx: index("idx_studio_job_favorites_tenant_job").on(t.tenantId, t.jobId),
+}));
 
 export type JobFavorite = typeof jobFavorites.$inferSelect;
 export type InsertJobFavorite = typeof jobFavorites.$inferInsert;

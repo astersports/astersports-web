@@ -40,4 +40,72 @@ export const ENV = {
   /** Replicate SAM2 (D1 = Option 2). Token + model-version id for the hosted mask source. */
   replicateApiToken: process.env.REPLICATE_API_TOKEN ?? "",
   replicateSam2Model: process.env.REPLICATE_SAM2_MODEL ?? "",
+  /** H6: upper bound on a source image's total pixel count for the deterministic
+   *  ops. A decoded RGBA frame costs width*height*4 bytes, so an unbounded upload
+   *  is a memory-exhaustion vector. 40 MP (~160 MB RGBA) covers real print artwork
+   *  with headroom; raise via STUDIO_MAX_MEGAPIXELS only with the memory budget in mind. */
+  studioMaxMegapixels: Math.max(1, Number(process.env.STUDIO_MAX_MEGAPIXELS ?? "40")),
+  /** H6: max concurrent sharp decodes. Each decode holds a full RGBA frame in
+   *  memory; without a cap, N simultaneous jobs multiply the peak. Default 4. */
+  studioMaxConcurrentDecodes: Math.max(1, Number(process.env.STUDIO_MAX_CONCURRENT_DECODES ?? "4")),
 };
+
+/**
+ * M15 — env fail-fast. A `?? ""` default turns a missing secret into a silent
+ * mis-configuration that only surfaces as a confusing runtime error (or, worse,
+ * a degraded-but-billing code path). validateEnv classifies config and, in
+ * production, refuses to boot when something required is absent. Non-production
+ * only warns, so dev/test stays runnable with a partial env.
+ */
+export function validateEnv(): { errors: string[]; warnings: string[] } {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  // Hard-required: the server cannot serve authenticated traffic without these.
+  const required: Array<[string, string]> = [
+    ["JWT_SECRET", ENV.cookieSecret],
+    ["DATABASE_URL", ENV.databaseUrl],
+    ["OAUTH_SERVER_URL", ENV.oAuthServerUrl],
+    ["VITE_APP_ID", ENV.appId],
+  ];
+  for (const [name, val] of required) {
+    if (!val) errors.push(`${name} is required but missing`);
+  }
+
+  // Conditional hard-requirement: opting into the SAM2 mask provider without its
+  // credentials is exactly the silent mis-config that motivated this guard — the
+  // sam2 path would fail per-request instead of refusing to boot.
+  if (ENV.maskProvider === "sam2") {
+    if (!ENV.replicateApiToken) errors.push("STUDIO_MASK_PROVIDER=sam2 requires REPLICATE_API_TOKEN");
+    if (!ENV.replicateSam2Model) errors.push("STUDIO_MASK_PROVIDER=sam2 requires REPLICATE_SAM2_MODEL");
+  }
+
+  // Feature-degrading: present-but-empty means that feature is dark. Warn only.
+  const optional: Array<[string, string, string]> = [
+    ["STRIPE_SECRET_KEY", ENV.stripeSecretKey, "billing/checkout"],
+    ["STRIPE_WEBHOOK_SECRET", ENV.stripeWebhookSecret, "Stripe webhook verification"],
+    ["RESEND_API_KEY", ENV.resendApiKey, "transactional email"],
+    ["BUILT_IN_FORGE_API_URL", ENV.forgeApiUrl, "Forge LLM/image generation"],
+    ["BUILT_IN_FORGE_API_KEY", ENV.forgeApiKey, "Forge LLM/image generation"],
+  ];
+  for (const [name, val, feature] of optional) {
+    if (!val) warnings.push(`${name} missing — ${feature} disabled`);
+  }
+
+  return { errors, warnings };
+}
+
+/**
+ * Call once at boot. In production, throws if any required env is missing so the
+ * process exits instead of serving a half-configured app. Elsewhere, logs.
+ */
+export function assertEnvOrExit(): void {
+  const { errors, warnings } = validateEnv();
+  for (const w of warnings) console.warn(`[env] ${w}`);
+  if (errors.length === 0) return;
+  for (const e of errors) console.error(`[env] ${e}`);
+  if (ENV.isProduction) {
+    throw new Error(`Missing required environment configuration:\n  - ${errors.join("\n  - ")}`);
+  }
+  console.warn("[env] continuing despite missing config (non-production)");
+}
