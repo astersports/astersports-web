@@ -600,3 +600,11 @@
 - [x] Add "Download ZIP" button to batch selection action bar
 - [x] Show progress indicator during download/zip creation ("Fetching X/Y..." → "Compressing...")
 - [x] Handle errors gracefully (skip failed fetches, toast notification with count)
+
+## PDF Lookbook Export (History Page)
+- [x] Install jsPDF dependency for client-side PDF generation
+- [x] Create lookbook PDF generator utility (branded cover, before/after pages, metadata) — client/src/lib/lookbookPdf.ts
+- [x] Add "Generate Lookbook" button to batch selection action bar
+- [x] Show progress indicator during PDF generation (stage-based: Preparing → Fetching → Compressing)
+- [x] Include: cover page with logo/date/tenant name, one landscape spread per item (before/after side-by-side), edit type badge, changes, credits, user attribution
+- [x] Handle errors gracefully (skip failed image fetches, toast notification)

@@ -39,7 +39,9 @@ import {
   Loader2,
   ImageIcon,
   RefreshCw,
+  FileText,
 } from "lucide-react";
+import { generateLookbookPdf, type LookbookItem } from "@/lib/lookbookPdf";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -530,6 +532,8 @@ function ArchiveTable({
   const [showFilters, setShowFilters] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState("");
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState("");
   const limit = 20;
 
   // Debounce search
@@ -669,6 +673,54 @@ function ArchiveTable({
     }
   };
 
+  // Generate Lookbook PDF
+  const handleGenerateLookbook = async () => {
+    const selectedJobs = jobs.filter((j) => selectedIds.has(j.id));
+    const lookbookItems: LookbookItem[] = selectedJobs
+      .filter((j) => {
+        const resultUrl = getResultUrl(j);
+        return !!resultUrl;
+      })
+      .map((j) => ({
+        title: j.title,
+        originalUrl: j.originalUrl,
+        resultUrl: getResultUrl(j)!,
+        editType: getEditType(j.controls),
+        changes: describeChanges(j.controls),
+        creditsUsed: j.creditsUsed,
+        createdAt: j.createdAt,
+        userName: j.userName || "Unknown",
+      }));
+
+    if (lookbookItems.length === 0) {
+      toast.error("No items with results", { description: "Selected jobs have no result images yet." });
+      return;
+    }
+
+    setIsGeneratingPdf(true);
+    setPdfProgress("Preparing...");
+
+    try {
+      await generateLookbookPdf({
+        title: "Design Lookbook",
+        subtitle: "Before & After Comparison",
+        tenantName: tenant?.name || undefined,
+        items: lookbookItems,
+        onProgress: (current, total, stage) => {
+          setPdfProgress(stage);
+        },
+      });
+      toast.success("Lookbook generated", {
+        description: `${lookbookItems.length} design${lookbookItems.length !== 1 ? "s" : ""} exported to PDF.`,
+      });
+    } catch (err: any) {
+      toast.error("PDF generation failed", { description: err.message });
+    } finally {
+      setIsGeneratingPdf(false);
+      setPdfProgress("");
+    }
+  };
+
   return (
     <div>
       {/* Section header */}
@@ -691,6 +743,18 @@ function ArchiveTable({
                   <><Loader2 className="w-3 h-3 animate-spin" />{downloadProgress || "Downloading..."}</>
                 ) : (
                   <><Download className="w-3 h-3" />Download ZIP</>
+                )}
+              </button>
+              <span className="text-slate-600">|</span>
+              <button
+                onClick={handleGenerateLookbook}
+                disabled={isGeneratingPdf}
+                className="inline-flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 underline disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isGeneratingPdf ? (
+                  <><Loader2 className="w-3 h-3 animate-spin" />{pdfProgress || "Generating..."}</>
+                ) : (
+                  <><FileText className="w-3 h-3" />Lookbook PDF</>
                 )}
               </button>
               <span className="text-slate-600">|</span>
