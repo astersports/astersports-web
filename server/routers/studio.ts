@@ -385,7 +385,7 @@ export const studioRouter = router({
             code: "BAD_REQUEST",
             message:
               "Scale works on repeating prints (ditsy, allover, geometric). " +
-              "This image reads as a single placed graphic — scale isn’t supported for it yet. Credits refunded.",
+              "This image reads as a single placed graphic — scale isn\u2019t supported for it yet. Credits refunded.",
           });
         }
 
