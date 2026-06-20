@@ -1,15 +1,18 @@
 /**
  * C1 storage-proxy authorization tests. Exercises the access decision in
  * isolation: capture the route handler, drive it with mock req/res, and mock the
- * auth + ownership lookups. Forge env is left unset so an AUTHORIZED request
- * stops at the "not configured" 500 — that proves it passed the authz gate
- * without needing to mock the Forge presign round-trip.
+ * auth + ownership lookups. ENV is mocked with forgeApiUrl/forgeApiKey unset so
+ * an AUTHORIZED request stops at the "not configured" 500 — that proves it
+ * passed the authz gate without needing to mock the Forge presign round-trip.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Express } from "express";
 
 vi.mock("./sdk", () => ({ sdk: { authenticateRequest: vi.fn() } }));
 vi.mock("../studioDb", () => ({ getMembership: vi.fn(), getVariationByResultKey: vi.fn() }));
+vi.mock("./env", () => ({
+  ENV: { forgeApiUrl: "", forgeApiKey: "" },
+}));
 
 import { sdk } from "./sdk";
 import { getMembership, getVariationByResultKey } from "../studioDb";
@@ -64,7 +67,7 @@ describe("storageProxy authorization", () => {
     await getHandler()(reqFor("aster_sports_logo_high_res_2b537f86.png"), res);
     expect(auth).not.toHaveBeenCalled(); // never required auth
     expect(variationByKey).toHaveBeenCalledWith("aster_sports_logo_high_res_2b537f86.png");
-    expect(res.statusCode).toBe(500); // reaches the config gate (forge env unset in test)
+    expect(res.statusCode).toBe(500); // reaches the config gate (forge env mocked empty)
   });
 
   it("generated/ key owned by another tenant: 403 (cross-tenant IDOR closed)", async () => {
@@ -83,7 +86,7 @@ describe("storageProxy authorization", () => {
     membership.mockResolvedValue({ tenantId: 5, userId: 7, role: "member" });
     const res = mockRes();
     await getHandler()(reqFor("generated/xyz.png"), res);
-    // Forge env is unset in test -> the only way to reach this 500 is past authz.
+    // Forge env is mocked empty -> the only way to reach this 500 is past authz.
     expect(membership).toHaveBeenCalledWith(5, 7);
     expect(res.statusCode).toBe(500);
   });
