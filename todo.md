@@ -623,3 +623,11 @@
 - [x] Verified: 30% test removes 63 motifs, 60% test removes 126 motifs
 - [x] Diff visualization confirms clean infill with correct base-cloth color
 - [x] All 347 tests pass after the fix
+
+## Density UI Bug Fixes
+- [x] Fix PercentStepper iOS Safari validation error (change type=number to type=text inputMode=numeric pattern=[0-9]*)
+- [x] Fix density gateway timeout: convert generate mutation to async job pattern (start → poll → complete)
+- [x] Add jobStatus query endpoint for polling job completion (reuse existing getJob)
+- [x] Update StudioEditor frontend to poll for job completion instead of awaiting mutation directly
+- [x] Show progress UI during async density generation (processing state with estimated time)
+- [x] Run all tests and save checkpoint

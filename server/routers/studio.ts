@@ -360,6 +360,51 @@ export const studioRouter = router({
         creditsUsed: creditCost,
       });
 
+      // ─── ASYNC PATH: density/scale deterministic ops run in background ────────
+      // These ops involve SAM2 segmentation + image processing which can exceed
+      // the gateway timeout (~30s). We return immediately with { async: true }
+      // and the frontend polls getJob for completion.
+      if (useDeterministicDensity || useDeterministicScale) {
+        const mode = {
+          recolor: false,
+          density: useDeterministicDensity,
+          scale: useDeterministicScale,
+        };
+        // Fire-and-forget background generation
+        (async () => {
+          try {
+            await runVariation({
+              controls,
+              originalUrl: job.originalUrl,
+              tenantId: ctx.tenant.id,
+              jobId: job.id,
+              instruction,
+              expectation,
+              round: 1,
+              mode,
+            });
+            await updateJobStatus(job.id, "done", { creditsUsed: creditCost });
+          } catch (err: any) {
+            const errMsg = err?.message || "Generation failed";
+            log.error("studio", `Async generation failed: ${errMsg}`, { jobId: job.id, tenantId: ctx.tenant.id, userId: ctx.user.id, metadata: { error: errMsg, path: useDeterministicDensity ? "density" : "scale" } });
+            // Refund credits on failure
+            await grantCredits(ctx.tenant.id, creditCost, "refund", `job-${job.id}-failed`, ctx.user.id);
+            await updateJobStatus(job.id, "failed", { errorMessage: errMsg });
+          }
+        })();
+
+        // Return immediately — frontend will poll getJob
+        return {
+          async: true as const,
+          jobId: job.id,
+          results: [],
+          creditsUsed: creditCost,
+          newBalance,
+          lowBalance: newBalance <= LOW_BALANCE_THRESHOLD,
+        };
+      }
+
+      // ─── SYNC PATH: recolor + prompt (fast enough for inline response) ────────
       // Generate variations in parallel — each is an independent AI call.
       const existingVariations = await getJobVariations(job.id);
       const nextRound = existingVariations.length > 0
@@ -368,7 +413,7 @@ export const studioRouter = router({
 
       const settled = await Promise.allSettled(
         Array.from({ length: controls.variations }, async (_unused, i) => {
-          log.info("studio", `Generating variation ${i + 1}`, { jobId: job.id, tenantId: ctx.tenant.id, userId: ctx.user.id, metadata: { round: nextRound, path: useDeterministicRecolor ? "recolor" : useDeterministicDensity ? "density" : useDeterministicScale ? "scale" : "prompt" } });
+          log.info("studio", `Generating variation ${i + 1}`, { jobId: job.id, tenantId: ctx.tenant.id, userId: ctx.user.id, metadata: { round: nextRound, path: useDeterministicRecolor ? "recolor" : "prompt" } });
           const audit = { orgId: String(ctx.tenant.id), jobId: String(job.id) };
           if (useDeterministicRecolor) {
             const png = await generateRecoloredImage(job.originalUrl, {
@@ -377,31 +422,6 @@ export const studioRouter = router({
               coverage: controls.recolor.coverage,
             }, audit);
             const key = `studio/${ctx.tenant.id}/${job.id}/recolor-${nextRound}.png`;
-            const { url } = await storagePut(key, png, "image/png");
-            await addVariation({ jobId: job.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: nextRound });
-            return { url, key };
-          }
-          // D-C: deterministic density path. On degrade / no-op, FAIL + REFUND —
-          // density never prompt-falls (the prompt path cannot do count-based
-          // removal and would return garbage). The rejection triggers the existing
-          // pro-rated refund.
-          if (useDeterministicDensity) {
-            const densityResult = await generateDensityImage(job.originalUrl, controls.density.percent, audit);
-            if (!densityResult) {
-              log.warn("density", `Provider degraded / no-op; rejecting (D-B)`, { jobId: job.id, tenantId: ctx.tenant.id, userId: ctx.user.id });
-              throw new Error("Density processing is temporarily unavailable. Please try again in a moment.");
-            }
-            const key = `studio/${ctx.tenant.id}/${job.id}/density-${nextRound}.png`;
-            const { url } = await storagePut(key, densityResult.png, "image/png");
-            await addVariation({ jobId: job.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: nextRound });
-            log.info("density", `Removed ${densityResult.removed} instances`, { jobId: job.id, tenantId: ctx.tenant.id, userId: ctx.user.id, metadata: { removed: densityResult.removed, percent: controls.density.percent } });
-            return { url, key };
-          }
-          if (useDeterministicScale) {
-            const png = await generateScaledImage(job.originalUrl, {
-              targetFraction: (100 + controls.scale.percent) / 100,
-            }, audit);
-            const key = `studio/${ctx.tenant.id}/${job.id}/scale-${nextRound}.png`;
             const { url } = await storagePut(key, png, "image/png");
             await addVariation({ jobId: job.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: nextRound });
             return { url, key };
@@ -486,6 +506,7 @@ export const studioRouter = router({
       await updateJobStatus(job.id, "done", { creditsUsed });
 
       return {
+        async: false as const,
         results,
         creditsUsed,
         newBalance,

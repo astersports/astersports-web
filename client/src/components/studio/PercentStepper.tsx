@@ -45,13 +45,13 @@ export default function PercentStepper({
         </Button>
         <div className="relative flex-1">
           <Input
-            type="number"
+            type="text"
             inputMode="numeric"
-            value={Number.isFinite(value) ? value : 0}
-            min={min}
-            max={max}
+            pattern="[0-9]*"
+            value={Number.isFinite(value) ? String(value) : "0"}
             onChange={(e) => {
-              const n = e.target.value === "" ? 0 : Number(e.target.value);
+              const raw = e.target.value.replace(/[^0-9\-]/g, "");
+              const n = raw === "" || raw === "-" ? 0 : Number(raw);
               if (Number.isFinite(n)) onChange(clamp(n));
             }}
             className="pr-8 text-center font-semibold tabular-nums"

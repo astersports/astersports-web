@@ -4,8 +4,11 @@
  * 2. AI detects print elements
  * 3. Configure controls (Scale, Density, Remove)
  * 4. Generate → view before/after
+ *
+ * Density and Scale use an async job pattern: the mutation returns immediately
+ * with { async: true }, and we poll getJob until status is "done" or "failed".
  */
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { useTenant } from "@/contexts/TenantContext";
 import ControlPanel from "@/components/studio/ControlPanel";
@@ -34,7 +37,7 @@ export default function StudioEditor() {
 
   const utils = trpc.useUtils();
 
-  const [step, setStep] = useState<"upload" | "controls" | "results">("upload");
+  const [step, setStep] = useState<"upload" | "controls" | "processing" | "results">("upload");
   const [jobId, setJobId] = useState<number | null>(null);
   const [originalUrl, setOriginalUrl] = useState<string>("");
   const [detectedElements, setDetectedElements] = useState<string[]>([]);
@@ -46,11 +49,72 @@ export default function StudioEditor() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingControls, setPendingControls] = useState<ControlSettings | null>(null);
 
+  // Async job polling state
+  const [pollingJobId, setPollingJobId] = useState<number | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const uploadMutation = trpc.studio.upload.useMutation();
   const detectMutation = trpc.studio.detectElements.useMutation();
   const generateMutation = trpc.studio.generate.useMutation();
 
   const [uploadProgress, setUploadProgress] = useState("");
+
+  // Poll for async job completion
+  useEffect(() => {
+    if (!pollingJobId || !tenant) return;
+
+    const poll = async () => {
+      try {
+        const job = await utils.client.studio.getJob.query({
+          tenantId: tenant.id,
+          jobId: pollingJobId,
+        });
+
+        if (job.status === "done") {
+          // Job complete — show results
+          clearInterval(pollIntervalRef.current!);
+          pollIntervalRef.current = null;
+          setPollingJobId(null);
+          setIsGenerating(false);
+
+          const jobResults = job.variations.map((v: any) => ({
+            url: v.resultUrl,
+            key: v.resultKey || v.resultUrl.replace("/manus-storage/", ""),
+          }));
+          setResults(jobResults);
+          setSelectedResult(0);
+          setStep("results");
+          utils.tenants.myTenants.invalidate();
+          toast.success(`Generation complete. ${job.creditsUsed ?? 0} credits used.`);
+        } else if (job.status === "failed") {
+          // Job failed
+          clearInterval(pollIntervalRef.current!);
+          pollIntervalRef.current = null;
+          setPollingJobId(null);
+          setIsGenerating(false);
+          setStep("controls");
+          utils.tenants.myTenants.invalidate();
+          const errMsg = job.errorMessage || "Generation failed. Credits have been refunded.";
+          toast.error(errMsg);
+        }
+        // else still processing — keep polling
+      } catch (err: any) {
+        // Network error — don't stop polling, just log
+        console.warn("[StudioEditor] Poll error:", err.message);
+      }
+    };
+
+    // Start polling every 3 seconds
+    poll(); // immediate first check
+    pollIntervalRef.current = setInterval(poll, 3000);
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [pollingJobId, tenant]);
 
   const handleFileSelect = useCallback(
     async (file: File) => {
@@ -144,20 +208,28 @@ export default function StudioEditor() {
           controls,
         });
 
-        setResults(result.results);
-        setSelectedResult(0);
-        setStep("results");
-        utils.tenants.myTenants.invalidate();
-
-        if (result.lowBalance) {
-          toast.warning(`Low balance: ${result.newBalance} credits remaining. Consider topping up.`);
+        if (result.async) {
+          // Async job started — switch to processing view and start polling
+          setStep("processing");
+          setPollingJobId(result.jobId);
+          toast.info("Processing started — this may take up to a minute.");
         } else {
-          toast.success(`${result.results.length} variation(s) generated. ${result.creditsUsed} credits used.`);
+          // Sync result — show immediately
+          setResults(result.results);
+          setSelectedResult(0);
+          setStep("results");
+          utils.tenants.myTenants.invalidate();
+          setIsGenerating(false);
+
+          if (result.lowBalance) {
+            toast.warning(`Low balance: ${result.newBalance} credits remaining. Consider topping up.`);
+          } else {
+            toast.success(`${result.results.length} variation(s) generated. ${result.creditsUsed} credits used.`);
+          }
         }
       } catch (error: any) {
-        toast.error(error.message || "Generation failed. Please try again.");
-      } finally {
         setIsGenerating(false);
+        toast.error(error.message || "Generation failed. Please try again.");
       }
   }, [pendingControls, jobId, tenant, generateMutation, utils]);
 
@@ -198,25 +270,25 @@ export default function StudioEditor() {
             >
               {isUploading || isDetecting ? (
                 <>
-                  <Loader2 className="w-10 h-10 text-primary animate-spin" />
-                  <p className="text-sm text-muted-foreground">
-                    {uploadProgress || "Processing..."}
-                  </p>
+                  <Loader2 className="w-12 h-12 text-primary animate-spin" />
+                  <p className="text-sm text-muted-foreground">{uploadProgress}</p>
                 </>
               ) : (
                 <>
-                  <Upload className="w-10 h-10 text-muted-foreground" />
+                  <Upload className="w-12 h-12 text-muted-foreground" />
                   <div className="text-center">
-                    <p className="text-sm font-medium">Drop a garment image here</p>
+                    <p className="text-sm font-medium">
+                      Drop an image here or click to browse
+                    </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      or click to browse — JPEG, PNG, WebP up to 16MB
+                      JPEG, PNG, or WebP — max 16 MB
                     </p>
                   </div>
                 </>
               )}
               <input
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
@@ -233,6 +305,45 @@ export default function StudioEditor() {
 
   // ─── Confirmation cost (must be computed before any early returns that use it) ──
   const confirmCreditCost = pendingControls ? computeCredits(pendingControls, CREDIT_COST) : 0;
+
+  // ─── Processing step (async job in progress) ──────────────────────────────
+  if (step === "processing") {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">Processing</h1>
+          <p className="text-muted-foreground mt-1">
+            Your image is being processed. This typically takes 30–60 seconds.
+          </p>
+        </div>
+
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center gap-6 py-16">
+            <div className="relative">
+              <Loader2 className="w-16 h-16 text-primary animate-spin" />
+              <Sparkles className="w-6 h-6 text-primary/60 absolute -top-1 -right-1 animate-pulse" />
+            </div>
+            <div className="text-center space-y-2">
+              <p className="text-lg font-medium">Generating your result...</p>
+              <p className="text-sm text-muted-foreground">
+                The AI is analyzing and modifying your print. Please wait — this page will update automatically.
+              </p>
+            </div>
+            {originalUrl && (
+              <div className="mt-4 w-full max-w-xs">
+                <img
+                  src={originalUrl}
+                  alt="Original"
+                  className="w-full rounded-lg object-contain max-h-48 opacity-60"
+                />
+                <p className="text-xs text-center text-muted-foreground mt-2">Original image</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // ─── Controls step ─────────────────────────────────────────────────────────
   if (step === "controls") {

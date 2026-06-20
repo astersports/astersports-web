@@ -222,6 +222,8 @@ export const jobs = mysqlTable("studio_jobs", {
   instruction: text("instruction"),
   status: mysqlEnum("status", ["pending", "processing", "done", "failed"]).default("pending").notNull(),
   creditsUsed: int("creditsUsed").default(0),
+  /** Error message when job fails (async density/scale/recolor). */
+  errorMessage: text("errorMessage"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (t) => ({

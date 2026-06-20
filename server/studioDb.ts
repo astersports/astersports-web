@@ -270,7 +270,7 @@ export async function createJob(data: InsertJob) {
 export async function updateJobStatus(
   jobId: number,
   status: "pending" | "processing" | "done" | "failed",
-  extra?: { instruction?: string; creditsUsed?: number; controls?: string; detectedElements?: string }
+  extra?: { instruction?: string; creditsUsed?: number; controls?: string; detectedElements?: string; errorMessage?: string }
 ) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
