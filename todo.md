@@ -348,3 +348,19 @@
 - [x] Fix: getInstanceMasks fail-safe returns empty array (D-B prompt-path fallback signal) when classical can't serve rasters
 - [x] Privacy gate test suite (server/privacyGate.test.ts) — 8 tests covering all 4 requirements
 - [x] All 178 tests passing, TypeScript clean
+
+## Scale & Density Eval Runners
+- [x] Build scaleEval.ts runner (manifest-driven, side-by-side PNGs, aggregate pass rates)
+- [x] Build densityEval.ts runner (manifest-driven, side-by-side PNGs, aggregate pass rates)
+- [x] Create sample manifests (scale.manifest.json, density.manifest.json)
+- [x] Verify runners execute end-to-end on synthetic data
+- [x] All 178 tests passing
+
+## Density Live Wiring (D-C)
+- [x] Add STUDIO_DENSITY_LIVE env flag to server/_core/env.ts
+- [x] Build generateDensityImage helper in server/aiEngine.ts (SAM2 raster + instances → densityThin → PNG)
+- [x] Add density-only detection in studio router (densityOnly + useDeterministicDensity)
+- [x] Add density deterministic branch in variation generation loop (with D-B fallback)
+- [x] Write densityLive.test.ts (5 tests: success path, URL signing, no-raster degradation, no-instances degradation, hard error propagation)
+- [x] TypeScript compiles cleanly (0 errors)
+- [x] All 183 tests passing

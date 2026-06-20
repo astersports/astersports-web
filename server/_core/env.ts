@@ -39,6 +39,10 @@ export const ENV = {
   studioDeterministicScale: process.env.STUDIO_DETERMINISTIC_SCALE === "true",
   /** Route Density through the deterministic thinDensity op. Eval-only; default off. */
   studioDeterministicDensity: process.env.STUDIO_DETERMINISTIC_DENSITY === "true",
+  /** D-C: Route density-only jobs through the deterministic densityThin op in the
+   *  live money path. Requires SAM2 (raster + instances). Default off; flip after
+   *  real-garment eval confirms countError <= 0.10 on production imagery. */
+  studioDensityLive: process.env.STUDIO_DENSITY_LIVE === "true",
   /** Replicate SAM2 (D1 = Option 2). Token + model-version id for the hosted mask source. */
   replicateApiToken: process.env.REPLICATE_API_TOKEN ?? "",
   replicateSam2Model: process.env.REPLICATE_SAM2_MODEL ?? "",

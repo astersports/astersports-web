@@ -15,6 +15,64 @@ import { fetchWithTimeout, TIMEOUT } from "./fetchTimeout";
 import { ENV } from "./_core/env";
 import { getMaskProvider } from "./_core/masking";
 import { separationRemap } from "./_core/studio/ops/separationRemap";
+import { densityThin } from "./_core/studio/ops/densityThin";
+import sharp from "sharp";
+
+/**
+ * Deterministic density (D-C): SAM2 fabric raster + instance masks -> densityThin -> PNG.
+ *
+ * Contract:
+ *  - Returns { png, removed } on success (the op always applies when instances > 0).
+ *  - Returns null when the provider degrades (fail-safe returns [] instances) — caller
+ *    should fall back to the prompt path (D-B) or refund.
+ *  - Throws on hard errors (bad input, image decode failure).
+ *
+ * The op is deterministic: same image + same percent + same instances = identical bytes.
+ * No model call, no no-op guard needed.
+ */
+export async function generateDensityImage(
+  originalImageUrl: string,
+  percent: number
+): Promise<{ png: Buffer; removed: number } | null> {
+  const srcUrl = originalImageUrl.startsWith("/manus-storage/")
+    ? await storageGetSignedUrl(originalImageUrl.replace("/manus-storage/", ""))
+    : originalImageUrl;
+
+  const provider = getMaskProvider();
+
+  // Step 1: Get fabric mask (must include raster for density).
+  const fabric = await provider.getFabricMask({ url: srcUrl });
+  if (!fabric.raster) {
+    // Provider degraded to classical (no raster) — signal prompt-path fallback.
+    console.warn(`[density-live] Provider returned no raster; degrading to prompt path (D-B).`);
+    return null;
+  }
+
+  // Step 2: Get instance masks.
+  const instances = await provider.getInstanceMasks({ url: srcUrl }, fabric);
+  if (instances.length === 0) {
+    // Provider degraded or image has no detectable motifs — signal prompt-path fallback.
+    console.warn(`[density-live] Provider returned 0 instances; degrading to prompt path (D-B).`);
+    return null;
+  }
+
+  // Step 3: Run the deterministic op.
+  const result = await densityThin({
+    image: { url: srcUrl },
+    fabric,
+    instances,
+    percent,
+  });
+
+  // Step 4: Encode raw RGBA to PNG.
+  const png = await sharp(result.data, {
+    raw: { width: result.width, height: result.height, channels: 4 },
+  })
+    .png()
+    .toBuffer();
+
+  return { png, removed: result.removed };
+}
 
 /** Deterministic recolor (A2): classical fabric mask + separationRemap -> PNG bytes.
  *  Caller (studio.generate) stores the buffer + records the variation. No model

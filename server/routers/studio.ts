@@ -7,7 +7,7 @@ import { TRPCError } from "@trpc/server";
 import { router } from "../_core/trpc";
 import { tenantProcedure } from "../tenancy";
 import { storagePut } from "../storage";
-import { detectPrintElements, generateEditedImage, generateRecoloredImage } from "../aiEngine";
+import { detectPrintElements, generateEditedImage, generateRecoloredImage, generateDensityImage } from "../aiEngine";
 import { ENV } from "../_core/env";
 import {
   createJob,
@@ -160,6 +160,14 @@ export const studioRouter = router({
         });
       }
 
+      // D-C live route: density-ONLY jobs go through the deterministic densityThin
+      // op (SAM2 raster + instances) when STUDIO_DENSITY_LIVE is on. If the provider
+      // degrades (no raster or no instances), falls back to the prompt path (D-B).
+      const densityOnly =
+        controls.density.enabled && !controls.scale.enabled &&
+        !controls.recolor.enabled && !controls.remove.enabled;
+      const useDeterministicDensity = ENV.studioDensityLive && densityOnly;
+
       const creditCost = computeCredits(controls, CREDIT_COST);
 
       if (creditCost === 0) {
@@ -224,6 +232,19 @@ export const studioRouter = router({
             const { url } = await storagePut(key, png, "image/png");
             await addVariation({ jobId: job.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: nextRound });
             return { url, key };
+          }
+          // D-C: deterministic density path. Falls back to prompt path if provider degrades.
+          if (useDeterministicDensity) {
+            const densityResult = await generateDensityImage(job.originalUrl, controls.density.percent);
+            if (densityResult) {
+              const key = `studio/${ctx.tenant.id}/${job.id}/density-${nextRound}.png`;
+              const { url } = await storagePut(key, densityResult.png, "image/png");
+              await addVariation({ jobId: job.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: nextRound });
+              console.log(`[studio] Density op removed ${densityResult.removed} instances for job ${job.id}`);
+              return { url, key };
+            }
+            // Provider degraded (D-B): fall through to prompt path below.
+            console.warn(`[studio] Density provider degraded for job ${job.id}; falling back to prompt path.`);
           }
           const resultUrl = await generateEditedImage(job.originalUrl, instruction, "image/jpeg", expectation);
           await addVariation({
