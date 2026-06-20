@@ -402,3 +402,6 @@
 - [x] Add log retention cleanup job: prune server_logs older than 30 days (Heartbeat cron at /api/scheduled/log-cleanup)
 - [x] Write tests for alert hook (10 tests: notifyOwner called on error, not on info/warn/debug, crash-safe)
 - [x] Write tests for log retention (6 tests: 30-day cutoff, DB unavailable, error propagation)
+
+## Density Generation Fix
+- [x] Fix SAM2 404: REPLICATE_SAM2_MODEL was set to bare slug 'meta/sam-2' causing SDK to hit deprecated /models/meta/sam-2/predictions endpoint; updated to 'meta/sam-2:fe97b453...' so SDK uses /predictions with version body
