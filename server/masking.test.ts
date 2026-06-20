@@ -94,7 +94,7 @@ describe("classical provider", () => {
 describe("sam2 provider", () => {
   it("default Replicate client is unavailable until provisioned (no token)", async () => {
     await expect(
-      defaultSam2Client().boxMask("data:image/png;base64,xx", [0, 0, 1, 1])
+      defaultSam2Client().autoSegment("data:image/png;base64,xx")
     ).rejects.toBeInstanceOf(MaskProviderUnavailableError);
   });
 });

@@ -57,8 +57,10 @@ describe("createSam2Provider (mocked client)", () => {
   });
 
   const client: Sam2Client = {
-    boxMask: async () => maskPng(W, H, 8, 8, 40, 40),
-    autoMasks: async () => [await maskPng(W, H, 4, 4, 20, 20), await maskPng(W, H, 28, 28, 44, 44)],
+    autoSegment: async () => ({
+      combined: await maskPng(W, H, 8, 8, 40, 40),
+      individuals: [await maskPng(W, H, 4, 4, 20, 20), await maskPng(W, H, 28, 28, 44, 44)],
+    }),
   };
 
   it("reports rasterReady", () => {
