@@ -6,6 +6,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { TenantProvider, useTenant } from "@/contexts/TenantContext";
 import AppShell from "@/components/studio/AppShell";
+import ImpersonationBanner from "@/components/studio/ImpersonationBanner";
 import { Button } from "@/components/ui/button";
 import { Loader2, Lock, LogIn } from "lucide-react";
 import { getLoginUrl } from "@/const";
@@ -74,7 +75,12 @@ function AccessGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <AppShell>{children}</AppShell>;
+  return (
+    <>
+      <ImpersonationBanner />
+      <AppShell>{children}</AppShell>
+    </>
+  );
 }
 
 export default function StudioLayout({ children }: { children: React.ReactNode }) {

@@ -453,3 +453,9 @@
 - [x] Add userId filter to creditLedger backend query (listCreditLedger + studio router)
 - [x] Show member avatar/name, amber spend bar, and collapsible recent 10 transactions per member
 - [x] Maintain all existing filters (type, date range, search) in chronological view; grouped view uses spendByMember
+
+## Impersonation Exit Banner
+- [x] Create ImpersonationBanner component (persistent amber gradient bar, Eye icon, firm name + metadata, Exit button)
+- [x] Wire into StudioLayout above AppShell (reads sessionStorage impersonate_tenant)
+- [x] On Exit: clear sessionStorage, redirect to /platform
+- [x] Responsive: truncates metadata on mobile, full info on desktop (z-60, sticky top-0)
