@@ -101,7 +101,10 @@ export const studioRouter = router({
         jobId: z.number(),
         controls: z.object({
           scale: z.object({ enabled: z.boolean(), percent: z.number() }),
-          density: z.object({ enabled: z.boolean(), percent: z.number() }),
+          density: z.object({
+            enabled: z.boolean(),
+            percent: z.number().transform((v) => Math.max(0, Math.min(90, v))),
+          }),
           remove: z.object({
             enabled: z.boolean(),
             element: z.string().max(MAX_ELEMENT_NAME_LENGTH).transform(sanitizeElementName),
