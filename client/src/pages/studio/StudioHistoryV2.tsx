@@ -14,6 +14,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useTenant } from "@/contexts/TenantContext";
+import { toast } from "sonner";
 import {
   Search,
   Star,
@@ -527,6 +528,8 @@ function ArchiveTable({
   const [page, setPage] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState("");
   const limit = 20;
 
   // Debounce search
@@ -600,6 +603,72 @@ function ArchiveTable({
     }
   };
 
+  // Batch ZIP download
+  const handleBatchDownload = async () => {
+    const selectedJobs = jobs.filter((j) => selectedIds.has(j.id));
+    const items = selectedJobs
+      .filter((j) => {
+        const resultUrl = j.variations?.length > 0
+          ? [...j.variations].sort((a: any, b: any) => b.round - a.round)[0]?.resultUrl
+          : null;
+        return !!resultUrl;
+      })
+      .map((j) => {
+        const resultUrl = [...j.variations].sort((a: any, b: any) => b.round - a.round)[0].resultUrl;
+        const safeName = j.title.replace(/[^a-zA-Z0-9_-]/g, "_");
+        return { url: resultUrl, filename: `${safeName}-result.png` };
+      });
+
+    if (items.length === 0) {
+      toast.error("No downloadable results", { description: "Selected jobs have no result images yet." });
+      return;
+    }
+
+    setIsDownloading(true);
+    setDownloadProgress(`Fetching 0/${items.length}...`);
+
+    try {
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
+      let fetched = 0;
+
+      const results = await Promise.allSettled(
+        items.map(async (item) => {
+          const resp = await fetch(item.url);
+          if (!resp.ok) throw new Error(`Failed: ${item.filename}`);
+          const blob = await resp.blob();
+          zip.file(item.filename, blob);
+          fetched++;
+          setDownloadProgress(`Fetching ${fetched}/${items.length}...`);
+        })
+      );
+
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      if (succeeded === 0) throw new Error("No files could be downloaded");
+
+      setDownloadProgress("Compressing...");
+      const content = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(content);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `aster-generations-${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success("Download complete", {
+        description: `${succeeded}/${items.length} images packaged into ZIP.`,
+      });
+      setSelectedIds(new Set());
+    } catch (err: any) {
+      toast.error("Download failed", { description: err.message });
+    } finally {
+      setIsDownloading(false);
+      setDownloadProgress("");
+    }
+  };
+
   return (
     <div>
       {/* Section header */}
@@ -614,13 +683,32 @@ function ArchiveTable({
             <div className="flex items-center gap-2 mr-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
               <span className="text-xs text-amber-400 font-medium">{selectedIds.size} selected</span>
               <button
+                onClick={handleBatchDownload}
+                disabled={isDownloading}
+                className="inline-flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 underline disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDownloading ? (
+                  <><Loader2 className="w-3 h-3 animate-spin" />{downloadProgress || "Downloading..."}</>
+                ) : (
+                  <><Download className="w-3 h-3" />Download ZIP</>
+                )}
+              </button>
+              <span className="text-slate-600">|</span>
+              <button
                 onClick={() => {
                   selectedIds.forEach((id) => onToggleFavorite(id));
                   setSelectedIds(new Set());
                 }}
-                className="text-xs text-amber-400 hover:text-amber-300 underline"
+                className="inline-flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 underline"
               >
-                Favorite all
+                <Star className="w-3 h-3" />Favorite all
+              </button>
+              <span className="text-slate-600">|</span>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="text-xs text-slate-500 hover:text-slate-300"
+              >
+                Clear
               </button>
             </div>
           )}

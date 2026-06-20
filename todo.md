@@ -593,3 +593,10 @@
 - [x] Empty state with illustration and CTA to Editor
 - [x] Skeleton loading states for strip and table
 - [x] Responsive: mobile collapses to card list, desktop shows full table
+
+## Batch ZIP Download (History Page)
+- [x] Add JSZip dependency (already installed)
+- [x] Implement batch download function (fetch images, zip, trigger download)
+- [x] Add "Download ZIP" button to batch selection action bar
+- [x] Show progress indicator during download/zip creation ("Fetching X/Y..." → "Compressing...")
+- [x] Handle errors gracefully (skip failed fetches, toast notification with count)
