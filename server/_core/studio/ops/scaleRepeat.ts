@@ -4,7 +4,8 @@
  * tiles (smaller motifs, tighter spacing, more of them, filling the garment like a
  * mill reducing the roller); enlarge center-crops. Composited only inside the
  * fabric raster, garment frozen. Pure + deterministic (pinned lanczos3 kernel, no
- * RNG, no model). Eval-only, behind STUDIO_DETERMINISTIC_SCALE, not router-wired.
+ * RNG, no model). Consumed by the scaleEval runner and the scale-live route
+ * (STUDIO_SCALE_LIVE, dark by default).
  *
  * Deferred (surfaced by eval PNGs, not attempted here): drape-follow displacement
  * warp (on-body/hanging), placed-graphic/non-repeating prints, tile-boundary

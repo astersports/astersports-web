@@ -50,8 +50,7 @@ vi.mock("./_core/env", () => ({
     maskProvider: "sam2",
     replicateApiToken: "test-token",
     studioRecolorLive: false,
-    studioDeterministicScale: false,
-    studioDeterministicDensity: false,
+    studioScaleLive: false,
     studioNoopGuard: true,
   },
 }));

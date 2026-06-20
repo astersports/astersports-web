@@ -13,10 +13,12 @@ import { generateImage } from "./_core/imageGeneration";
 import { storageGetSignedUrl } from "./storage";
 import { fetchWithTimeout, TIMEOUT } from "./fetchTimeout";
 import { ENV } from "./_core/env";
+import sharp from "sharp";
 import { getMaskProvider } from "./_core/masking";
 import { separationRemap } from "./_core/studio/ops/separationRemap";
 import { densityThin } from "./_core/studio/ops/densityThin";
-import sharp from "sharp";
+import { scalePrintRepeat } from "./_core/studio/ops/scaleRepeat";
+import type { RasterMask } from "./_core/masking/types";
 
 /**
  * Deterministic density (D-C): SAM2 fabric raster + instance masks -> densityThin -> PNG.
@@ -86,6 +88,34 @@ export async function generateRecoloredImage(
     : originalImageUrl;
   const fabric = await getMaskProvider().getFabricMask({ url: srcUrl }); // classical floor (bbox)
   return separationRemap({ url: srcUrl }, fabric, params);
+}
+
+/** D-C no-op-billing guard: true if the raster has any included pixel. */
+function hasAnyPixel(raster: RasterMask): boolean {
+  for (let i = 0; i < raster.data.length; i++) if (raster.data[i] > 127) return true;
+  return false;
+}
+
+/** Sentinel: scale found no fabric region, so the op would be a no-op. */
+export const NO_OP_SCALE_ERROR = "NO_OP_SCALE";
+
+/** Deterministic scale (scale-live): SAM2 fabric raster + scalePrintRepeat -> PNG.
+ *  Throws NO_OP_SCALE_ERROR on an empty fabric raster so the caller's refund path
+ *  fires (D-C; scalePrintRepeat itself passes through on an empty mask, which would
+ *  otherwise bill for a no-op). No model call, no generative no-op guard. */
+export async function generateScaledImage(
+  originalImageUrl: string,
+  params: { targetFraction: number }
+): Promise<Buffer> {
+  const srcUrl = originalImageUrl.startsWith("/manus-storage/")
+    ? await storageGetSignedUrl(originalImageUrl.replace("/manus-storage/", ""))
+    : originalImageUrl;
+  const fabric = await getMaskProvider().getFabricMask({ url: srcUrl }); // SAM2 raster (combined_mask)
+  if (!fabric.raster || !hasAnyPixel(fabric.raster)) {
+    throw new Error(NO_OP_SCALE_ERROR);
+  }
+  const r = await scalePrintRepeat({ image: { url: srcUrl }, fabric, targetFraction: params.targetFraction });
+  return sharp(r.data, { raw: { width: r.width, height: r.height, channels: 4 } }).png().toBuffer();
 }
 
 /** Sentinel error: the model returned an image that did not apply the requested edit. */
