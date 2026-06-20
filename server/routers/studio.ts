@@ -7,8 +7,8 @@ import { TRPCError } from "@trpc/server";
 import { router } from "../_core/trpc";
 import { tenantProcedure } from "../tenancy";
 import { storagePut } from "../storage";
-import { detectPrintElements, generateEditedImage } from "../aiEngine";
-import { hybridScale } from "../hybridScale";
+import { detectPrintElements, generateEditedImage, generateRecoloredImage } from "../aiEngine";
+import { ENV } from "../_core/env";
 import {
   createJob,
   updateJobStatus,
@@ -25,7 +25,7 @@ import {
   getTrialStatus,
   analyzeTrialUsage,
 } from "../studioDb";
-import { buildInstruction, computeCredits, type ControlSettings } from "../../shared/controls";
+import { buildInstruction, computeCredits, describeExpectedChange, resolveTargetColorHex, type ControlSettings } from "../../shared/controls";
 import { CREDIT_COST, LOW_BALANCE_THRESHOLD, PLANS, TRIAL_DURATION_DAYS, TRIAL_RECOMMENDATION_START_DAY } from "../../shared/billing";
 import { sanitizeElementName, sanitizeColorValue, MAX_ELEMENT_NAME_LENGTH } from "../../shared/sanitize";
 
@@ -109,6 +109,7 @@ export const studioRouter = router({
           recolor: z.object({
             enabled: z.boolean(),
             element: z.string().max(MAX_ELEMENT_NAME_LENGTH).transform(sanitizeElementName),
+            fromColor: z.string().max(30).default(""),
             targetColor: z.string().max(30).transform(sanitizeColorValue),
             coverage: z.number().min(10).max(100),
           }),
@@ -145,6 +146,20 @@ export const studioRouter = router({
         });
       }
 
+      // A2 live route: recolor-ONLY jobs go through the deterministic op (classical
+      // provider, no SAM2) when STUDIO_RECOLOR_LIVE is on. Everything else (combined
+      // or non-recolor) stays on the existing prompt path.
+      const recolorOnly =
+        controls.recolor.enabled && !controls.scale.enabled &&
+        !controls.density.enabled && !controls.remove.enabled;
+      const useDeterministicRecolor = ENV.studioRecolorLive && recolorOnly;
+      if (useDeterministicRecolor && !controls.recolor.fromColor) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Source color is required for recolor. Click the print color to sample it.",
+        });
+      }
+
       const creditCost = computeCredits(controls, CREDIT_COST);
 
       if (creditCost === 0) {
@@ -159,8 +174,9 @@ export const studioRouter = router({
         });
       }
 
-      // Build instruction
+      // Build instruction + the expected-change description used by the no-op guard.
       const instruction = buildInstruction(controls);
+      const expectation = describeExpectedChange(controls);
 
       // Deduct credits (atomic; throws if a concurrent balance race loses).
       let newBalance: number;
@@ -190,10 +206,6 @@ export const studioRouter = router({
       });
 
       // Generate variations in parallel — each is an independent AI call.
-      // EXCEPTION: If ONLY scale is enabled, use the hybrid pipeline (SAM2 + programmatic resize)
-      // because AI models cannot reliably perform geometric scaling.
-      const isScaleOnly = controls.scale.enabled && !controls.density.enabled && !controls.remove.enabled && !controls.recolor.enabled;
-
       const existingVariations = await getJobVariations(job.id);
       const nextRound = existingVariations.length > 0
         ? Math.max(...existingVariations.map((v) => v.round)) + 1
@@ -201,19 +213,19 @@ export const studioRouter = router({
 
       const settled = await Promise.allSettled(
         Array.from({ length: controls.variations }, async (_unused, i) => {
-          console.log(`[studio] Generating variation ${i + 1} for job ${job.id}${isScaleOnly ? ' (hybrid scale)' : ''}`);
-
-          let resultUrl: string;
-          if (isScaleOnly) {
-            // Use hybrid pipeline: SAM2 segmentation → programmatic resize → composite
-            const scaleResult = await hybridScale(job.originalUrl, controls.scale.percent);
-            resultUrl = scaleResult.url;
-            console.log(`[studio] Hybrid scale complete: ${scaleResult.motifsScaled} motifs scaled`);
-          } else {
-            // Use AI-only pipeline for other controls (or combined controls)
-            resultUrl = await generateEditedImage(job.originalUrl, instruction);
+          console.log(`[studio] Generating variation ${i + 1} for job ${job.id}`);
+          if (useDeterministicRecolor) {
+            const png = await generateRecoloredImage(job.originalUrl, {
+              fromColor: controls.recolor.fromColor,
+              toColor: resolveTargetColorHex(controls.recolor.targetColor),
+              coverage: controls.recolor.coverage,
+            });
+            const key = `studio/${ctx.tenant.id}/${job.id}/recolor-${nextRound}.png`;
+            const { url } = await storagePut(key, png, "image/png");
+            await addVariation({ jobId: job.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: nextRound });
+            return { url, key };
           }
-
+          const resultUrl = await generateEditedImage(job.originalUrl, instruction, "image/jpeg", expectation);
           await addVariation({
             jobId: job.id,
             tenantId: ctx.tenant.id,
@@ -411,6 +423,7 @@ export const studioRouter = router({
 
       // Create new job
       const instruction = buildInstruction(controls);
+      const expectation = describeExpectedChange(controls);
       const newJob = await createJob({
         tenantId: ctx.tenant.id,
         userId: ctx.user?.id ?? 0,
@@ -427,7 +440,7 @@ export const studioRouter = router({
       // Generate in background (don't block response)
       (async () => {
         try {
-          const resultUrl = await generateEditedImage(originalJob.originalUrl, instruction);
+          const resultUrl = await generateEditedImage(originalJob.originalUrl, instruction, "image/jpeg", expectation);
           const key = `studio/${ctx.tenant.id}/${newJob.id}/result-1.png`;
           const { url } = await storagePut(key, Buffer.from(await (await fetch(resultUrl)).arrayBuffer()), "image/png");
           await addVariation({ jobId: newJob.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: 1 });

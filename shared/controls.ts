@@ -28,6 +28,9 @@ export interface RecolorControl {
   enabled: boolean;
   /** Natural-language element name to recolor, e.g. "pink blossoms". */
   element: string;
+  /** Source print color (hex) sampled via the swatch/eyedropper; identifies the
+   *  separation to recolor for the deterministic op. */
+  fromColor: string;
   /** Target color name or hex code, e.g. "coral", "deep navy", "#2A4B7C". */
   targetColor: string;
   /** Optional: coverage percentage — what percent of the selected element to recolor (default 100). */
@@ -73,12 +76,36 @@ export const RECOLOR_PRESETS = [
   { name: "Champagne Gold", value: "champagne gold" },
 ] as const;
 
+/** Pinned hex for the descriptive preset names (not CSS colors). v1 swatches. */
+export const RECOLOR_PRESET_HEX: Record<string, string> = {
+  "coral": "#FF7F50",
+  "deep navy": "#14233A",
+  "sage green": "#9CAF88",
+  "dusty rose": "#C4979B",
+  "ivory": "#FFFFF0",
+  "burnt sienna": "#E97451",
+  "cobalt blue": "#0047AB",
+  "chartreuse": "#7FFF00",
+  "mauve": "#E0B0FF",
+  "terracotta": "#E2725B",
+  "midnight black": "#0B0B0B",
+  "champagne gold": "#F7E7CE",
+};
+
+/**
+ * Resolve a recolor target (preset name | CSS name | hex) to a string the op's
+ * hexToLab can parse. Presets map to pinned hex; everything else passes through.
+ */
+export function resolveTargetColorHex(input: string): string {
+  return RECOLOR_PRESET_HEX[input.trim().toLowerCase()] ?? input;
+}
+
 export function defaultControls(): ControlSettings {
   return {
     scale: { enabled: false, percent: 0 },
     density: { enabled: false, percent: 0 },
     remove: { enabled: false, element: "", percent: 0 },
-    recolor: { enabled: false, element: "", targetColor: "", coverage: 100 },
+    recolor: { enabled: false, element: "", fromColor: "", targetColor: "", coverage: 100 },
     variations: 1,
   };
 }
@@ -234,8 +261,43 @@ export function buildInstruction(c: ControlSettings): string {
     "- Same lighting, white balance, and shadow placement.\n" +
     "- The hanger, clips, mannequin, or surface must remain pixel-identical.\n" +
     "- No watermarks, text overlays, or border artifacts.\n" +
-    "- If you cannot perform the edit without moving the garment, return the image unchanged rather than rotating it."
+    "- You MUST apply the requested change. Do NOT return the image unchanged. " +
+    "Preserve the garment's position and orientation, but the print modification above is REQUIRED."
   );
+}
+
+/**
+ * Human-readable description of the visible change a given control set should
+ * produce. Used by the server-side no-op guard (and, later, the eval harness)
+ * to verify the edited image actually differs from the original as requested.
+ * Returns "" when no change is expected.
+ */
+export function describeExpectedChange(c: ControlSettings): string {
+  const parts: string[] = [];
+
+  if (c.scale.enabled && c.scale.percent !== 0) {
+    parts.push(
+      c.scale.percent < 0
+        ? "the printed motifs are visibly SMALLER (reduced print scale), with more plain background fabric showing between them"
+        : "the printed motifs are visibly LARGER (enlarged print scale), filling more of the fabric surface"
+    );
+  }
+  if (c.density.enabled && c.density.percent > 0) {
+    parts.push(
+      "there are visibly FEWER printed motifs (the print is thinned out, with more bare background fabric showing)"
+    );
+  }
+  if (c.remove.enabled && c.remove.element && c.remove.percent > 0) {
+    const el = sanitizeElementName(c.remove.element);
+    if (el) parts.push(`some "${el}" motifs have been erased/removed from the fabric`);
+  }
+  if (c.recolor.enabled && c.recolor.element && c.recolor.targetColor) {
+    const el = sanitizeElementName(c.recolor.element);
+    const color = sanitizeColorValue(c.recolor.targetColor);
+    if (el && color) parts.push(`the "${el}" motifs have been recolored toward "${color}"`);
+  }
+
+  return parts.join("; ");
 }
 
 /** How many credits a given control settings job will consume. */

@@ -12,6 +12,26 @@ import { invokeLLM } from "./_core/llm";
 import { generateImage } from "./_core/imageGeneration";
 import { storageGetSignedUrl } from "./storage";
 import { fetchWithTimeout, TIMEOUT } from "./fetchTimeout";
+import { ENV } from "./_core/env";
+import { getMaskProvider } from "./_core/masking";
+import { separationRemap } from "./_core/studio/ops/separationRemap";
+
+/** Deterministic recolor (A2): classical fabric mask + separationRemap -> PNG bytes.
+ *  Caller (studio.generate) stores the buffer + records the variation. No model
+ *  call, no no-op guard (the op always applies). */
+export async function generateRecoloredImage(
+  originalImageUrl: string,
+  params: { fromColor: string; toColor: string; coverage: number }
+): Promise<Buffer> {
+  const srcUrl = originalImageUrl.startsWith("/manus-storage/")
+    ? await storageGetSignedUrl(originalImageUrl.replace("/manus-storage/", ""))
+    : originalImageUrl;
+  const fabric = await getMaskProvider().getFabricMask({ url: srcUrl }); // classical floor (bbox)
+  return separationRemap({ url: srcUrl }, fabric, params);
+}
+
+/** Sentinel error: the model returned an image that did not apply the requested edit. */
+export const NO_OP_EDIT_ERROR = "NO_OP_EDIT";
 
 /** Maximum image size allowed for generation (5MB). Larger images are rejected. */
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
@@ -137,10 +157,100 @@ async function downloadImageAsBase64(
   };
 }
 
+/** Resolve a storage path or URL into a URL the LLM service can fetch. */
+async function resolveAccessibleUrl(url: string): Promise<string> {
+  if (url.startsWith("/manus-storage/")) {
+    return storageGetSignedUrl(url.replace("/manus-storage/", ""));
+  }
+  return url;
+}
+
+/** Strict QA prompt for the no-op guard. */
+const NOOP_JUDGE_SYSTEM_PROMPT =
+  "You are a strict QA reviewer for a textile-print editing tool. You are shown an ORIGINAL " +
+  "garment photo and an EDITED version, plus a description of the change that was requested. " +
+  "Decide whether the requested change is ACTUALLY VISIBLE in the edited image compared to the " +
+  "original. Ignore minor differences from JPEG compression, resolution, or tiny lighting shifts. " +
+  "Set changed=false only when the two images are essentially identical for the requested change " +
+  "(i.e. the edit was not applied). Be confident: set a high confidence when the verdict is clear.";
+
+/**
+ * No-op guard: ask the vision LLM whether the requested edit is visible in the result.
+ * Returns "applied", "noop" (confident the edit did NOT happen), or "unknown" (could not
+ * judge — caller should fail open and keep the result rather than refunding).
+ */
+async function judgeEditApplied(
+  originalImageUrl: string,
+  resultImageUrl: string,
+  expectation: string
+): Promise<"applied" | "noop" | "unknown"> {
+  try {
+    const [origUrl, resUrl] = await Promise.all([
+      resolveAccessibleUrl(originalImageUrl),
+      resolveAccessibleUrl(resultImageUrl),
+    ]);
+
+    const response = await invokeLLM({
+      messages: [
+        { role: "system" as const, content: NOOP_JUDGE_SYSTEM_PROMPT },
+        {
+          role: "user" as const,
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Requested change: ${expectation}\n` +
+                `Image 1 is the ORIGINAL. Image 2 is the EDITED result. ` +
+                `Did the edited image actually apply the requested change versus the original?`,
+            },
+            { type: "image_url" as const, image_url: { url: origUrl, detail: "low" as const } },
+            { type: "image_url" as const, image_url: { url: resUrl, detail: "low" as const } },
+          ],
+        },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "edit_check",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              changed: { type: "boolean" },
+              confidence: { type: "number" },
+              reason: { type: "string" },
+            },
+            required: ["changed", "confidence", "reason"],
+            additionalProperties: false,
+          },
+        },
+      },
+    });
+
+    const raw = response.choices?.[0]?.message?.content ?? "{}";
+    const content = typeof raw === "string" ? raw : JSON.stringify(raw);
+    const parsed = JSON.parse(content) as { changed?: boolean; confidence?: number; reason?: string };
+    // Only declare a no-op when the judge is confident the edit did NOT happen.
+    if (parsed.changed === false && (parsed.confidence ?? 0) >= 0.8) {
+      console.warn(`[aiEngine] No-op guard flagged unchanged output: ${parsed.reason ?? ""}`);
+      return "noop";
+    }
+    return "applied";
+  } catch (err: any) {
+    // Fail open: never block a result because the judge itself failed.
+    console.error(`[aiEngine] No-op guard could not evaluate result:`, err?.message || err);
+    return "unknown";
+  }
+}
+
 /**
  * Generate an edited image based on the instruction and original image.
  * Downloads the image server-side and passes it as base64 to avoid URL accessibility issues.
  * Returns the URL of the generated result stored in S3.
+ *
+ * When `expectation` is provided and the no-op guard is enabled, the result is QA-checked
+ * against the original; if the requested change was not applied, it retries once and then
+ * throws `NO_OP_EDIT_ERROR` so the caller can refund instead of billing for a no-op.
  *
  * Timeouts:
  * - Image download: 30 seconds
@@ -149,7 +259,8 @@ async function downloadImageAsBase64(
 export async function generateEditedImage(
   originalImageUrl: string,
   instruction: string,
-  mimeType: string = "image/jpeg"
+  mimeType: string = "image/jpeg",
+  expectation?: string
 ): Promise<string> {
   // Resolve the download URL
   let downloadUrl: string;
@@ -168,20 +279,39 @@ export async function generateEditedImage(
 
   console.log(`[aiEngine] Calling generateImage, prompt length: ${instruction.length} chars`);
 
-  try {
-    const result = await generateImage({
+  const runGeneration = () =>
+    generateImage({
       prompt: instruction,
-      originalImages: [
-        {
-          b64Json: imageBase64,
-          mimeType: resolvedMimeType,
-        },
-      ],
+      originalImages: [{ b64Json: imageBase64, mimeType: resolvedMimeType }],
     });
 
+  try {
+    const result = await runGeneration();
     if (!result.url) {
       throw new Error("Image generation returned no URL");
     }
+
+    // No-op guard: verify the requested change was actually applied.
+    const guardActive = ENV.studioNoOpGuard && !!expectation;
+    if (guardActive) {
+      const verdict = await judgeEditApplied(originalImageUrl, result.url, expectation!);
+      if (verdict === "noop") {
+        console.warn(`[aiEngine] Edit not applied; retrying once.`);
+        const retry = await runGeneration();
+        if (!retry.url) {
+          throw new Error("Image generation returned no URL");
+        }
+        const retryVerdict = await judgeEditApplied(originalImageUrl, retry.url, expectation!);
+        if (retryVerdict === "noop") {
+          throw new Error(
+            `${NO_OP_EDIT_ERROR}: the model returned an unchanged image after retry`
+          );
+        }
+        console.log(`[aiEngine] Retry applied the edit, result stored.`);
+        return retry.url;
+      }
+    }
+
     console.log(`[aiEngine] Generation successful, result stored.`);
     return result.url;
   } catch (err: any) {

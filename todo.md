@@ -327,3 +327,15 @@
 - [x] Generate SAM2 truth mask for black-floral-skirt via Replicate (meta/sam-2)
 - [x] Run eval with truth mask: pink→navy PASS (offBg=1.18), blue→amber RASTER-NEEDED (offBg=2.14)
 - [x] Verify structural blindness fix: no-truth case correctly shows "blind" instead of 0.00
+
+## Full Claude Branch Merge (afac00a)
+- [x] Merged A2 recolor live wiring (generateRecoloredImage + router gate + STUDIO_RECOLOR_LIVE flag)
+- [x] Merged deterministic Scale op (scaleRepeat.ts + tile.ts + scaleMetrics.ts)
+- [x] Merged deterministic Density op (densityThin.ts + infill.ts + stratifiedSelect.ts + densityMetrics.ts)
+- [x] Merged SAM2 provider (sam2Provider.ts + replicateSam2.ts + sam2Mask.ts — full implementation)
+- [x] Merged fromColor eyedropper picker in ControlPanel
+- [x] Merged resolveTargetColorHex preset mapping
+- [x] Merged describeExpectedChange + no-op guard (judgeEditApplied)
+- [x] Merged cluster selection fix (separationRemap latest)
+- [x] All 170 tests passing, TypeScript clean
+- [x] All features dark-launched behind flags (defaults OFF)

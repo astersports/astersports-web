@@ -13,6 +13,7 @@ import {
   MaskNotImplementedError,
   MaskProviderUnavailableError,
 } from "./_core/masking";
+import { defaultSam2Client } from "./_core/masking/replicateSam2";
 
 const mockLLM = invokeLLM as unknown as ReturnType<typeof vi.fn>;
 
@@ -29,9 +30,9 @@ describe("getMaskProvider", () => {
     expect(getMaskProvider("sam2").name).toBe("sam2");
   });
 
-  it("neither provider reports rasterReady yet (gated on S3 / D1)", () => {
+  it("rasterReady: classical floor false (bbox only), sam2 true (D1 = Option 2)", () => {
     expect(getMaskProvider("classical").rasterReady).toBe(false);
-    expect(getMaskProvider("sam2").rasterReady).toBe(false);
+    expect(getMaskProvider("sam2").rasterReady).toBe(true);
   });
 });
 
@@ -91,9 +92,9 @@ describe("classical provider", () => {
 });
 
 describe("sam2 provider", () => {
-  it("is unavailable until hosting is provisioned (D1/S5)", async () => {
+  it("default Replicate client is unavailable until provisioned (no token)", async () => {
     await expect(
-      getMaskProvider("sam2").getFabricMask({ url: "http://example.com/garment.jpg" })
+      defaultSam2Client().boxMask("data:image/png;base64,xx", [0, 0, 1, 1])
     ).rejects.toBeInstanceOf(MaskProviderUnavailableError);
   });
 });
