@@ -7,8 +7,9 @@ import { TRPCError } from "@trpc/server";
 import { router } from "../_core/trpc";
 import { tenantProcedure } from "../tenancy";
 import { storagePut } from "../storage";
-import { detectPrintElements, generateEditedImage, generateRecoloredImage, generateDensityImage } from "../aiEngine";
+import { detectPrintElements, generateEditedImage, generateRecoloredImage, generateDensityImage, generateScaledImage } from "../aiEngine";
 import { ENV } from "../_core/env";
+import { getMaskProvider } from "../_core/masking";
 import {
   createJob,
   updateJobStatus,
@@ -168,6 +169,39 @@ export const studioRouter = router({
         !controls.recolor.enabled && !controls.remove.enabled;
       const useDeterministicDensity = ENV.studioDensityLive && densityOnly;
 
+      // Scale-live route: scale-ONLY jobs go through scalePrintRepeat when
+      // STUDIO_SCALE_LIVE is on AND the provider serves rasters. Dark by default.
+      const scaleOnly =
+        controls.scale.enabled && controls.scale.percent !== 0 &&
+        !controls.recolor.enabled && !controls.density.enabled && !controls.remove.enabled;
+      const scaleRasterReady = getMaskProvider().rasterReady;
+      const useDeterministicScale = ENV.studioScaleLive && scaleOnly && scaleRasterReady;
+      // D-A: reject scale combined with other edits, gated on the live flag +
+      // rasterReady (pre-deduct; flag off => unchanged). Chaining is deferred.
+      if (
+        ENV.studioScaleLive && scaleRasterReady &&
+        controls.scale.enabled && controls.scale.percent !== 0 && !scaleOnly
+      ) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Scale can't yet combine with other edits — run it separately.",
+        });
+      }
+      // D-B: live flag on but provider not rasterReady (misconfig / SAM2 down) ->
+      // fall back to the prompt path + WARN with job + org context. (R4: once the
+      // locked prompt makes rasterReady provisioning-aware, this becomes the
+      // primary gate; the static flag here is the dark-build placeholder.)
+      if (ENV.studioScaleLive && !scaleRasterReady && scaleOnly) {
+        console.warn(
+          `[studio] scale-live on but provider not rasterReady; prompt-path fallback. job=${job.id} org=${ctx.tenant.id}`
+        );
+      }
+      // TODO(locked scale prompt + IoU): Decision 1 non-repeat guard — reject
+      // pre-deduct when periodConfidence < the eval-set threshold ("Scale supports
+      // repeating prints; this reads as a single placed graphic"). Exact placement
+      // (pre-deduct segmentation reuse) + threshold are pinned by the locked prompt;
+      // deferred while the route is dark.
+
       const creditCost = computeCredits(controls, CREDIT_COST);
 
       if (creditCost === 0) {
@@ -245,6 +279,15 @@ export const studioRouter = router({
             }
             // Provider degraded (D-B): fall through to prompt path below.
             console.warn(`[studio] Density provider degraded for job ${job.id}; falling back to prompt path.`);
+          }
+          if (useDeterministicScale) {
+            const png = await generateScaledImage(job.originalUrl, {
+              targetFraction: (100 + controls.scale.percent) / 100,
+            });
+            const key = `studio/${ctx.tenant.id}/${job.id}/scale-${nextRound}.png`;
+            const { url } = await storagePut(key, png, "image/png");
+            await addVariation({ jobId: job.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: nextRound });
+            return { url, key };
           }
           const resultUrl = await generateEditedImage(job.originalUrl, instruction, "image/jpeg", expectation);
           await addVariation({

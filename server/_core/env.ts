@@ -25,20 +25,14 @@ export const ENV = {
   maskProvider: (process.env.STUDIO_MASK_PROVIDER === "sam2" ? "sam2" : "classical") as
     | "classical"
     | "sam2",
-  /**
-   * Route the Recolor control through the deterministic separation-remap op
-   * (A1) instead of the generative path. Default off — generative recolor stays
-   * the fallback until A1 clears its eval gate. Requires a source color input.
-   */
-  studioDeterministicRecolor: process.env.STUDIO_DETERMINISTIC_RECOLOR === "true",
-  /** A2: Route recolor-only jobs through the deterministic op in the live money
-   *  path. Distinct from the eval flag above — this is the production route.
-   *  Default off; flip after Architect verifies afac00a. */
+  /** A2: route recolor-only jobs through the deterministic separation-remap op in
+   *  the live money path. Default off; flip after Architect verifies afac00a. */
   studioRecolorLive: process.env.STUDIO_RECOLOR_LIVE === "true",
-  /** Route Scale through the deterministic scalePrintRepeat op. Eval-only; default off. */
-  studioDeterministicScale: process.env.STUDIO_DETERMINISTIC_SCALE === "true",
-  /** Route Density through the deterministic thinDensity op. Eval-only; default off. */
-  studioDeterministicDensity: process.env.STUDIO_DETERMINISTIC_DENSITY === "true",
+  /** Scale-live: route scale-only jobs through scalePrintRepeat in the money path.
+   *  Default off — lands dark; flip after the per-route real-garment eval passes.
+   *  (Decision 5: the dead STUDIO_DETERMINISTIC_* eval flags were removed here —
+   *  the scale/density/recolor eval runners invoke the ops directly, never gated.) */
+  studioScaleLive: process.env.STUDIO_SCALE_LIVE === "true",
   /** D-C: Route density-only jobs through the deterministic densityThin op in the
    *  live money path. Requires SAM2 (raster + instances). Default off; flip after
    *  real-garment eval confirms countError <= 0.10 on production imagery. */
