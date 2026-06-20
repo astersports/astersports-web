@@ -92,3 +92,46 @@ the target set and is silently recolored — **read the PNGs**, they're primary.
 
 target + lum pass on real samples; off-ΔE failures characterized as bbox-only
 artifacts that the raster mask resolves.
+
+---
+
+# Scale & Density eval (Phase B/C)
+
+Offline acceptance gates for `scaleRepeat` / `densityThin`, mirroring the recolor
+harness. Unlike recolor (which runs at a bbox floor), **scale and density
+hard-require a fabric RASTER**, so each case supplies a local fabric-mask PNG; the
+same mask is the op's raster AND the metric's truth, so the background ΔE signal is
+real (and, like recolor's `offBg`, **excluded from `verdict.pass`**).
+
+## Files per garment
+| file | role |
+|---|---|
+| `*.jpg` | the garment image (`imageUrl`) |
+| `*.mask.png` | fabric truth mask — non-near-black = fabric (`maskUrl`) |
+| `*.instances.png` | **density only** — instance label map, one distinct colour per motif (`labelUrl`) |
+
+## Make the instance label map from SAM2 masks
+SAM2 (`autoSegment`) returns one binary mask per motif. Turn a directory of those
+into a label map:
+
+```
+npx tsx server/_core/studio/eval/buildLabelMap.ts <masksDir> eval/samples/<g>.instances.png [<g>.jpg]
+```
+Ground stays black; each instance gets a unique bright colour that
+`loadInstanceLabelMap` reads back as a distinct motif.
+
+## Run
+```
+npx tsx server/_core/studio/eval/scaleEval.ts   eval/samples/scale.manifest.json
+npx tsx server/_core/studio/eval/densityEval.ts eval/samples/density.manifest.json
+```
+See `scale.manifest.example.json` / `density.manifest.example.json` for the case
+shape. Side-by-side PNGs land in `eval/out/` (gitignored).
+
+## Verdicts (op correctness only; background ΔE reported, excluded)
+- **Scale** — `scaleRatioError ≤ 0.15` && `paletteDeltaE ≤ 5`. `poseBgDeltaE` is the
+  D1/mask signal, excluded. Estimator is autocorrelation period (area-ratio fallback
+  needs instance areas, not supplied here).
+- **Density** — `countError ≤ 0.10` && `survivorIntegrity ≤ 2` && `evenness ≤ 1.5`
+  && `infillCleanliness ≤ 2.5`. `bgDeltaE` excluded. Counts/evenness score against
+  the label map.
