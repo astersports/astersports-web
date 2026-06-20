@@ -5,9 +5,9 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router } from "../_core/trpc";
-import { tenantProcedure, tenantAdminProcedure } from "../tenancy";
+import { tenantProcedure, tenantAdminProcedure, tenantOwnerProcedure } from "../tenancy";
 import { stripe } from "../stripe";
-import { getCreditHistory, updateTenantStripe, grantCredits } from "../studioDb";
+import { getCreditHistory, updateTenantStripe, grantCredits, getTrialStatus } from "../studioDb";
 import { PLANS, TOPUP_PACKS, type PlanKey } from "../../shared/billing";
 
 // ─── Stripe Product/Price cache for Studio ───────────────────────────────────
@@ -193,5 +193,55 @@ export const studioBillingRouter = router({
       stripeCustomerId: ctx.tenant.stripeCustomerId,
       stripeSubscriptionId: ctx.tenant.stripeSubscriptionId,
     };
+  }),
+
+  /** Enriched billing status with trial info, role, and subscription details. */
+  billingStatus: tenantProcedure.query(async ({ ctx }) => {
+    const trial = getTrialStatus(ctx.tenant);
+    const role = ctx.membership.role;
+    const isOwner = role === "owner";
+
+    return {
+      role,
+      isOwner,
+      plan: ctx.tenant.plan,
+      creditBalance: ctx.tenant.creditBalance,
+      seats: ctx.tenant.seats,
+      stripeCustomerId: ctx.tenant.stripeCustomerId,
+      stripeSubscriptionId: ctx.tenant.stripeSubscriptionId,
+      trial: {
+        inTrial: trial.inTrial,
+        daysRemaining: trial.daysRemaining,
+        trialDay: trial.trialDay,
+        expired: trial.expired,
+        trialCredits: ctx.tenant.trialCredits,
+        trialStartedAt: ctx.tenant.trialStartedAt?.toISOString() ?? null,
+      },
+    };
+  }),
+
+  /** Cancel trial — owner only. Cancels the Stripe subscription if exists. */
+  cancelTrial: tenantOwnerProcedure.mutation(async ({ ctx }) => {
+    if (!ctx.tenant.stripeSubscriptionId) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "No active subscription to cancel" });
+    }
+    await stripe.subscriptions.cancel(ctx.tenant.stripeSubscriptionId);
+    await updateTenantStripe(ctx.tenant.id, {
+      stripeSubscriptionId: undefined,
+      plan: "none",
+    });
+    return { success: true };
+  }),
+
+  /** Start plan now — owner only. Ends trial immediately and activates the plan. */
+  startNow: tenantOwnerProcedure.mutation(async ({ ctx }) => {
+    if (!ctx.tenant.stripeSubscriptionId) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "No subscription to activate" });
+    }
+    // End trial immediately by updating the subscription
+    await stripe.subscriptions.update(ctx.tenant.stripeSubscriptionId, {
+      trial_end: "now",
+    });
+    return { success: true };
   }),
 });

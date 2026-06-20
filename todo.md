@@ -405,3 +405,15 @@
 
 ## Density Generation Fix
 - [x] Fix SAM2 404: REPLICATE_SAM2_MODEL was set to bare slug 'meta/sam-2' causing SDK to hit deprecated /models/meta/sam-2/predictions endpoint; updated to 'meta/sam-2:fe97b453...' so SDK uses /predictions with version body
+
+## Billing Screen Rebuild (Spec Screen 3)
+- [x] Rebuild StudioBilling.tsx with role-gated views (owner/admin/member)
+- [x] Add trial countdown card with progress track (amber gradient, days-left counter)
+- [x] Add trial timeline card (Day 0/4/6/7 steps with done/now/future nodes)
+- [x] Add payment method card (owner-only, links to Stripe portal)
+- [x] Add credit packs section (owner-only purchase, visible to all)
+- [x] Add subscription plans section (owner-only subscribe, visible to all)
+- [x] Add "Start plan now" and "Cancel trial" actions (owner-only)
+- [x] Gate billing management buttons by role (owner sees all, admin sees read-only, member sees balance only)
+- [x] Add backend billingStatus procedure with trial + subscription + payment info
+- [x] Write tests for role gating

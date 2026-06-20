@@ -65,3 +65,13 @@ export const tenantAdminProcedure = tenantProcedure.use(async ({ ctx, next }) =>
   }
   return next({ ctx });
 });
+
+export const tenantOwnerProcedure = tenantProcedure.use(async ({ ctx, next }) => {
+  if (ctx.membership.role !== "owner") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Only the account owner can perform this action",
+    });
+  }
+  return next({ ctx });
+});
