@@ -1,0 +1,41 @@
+# M16 — mechanical gate for audit-class regressions. Runs the two checks we rely
+# on by hand all session: the TypeScript type-check and the vitest suite. A red
+# check blocks the merge button, so a type error or a broken test can't ride into
+# main unnoticed.
+#
+# Credential-dependent tests (live RESEND/REPLICATE/OWNER/STRIPE) skip themselves
+# when their secret is absent (it.skipIf), so the suite is green in a clean CI
+# environment and still runs fully where the secrets exist.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    name: typecheck + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        # Version comes from package.json "packageManager"; specifying it here too
+        # makes the action error with ERR_PNPM_BAD_PM_VERSION.
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run check
+
+      - name: Tests
+        run: pnpm run test

@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 
 describe("Owner Environment", () => {
-  it("VITE_OWNER_OPEN_ID matches OWNER_OPEN_ID", () => {
+  // Env-parity assertion: only meaningful where the owner env is configured.
+  // Skipped in a clean environment (CI) where these secrets are absent.
+  it.skipIf(!process.env.OWNER_OPEN_ID)("VITE_OWNER_OPEN_ID matches OWNER_OPEN_ID", () => {
     const ownerOpenId = process.env.OWNER_OPEN_ID;
     const viteOwnerOpenId = process.env.VITE_OWNER_OPEN_ID;
 
