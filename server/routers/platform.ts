@@ -121,7 +121,7 @@ export const platformRouter = router({
         type: "firm",
         plan: input.plan,
         seats: input.seats,
-        creditBalance: input.initialCredits,
+        creditBalance: 0,
         allowedEmailDomain: input.domainLock || null,
       });
 
@@ -147,17 +147,11 @@ export const platformRouter = router({
         }
       }
 
-      // Record initial credits in ledger if any
+      // Grant initial credits. grantCredits sets the balance AND writes the
+      // matching append-only ledger row with a correct balanceAfter, so this is
+      // the single source of truth — no manual creditBalance write afterward.
       if (input.initialCredits > 0) {
         await grantCredits(tenant.id, input.initialCredits, "grant", undefined, undefined);
-        // grantCredits adds to balance, but we already set it, so adjust
-        // Actually createTenant already set creditBalance, and grantCredits adds on top.
-        // Fix: set initial to 0 and let grantCredits handle it.
-        // Re-adjust: subtract the double-count
-        await db
-          .update(tenants)
-          .set({ creditBalance: input.initialCredits })
-          .where(eq(tenants.id, tenant.id));
       }
 
       return tenant;
