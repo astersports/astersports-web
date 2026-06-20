@@ -1,0 +1,26 @@
+[
+  {
+    "id": "synthetic-shrink-50",
+    "imageUrl": "eval/samples/synthetic-pink-circle.png",
+    "targetFraction": 0.5,
+    "bbox": { "x": 0, "y": 0, "w": 1, "h": 1 },
+    "rasterUrl": "eval/samples/synthetic-scale-raster.png",
+    "note": "Synthetic: full-image raster, shrink 50%. Mirror-tile should fill."
+  },
+  {
+    "id": "synthetic-enlarge-130",
+    "imageUrl": "eval/samples/synthetic-pink-circle.png",
+    "targetFraction": 1.3,
+    "bbox": { "x": 0, "y": 0, "w": 1, "h": 1 },
+    "rasterUrl": "eval/samples/synthetic-scale-raster.png",
+    "note": "Synthetic: full-image raster, enlarge 30%. Center-crop."
+  },
+  {
+    "id": "synthetic-passthrough",
+    "imageUrl": "eval/samples/synthetic-pink-circle.png",
+    "targetFraction": 1.0,
+    "bbox": { "x": 0, "y": 0, "w": 1, "h": 1 },
+    "rasterUrl": "eval/samples/synthetic-scale-raster.png",
+    "note": "Synthetic: identity fraction — passthrough."
+  }
+]

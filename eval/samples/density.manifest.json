@@ -1,0 +1,46 @@
+[
+  {
+    "id": "synthetic-density-30",
+    "imageUrl": "eval/samples/synthetic-density-scene.png",
+    "percent": 30,
+    "bbox": {
+      "x": 0,
+      "y": 0,
+      "w": 1,
+      "h": 1
+    },
+    "rasterUrl": "eval/samples/synthetic-density-raster.png",
+    "instanceLabelsUrl": "eval/samples/synthetic-density-instances.png",
+    "truthMaskUrl": "eval/samples/synthetic-density-raster.png",
+    "note": "Synthetic: 9 dots, remove 30% (~3 dots). Full-image raster."
+  },
+  {
+    "id": "synthetic-density-50",
+    "imageUrl": "eval/samples/synthetic-density-scene.png",
+    "percent": 50,
+    "bbox": {
+      "x": 0,
+      "y": 0,
+      "w": 1,
+      "h": 1
+    },
+    "rasterUrl": "eval/samples/synthetic-density-raster.png",
+    "instanceLabelsUrl": "eval/samples/synthetic-density-instances.png",
+    "truthMaskUrl": "eval/samples/synthetic-density-raster.png",
+    "note": "Synthetic: 9 dots, remove 50% (~5 dots). Tests evenness on small grid."
+  },
+  {
+    "id": "synthetic-density-0",
+    "imageUrl": "eval/samples/synthetic-density-scene.png",
+    "percent": 0,
+    "bbox": {
+      "x": 0,
+      "y": 0,
+      "w": 1,
+      "h": 1
+    },
+    "rasterUrl": "eval/samples/synthetic-density-raster.png",
+    "instanceLabelsUrl": "eval/samples/synthetic-density-instances.png",
+    "note": "Synthetic: passthrough — percent=0, removed=0."
+  }
+]

@@ -1,0 +1,43 @@
+[
+  {
+    "id": "skirt-density-30",
+    "imageUrl": "eval/samples/black-floral-skirt.jpg",
+    "percent": 30,
+    "bbox": { "x": 0.27, "y": 0.16, "w": 0.46, "h": 0.78 },
+    "rasterUrl": "eval/samples/black-floral-skirt.mask.png",
+    "instanceLabelsUrl": "eval/samples/black-floral-skirt.instances.png",
+    "truthMaskUrl": "eval/samples/black-floral-skirt.mask.png",
+    "note": "REAL hanger sample, OFFLINE. Remove 30% of motifs. Requires instance label PNG (each color = one motif)."
+  },
+  {
+    "id": "skirt-density-50",
+    "imageUrl": "eval/samples/black-floral-skirt.jpg",
+    "percent": 50,
+    "bbox": { "x": 0.27, "y": 0.16, "w": 0.46, "h": 0.78 },
+    "rasterUrl": "eval/samples/black-floral-skirt.mask.png",
+    "instanceLabelsUrl": "eval/samples/black-floral-skirt.instances.png",
+    "truthMaskUrl": "eval/samples/black-floral-skirt.mask.png",
+    "note": "Higher removal — tests stratified selection evenness at 50%."
+  },
+  {
+    "id": "skirt-density-0",
+    "imageUrl": "eval/samples/black-floral-skirt.jpg",
+    "percent": 0,
+    "bbox": { "x": 0.27, "y": 0.16, "w": 0.46, "h": 0.78 },
+    "rasterUrl": "eval/samples/black-floral-skirt.mask.png",
+    "instanceLabelsUrl": "eval/samples/black-floral-skirt.instances.png",
+    "note": "Passthrough — percent=0 should return original unchanged, removed=0."
+  },
+  {
+    "id": "dense-print-30",
+    "imageUrl": "/manus-storage/studio/SAMPLE/dense-ditsy-floral.jpg",
+    "percent": 30,
+    "note": "AUTO mode (needs SAM2 creds). Dense ditsy print — many small motifs. Tests instance segmentation quality + stratified selection on high-n."
+  },
+  {
+    "id": "sparse-print-50",
+    "imageUrl": "/manus-storage/studio/SAMPLE/sparse-polka-dot.jpg",
+    "percent": 50,
+    "note": "AUTO mode. Sparse polka dots — few motifs. Tests small-n count granularity (round(n*percent/100) coarseness)."
+  }
+]
