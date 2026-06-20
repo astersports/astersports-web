@@ -79,6 +79,8 @@ describe("computeRecolorMetrics", () => {
     const v = verdict(m);
     expect(v.offBackgroundPass).toBe(false);
     expect(v.offFabricPass).toBe(true);
+    // A1 op correctness PASSES despite background bleed — that's the mask/D1 decision.
+    expect(v.pass).toBe(true);
   });
 
   it("excludes the intended soft-edge band from both off-target metrics", () => {

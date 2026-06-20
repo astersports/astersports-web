@@ -39,7 +39,8 @@
     "toColor": "#1B2A4A",
     "coverage": 100,
     "bbox": { "x": 0.27, "y": 0.16, "w": 0.46, "h": 0.78 },
-    "note": "Stress the red-rim pull at full radius — watch offFab + the PNG (op-tuning, not raster)."
+    "truthMaskUrl": "eval/samples/black-floral-skirt.mask.png",
+    "note": "Add a SAM2 truth mask (white=skirt, black=wall) to measure offBg. White wall is far from pink, so expect offBg ~ small — this garment does NOT stress the raster signal."
   },
   {
     "id": "skirt-blue-amber-60",
@@ -49,5 +50,15 @@
     "coverage": 60,
     "bbox": { "x": 0.27, "y": 0.16, "w": 0.46, "h": 0.78 },
     "note": "Select the blue beaded clusters among black/pink/blue/green."
+  },
+  {
+    "id": "raster-stress-warm-on-wood",
+    "imageUrl": "eval/samples/warm-print-on-wood.jpg",
+    "fromColor": "#C98A5A",
+    "toColor": "#2E6E8E",
+    "coverage": 100,
+    "bbox": { "x": 0.10, "y": 0.10, "w": 0.80, "h": 0.80 },
+    "truthMaskUrl": "eval/samples/warm-print-on-wood.mask.png",
+    "note": "THE D1 RASTER SAMPLE (Architect's request): a warm print on a wood/peach surface (or on-body, skin near a warm motif). Background is color-near fromColor, so the bbox sweeps it in -> offBg should FAIL on bbox and land in RASTER-NEEDED. This is where SAM2 earns the spend."
   }
 ]

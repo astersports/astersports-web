@@ -4,20 +4,26 @@
  * Pure functions over raw RGBA buffers — no I/O, fully unit-testable.
  *
  * Set definition (op-agnostic): the harness splits pixels by the SOURCE color's
- * perceptual distance to `fromColor`, NOT by whether the op changed them — so it
- * can measure bleed (off-target pixels that changed) independently of the op.
- * Three bands by source distance to fromColor, plus the fabric/background split:
- *   - target        = fabric & ΔE2000(s, fromColor) <= near        (the separation)
- *   - excluded band = fabric & near < ΔE2000 <= far                (the op's intended
- *                     soft antialiased edge — scored by NEITHER metric)
- *   - off-target    = (fabric & ΔE2000 > far)  OR  background
+ * perceptual distance to `fromColor`, NOT by whether the op changed them.
+ *
+ * CRITICAL — the classification mask MUST be a TRUTH fabric mask (SAM2), NOT the
+ * op's floor (bbox) membership. The op only modifies fabric pixels, so scoring
+ * background against the op's OWN bbox membership makes offTargetBackgroundDeltaE
+ * structurally 0.00 (those pixels are byte-identical) and hides bbox-included
+ * background bleed in the op-tuning bucket. Decouple them: the op runs at the
+ * floor (bbox); the metric classifies against the SAM2 truth mask passed here.
+ *
+ * Three bands by source distance to fromColor, plus the truth fabric/background split:
+ *   - target        = truth-fabric & ΔE2000(s, fromColor) <= near   (the separation)
+ *   - excluded band = truth-fabric & near < ΔE2000 <= far           (op's soft edge)
+ *   - off-target    = (truth-fabric & ΔE2000 > far)  OR  truth-background
  *
  * off-target is split because only one half is raster-fixable:
- *   - offTargetBackgroundDeltaE (membership==0): bleed into pixels a precise
- *     fabric mask would exclude. THIS drives RASTER-NEEDED (the D1 signal).
- *   - offTargetFabricDeltaE (fabric & far): a nearby separation getting pulled
- *     (e.g. pink dragging the red rims). A mask cannot fix this — both are inside
- *     the fabric. It's an OP-TUNING signal (reduce radius at high coverage).
+ *   - offTargetBackgroundDeltaE (truth==0): the op changed a pixel the TRUTH mask
+ *     says is background — a precise mask would exclude it. THE D1 raster signal.
+ *     (NOT part of the A1 pass verdict; background bleed is the mask/D1 decision.)
+ *   - offTargetFabricDeltaE (truth-fabric & far): a nearby separation getting
+ *     pulled. A mask cannot fix this (both inside the fabric). OP-TUNING signal.
  *
  * target metric is CHROMA/HUE at the pixel's OWN luminance (A1 preserves L by
  * design, so a flat ΔE to the target color would falsely fail correct output —
@@ -73,7 +79,8 @@ export function computeRecolorMetrics(
   out: Buffer,
   width: number,
   height: number,
-  membership: Uint8Array,
+  /** TRUTH fabric mask (SAM2 eval ground truth) — NOT the op's bbox membership. */
+  truthMask: Uint8Array,
   fromColor: string,
   toColor: string,
   thresholds: MetricThresholds = {}
@@ -96,7 +103,7 @@ export function computeRecolorMetrics(
     const p = i * 4;
     const s = rgb255ToLab(source[p], source[p + 1], source[p + 2]);
     const o = rgb255ToLab(out[p], out[p + 1], out[p + 2]);
-    const inFabric = membership[i] === 1;
+    const inFabric = truthMask[i] === 1;
 
     if (inFabric) {
       fabricCount++;
@@ -136,7 +143,10 @@ export function computeRecolorMetrics(
 }
 
 /**
- * A1 acceptance verdict per the spec thresholds.
+ * A1 acceptance verdict.
+ * `pass` is OP correctness only: target && lum && offFabric. offBackground is the
+ * MASK/D1 decision (drives RASTER-NEEDED) and is deliberately EXCLUDED from pass —
+ * background bleed is fixed by the mask tier, not by the op.
  * - offBackgroundPass: raster-fixable bleed -> drives RASTER-NEEDED.
  * - offFabricPass: nearby-separation pull -> op-tuning (reduce radius), NOT raster.
  */
@@ -156,6 +166,6 @@ export function verdict(m: RecolorMetrics): {
     lumPass,
     offBackgroundPass,
     offFabricPass,
-    pass: targetPass && lumPass && offBackgroundPass && offFabricPass,
+    pass: targetPass && lumPass && offFabricPass,
   };
 }

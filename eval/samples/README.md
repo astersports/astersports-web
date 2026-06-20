@@ -53,29 +53,40 @@ into three bands plus the fabric/background split:
 - **off-target** (`ΔE > far`, or background) — split below because only one half
   is mask-fixable.
 
+### The op runs at the floor; the metric scores against a TRUTH mask
+
+The op **always** runs at the floor (bbox) — production behavior. The metric
+classifies background against a **TRUTH fabric mask** (`truthMaskUrl`, a
+SAM2-generated mask: non-near-black = fabric), **decoupled from the op's bbox
+membership**. This matters: the op only touches fabric pixels, so scoring
+background against the op's *own* bbox membership makes `offBg` structurally
+`0.00` and hides bbox-included background bleed in the op-tuning bucket. Without a
+`truthMaskUrl` the harness prints `offBg = blind` and does **not** treat it as
+evidence.
+
 Metrics:
 - **target ΔE2000 ≤ 5** — chroma/hue of the remapped separation vs target, measured
   **at each pixel's own L** (A1 preserves luminance, so a flat ΔE to the target
   would falsely fail a correct navy-rose that keeps bright highlights).
 - **luminance SSIM ≥ 0.95** — L channel source vs out over the target set (~1.0).
-- **offBg ΔE2000 ≤ 2** — change on **background** pixels (membership 0). A precise
-  fabric mask fixes this → **the only D1 raster signal**.
-- **offFab ΔE2000 ≤ 2** — change on **far-from-source fabric** pixels (e.g. pink
-  dragging the red rims). A mask can't fix this (both are inside the fabric) →
-  **op-tuning** (reduce radius at high coverage), NOT raster.
+- **offFab ΔE2000 ≤ 2** — change on **truth-fabric** pixels far from `fromColor`
+  (e.g. pink dragging the red rims). A mask can't fix this → **op-tuning** (reduce
+  radius), NOT raster. **Part of the A1 pass verdict.**
+- **offBg ΔE2000 ≤ 2** — op changed a pixel the **truth mask says is background**.
+  A precise mask fixes this → **the only D1 raster signal**. **Excluded from the
+  A1 pass verdict** (it's the mask/tier decision, not op correctness).
+
+`verdict.pass = target && lum && offFab` — background bleed never fails A1.
 
 ## Two lists, two different fixes
 
-- **RASTER-NEEDED** = pass target+lum but FAIL **offBg**. The D1 recolor evidence
-  for the precise mask (`rasterReady` / S5).
-- **OP-TUNING** = pass target+lum but FAIL **offFab**. Drop the soft radius; do
+- **RASTER-NEEDED** = truth-masked case that passes target+lum but FAILs **offBg**.
+  The D1 recolor evidence for the precise mask (`rasterReady` / S5).
+- **OP-TUNING** = passes target+lum but FAILs **offFab**. Drop the soft radius; do
   **not** read as needing SAM 2.
 
-A single bbox run is an **A1 acceptance** read, not D1 evidence. The definitive
-raster signal is the **bbox-vs-raster delta** on the same image (lands when
-`rasterReady` flips — re-run the same manifest, no op change). One trap no number
-catches: in-bbox background that is color-near `fromColor` folds into the target
-set and is silently recolored — **read the PNGs**, they're primary for interpretation.
+One trap no number catches: in-bbox background color-near `fromColor` folds into
+the target set and is silently recolored — **read the PNGs**, they're primary.
 
 ## Acceptance to wire A1 live (at A2)
 
