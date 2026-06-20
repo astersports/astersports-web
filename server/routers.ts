@@ -12,6 +12,7 @@ import { adminLogsRouter } from "./routers/adminLogs";
 import { fetchAllGames, invalidateAllCaches, getTournamentRegistry } from "./scraper";
 import { notifyOwner } from "./_core/notification";
 import { sdk } from "./_core/sdk";
+import { pruneOldLogs } from "./logRetention";
 import type { Game } from "../shared/types";
 
 // Owner-only procedure: restricts access to the site owner (OWNER_OPEN_ID)
@@ -188,8 +189,37 @@ export const appRouter = router({
   }),
 });
 
-// Register the scheduled game-check endpoint outside tRPC
+// Register the scheduled endpoints outside tRPC
 export function registerScheduledRoutes(app: any) {
+  // Log retention cleanup — prune server_logs older than 30 days
+  app.post('/api/scheduled/log-cleanup', async (req: any, res: any) => {
+    try {
+      const user = await sdk.authenticateRequest(req);
+      if (!user.isCron || !user.taskUid) {
+        return res.status(403).json({ error: 'cron-only' });
+      }
+
+      const deleted = await pruneOldLogs();
+      console.log(`[log-cleanup] Pruned ${deleted} log entries older than 30 days`);
+
+      res.json({
+        success: true,
+        deletedRows: deleted,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('[log-cleanup] Error:', (error as Error).message);
+      res.status(500).json({
+        success: false,
+        error: (error as Error).message,
+        stack: (error as Error).stack,
+        context: { url: req.url, taskUid: (req as any).__taskUid },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
+  // Game status check
   app.post('/api/scheduled/game-check', async (req: any, res: any) => {
     try {
       // Authenticate cron request

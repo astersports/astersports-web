@@ -396,3 +396,9 @@
 - [x] Wire logger into density, scale, recolor, and error paths in studio router
 - [x] Add admin tRPC procedure to query logs (paginated, filterable by level/source/job/tenant/time/search)
 - [x] Add Admin Logs page at /admin/logs (stats cards, filters, paginated log viewer, auto-refresh)
+
+## Alert Hook & Log Retention
+- [x] Wire error-level serverLog entries to trigger notifyOwner() (fire-and-forget, non-blocking)
+- [x] Add log retention cleanup job: prune server_logs older than 30 days (Heartbeat cron at /api/scheduled/log-cleanup)
+- [x] Write tests for alert hook (10 tests: notifyOwner called on error, not on info/warn/debug, crash-safe)
+- [x] Write tests for log retention (6 tests: 30-day cutoff, DB unavailable, error propagation)
