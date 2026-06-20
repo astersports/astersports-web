@@ -67,7 +67,7 @@ describe("handleStripeWebhook", () => {
     beforeEach(() => { prevSecret = ENV.stripeWebhookSecret; ENV.stripeWebhookSecret = "whsec_test_secret"; });
     afterEach(() => { ENV.stripeWebhookSecret = prevSecret; });
 
-    it("returns verified: true for test events (evt_test_ prefix)", async () => {
+    it("rejects forged test events (evt_test_ prefix) when a webhook secret is configured", async () => {
       const testEvent = { id: "evt_test_abc123", type: "checkout.session.completed", data: {} };
       const { req, res } = createMockReqRes(testEvent);
 
@@ -78,7 +78,10 @@ describe("handleStripeWebhook", () => {
 
       await handleStripeWebhook(req, res);
 
-      expect(res.json).toHaveBeenCalledWith({ verified: true });
+      // With a secret configured, a signature failure must always be rejected,
+      // even for evt_test_ ids — the test-event bypass is local-dev only.
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: "Webhook signature verification failed" });
     });
 
     it("returns 400 for invalid signature on non-test events", async () => {
