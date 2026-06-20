@@ -291,3 +291,60 @@
 - [x] Fix: Improve Scale prompt to be more explicit about physical size change of motifs
 - [x] Fix: Improve Density prompt to be more explicit about removing/thinning motifs
 - [x] Fix: Rewrite Scale prompt v2 — use textile terminology (ditsy/statement print, repeat scale) instead of math percentages; describe end-state visually
+
+## Hybrid Scale Pipeline (SAM2 + Programmatic Resize)
+- [x] Set up Replicate API token as project secret
+- [x] Build server/replicateClient.ts — SAM2 segmentation via Replicate API
+- [x] Build server/hybridScale.ts — full hybrid pipeline (SAM2 → programmatic resize → bg infill → composite)
+- [x] Integrate hybrid pipeline into studio router (scale-only → hybrid, combined → AI)
+- [x] Write tests for routing logic, scale factor math, and Replicate token validation (90 tests passing)
+
+## Claude A1 Merge (deterministic recolor pipeline)
+- [x] Fetch and review Claude's branch (claude/jolly-pascal-k9tw4r)
+- [x] Copy masking interface (server/_core/masking/) — types, index, classical provider, sam2 stub, locateFabricRegion
+- [x] Copy image decode (server/_core/image/decodeUpright.ts) — EXIF-aware decode with LRU cache
+- [x] Copy A1 ops (server/_core/studio/ops/) — color.ts, kmeans.ts, membership.ts, separationRemap.ts
+- [x] Copy eval harness (server/_core/studio/eval/) — metrics.ts, recolorEval.ts
+- [x] Copy eval manifest and samples (eval/)
+- [x] Copy spike scripts (scripts/spike/)
+- [x] Copy all tests (separationRemap, masking, decodeUpright, metrics)
+- [x] Update server/_core/env.ts with Studio env vars (STUDIO_NOOP_GUARD, STUDIO_MASK_PROVIDER, STUDIO_DETERMINISTIC_RECOLOR)
+- [x] Install culori + @types/culori dependency
+- [x] Verify TypeScript compiles cleanly (0 errors)
+- [x] All 118 tests passing (13 test files)
+
+## A1 Op Fix: Coverage Semantics + Metric Rewrite (per Claude's spec)
+- [x] separationRemap.ts: Replace blend-strength weight curve with selection-tolerance (full remap inside T, thin antialias edge, skip outside)
+- [x] metrics.ts: Switch target metric to change-based scoring (only score pixels the op actually remapped, ΔE(source,out) > delta)
+- [x] metrics.ts: Split off-target into offTargetBackgroundDeltaE (membership==0) and offTargetFabricDeltaE (dFrom > far)
+- [x] TypeScript compiles cleanly (0 errors)
+- [x] All 118 tests pass (13 test files)
+- [x] Synthetic eval: 4/4 PASS, all deterministic, targetΔE=0.11, lumSSIM=1.000, offΔE=0.00
+- [x] Run eval on real garment photo (black-floral-skirt.jpg) — PASS at all coverage levels
+
+## Truth-Mask Decoupling + SAM2 Eval
+- [x] Pull Claude's truth-mask decoupling commits (0e94c53)
+- [x] Generate SAM2 truth mask for black-floral-skirt via Replicate (meta/sam-2)
+- [x] Run eval with truth mask: pink→navy PASS (offBg=1.18), blue→amber RASTER-NEEDED (offBg=2.14)
+- [x] Verify structural blindness fix: no-truth case correctly shows "blind" instead of 0.00
+
+## Full Claude Branch Merge (afac00a)
+- [x] Merged A2 recolor live wiring (generateRecoloredImage + router gate + STUDIO_RECOLOR_LIVE flag)
+- [x] Merged deterministic Scale op (scaleRepeat.ts + tile.ts + scaleMetrics.ts)
+- [x] Merged deterministic Density op (densityThin.ts + infill.ts + stratifiedSelect.ts + densityMetrics.ts)
+- [x] Merged SAM2 provider (sam2Provider.ts + replicateSam2.ts + sam2Mask.ts — full implementation)
+- [x] Merged fromColor eyedropper picker in ControlPanel
+- [x] Merged resolveTargetColorHex preset mapping
+- [x] Merged describeExpectedChange + no-op guard (judgeEditApplied)
+- [x] Merged cluster selection fix (separationRemap latest)
+- [x] All 170 tests passing, TypeScript clean
+- [x] All features dark-launched behind flags (defaults OFF)
+
+## SAM2 Privacy Gate (4 Requirements)
+- [x] Req 1: Crop-to-fabric minimization — only fabric bbox crop sent to Replicate, with full coordinate round-trip (remapRasterToFullImage + bbox re-normalization)
+- [x] Req 2: org_id audit logging — structured log on every outbound SAM2 call (op, org_id, job_id, crop_dimensions, timestamp)
+- [x] Req 3: Retention/sub-processor documentation (docs/replicate-sub-processor-disclosure.md)
+- [x] Req 4: Fail-safe fallback — SAM2 → classical on infra error; getInstanceMasks returns empty array (D-B signal) when classical can't serve rasters
+- [x] Fix: getInstanceMasks fail-safe returns empty array (D-B prompt-path fallback signal) when classical can't serve rasters
+- [x] Privacy gate test suite (server/privacyGate.test.ts) — 8 tests covering all 4 requirements
+- [x] All 178 tests passing, TypeScript clean
