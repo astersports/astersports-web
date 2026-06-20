@@ -362,6 +362,24 @@ export async function getJobVariations(jobId: number) {
     .orderBy(desc(jobVariations.createdAt));
 }
 
+/**
+ * C1 (generated/* scope): resolve the owning tenant of a prompt-path output by
+ * its storage key. The storage proxy uses this to require tenant membership
+ * before presigning a `generated/*` key — the same cross-tenant IDOR guard that
+ * the `studio/<tenant>/...` regex already provides for originals. A key with no
+ * matching variation has no legitimate reader, so the caller fails closed.
+ */
+export async function getVariationByResultKey(resultKey: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [v] = await db
+    .select({ tenantId: jobVariations.tenantId, jobId: jobVariations.jobId })
+    .from(jobVariations)
+    .where(eq(jobVariations.resultKey, resultKey))
+    .limit(1);
+  return v;
+}
+
 // ─── Credit Ledger ──────────────────────────────────────────────────────────
 
 export async function listCreditLedger(

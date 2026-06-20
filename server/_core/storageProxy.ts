@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { ENV } from "./env";
 import { sdk } from "./sdk";
-import { getMembership } from "../studioDb";
+import { getMembership, getVariationByResultKey } from "../studioDb";
 
 export function registerStorageProxy(app: Express) {
   app.get("/manus-storage/*", async (req, res) => {
@@ -25,16 +25,31 @@ export function registerStorageProxy(app: Express) {
     }
     const tenantMatch = key.match(/^studio\/(\d+)\//);
     if (tenantMatch) {
+      // Originals (and any future tenant-prefixed key) carry the tenant in the
+      // path: require membership directly.
       const tenantId = Number(tenantMatch[1]);
       const membership = await getMembership(tenantId, userId);
       if (!membership) {
         res.status(403).send("Forbidden");
         return;
       }
+    } else {
+      // C1 (generated/* scope): prompt-path outputs (generated/...) are customer
+      // image context recorded as variations with a resultKey + tenantId, but the
+      // tenant isn't in the path. Resolve the owning tenant by the key and require
+      // membership — same IDOR guard as originals. Fail closed: a key that maps to
+      // no owned variation has no legitimate reader.
+      const variation = await getVariationByResultKey(key);
+      if (!variation) {
+        res.status(404).send("Not found");
+        return;
+      }
+      const membership = await getMembership(variation.tenantId, userId);
+      if (!membership) {
+        res.status(403).send("Forbidden");
+        return;
+      }
     }
-    // Non-tenant-scoped keys (e.g. generated/...) are auth-gated only; scoping
-    // those to an owner is a follow-up (migrate to tenant keys, or a variation
-    // ownership lookup).
 
     if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
       res.status(500).send("Storage proxy not configured");
