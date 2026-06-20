@@ -19,6 +19,7 @@ import {
   type InsertJobVariation,
   type InsertCreditLedgerEntry,
 } from "../drizzle/schema";
+import { TRIAL_DURATION_DAYS } from "../shared/billing";
 
 // ─── Categories ──────────────────────────────────────────────────────────────
 
@@ -206,6 +207,27 @@ export async function grantCredits(
   if (!db) throw new Error("DB unavailable");
 
   return db.transaction(async (tx) => {
+    // Idempotency: when a refId is supplied (e.g. a Stripe event id), a retried
+    // webhook must not grant twice. If a ledger row already exists for this
+    // (tenant, refId, reason) tuple, return the current balance unchanged.
+    if (refId) {
+      const [existing] = await tx
+        .select({ id: creditLedger.id })
+        .from(creditLedger)
+        .where(
+          and(
+            eq(creditLedger.tenantId, tenantId),
+            eq(creditLedger.refId, refId),
+            eq(creditLedger.reason, reason)
+          )
+        )
+        .limit(1);
+      if (existing) {
+        const [current] = await tx.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+        return current!.creditBalance;
+      }
+    }
+
     const res = await tx
       .update(tenants)
       .set({ creditBalance: sql`${tenants.creditBalance} + ${amount}` })
@@ -499,8 +521,8 @@ export function getTrialStatus(tenant: Tenant) {
   const elapsed = now - started;
   const elapsedDays = Math.floor(elapsed / (1000 * 60 * 60 * 24));
   const trialDay = elapsedDays + 1; // 1-indexed
-  const daysRemaining = Math.max(0, 7 - elapsedDays);
-  const expired = daysRemaining === 0;
+  const daysRemaining = Math.max(0, TRIAL_DURATION_DAYS - elapsedDays);
+  const expired = elapsedDays >= TRIAL_DURATION_DAYS;
   const creditsUsed = tenant.trialCredits - tenant.creditBalance;
 
   return { inTrial: true, daysRemaining, trialDay, expired, creditsUsed };
