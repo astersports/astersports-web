@@ -6,61 +6,13 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router } from "../_core/trpc";
 import { tenantProcedure, tenantAdminProcedure, tenantOwnerProcedure } from "../tenancy";
-import { stripe } from "../stripe";
+import { stripe, ensureStudioPrice } from "../stripe";
 import { getCreditHistory, updateTenantStripe, grantCredits, getTrialStatus } from "../studioDb";
 import { PLANS, TOPUP_PACKS, type PlanKey } from "../../shared/billing";
 import { createOrgSetupIntent, cancelTrialAndFreezeCredits } from "../shadowBilling";
 
-// ─── Stripe Product/Price cache for Studio ───────────────────────────────────
-
-const priceCache: Map<string, string> = new Map();
-
-async function ensureStudioPrice(
-  productName: string,
-  amountCents: number,
-  interval?: "month"
-): Promise<string> {
-  const cacheKey = `${productName}-${amountCents}-${interval ?? "once"}`;
-  if (priceCache.has(cacheKey)) return priceCache.get(cacheKey)!;
-
-  // Search for existing product
-  const products = await stripe.products.search({ query: `name:"${productName}"` });
-  let productId: string;
-
-  if (products.data.length > 0) {
-    productId = products.data[0].id;
-  } else {
-    const product = await stripe.products.create({
-      name: productName,
-      description: `Aster Print Studio - ${productName}`,
-    });
-    productId = product.id;
-  }
-
-  // Search for matching price
-  const prices = await stripe.prices.list({ product: productId, active: true, limit: 20 });
-  const match = prices.data.find(
-    (p) =>
-      p.unit_amount === amountCents &&
-      (interval ? p.recurring?.interval === interval : !p.recurring)
-  );
-
-  if (match) {
-    priceCache.set(cacheKey, match.id);
-    return match.id;
-  }
-
-  const priceData: any = {
-    product: productId,
-    unit_amount: amountCents,
-    currency: "usd",
-  };
-  if (interval) priceData.recurring = { interval };
-
-  const price = await stripe.prices.create(priceData);
-  priceCache.set(cacheKey, price.id);
-  return price.id;
-}
+// `ensureStudioPrice` now lives in `../stripe` (shared with shadowBilling;
+// kept there to avoid a studioBilling <-> shadowBilling import cycle).
 
 export const studioBillingRouter = router({
   /** Get credit history for the tenant. */

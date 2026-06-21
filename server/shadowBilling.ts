@@ -8,13 +8,15 @@
  * 1. Day 0: Owner sets up card via Stripe SetupIntent → stores PaymentMethod on tenant
  * 2. Day 4: Reminder notification (handled by trialReminders.ts)
  * 3. Day 6: Final warning notification (handled by trialReminders.ts)
- * 4. Day 7: Auto-charge via PaymentIntent using stored PaymentMethod → convert to paid plan
+ * 4. Day 7: Auto-charge by creating a recurring subscription on the stored
+ *    PaymentMethod (first invoice = the conversion charge) → convert to paid plan.
+ *    Renewals then fire invoice.paid → handleStudioInvoicePaid.
  *
  * On cancel before Day 7: credits freeze (90-day expiry), card is not charged.
  * On re-subscribe within 90 days: frozen credits restore.
  */
 
-import { stripe } from "./stripe";
+import { stripe, ensureStudioPrice } from "./stripe";
 import { getDb } from "./db";
 import { tenants } from "../drizzle/schema";
 import { eq, and, isNotNull, isNull, lte } from "drizzle-orm";
@@ -181,45 +183,51 @@ export async function processTrialAutoCharges(): Promise<{
         continue;
       }
 
-      // Charge for Starter plan ($39)
+      // Create a RECURRING subscription on the stored card. The first invoice is
+      // charged immediately off-session (the single conversion charge);
+      // `error_if_incomplete` throws if that charge can't settle synchronously
+      // (caught below → failed). Renewals then fire invoice.paid →
+      // handleStudioInvoicePaid — which the one-off PaymentIntent never did.
       const plan = PLANS.starter;
       const amountCents = plan.priceMonthly * 100; // $39.00 = 3900 cents
+      const priceId = await ensureStudioPrice("Print Studio Starter", amountCents, "month");
 
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: amountCents,
-        currency: "usd",
+      const subscription = await stripe.subscriptions.create({
         customer: tenant.stripeCustomerId,
-        payment_method: tenant.stripePaymentMethodId,
+        items: [{ price: priceId, quantity: 1 }],
+        default_payment_method: tenant.stripePaymentMethodId,
         off_session: true,
-        confirm: true,
+        payment_behavior: "error_if_incomplete",
         metadata: {
           tenantId: tenant.id.toString(),
           product: "print-studio",
-          purpose: "trial-conversion",
           plan: "starter",
+          seats: "1",
         },
-        description: `Print Studio — Starter plan activation for ${tenant.name}`,
       });
 
-      if (paymentIntent.status === "succeeded") {
-        // Convert the trial: set plan, grant credits, mark converted
-        await convertTrialToPaid(tenant.id, "starter", paymentIntent.id);
+      if (subscription.status === "active") {
+        // Convert: set plan + store the subscription id, grant the first cycle.
+        // The first invoice (billing_reason='subscription_create') is skipped by
+        // handleStudioInvoicePaid, so this manual grant is the ONLY first-cycle
+        // grant (idempotent on the subscription id); renewals grant via webhook.
+        await convertTrialToPaid(tenant.id, "starter", subscription.id, subscription.id);
         result.charged++;
 
-        log.info("shadowBilling", "Trial auto-charge succeeded", {
+        log.info("shadowBilling", "Trial auto-charge succeeded (subscription created)", {
           tenantId: tenant.id,
-          metadata: { paymentIntentId: paymentIntent.id, amount: amountCents },
+          metadata: { subscriptionId: subscription.id, amount: amountCents },
         });
       } else {
-        // Payment requires additional action (3DS, etc.) — mark as failed
+        // First invoice didn't settle synchronously (e.g. needs 3DS) — mark failed.
         result.errors.push(
-          `Tenant ${tenant.id}: PaymentIntent status=${paymentIntent.status} (may need 3DS)`
+          `Tenant ${tenant.id}: subscription status=${subscription.status} (may need 3DS)`
         );
         result.failed++;
 
         log.warn("shadowBilling", "Trial auto-charge requires action", {
           tenantId: tenant.id,
-          metadata: { paymentIntentId: paymentIntent.id, status: paymentIntent.status },
+          metadata: { subscriptionId: subscription.id, status: subscription.status },
         });
       }
     } catch (err) {
@@ -265,7 +273,8 @@ export async function processTrialAutoCharges(): Promise<{
 export async function convertTrialToPaid(
   tenantId: number,
   plan: PlanKey,
-  referenceId: string
+  referenceId: string,
+  subscriptionId?: string
 ): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -273,12 +282,14 @@ export async function convertTrialToPaid(
   const planDef = PLANS[plan as Exclude<PlanKey, "none">];
   if (!planDef) throw new Error(`Invalid plan: ${plan}`);
 
-  // Update tenant: set plan, mark trial as converted
+  // Update tenant: set plan, mark trial converted, and store the subscription id
+  // when one was created (so renewals + cancelTrial act on a real subscription).
   await db
     .update(tenants)
     .set({
       plan: plan as any,
       trialConvertedAt: new Date(),
+      ...(subscriptionId ? { stripeSubscriptionId: subscriptionId } : {}),
     })
     .where(eq(tenants.id, tenantId));
 
