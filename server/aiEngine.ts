@@ -17,6 +17,7 @@ import sharp from "sharp";
 import { getMaskProvider } from "./_core/masking";
 import { separationRemap } from "./_core/studio/ops/separationRemap";
 import { densityThin } from "./_core/studio/ops/densityThin";
+import { densityRedistribute } from "./_core/studio/ops/densityRedistribute";
 import { scalePrintRepeat } from "./_core/studio/ops/scaleRepeat";
 import { checkRepeat, MIN_REPEAT_CONFIDENCE } from "./_core/studio/ops/repeatGuard";
 import { decodeUpright } from "./_core/image/decodeUpright";
@@ -54,6 +55,53 @@ export async function generateDensityImage(
   // requested percent) — refund rather than bill for an unchanged image.
   if (result.removed === 0) {
     console.warn(`[density-live] densityThin removed 0 motifs; no-op -> fail + refund.`);
+    return null;
+  }
+
+  const png = await sharp(result.data, {
+    raw: { width: result.width, height: result.height, channels: 4 },
+  })
+    .png()
+    .toBuffer();
+
+  return { png, removed: result.removed };
+}
+
+/**
+ * Density v2 (Option B, DARK): SAM2 fabric raster + instance masks ->
+ * densityRedistribute -> PNG. Removes percent% of motifs, then RELOCATES the
+ * survivors to an even (blue-noise) layout (deterministic composite, no model
+ * call). Same single-getSegmentation + null-on-degrade/no-op -> FAIL+REFUND
+ * contract as generateDensityImage, and the SAME count-based refund (`removed`).
+ *
+ * NOT router-wired and NOT a behavioural change: studio.generate must select this
+ * (over generateDensityImage) only when ENV.studioDensityRedistribute is on — that
+ * wiring + the flag flip are Frank's after the per-route eval gates clear. This
+ * function deliberately does not touch generateDensityImage or the money path.
+ */
+export async function generateDensityRedistributeImage(
+  originalImageUrl: string,
+  percent: number,
+  audit?: Sam2AuditContext
+): Promise<{ png: Buffer; removed: number } | null> {
+  const srcUrl = originalImageUrl.startsWith("/manus-storage/")
+    ? await storageGetSignedUrl(originalImageUrl.replace("/manus-storage/", ""))
+    : originalImageUrl;
+
+  // Single SAM2 call -> fabric + instances. (C5: stamp audit on the outbound call.)
+  const { fabric, instances } = await getMaskProvider().getSegmentation({ url: srcUrl, audit });
+  if (!fabric.raster || !hasAnyPixel(fabric.raster) || instances.length === 0) {
+    console.warn(`[density-redistribute-live] Provider degraded (no/empty raster or 0 instances); fail + refund.`);
+    return null;
+  }
+
+  const result = await densityRedistribute({ image: { url: srcUrl }, fabric, instances, percent });
+
+  // No-op guard: the op ran but removed nothing (too few motifs for the requested
+  // percent, no bare ground to sample, or instances outside the fabric) — refund
+  // rather than bill for an unchanged image. Mirrors generateDensityImage.
+  if (result.removed === 0) {
+    console.warn(`[density-redistribute-live] densityRedistribute removed 0 motifs; no-op -> fail + refund.`);
     return null;
   }
 

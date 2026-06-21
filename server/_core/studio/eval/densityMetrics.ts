@@ -132,7 +132,7 @@ function meanGradient(buf: Buffer, w: number, h: number, pixels: number[] | null
  * R = observedMeanNN / expectedMeanNN. R=1 random, R>1 dispersed, R<1 clustered.
  * Returns 1.0 (neutral) when fewer than 2 points exist.
  */
-function computeNNI(
+export function computeNNI(
   centroids: Array<[number, number]>,
   fabricMask: Uint8Array,
   width: number,
