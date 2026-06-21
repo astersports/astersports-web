@@ -653,3 +653,12 @@
 - [x] Invite Dashboard section in Platform Console (list all links with status)
 - [x] Add "Copy Invite Link" button in Studio Admin alongside email invite
 - [x] Mobile-optimized for all new screens
+
+## Fix Density Container Shutdown (SSE Keep-Alive)
+- [x] Replace fire-and-forget async pattern with SSE streaming endpoint for density/scale
+- [x] Send periodic heartbeat events to keep serverless container alive during SAM2 processing
+- [x] Update frontend to consume SSE stream (progress events → completion event)
+- [x] Handle error/timeout gracefully with refund on SSE stream
+- [x] Fix 3 stuck processing jobs (360001, 420001, 420002) and refund 30 credits
+- [x] Extract runVariation to shared studioEngine module
+- [x] Add vitest tests for SSE endpoint (6 tests passing)

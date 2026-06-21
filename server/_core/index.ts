@@ -9,6 +9,7 @@ import { appRouter, registerScheduledRoutes } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { handleStripeWebhook } from "../webhook";
+import { registerStudioStreamRoutes } from "../routes/studioStream";
 import { assertEnvOrExit, ENV } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -58,6 +59,8 @@ async function startServer() {
   registerOAuthRoutes(app);
   // Register scheduled routes (heartbeat game-check)
   registerScheduledRoutes(app);
+  // SSE streaming endpoint for long-running density/scale generation
+  registerStudioStreamRoutes(app);
 
   // tRPC API
   app.use(

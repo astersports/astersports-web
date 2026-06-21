@@ -5,10 +5,13 @@
  * 3. Configure controls (Scale, Density, Remove)
  * 4. Generate → view before/after
  *
- * Density and Scale use an async job pattern: the mutation returns immediately
- * with { async: true }, and we poll getJob until status is "done" or "failed".
+ * Density and Scale use SSE streaming: the frontend opens a long-lived POST
+ * to /api/studio/generate-stream which keeps the serverless container alive
+ * via heartbeats while SAM2 processes the image. On completion, the stream
+ * sends a "done" event with results. Fallback: if the SSE endpoint rejects
+ * (e.g. non-deterministic path), we use the tRPC mutation directly.
  */
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { useTenant } from "@/contexts/TenantContext";
 import ControlPanel from "@/components/studio/ControlPanel";
@@ -32,6 +35,8 @@ import { compressImage } from "@/lib/imageCompress";
 import type { ControlSettings } from "@shared/controls";
 import { computeCredits } from "@shared/controls";
 import { CREDIT_COST } from "@shared/billing";
+import { shouldUseStream } from "@shared/controlHelpers";
+import { useGenerateStream, type StreamCallbacks } from "@/hooks/useGenerateStream";
 
 export default function StudioEditor() {
   const { tenant } = useTenant();
@@ -50,10 +55,6 @@ export default function StudioEditor() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingControls, setPendingControls] = useState<ControlSettings | null>(null);
 
-  // Async job polling state
-  const [pollingJobId, setPollingJobId] = useState<number | null>(null);
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   // Processing timer & progress state
   const [processingStartTime, setProcessingStartTime] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -64,6 +65,41 @@ export default function StudioEditor() {
   const generateMutation = trpc.studio.generate.useMutation();
 
   const [uploadProgress, setUploadProgress] = useState("");
+
+  // ─── SSE Stream callbacks ─────────────────────────────────────────────────
+  const streamCallbacks = useMemo<StreamCallbacks>(() => ({
+    onStarted: (data) => {
+      setProcessingStartTime(Date.now());
+      setElapsedSeconds(0);
+      setStep("processing");
+      toast.info("Processing started — this may take up to a minute.");
+    },
+    onHeartbeat: () => {
+      // No-op — the heartbeat keeps the connection alive; the timer handles UI
+    },
+    onDone: (data) => {
+      setIsGenerating(false);
+      setResults(data.results);
+      setSelectedResult(0);
+      setStep("results");
+      utils.tenants.myTenants.invalidate();
+
+      if (data.lowBalance) {
+        toast.warning(`Low balance: ${data.newBalance} credits remaining. Consider topping up.`);
+      } else {
+        toast.success(`Generation complete. ${data.creditsUsed} credits used.`);
+      }
+    },
+    onError: (data) => {
+      setIsGenerating(false);
+      setStep("controls");
+      utils.tenants.myTenants.invalidate();
+      const msg = data.message || "Generation failed.";
+      toast.error(data.refunded ? `${msg} Credits have been refunded.` : msg);
+    },
+  }), [utils]);
+
+  const { startStream, abort: abortStream } = useGenerateStream(streamCallbacks);
 
   // Elapsed timer — ticks every second while processing
   useEffect(() => {
@@ -85,63 +121,6 @@ export default function StudioEditor() {
       timerRef.current = null;
     }
   }, [step, processingStartTime]);
-
-  // Poll for async job completion
-  useEffect(() => {
-    if (!pollingJobId || !tenant) return;
-
-    const poll = async () => {
-      try {
-        const job = await utils.client.studio.getJob.query({
-          tenantId: tenant.id,
-          jobId: pollingJobId,
-        });
-
-        if (job.status === "done") {
-          // Job complete — show results
-          clearInterval(pollIntervalRef.current!);
-          pollIntervalRef.current = null;
-          setPollingJobId(null);
-          setIsGenerating(false);
-
-          const jobResults = job.variations.map((v: any) => ({
-            url: v.resultUrl,
-            key: v.resultKey || v.resultUrl.replace("/manus-storage/", ""),
-          }));
-          setResults(jobResults);
-          setSelectedResult(0);
-          setStep("results");
-          utils.tenants.myTenants.invalidate();
-          toast.success(`Generation complete. ${job.creditsUsed ?? 0} credits used.`);
-        } else if (job.status === "failed") {
-          // Job failed
-          clearInterval(pollIntervalRef.current!);
-          pollIntervalRef.current = null;
-          setPollingJobId(null);
-          setIsGenerating(false);
-          setStep("controls");
-          utils.tenants.myTenants.invalidate();
-          const errMsg = job.errorMessage || "Generation failed. Credits have been refunded.";
-          toast.error(errMsg);
-        }
-        // else still processing — keep polling
-      } catch (err: any) {
-        // Network error — don't stop polling, just log
-        console.warn("[StudioEditor] Poll error:", err.message);
-      }
-    };
-
-    // Start polling every 3 seconds
-    poll(); // immediate first check
-    pollIntervalRef.current = setInterval(poll, 3000);
-
-    return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
-    };
-  }, [pollingJobId, tenant]);
 
   const handleFileSelect = useCallback(
     async (file: File) => {
@@ -228,6 +207,19 @@ export default function StudioEditor() {
     setPendingControls(null);
     setIsGenerating(true);
 
+    // Determine if this should use the SSE streaming path
+    const useStream = shouldUseStream(controls);
+
+    if (useStream) {
+      // ─── SSE STREAMING PATH (density/scale) ─────────────────────────────
+      // Opens a long-lived connection that keeps the container alive.
+      startStream({
+        tenantId: tenant.id,
+        jobId,
+        controls,
+      });
+    } else {
+      // ─── TRPC MUTATION PATH (recolor/remove/prompt — fast) ──────────────
       try {
         const result = await generateMutation.mutateAsync({
           tenantId: tenant.id,
@@ -236,12 +228,13 @@ export default function StudioEditor() {
         });
 
         if (result.async) {
-          // Async job started — switch to processing view and start polling
-          setProcessingStartTime(Date.now());
-          setElapsedSeconds(0);
-          setStep("processing");
-          setPollingJobId(result.jobId);
-          toast.info("Processing started — this may take up to a minute.");
+          // Shouldn't happen for non-density/scale, but handle gracefully
+          // by falling back to SSE stream
+          startStream({
+            tenantId: tenant.id,
+            jobId,
+            controls,
+          });
         } else {
           // Sync result — show immediately
           setResults(result.results);
@@ -260,7 +253,8 @@ export default function StudioEditor() {
         setIsGenerating(false);
         toast.error(error.message || "Generation failed. Please try again.");
       }
-  }, [pendingControls, jobId, tenant, generateMutation, utils]);
+    }
+  }, [pendingControls, jobId, tenant, generateMutation, utils, startStream]);
 
   const handleRegenerate = () => {
     setStep("controls");
@@ -268,6 +262,7 @@ export default function StudioEditor() {
   };
 
   const handleNewUpload = () => {
+    abortStream(); // Cancel any in-flight stream
     setStep("upload");
     setJobId(null);
     setOriginalUrl("");
@@ -335,7 +330,7 @@ export default function StudioEditor() {
   // ─── Confirmation cost (must be computed before any early returns that use it) ──
   const confirmCreditCost = pendingControls ? computeCredits(pendingControls, CREDIT_COST) : 0;
 
-  // ─── Processing step (async job in progress) ──────────────────────────────
+  // ─── Processing step (SSE stream in progress) ──────────────────────────────
   if (step === "processing") {
     // Estimated duration: 50s typical. Progress uses an ease-out curve
     // so it moves fast at first and slows near the end (never reaches 100% until done).
