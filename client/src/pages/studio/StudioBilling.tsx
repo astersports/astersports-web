@@ -68,7 +68,7 @@ export default function StudioBilling() {
       )}
 
       {/* Subscription Plans (visible to all, purchase gated to owner) */}
-      {isAdmin && <PlansSection tenantId={tenant.id} currentPlan={status.plan} isOwner={isOwner} />}
+      {isAdmin && <PlansSection tenantId={tenant.id} currentPlan={status.plan} isOwner={isOwner} tenantType={tenant.type} />}
 
       {/* Credit Packs (visible to all, purchase gated to owner) */}
       <PacksSection tenantId={tenant.id} isOwner={isOwner} />
@@ -128,7 +128,7 @@ function StatusCard({ status, tenantId }: { status: any; tenantId: number }) {
   );
 }
 
-function PlansSection({ tenantId, currentPlan, isOwner }: { tenantId: number; currentPlan: string; isOwner: boolean }) {
+function PlansSection({ tenantId, currentPlan, isOwner, tenantType }: { tenantId: number; currentPlan: string; isOwner: boolean; tenantType: string }) {
   const subscribeMutation = trpc.studioBilling.subscribe.useMutation({
     onSuccess: (data) => {
       if (data.checkoutUrl) {
@@ -150,7 +150,10 @@ function PlansSection({ tenantId, currentPlan, isOwner }: { tenantId: number; cu
         )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {(Object.keys(PLANS) as Array<Exclude<PlanKey, "none">>).map((key) => {
+        {(Object.keys(PLANS) as Array<Exclude<PlanKey, "none">>)
+          // Team is per-seat / multi-seat — not applicable to single-seat individual accounts.
+          .filter((key) => !(tenantType === "individual" && key === "team"))
+          .map((key) => {
           const plan = PLANS[key];
           const isCurrent = currentPlan === key;
           return (

@@ -82,9 +82,9 @@ export const firmAdminRouter = router({
   }),
 
   /**
-   * Toggle a member's role flags (is_user / is_admin).
-   * Per spec: User toggle is cobalt, Admin toggle is amber.
-   * Owner row toggles are locked on (cannot be changed).
+   * Toggle a member's role between "admin" and "member".
+   * The owner role is immutable here, and the last remaining admin/owner cannot
+   * be demoted (guarded below).
    */
   toggleRole: tenantAdminProcedure
     .input(
