@@ -12,6 +12,7 @@ import {
   jobs,
   jobVariations,
   jobFavorites,
+  tenantStats,
   users,
   type Tenant,
   type InsertTenant,
@@ -488,6 +489,84 @@ async function computeTopEditType(
   }
 }
 
+/** Single-scan aggregate of a tenant's job stats (total / credits / done). */
+async function computeJobAggregates(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  tenantId: number
+): Promise<{ totalJobs: number; creditsSpent: number; doneJobs: number }> {
+  const [agg] = await db
+    .select({
+      totalJobs: sql<number>`count(*)`,
+      creditsSpent: sql<number>`COALESCE(SUM(${jobs.creditsUsed}), 0)`,
+      doneJobs: sql<number>`SUM(CASE WHEN ${jobs.status} = 'done' THEN 1 ELSE 0 END)`,
+    })
+    .from(jobs)
+    .where(eq(jobs.tenantId, tenantId));
+  return {
+    totalJobs: Number(agg?.totalJobs ?? 0),
+    creditsSpent: Number(agg?.creditsSpent ?? 0),
+    doneJobs: Number(agg?.doneJobs ?? 0),
+  };
+}
+
+const TENANT_STATS_FRESH_MS = 5 * 60 * 1000;
+
+/**
+ * True only for the MySQL "table doesn't exist" error (errno 1146 /
+ * ER_NO_SUCH_TABLE). Lets the rollup reader tolerate `studio_tenant_stats` not
+ * being present yet (migration 0013 not applied via db:push) while still
+ * surfacing every other DB error instead of silently swallowing it.
+ */
+function isMissingTableError(err: unknown): boolean {
+  const e = err as { code?: string; errno?: number; message?: string } | null;
+  return (
+    e?.code === "ER_NO_SUCH_TABLE" ||
+    e?.errno === 1146 ||
+    (typeof e?.message === "string" && /doesn'?t exist|no such table|ER_NO_SUCH_TABLE/i.test(e.message))
+  );
+}
+
+/**
+ * History tile aggregates served from the `studio_tenant_stats` rollup. Returns
+ * the cached row when fresh; otherwise recomputes from live data (one scan) and
+ * upserts it — O(1) reads within the freshness window, with no cron and no
+ * write-path coupling. Recomputed-from-live so it matches a live-scan oracle by
+ * construction. Falls back to a pure live aggregate if `studio_tenant_stats`
+ * isn't present yet (migration 0013 not applied) — safe to merge ahead of
+ * `db:push`.
+ */
+async function getHistoryAggregates(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  tenantId: number
+): Promise<{ totalJobs: number; creditsSpent: number; doneJobs: number }> {
+  try {
+    const [cached] = await db
+      .select({
+        totalJobs: tenantStats.totalJobs,
+        creditsSpent: tenantStats.creditsSpent,
+        doneJobs: tenantStats.doneJobs,
+        computedAt: tenantStats.computedAt,
+      })
+      .from(tenantStats)
+      .where(eq(tenantStats.tenantId, tenantId))
+      .limit(1);
+    if (cached && Date.now() - new Date(cached.computedAt).getTime() < TENANT_STATS_FRESH_MS) {
+      return { totalJobs: cached.totalJobs, creditsSpent: cached.creditsSpent, doneJobs: cached.doneJobs };
+    }
+    const agg = await computeJobAggregates(db, tenantId);
+    await db
+      .insert(tenantStats)
+      .values({ tenantId, ...agg, computedAt: new Date() })
+      .onDuplicateKeyUpdate({ set: { ...agg, computedAt: new Date() } });
+    return agg;
+  } catch (err) {
+    // Tolerate the rollup table not being present yet (pre-db:push); surface
+    // every other DB error rather than masking it behind a silent live fallback.
+    if (!isMissingTableError(err)) throw err;
+    return computeJobAggregates(db, tenantId);
+  }
+}
+
 /**
  * Get summary stats for the History page dashboard cards.
  */
@@ -495,27 +574,11 @@ export async function getHistoryStats(tenantId: number) {
   const db = await getDb();
   if (!db) return { totalJobs: 0, creditsSpent: 0, successRate: 0, topType: "none" };
 
-  // Total jobs
-  const [totalResult] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(jobs)
-    .where(eq(jobs.tenantId, tenantId));
-  const totalJobs = totalResult?.count ?? 0;
-
-  // Credits spent (all time)
-  const [creditsResult] = await db
-    .select({ total: sql<number>`COALESCE(SUM(${jobs.creditsUsed}), 0)` })
-    .from(jobs)
-    .where(eq(jobs.tenantId, tenantId));
-  const creditsSpent = creditsResult?.total ?? 0;
-
-  // Success rate
-  const [doneResult] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(jobs)
-    .where(and(eq(jobs.tenantId, tenantId), eq(jobs.status, "done")));
-  const doneCount = doneResult?.count ?? 0;
-  const successRate = totalJobs > 0 ? Math.round((doneCount / totalJobs) * 100) : 0;
+  // Total jobs / credits spent / done jobs — served from the studio_tenant_stats
+  // rollup (recompute-on-read when stale); falls back to a live aggregate if the
+  // rollup table isn't present yet (migration 0013 not applied).
+  const { totalJobs, creditsSpent, doneJobs } = await getHistoryAggregates(db, tenantId);
+  const successRate = totalJobs > 0 ? Math.round((doneJobs / totalJobs) * 100) : 0;
 
   // Top edit type — denormalized `editType` column with a legacy LIKE fallback
   // (safe to merge ahead of `db:push`; see computeTopEditType above).
