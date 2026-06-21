@@ -17,7 +17,9 @@
  * crystalline. r is used only to scale the initial jitter — Lloyd does the rest.
  *
  * Pure + deterministic: seeded PRNG, fixed iteration count, discrete Voronoi over
- * the raster's fabric pixels. Same inputs -> identical points.
+ * a BOUNDED, strided sample of the raster's fabric pixels (so cost stays
+ * O(iterations·M·CAP) and the allocation stays bounded even on a 40MP bbox-fill
+ * raster in the live path). Same inputs -> identical points.
  */
 import type { RasterMask, BBoxNormalized } from "../../masking/types";
 
@@ -79,13 +81,30 @@ export function blueNoiseLayout(
   const { width: w, height: h, data } = raster;
   if (m <= 0) return [];
 
-  // Fabric pixel index list — the discrete domain for Voronoi relaxation.
-  const fabric: number[] = [];
-  for (let i = 0; i < w * h; i++) if (data[i] > 127) fabric.push(i);
-  if (fabric.length === 0) return [];
-  // Degenerate: more points requested than fabric pixels — just hand back the first m.
-  if (m >= fabric.length) {
-    return fabric.slice(0, m).map((i) => [i % w, Math.floor(i / w)] as Point);
+  // True fabric area (pixel count) — bounds the spacing target + the degenerate check.
+  // Counted, not materialised, so a 40MP raster costs O(WH) time but no big allocation.
+  let fabricArea = 0;
+  for (let i = 0; i < w * h; i++) if (data[i] > 127) fabricArea++;
+  if (fabricArea === 0) return [];
+  // Degenerate: more points requested than fabric pixels — hand back the first m.
+  if (m >= fabricArea) {
+    const pts: Point[] = [];
+    for (let i = 0; i < w * h && pts.length < m; i++) if (data[i] > 127) pts.push([i % w, Math.floor(i / w)]);
+    return pts;
+  }
+
+  // Bounded, strided sample of fabric pixels — the discrete domain for Voronoi
+  // relaxation AND seed-snapping. Capping at ~CAP keeps cost O(iterations·M·CAP)
+  // and the allocation bounded regardless of raster size. (When fabricArea <= CAP,
+  // stride === 1, so the sample is the full fabric and the output is unchanged.)
+  const CAP = 20000;
+  const stride = Math.max(1, Math.floor(fabricArea / CAP));
+  const sample: number[] = [];
+  let seen = 0;
+  for (let i = 0; i < w * h; i++) {
+    if (data[i] <= 127) continue;
+    if (seen % stride === 0) sample.push(i);
+    seen++;
   }
 
   const seed = opts.seed ?? 1;
@@ -110,17 +129,18 @@ export function blueNoiseLayout(
   const ih = Math.max(1, bh * (1 - 2 * margin));
 
   // Densest-hex spacing target r; eps scales it. Used to bound the init jitter.
-  const A = fabric.length;
+  const A = fabricArea;
   const r = eps * Math.sqrt((2 * A) / (Math.sqrt(3) * m));
 
   // Snap an arbitrary point to the nearest fabric pixel (keeps seeds in-region).
+  // Nearest search is over the bounded sample, so it stays O(CAP) per call.
   const snap = (px: number, py: number): Point => {
     const xi = Math.round(px);
     const yi = Math.round(py);
     if (xi >= 0 && xi < w && yi >= 0 && yi < h && data[yi * w + xi] > 127) return [xi, yi];
-    let best = fabric[0];
+    let best = sample[0];
     let bd = Infinity;
-    for (const fi of fabric) {
+    for (const fi of sample) {
       const fx = fi % w;
       const fy = Math.floor(fi / w);
       const d = (fx - px) ** 2 + (fy - py) ** 2;
@@ -154,7 +174,7 @@ export function blueNoiseLayout(
     const sumX = new Float64Array(k);
     const sumY = new Float64Array(k);
     const cnt = new Int32Array(k);
-    for (const fi of fabric) {
+    for (const fi of sample) {
       const fx = fi % w;
       const fy = Math.floor(fi / w);
       let best = 0;

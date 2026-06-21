@@ -34,9 +34,11 @@ export interface RedistributeInput {
 }
 
 export interface RedistributeResult extends InfillResult {
-  /** Surviving (relocated) motif count = M. */
+  /** Motifs present in the output: M (relocated survivors) on the active path, or
+   *  all N on a no-op/passthrough. Invariant: removed + kept === instances.length. */
   kept: number;
-  /** Removed motif count = N − M. Drives the count-based refund contract (§4.5). */
+  /** Removed motif count = N − kept (0 on a no-op/passthrough). Drives the
+   *  count-based refund contract (§4.5): removed === 0 -> FAIL+REFUND. */
   removed: number;
   /** Even target positions the survivors were relocated to. */
   targets: Point[];
@@ -169,7 +171,10 @@ export async function densityRedistribute(input: RedistributeInput): Promise<Red
     throw new Error(`densityRedistribute: raster dims ${raster.width}x${raster.height} != image ${width}x${height}`);
   }
 
-  const empty = (): RedistributeResult => ({ data: buffer, width, height, kept: 0, removed: 0, targets: [], assignments: [] });
+  // No-op/passthrough: image returned unchanged, so all N motifs are still present
+  // (kept = N, removed = 0). Keeps removed + kept === instances.length. removed === 0
+  // still drives the caller's FAIL+REFUND, so billing is unaffected.
+  const empty = (): RedistributeResult => ({ data: buffer, width, height, kept: input.instances.length, removed: 0, targets: [], assignments: [] });
 
   const n = input.instances.length;
   const percent = clamp(input.percent, 0, 90);

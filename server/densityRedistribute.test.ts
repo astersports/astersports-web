@@ -68,10 +68,11 @@ describe("densityRedistribute (Option B)", () => {
   it("passthrough on percent 0 and on empty instances (removed === 0, byte-identical)", async () => {
     const a = await densityRedistribute({ image: { url: "x" }, fabric, instances: instances(), percent: 0 });
     expect(a.removed).toBe(0);
-    expect(a.kept).toBe(0);
+    expect(a.kept).toBe(36); // no-op keeps all N present (removed + kept === N)
     expect(Buffer.compare(a.data, scene())).toBe(0);
     const b = await densityRedistribute({ image: { url: "x" }, fabric, instances: [], percent: 30 });
     expect(b.removed).toBe(0);
+    expect(b.kept).toBe(0); // no instances -> nothing kept
   });
 
   it("never relocates on a no-removal rounding (removeN === 0 -> refund)", async () => {
