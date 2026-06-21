@@ -305,9 +305,12 @@ export function computeCredits(
   c: ControlSettings,
   costs: { standardGeneration: number; extraVariation: number; combinedControls: number }
 ): number {
+  // A control enabled at a no-op value (scale or density at 0%) must not be
+  // billed — the server fails+refunds such jobs, so they must not count toward
+  // credits here either, or the user is charged for an unchanged image.
   const activeControls = [
-    c.scale.enabled,
-    c.density.enabled,
+    c.scale.enabled && c.scale.percent !== 0,
+    c.density.enabled && c.density.percent > 0,
     c.remove.enabled,
     c.recolor.enabled,
   ].filter(Boolean).length;
