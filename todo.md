@@ -662,3 +662,10 @@
 - [x] Fix 3 stuck processing jobs (360001, 420001, 420002) and refund 30 credits
 - [x] Extract runVariation to shared studioEngine module
 - [x] Add vitest tests for SSE endpoint (6 tests passing)
+
+## Fix Density Applying to Subsection Only (Not Full Garment)
+- [x] Change locateFabricRegion prompt to detect the ENTIRE visible printed fabric area (not just the "best sample region")
+- [x] Add bbox expansion/padding (5% on each side) to ensure full garment coverage
+- [x] Update default fallback from center-crop (40%) to full-garment (90%)
+- [x] Update masking tests for new expansion behavior
+- [x] Verify densityThin operates on all detected instances across the full garment

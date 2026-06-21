@@ -17,16 +17,38 @@ export interface FabricRegionResult {
 
 const SYSTEM_PROMPT =
   "You are a textile-print vision analyst. Given a garment photo, return the " +
-  "axis-aligned bounding box of the FLATTEST, most frontal, least-folded region " +
-  "of PRINTED FABRIC — the area best suited to sample the print's repeat. Avoid " +
-  "seams, edges, deep shadow, the hanger/mannequin, and the photographic background. " +
+  "axis-aligned bounding box that FULLY ENCLOSES ALL visible printed fabric on the garment. " +
+  "The box must cover the ENTIRE garment surface where print/pattern is visible — " +
+  "from the topmost printed area to the bottommost, and from the leftmost to the rightmost. " +
+  "Include ALL panels (front, sleeves, collar, hem) that show printed pattern. " +
+  "The goal is to capture EVERY motif/element on the fabric so that density operations " +
+  "apply uniformly across the whole garment, not just a subsection. " +
+  "Exclude only the photographic background, hanger/mannequin hardware, and any non-fabric areas. " +
+  "Err on the side of a LARGER box — it is better to include a small margin of background " +
+  "than to miss printed fabric at the edges. " +
   "Coordinates are normalized 0..1 (x,y = top-left; w,h = size). Give an honest confidence.";
 
-/** Center-crop fallback used when the locator can't be parsed. */
+/** Full-garment fallback used when the locator can't be parsed. */
 const DEFAULT_REGION: FabricRegionResult = {
-  bbox: { x: 0.3, y: 0.3, w: 0.4, h: 0.4 },
+  bbox: { x: 0.05, y: 0.05, w: 0.9, h: 0.9 },
   confidence: 0,
 };
+
+/**
+ * Expand a bbox by a relative padding factor on each side, clamped to [0,1].
+ * This ensures the fabric region covers the full garment even if the LLM
+ * returns a slightly tight box.
+ */
+const EXPANSION_FACTOR = 0.05; // 5% padding on each side
+function expandBbox(bbox: BBoxNormalized): BBoxNormalized {
+  const padX = bbox.w * EXPANSION_FACTOR;
+  const padY = bbox.h * EXPANSION_FACTOR;
+  const x = Math.max(0, bbox.x - padX);
+  const y = Math.max(0, bbox.y - padY);
+  const w = Math.min(1 - x, bbox.w + 2 * padX);
+  const h = Math.min(1 - y, bbox.h + 2 * padY);
+  return { x, y, w, h };
+}
 
 const clamp01 = (v: unknown): number => {
   const n = Number(v);
@@ -87,8 +109,9 @@ export async function locateFabricRegion(imageUrl: string): Promise<FabricRegion
     const h = clamp01(p.h);
     if (w <= 0 || h <= 0) return DEFAULT_REGION;
 
+    const rawBbox = { x: clamp01(p.x), y: clamp01(p.y), w, h };
     return {
-      bbox: { x: clamp01(p.x), y: clamp01(p.y), w, h },
+      bbox: expandBbox(rawBbox),
       confidence: clamp01(p.confidence),
     };
   } catch (err: any) {
