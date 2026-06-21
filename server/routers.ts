@@ -23,6 +23,12 @@ import type { Game } from "../shared/types";
 // Owner-only procedure: restricts access to the site owner (OWNER_OPEN_ID)
 const ownerProcedure = protectedProcedure.use(async ({ ctx, next }) => {
   if (!ENV.ownerOpenId) {
+    // Fail closed in production: with no owner configured we must not silently
+    // downgrade "owner-only" to "any admin". Outside production we keep the
+    // admin fallback so dev/test stays runnable without OWNER_OPEN_ID.
+    if (ENV.isProduction) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Owner access only" });
+    }
     if (ctx.user.role !== "admin") {
       throw new TRPCError({ code: "FORBIDDEN", message: "Owner access only" });
     }
@@ -39,9 +45,16 @@ export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
+    // TODO(security): logout is cookie-only; stateless JWT stays valid until exp — add a tokenValidAfter/sessionVersion revocation store (needs migration).
     logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      // Clear with a fixed canonical attribute set in production so the clear
+      // directive matches the originally-set Secure cookie regardless of how the
+      // per-request protocol is inferred (a request that doesn't look HTTPS would
+      // otherwise emit a non-Secure clear that fails to remove the Secure cookie).
+      const clearOptions = ENV.isProduction
+        ? ({ httpOnly: true, sameSite: "lax", path: "/", secure: true } as const)
+        : getSessionCookieOptions(ctx.req);
+      ctx.res.clearCookie(COOKIE_NAME, { ...clearOptions, maxAge: -1 });
       return { success: true } as const;
     }),
   }),
@@ -247,6 +260,9 @@ export function registerScheduledRoutes(app: any) {
   // Trial reminder notifications — Day 4 and Day 6
   app.post('/api/scheduled/trial-reminders', async (req: any, res: any) => {
     try {
+      if (!cronSecretOk(req)) {
+        return res.status(403).json({ error: 'forbidden' });
+      }
       const user = await sdk.authenticateRequest(req);
       if (!user.isCron || !user.taskUid) {
         return res.status(403).json({ error: 'cron-only' });
@@ -261,12 +277,12 @@ export function registerScheduledRoutes(app: any) {
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      console.error('[trial-reminders] Error:', (error as Error).message);
+      // Log the full error server-side only; never return stack/context in the
+      // HTTP body (info disclosure, reachable before cron auth).
+      console.error('[trial-reminders] Error:', error);
       res.status(500).json({
         success: false,
-        error: (error as Error).message,
-        stack: (error as Error).stack,
-        context: { url: req.url, taskUid: (req as any).__taskUid },
+        error: 'Internal error',
         timestamp: new Date().toISOString(),
       });
     }
@@ -275,6 +291,9 @@ export function registerScheduledRoutes(app: any) {
   // Trial auto-charge — Day 7: charge stored PaymentMethod, convert to paid plan
   app.post('/api/scheduled/trial-autocharge', async (req: any, res: any) => {
     try {
+      if (!cronSecretOk(req)) {
+        return res.status(403).json({ error: 'forbidden' });
+      }
       const user = await sdk.authenticateRequest(req);
       if (!user.isCron || !user.taskUid) {
         return res.status(403).json({ error: 'cron-only' });
@@ -289,12 +308,12 @@ export function registerScheduledRoutes(app: any) {
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      console.error('[trial-autocharge] Error:', (error as Error).message);
+      // Log the full error server-side only; never return stack/context in the
+      // HTTP body (info disclosure, reachable before cron auth).
+      console.error('[trial-autocharge] Error:', error);
       res.status(500).json({
         success: false,
-        error: (error as Error).message,
-        stack: (error as Error).stack,
-        context: { url: req.url, taskUid: (req as any).__taskUid },
+        error: 'Internal error',
         timestamp: new Date().toISOString(),
       });
     }

@@ -106,7 +106,7 @@ export function parseGameDate(dateStr: string): Date | null {
     if (ampm === 'AM' && hours === 12) hours = 0;
 
     // Construct as Eastern time, then convert to UTC
-    const isDST = isEasternDST(year, month, day);
+    const isDST = isEasternDST(year, month, day, hours);
     const offsetHours = isDST ? 4 : 5;
 
     // Build UTC date by adding the offset
@@ -117,22 +117,35 @@ export function parseGameDate(dateStr: string): Date | null {
   }
 }
 
-function isEasternDST(year: number, month: number, day: number): boolean {
+/**
+ * Is the given Eastern wall-clock instant within US daylight saving time?
+ * DST runs from 02:00 local on the second Sunday of March to 02:00 local on the
+ * first Sunday of November. The `localHour` argument lets the two transition
+ * Sundays be classified correctly at the 2 AM boundary (the November Sunday is
+ * still DST before 02:00; the March Sunday is standard before 02:00).
+ */
+function isEasternDST(year: number, month: number, day: number, localHour: number): boolean {
   // DST starts second Sunday in March, ends first Sunday in November
   if (month < 3 || month > 11) return false;
   if (month > 3 && month < 11) return true;
 
   if (month === 3) {
-    // Second Sunday in March
+    // Second Sunday in March — spring forward at 02:00 local.
     const firstDay = new Date(year, 2, 1).getDay();
     const secondSunday = firstDay === 0 ? 8 : (14 - firstDay + 1);
-    return day >= secondSunday;
+    if (day > secondSunday) return true;
+    if (day < secondSunday) return false;
+    // On the transition day, DST begins at 02:00.
+    return localHour >= 2;
   }
 
-  // month === 11: First Sunday in November
+  // month === 11: First Sunday in November — fall back at 02:00 local.
   const firstDay = new Date(year, 10, 1).getDay();
   const firstSunday = firstDay === 0 ? 1 : (7 - firstDay + 1);
-  return day < firstSunday;
+  if (day < firstSunday) return true;
+  if (day > firstSunday) return false;
+  // On the transition day, DST is still in effect until 02:00.
+  return localHour < 2;
 }
 
 /**

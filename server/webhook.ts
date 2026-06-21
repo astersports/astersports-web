@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { stripe } from "./stripe";
 import { getDb } from "./db";
 import { billingClients } from "../drizzle/schema";
@@ -39,7 +39,7 @@ export async function handleStripeWebhook(req: Request, res: Response) {
     // Check if this is a test event
     try {
       const parsed = JSON.parse(req.body.toString());
-      if (!ENV.isProduction && parsed.id && parsed.id.startsWith("evt_test_")) {
+      if (!ENV.stripeWebhookSecret && parsed.id && parsed.id.startsWith("evt_test_")) {
         console.log("[Stripe Webhook] Test event received:", parsed.id);
         return res.json({ verified: true });
       }
@@ -365,7 +365,10 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
         subscriptionStatus: subscription.status,
         stripeSubscriptionId: subscription.id,
       })
-      .where(eq(billingClients.stripeCustomerId, customerId));
+      .where(and(
+        eq(billingClients.stripeCustomerId, customerId),
+        eq(billingClients.stripeSubscriptionId, subscription.id)
+      ));
 
     console.log(`[Stripe Webhook] Subscription updated: ${subscription.id} → ${subscription.status}`);
 
@@ -407,7 +410,10 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
       .set({
         subscriptionStatus: "canceled",
       })
-      .where(eq(billingClients.stripeCustomerId, customerId));
+      .where(and(
+        eq(billingClients.stripeCustomerId, customerId),
+        eq(billingClients.stripeSubscriptionId, subscription.id)
+      ));
 
     console.log(`[Stripe Webhook] Subscription deleted: ${subscription.id}`);
 
@@ -634,13 +640,18 @@ async function handleStudioSubscriptionUpdated(subscription: Stripe.Subscription
   const tenantId = parseInt(subscription.metadata?.tenantId ?? "0", 10);
   if (!tenantId) return;
 
-  const plan = (subscription.metadata?.plan ?? "none") as PlanKey;
-
   try {
-    await updateTenantStripe(tenantId, {
+    // Only update the stored plan when the event actually carries plan metadata.
+    // A bare subscription.updated event (e.g. status-only change) must not
+    // silently downgrade a paying tenant to "none".
+    const update: { stripeSubscriptionId: string; plan?: any } = {
       stripeSubscriptionId: subscription.id,
-      plan: plan as any,
-    });
+    };
+    if (subscription.metadata?.plan) {
+      update.plan = subscription.metadata.plan as any;
+    }
+
+    await updateTenantStripe(tenantId, update);
     console.log(`[Studio Webhook] Subscription updated for tenant ${tenantId}: ${subscription.status}`);
   } catch (err) {
     console.error("[Studio Webhook] Error handling subscription.updated:", (err as Error).message);

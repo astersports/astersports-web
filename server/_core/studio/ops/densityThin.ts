@@ -89,14 +89,20 @@ export async function densityThin(input: DensityInput): Promise<DensityResult> {
   const removeN = clamp(Math.round((n * input.percent) / 100), 0, n);
   if (removeN === 0) return { data: buffer, width, height, removed: 0 };
 
-  // F3: instance rasters must match image dims or markInstance falls back to a
-  // full bbox rectangle (gross over-erase). Warn once if any drift so it is
-  // diagnosable; normalization is a provider-side follow-up after the credentialed run.
+  // F3: instance rasters MUST match image dims. If any drift, markInstance would
+  // fall back to filling the entire bbox rectangle — a gross over-erase on a paid
+  // op. Treat dim drift as a DEGRADE/no-op (consistent with the F1/F2 guards
+  // below): return removed:0 so the caller's no-op guard fails + refunds instead
+  // of billing for a bbox-painted result. Per-instance raster normalization is a
+  // provider-side follow-up after the credentialed run. Returning here (before
+  // baseClothAnchor and the removal-region build, both of which call markInstance)
+  // guarantees no bbox fill ever runs.
   const dimDrift = input.instances.filter(
     (m) => !m.raster || m.raster.width !== width || m.raster.height !== height
   ).length;
   if (dimDrift > 0) {
-    console.warn(`[density] ${dimDrift}/${input.instances.length} instance rasters not at ${width}x${height}; bbox fallback in effect.`);
+    console.warn(`[density] ${dimDrift}/${input.instances.length} instance rasters not at ${width}x${height}; degrade -> refund (no bbox over-erase).`);
+    return { data: buffer, width, height, removed: 0 };
   }
 
   const selected = stratifiedSelect(input.instances, removeN, input.fabric.bbox, width, height);

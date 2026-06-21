@@ -44,20 +44,35 @@ export function rasterBBox(raster: RasterMask): { bbox: BBoxNormalized; area: nu
 }
 
 /**
+ * Fraction of total crop area below which an instance is treated as a speck.
+ * Measuring the speck floor as a fraction of the crop (rather than an absolute
+ * pixel count) keeps the density instance count stable across loose vs. tight
+ * crops — a fixed px floor over- or under-filters as the crop scale changes.
+ */
+const MIN_AREA_FRACTION = 0.0002; // 0.02% of crop area
+/** Absolute floor so tiny crops don't drop the threshold to ~0 px. */
+const MIN_AREA_FLOOR_PX = 64;
+
+/**
  * Assemble InstanceMask[] from per-instance mask images, dropping specks below
- * `minAreaPx`. Larger instances first (stable, deterministic by area then bbox).
+ * the minimum area. Larger instances first (stable, deterministic by area then
+ * bbox). When `minAreaPx` is omitted the floor is normalized to the crop size
+ * (MIN_AREA_FRACTION of width*height, clamped up to MIN_AREA_FLOOR_PX); pass an
+ * explicit value to override.
  */
 export async function instancesFromMasks(
   maskPngs: Buffer[],
   width: number,
   height: number,
-  minAreaPx = 200
+  minAreaPx?: number
 ): Promise<InstanceMask[]> {
+  const minArea =
+    minAreaPx ?? Math.max(MIN_AREA_FLOOR_PX, Math.round(width * height * MIN_AREA_FRACTION));
   const items: Array<{ inst: InstanceMask; area: number }> = [];
   for (const png of maskPngs) {
     const raster = await decodeMaskToRaster(png, width, height);
     const bb = rasterBBox(raster);
-    if (!bb || bb.area < minAreaPx) continue;
+    if (!bb || bb.area < minArea) continue;
     items.push({ inst: { bbox: bb.bbox, raster }, area: bb.area });
   }
   items.sort((a, b) => b.area - a.area || a.inst.bbox.x - b.inst.bbox.x || a.inst.bbox.y - b.inst.bbox.y);
