@@ -1,0 +1,241 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Print Studio — Admin Surface Mockup</title>
+<!--
+  Print Studio — Admin Surface interactive mockup (companion to docs/admin-redesign-spec.md).
+  Fidelity: reconstructed from drizzle schema (3b69395) + server contracts (studioDb.ts ca6f39a,
+  firmAdmin.ts 35a9af7) + observed logged-in state. NOT pixel-scraped from prod, NOT yet reconciled
+  against client/**. Design-intent fidelity, not a 1:1 reproduction of current React.
+-->
+<style>
+:root{--bg:#0f1115;--panel:#171a21;--panel2:#1e222b;--line:#2a2f3a;--ink:#e7ebf2;--mut:#9aa3b2;--acc:#5b8cff;--cobalt:#3b6fe0;--amber:#e0a23b;--good:#3fb37f;--bad:#e0556b;--warn:#e0a23b;--proc:#5b8cff;}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial}
+.app{max-width:1180px;margin:0 auto;padding:16px}
+.bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.brand{font-weight:700;letter-spacing:.2px}.brand small{color:var(--mut);font-weight:500}
+.spacer{flex:1}
+.pill{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:5px 12px;color:var(--ink);font-variant-numeric:tabular-nums}
+.seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{background:transparent;border:0;color:var(--mut);padding:7px 12px;cursor:pointer;font:inherit}
+.seg button.on{background:var(--acc);color:#fff}
+.tabs{display:flex;gap:6px;margin:14px 0}
+.tabs button{background:var(--panel);border:1px solid var(--line);color:var(--mut);border-radius:9px;padding:8px 14px;cursor:pointer;font:inherit}
+.tabs button.on{color:var(--ink);border-color:var(--acc);box-shadow:inset 0 -2px 0 var(--acc)}
+.note{font-size:12px;color:var(--mut);margin:6px 2px 14px}
+.grid{display:grid;gap:12px}.cards{grid-template-columns:repeat(4,1fr)}@media(max-width:820px){.cards{grid-template-columns:repeat(2,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.card h4{margin:0 0 6px;font-size:12px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.card .big{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:12px}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.toolbar{gap:8px}
+input,select{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:7px 10px;font:inherit}
+.btn{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:7px 12px;cursor:pointer;font:inherit}
+.btn.acc{background:var(--acc);border-color:var(--acc);color:#fff}.btn.ghost{background:transparent}
+table{width:100%;border-collapse:collapse;margin-top:10px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{color:var(--mut);font-size:12px;font-weight:600}
+.thumb{width:34px;height:34px;border-radius:6px;display:inline-block;background:repeating-linear-gradient(45deg,#2b3140,#2b3140 5px,#333a49 5px,#333a49 10px)}
+.tag{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--mut)}
+.s-done{color:var(--good)}.s-failed{color:var(--bad)}.s-processing{color:var(--proc)}.s-pending{color:var(--mut)}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px}
+.toggle{width:38px;height:22px;border-radius:999px;background:#39404e;position:relative;cursor:pointer;border:0;flex:0 0 auto}
+.toggle .k{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.15s}
+.toggle.on{background:var(--cobalt)}.toggle.on.amber{background:var(--amber)}.toggle.on .k{left:18px}
+.toggle.lock{opacity:.5;cursor:not-allowed}
+.pager{display:flex;gap:6px;align-items:center;margin-top:10px;color:var(--mut)}
+.bulkbar{display:none;align-items:center;gap:10px;background:#1b2740;border:1px solid var(--acc);border-radius:10px;padding:8px 12px;margin-top:10px}
+.bulkbar.on{display:flex}
+.bar2{height:8px;border-radius:6px;background:var(--panel2);overflow:hidden}.bar2 i{display:block;height:100%;background:var(--acc)}
+.cap .bar2 i{background:linear-gradient(90deg,var(--good),var(--warn))}
+.kvs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.muted{color:var(--mut)}.right{margin-left:auto}.mono{font-variant-numeric:tabular-nums}
+.flag{background:#3a2b14;border:1px solid var(--amber);color:#f3d39a;border-radius:8px;padding:6px 10px;font-size:12px;display:inline-block}
+.badge{font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 7px;color:var(--mut)}
+.hidden{display:none}
+.orgrow td{background:#141821}
+</style></head>
+<body><div class="app">
+  <div class="bar">
+    <div class="brand">Print&nbsp;Studio <small id="scopeName">· Jaya</small></div>
+    <div class="seg" id="modeSeg">
+      <button data-mode="individual">Individual</button>
+      <button data-mode="single" class="on">Single-Org</button>
+      <button data-mode="multi">Multi-Org</button>
+    </div>
+    <select id="orgSwitch" class="hidden"></select>
+    <div class="spacer"></div>
+    <div class="pill">Balance <b id="bal">9,770</b> cr</div>
+  </div>
+  <div class="tabs" id="tabs">
+    <button data-tab="history" class="on">History</button>
+    <button data-tab="ledger">Credit Ledger</button>
+    <button data-tab="admin">Admin</button>
+    <button data-tab="billing">Billing</button>
+  </div>
+  <div class="note" id="modeNote"></div>
+  <div id="view"></div>
+</div>
+<script>
+const STATE={mode:'single',tab:'history',orgWs:'jaya'};
+const WS={jaya:{name:'Jaya',plan:'pro',seats:7,bal:9770},northwind:{name:'Northwind Apparel',plan:'team',seats:22,bal:41200},lumen:{name:'Lumen Studio',plan:'starter',seats:1,bal:1480}};
+const ORG={name:'Atlas Brands Group',ws:['jaya','northwind','lumen']};
+const TYPES=['Density','Scale','Recolor','Remove','Mixed','Upload'];
+const STAT=['done','done','done','done','failed','processing','done','pending'];
+function rnd(s){let x=Math.sin(s)*1e4;return x-Math.floor(x)}
+function jobs(n,seed){return Array.from({length:n},(_,i)=>{const s=seed+i;const st=STAT[Math.floor(rnd(s)*STAT.length)];return{
+ id:'job-'+(48210-i),title:['Jersey navy→crimson','Logo upscale 4×','Crowd density +30%','Remove sponsor patch','Mixed: recolor+scale','Kit upload'][Math.floor(rnd(s*1.3)*6)],
+ type:TYPES[Math.floor(rnd(s*2.1)*TYPES.length)],changes:1+Math.floor(rnd(s*3.7)*4),by:['A. Rao','J. Kim','M. Singh','S. Patel','System'][Math.floor(rnd(s*4.2)*5)],
+ date:'2026-06-'+String(21-(i%21)).padStart(2,'0'),credits:st==='failed'?0:10*(1+Math.floor(rnd(s*5.5)*3)),status:st};})}
+function ledger(n,seed){const out=[];let bal=9770;for(let i=0;i<n;i++){const s=seed+i;const fail=rnd(s*2)<0.18;const gen=-10*(1+Math.floor(rnd(s*3)*3));
+ if(rnd(s)<0.12){const g=[3900,5000,2000][Math.floor(rnd(s*7)*3)];bal+=g;out.push({id:'job-'+(48210-i),delta:g,bal,reason:'subscription',by:'System',date:'2026-06-'+String(21-(i%21)).padStart(2,'0')});}
+ else{bal+=gen;out.push({id:'job-'+(48210-i),delta:gen,bal,reason:'generation',by:['A. Rao','J. Kim','M. Singh','S. Patel'][Math.floor(rnd(s*4)*4)],date:'2026-06-'+String(21-(i%21)).padStart(2,'0')});
+   if(fail){bal-=gen;out.push({id:'job-'+(48210-i)+'-failed',delta:-gen,bal,reason:'refund',by:'System',date:'2026-06-'+String(21-(i%21)).padStart(2,'0')});}}}
+ return out}
+function members(){return[{n:'A. Rao',r:'owner',s7:1240,sa:18900},{n:'J. Kim',r:'admin',s7:880,sa:12100},{n:'M. Singh',r:'member',s7:610,sa:7400},{n:'S. Patel',r:'member',s7:120,sa:3050},{n:'System / Subscription',r:'system',s7:0,sa:0,sys:true}]}
+const $=s=>document.querySelector(s);const el=(h)=>{const d=document.createElement('div');d.innerHTML=h;return d.firstElementChild};
+function setMode(m){STATE.mode=m;[...$('#modeSeg').children].forEach(b=>b.classList.toggle('on',b.dataset.mode===m));
+ const multi=m==='multi';$('#orgSwitch').classList.toggle('hidden',!multi);
+ if(multi){$('#orgSwitch').innerHTML='<option value="__roll">— Org rollup (all workspaces) —</option>'+ORG.ws.map(w=>`<option value="${w}">${WS[w].name}</option>`).join('');STATE.orgWs='__roll';}
+ const ws=multi?(STATE.orgWs==='__roll'?null:WS[STATE.orgWs]):WS.jaya;
+ $('#scopeName').textContent=multi?('· '+ORG.name):('· '+WS.jaya.name);
+ $('#bal').textContent=ws?ws.bal.toLocaleString():'—';
+ $('#modeNote').textContent={individual:'Mode 1 · Individual — personal workspace, no org, Starter. Single seat; the member IS the owner.',
+  single:'Mode 2 · Single-Org / Team — one workspace, many seats drawing from one shared pool (Pro/Team).',
+  multi:'Mode 3 · Multi-Org — org parent over N workspaces. Org views are READ-ONLY rollups: no consolidated invoice, no cross-workspace credit pooling. Each workspace bills itself.'}[m];
+ render();}
+function setTab(t){STATE.tab=t;[...$('#tabs').children].forEach(b=>b.classList.toggle('on',b.dataset.tab===t));render();}
+$('#modeSeg').addEventListener('click',e=>{if(e.target.dataset.mode)setMode(e.target.dataset.mode)});
+$('#tabs').addEventListener('click',e=>{if(e.target.dataset.tab)setTab(e.target.dataset.tab)});
+$('#orgSwitch')&&$('#orgSwitch').addEventListener('change',e=>{STATE.orgWs=e.target.value;$('#bal').textContent=e.target.value==='__roll'?'—':WS[e.target.value].bal.toLocaleString();render();});
+function render(){const v=$('#view');v.innerHTML='';
+ if(STATE.mode==='multi'&&STATE.orgWs==='__roll'){v.appendChild(rollup());return;}
+ if(STATE.tab==='history')v.appendChild(History());
+ if(STATE.tab==='ledger')v.appendChild(Ledger());
+ if(STATE.tab==='admin')v.appendChild(Admin());
+ if(STATE.tab==='billing')v.appendChild(Billing());}
+function History(){const ind=STATE.mode==='individual';const data=jobs(ind?9:26,ind?5:11);
+ const wrap=el('<div></div>');
+ wrap.appendChild(el(`<div class="grid cards">
+  <div class="card"><h4>Total Generations</h4><div class="big">${ind?'214':'4,821'}</div></div>
+  <div class="card"><h4>Credits Spent</h4><div class="big">${ind?'2,140':'58,300'}</div></div>
+  <div class="card"><h4>Success Rate</h4><div class="big">${ind?'96%':'92%'}</div></div>
+  <div class="card"><h4>Top Edit Type</h4><div class="big">Recolor</div></div></div>`));
+ const p=el('<div class="panel"></div>');
+ p.appendChild(el(`<div class="row toolbar">
+   <input placeholder="Search title / element / instruction…" style="min-width:240px">
+   <select><option>All types</option>${TYPES.map(t=>`<option>${t}</option>`).join('')}</select>
+   <select><option>All status</option><option>done</option><option>failed</option><option>processing</option><option>pending</option></select>
+   ${ind?'':'<select><option>All members</option><option>A. Rao</option><option>J. Kim</option><option>M. Singh</option><option>S. Patel</option></select>'}
+   <span class="right badge">keyset · server-side</span></div>`));
+ const bulk=el(`<div class="bulkbar"><b><span id="selN">0</span> selected</b><button class="btn">Re-run</button><button class="btn">Export</button><button class="btn">Add to favorites</button><button class="btn">Archive</button><span class="right muted">bulk actions</span></div>`);
+ p.appendChild(bulk);
+ const t=el(`<table><thead><tr><th><input type="checkbox" id="all"></th><th>Preview</th><th>Title</th><th>Type</th><th>Changes</th>${ind?'':'<th>Created by</th>'}<th>Date</th><th>Credits</th><th>Status</th></tr></thead><tbody></tbody></table>`);
+ const tb=t.querySelector('tbody');
+ data.forEach(j=>{const tr=el(`<tr><td><input type="checkbox" class="sel"></td><td><span class="thumb"></span></td><td>${j.title}</td><td><span class="tag">${j.type}</span></td><td>${j.changes}</td>${ind?'':`<td>${j.by}</td>`}<td>${j.date}</td><td class="mono">${j.credits||'—'}</td><td class="s-${j.status}"><span class="dot" style="background:currentColor"></span>${j.status}</td></tr>`);tb.appendChild(tr);});
+ p.appendChild(t);
+ p.appendChild(el(`<div class="pager"><button class="btn ghost">‹ Newer</button><span class="muted">Showing 1–${data.length} · keyset cursor</span><button class="btn ghost">Older ›</button><span class="right flag">Audit: live tiles run ~9 unbounded scans (incl. 4× LIKE on controls) — replace with rollups</span></div>`));
+ wrap.appendChild(p);
+ t.addEventListener('change',()=>{const sels=[...t.querySelectorAll('.sel')];const n=sels.filter(s=>s.checked).length;bulk.classList.toggle('on',n>0);bulk.querySelector('#selN').textContent=n;});
+ t.querySelector('#all').addEventListener('change',e=>{t.querySelectorAll('.sel').forEach(s=>s.checked=e.target.checked);t.dispatchEvent(new Event('change'));});
+ return wrap;}
+function Ledger(){const ind=STATE.mode==='individual';const data=ledger(ind?14:40,ind?3:9);
+ const wrap=el('<div></div>');
+ wrap.appendChild(el(`<div class="grid cards">
+  <div class="card"><h4>Balance</h4><div class="big mono">${(ind?WS.jaya.bal:WS.jaya.bal).toLocaleString()}</div></div>
+  <div class="card"><h4>Spent (30d)</h4><div class="big mono">${ind?'1,180':'12,640'}</div></div>
+  <div class="card"><h4>Earned (30d)</h4><div class="big mono">${ind?'3,900':'19,900'}</div></div>
+  <div class="card"><h4>Trend</h4><div class="big">▁▂▄▆▅▇</div></div></div>`));
+ const p=el('<div class="panel"></div>');
+ p.appendChild(el(`<div class="row toolbar"><div class="seg"><button class="on">Timeline</button><button>By member</button></div>
+   <input placeholder="Search refId / note…" style="min-width:200px">
+   <select><option>All reasons</option><option>generation</option><option>refund</option><option>subscription</option><option>topup</option></select>
+   <button class="btn">Export CSV</button><span class="right badge">keyset · server-side</span></div>`));
+ const t=el(`<table><thead><tr><th>Entry</th><th>Reason</th><th>By</th><th>Date</th><th>Δ Credits</th><th>Balance after</th></tr></thead><tbody></tbody></table>`);
+ const tb=t.querySelector('tbody');
+ data.forEach(e=>{tb.appendChild(el(`<tr><td class="mono">${e.id}</td><td><span class="tag">${e.reason}</span></td><td>${e.by}</td><td>${e.date}</td><td class="mono ${e.delta<0?'s-failed':'s-done'}">${e.delta>0?'+':''}${e.delta}</td><td class="mono">${e.bal.toLocaleString()}</td></tr>`));});
+ p.appendChild(t);
+ p.appendChild(el(`<div class="pager"><button class="btn ghost">‹ Newer</button><span class="muted">${data.length} rows · refund-on-failure ⇒ ~2 rows/attempt</span><button class="btn ghost">Older ›</button><span class="right flag">Audit: ledger→jobs join is non-sargable (CAST on refId) — add real jobId column · TODO(architect)</span></div>`));
+ wrap.appendChild(p);return wrap;}
+function Admin(){const wrap=el('<div></div>');
+ if(STATE.mode==='individual'){wrap.appendChild(el(`<div class="panel"><h3 style="margin-top:0">Account</h3><div class="muted">Individual mode — single seat; you are the owner. No member management, join links, or domain lock. Admin surface collapses to plan + usage.</div></div>`));wrap.appendChild(AutoTopUp());return wrap;}
+ const ws=STATE.mode==='multi'?WS[STATE.orgWs]:WS.jaya;
+ wrap.appendChild(el(`<div class="grid cards">
+  <div class="card"><h4>Pool Balance</h4><div class="big mono">${ws.bal.toLocaleString()}</div></div>
+  <div class="card"><h4>Spent (7d)</h4><div class="big mono">2,850</div></div>
+  <div class="card"><h4>Active / Seats</h4><div class="big">${ws.seats} / ${ws.plan==='team'?'∞':ws.plan==='pro'?'10':'1'}</div></div>
+  <div class="card"><h4>Plan</h4><div class="big" style="text-transform:capitalize">${ws.plan}</div></div></div>`));
+ const sp=el('<div class="panel"><h3 style="margin-top:0">Spend by Member</h3></div>');
+ const st=el('<table><thead><tr><th>Member</th><th>Spent (7d)</th><th>Spent (all-time)</th></tr></thead><tbody></tbody></table>');
+ members().forEach(m=>st.querySelector('tbody').appendChild(el(`<tr class="${m.sys?'orgrow':''}"><td>${m.n} ${m.sys?'<span class="badge">system grant — null user</span>':''}</td><td class="mono">${m.s7.toLocaleString()}</td><td class="mono">${m.sa.toLocaleString()}</td></tr>`)));
+ sp.appendChild(st);sp.appendChild(el('<div class="note">Audit: today system/subscription spend (null userId) is dropped from Spend-by-Member; shown here as an explicit "System" bucket so totals reconcile — attribution semantics are TODO(architect).</div>'));
+ wrap.appendChild(sp);
+ const mp=el('<div class="panel"><h3 style="margin-top:0">Members</h3></div>');
+ const mt=el('<table><thead><tr><th>Member</th><th>Role</th><th>User</th><th>Admin</th><th></th></tr></thead><tbody></tbody></table>');
+ [['A. Rao','owner'],['J. Kim','admin'],['M. Singh','member'],['S. Patel','member']].forEach(([n,r])=>{
+   const owner=r==='owner';
+   mt.querySelector('tbody').appendChild(el(`<tr><td>${n}</td><td><span class="tag" style="text-transform:capitalize">${r}</span></td>
+     <td><button class="toggle on cobalt ${owner?'lock':''}"><span class="k"></span></button></td>
+     <td><button class="toggle ${r!=='member'?'on amber':''} ${owner?'lock':''}"><span class="k"></span></button></td>
+     <td class="right">${owner?'<span class="muted">—</span>':'<button class="btn ghost">Remove</button>'}</td></tr>`));});
+ mp.appendChild(mt);
+ mp.querySelectorAll('.toggle:not(.lock)').forEach(t=>t.addEventListener('click',()=>{t.classList.toggle('on');if(t.classList.contains('amber')||t.parentElement.cellIndex===3)t.classList.toggle('amber');}));
+ mp.appendChild(el('<div class="note">Owner row toggles are locked on (verified: firmAdmin.toggleRole rejects owner changes + last-admin guard). User=cobalt, Admin=amber per server comment.</div>'));
+ wrap.appendChild(mp);
+ wrap.appendChild(el(`<div class="panel"><div class="kvs">
+   <div><b>Invite Member</b><div class="row" style="margin-top:6px"><input placeholder="email@firm.com" style="flex:1"><button class="btn acc">Invite</button></div></div>
+   <div><b>Shareable Join Links</b><div class="row" style="margin-top:6px"><input value="astersports.io/join/8fk2…" readonly style="flex:1"><button class="btn">Copy</button><button class="btn ghost">Revoke</button></div></div>
+   <div><b>Domain Lock</b><div class="row" style="margin-top:6px"><input value="@${ws.name.toLowerCase().replace(/\s/g,'')}.com" style="flex:1"><button class="btn">Save</button></div></div>
+   <div><b>Transfer Ownership</b><div class="row" style="margin-top:6px"><select style="flex:1"><option>J. Kim (admin)</option><option>M. Singh</option></select><button class="btn">Transfer</button></div></div>
+ </div></div>`));
+ wrap.appendChild(AutoTopUp());
+ return wrap;}
+function AutoTopUp(){const cap=200,used=128;const pct=Math.round(used/cap*100);
+ const p=el(`<div class="panel cap"><h3 style="margin-top:0">Auto-Top-Up <span class="badge">advisory layer · buildable now</span> <span class="badge" style="border-color:var(--amber);color:#f3d39a">card-charge = TODO(architect) · dark</span></h3>
+   <div class="row" style="gap:18px;align-items:flex-start">
+     <div style="flex:1;min-width:240px">
+       <div class="muted" style="margin-bottom:6px">Run-rate estimate (trailing 10d)</div>
+       <div class="mono" style="font-size:18px">≈ 1,180 cr/day · projected exhaustion <b>Thursday Jun 25</b></div>
+       <div class="note">Recommends 5,000-pack (covers ~4 more days). Reuses analyzeTrialUsage() → projectExhaustion().</div>
+     </div>
+     <div style="flex:1;min-width:240px">
+       <div class="muted">Monthly budget cap (dollars) — owner-set, non-bypassable</div>
+       <div class="row" style="margin:6px 0"><input value="200" style="width:80px"><span class="muted">/ mo</span><span class="right mono">$${used} of $${cap}</span></div>
+       <div class="bar2"><i style="width:${pct}%"></i></div>
+       <div class="note">Alerts at 50 / 75 / 100%. Receipts per top-up (not approvals). At-cap behavior: <b>notify-and-pause</b> <span class="muted">(owner-decision · hard-stop toggle available)</span>.</div>
+     </div>
+   </div>
+   <table style="margin-top:6px"><thead><tr><th>Receipt</th><th>Pack</th><th>Charged</th><th>Date</th><th>Status</th></tr></thead><tbody>
+     <tr><td class="mono">tu_9f2a</td><td>5,000 cr</td><td class="mono">$60</td><td>Jun 18</td><td class="s-done">✓ receipt sent</td></tr>
+     <tr><td class="mono">tu_7c1b</td><td>5,000 cr</td><td class="mono">$60</td><td>Jun 11</td><td class="s-done">✓ receipt sent</td></tr>
+     <tr><td class="mono">—</td><td>5,000 cr</td><td class="mono">$60</td><td>Jun 25 (proj.)</td><td class="s-processing">armed · within cap</td></tr>
+   </tbody></table></div>`);
+ return p;}
+function Billing(){const ws=STATE.mode==='multi'?WS[STATE.orgWs]:STATE.mode==='individual'?WS.lumen:WS.jaya;
+ const plans=[['Starter','$39/mo','3,900 cr · 1 seat',ws.plan==='starter'],['Pro','$199/mo','19,900 cr · ≤10 seats',ws.plan==='pro'],['Team','$20/seat/mo','2,000 cr/seat · ∞ seats · shared library',ws.plan==='team']];
+ const wrap=el('<div></div>');
+ wrap.appendChild(el(`<div class="panel"><div class="row"><div><h3 style="margin:0">Plan for ${ws.name}</h3><div class="muted">Workspace = sole billed entity · one Stripe customer · one card · one pool · one invoice</div></div><div class="right flag">Stripe TEST mode detected in prod copy — flip to live is gated money-path (G0/G1)</div></div></div>`));
+ const g=el('<div class="grid" style="grid-template-columns:repeat(3,1fr);margin-top:12px"></div>');
+ plans.forEach(([n,pr,d,cur])=>g.appendChild(el(`<div class="card" style="${cur?'border-color:var(--acc)':''}"><h4>${n} ${cur?'· current':''}</h4><div class="big">${pr}</div><div class="muted" style="margin:6px 0 10px">${d}</div><button class="btn ${cur?'':'acc'}" ${cur?'disabled':''}>${cur?'Current plan':'Switch'}</button></div>`)));
+ wrap.appendChild(g);
+ wrap.appendChild(el(`<div class="panel"><h3 style="margin-top:0">Credit Packs</h3><div class="grid" style="grid-template-columns:repeat(3,1fr)">
+   <div class="card"><div class="big">1,000</div><div class="muted">$15 · $0.015/cr</div></div>
+   <div class="card"><div class="big">5,000</div><div class="muted">$60 · $0.012/cr</div></div>
+   <div class="card"><div class="big">20,000</div><div class="muted">$200 · $0.010/cr</div></div></div>
+   <div class="note">Packs persist; monthly credits reset (proposed expiry posture). Pack $/cr ≥ plan $/cr — packs never undercut subscription. ✓</div></div>`));
+ if(STATE.mode==='multi')wrap.appendChild(el('<div class="note flag">Multi-org: each workspace bills itself. No consolidated invoice, no cross-workspace pooling (locked). Org parent = reporting rollup only.</div>'));
+ return wrap;}
+function rollup(){const wrap=el('<div></div>');
+ wrap.appendChild(el(`<div class="panel"><div class="row"><div><h3 style="margin:0">${ORG.name} — Org Rollup</h3><div class="muted">READ-ONLY cross-workspace reporting · GROUP BY orgId · no pooled spend, no consolidated invoice</div></div><div class="right badge">multi-org</div></div></div>`));
+ wrap.appendChild(el(`<div class="grid cards">
+  <div class="card"><h4>Workspaces</h4><div class="big">3</div></div>
+  <div class="card"><h4>Total Seats</h4><div class="big">30</div></div>
+  <div class="card"><h4>Spend (7d, all ws)</h4><div class="big mono">11,400</div></div>
+  <div class="card"><h4>Combined Balance</h4><div class="big mono">52,450</div></div></div>`));
+ const p=el('<div class="panel"><h3 style="margin-top:0">By Workspace</h3></div>');
+ const t=el('<table><thead><tr><th>Workspace</th><th>Plan</th><th>Seats</th><th>Balance</th><th>Spend 7d</th><th>Invoice</th><th></th></tr></thead><tbody></tbody></table>');
+ ORG.ws.forEach(w=>{const x=WS[w];t.querySelector('tbody').appendChild(el(`<tr><td>${x.name}</td><td style="text-transform:capitalize">${x.plan}</td><td>${x.seats}</td><td class="mono">${x.bal.toLocaleString()}</td><td class="mono">${(x.seats*180).toLocaleString()}</td><td class="muted">separate · self-billed</td><td class="right"><button class="btn ghost" onclick="pick('${w}')">Open ›</button></td></tr>`));});
+ p.appendChild(t);p.appendChild(el('<div class="note">No "consolidated invoice" cell by design — each workspace keeps its own Stripe customer/subscription/invoice. Rollup aggregates reporting only.</div>'));
+ wrap.appendChild(p);return wrap;}
+function pick(w){STATE.orgWs=w;$('#orgSwitch').value=w;$('#bal').textContent=WS[w].bal.toLocaleString();render();}
+setMode('single');
+</script></body></html>
