@@ -9,26 +9,20 @@ before each task — `main` is moving).
 
 ---
 
-## SCOPE — money-path go-live ONLY (do not drift)
+## SCOPE — full studio section (Manus owns end-to-end)
 
-This order covers **only** Tasks M1–M3 (reverse-trial subscription, ledger
-integrity, Stripe live wiring). It does **NOT** include the Admin / History /
-Billing **surface** redesigns. Do not start surface/UX work under this order.
+Per Frank (2026-06-21), Manus owns its whole studio section. This order covers
+**both** the money-path go-live (M1–M3) **and** the Admin / History / Billing
+surface redesigns (M4–M6). Every task follows the same rules: one task = one PR,
+anchor to named functions, never flip env, never weaken the credit primitives,
+STOP-and-ask rather than improvise.
 
-**Surface backlog = separate track (CC lane unless Frank reassigns):**
-- **Admin:** `member_spend_rollup` (replace 2 full ledger `GROUP BY` scans/load);
-  remove vestigial `isUser`/`isAdmin` (not columns — dead synthetic fields in
-  `tenancy.ts` + stale `firmAdmin.ts` comment); member-table paging. *(Shipped:
-  #24 individual-account scoping.)*
-- **History:** replace `getHistoryStats`' 4× unindexable `LIKE` + ~9 unbounded
-  aggregates (denormalize `editType` at job-create + `tenant_stats` rollup —
-  **writes in `generate`, money-path-adjacent → Manus or coordinate**); keyset
-  paging; FULLTEXT search; fix `topType` combined-job double-count.
-- **Billing surface:** hide per-seat **Team** plan for `individual` accounts;
-  trim dead credit-model bits (`highRes` unused; `variations` clamped to 1 so
-  extra-variation cost is dormant but advertised in `ControlPanel.tsx`) —
-  **`shared/billing.ts` is money-path → Manus.**
-- **Ledger:** keyset paging. *(Shipped: #24 full-export CSV.)*
+**Money-path-adjacent tasks** (touch `generate` or `shared/billing.ts` / credit
+constants) — handle with money-path care, idempotency intact: **M1, M2, M5a,
+M5b, M6b.**
+
+Already shipped (CC lane, merged — do not redo): #24 individual-account Admin
+scoping + full-export ledger CSV.
 
 ---
 
@@ -114,7 +108,7 @@ generation is live.
 
 **Change (implement exactly this contract):**
 - Create the tenant with `creditBalance: 0`, then grant the trial credits through
-  `grantCredits(tenant.id, TRIAL_CREDITS, 'grant', \`trial-init-${tenant.id}\`, ctx.user.id)`
+  `grantCredits(tenant.id, TRIAL_CREDITS, 'grant', 'trial-init-' + tenant.id, ctx.user.id)`
   so a ledger row is written. Mirror the working pattern in
   `inviteLinks.redeem` (the firm/individual branches already do this).
 - **Bound self-serve creation.** The exact rule is a Frank decision — **STOP and
@@ -150,6 +144,92 @@ generation is live.
 
 ---
 
+## TASK M4 — Admin surface
+**Files:** `server/routers/firmAdmin.ts` (`spendByMember`), `server/tenancy.ts`,
+`client/src/pages/studio/StudioAdmin.tsx`
+
+**M4a — member spend rollup.** `spendByMember` runs **two full `creditLedger`
+`GROUP BY userId` scans** (all-time + 7d) on every Admin load. Replace with an
+incrementally-maintained or daily-materialized per-`(tenant,user)` rollup so the
+Admin tiles are O(1) reads.
+- Acceptance: rollup totals **exactly match** a live-scan oracle on a seeded
+  large tenant (run on fixed runners); Admin load no longer full-scans the ledger.
+- DO NOT change `deductCredits` / `grantCredits`; read/reporting only.
+
+**M4b — role-model cleanup.** Remove the vestigial `isUser` / `isAdmin` — they
+are **not** schema columns; they exist only as dead fields on the synthetic
+impersonation membership in `tenancy.ts` and as a stale comment on
+`firmAdmin.ts` `toggleRole`. Standardize on the single `memberships.role` enum
+the code already uses.
+- Acceptance: zero `isUser` / `isAdmin` references remain; `toggleRole`'s comment
+  matches its code; impersonation still grants owner access; check + test green.
+
+**M4c — members paging.** Add server-side paging + sort to `tenants.members` for
+unlimited-seat (Team) tenants.
+- Acceptance: members list paginates; no regression for small tenants.
+
+**Verify:** extend `firmAdmin.test.ts`; rollup-vs-oracle eval for M4a.
+
+---
+
+## TASK M5 — History surface  (M5a touches `generate` — money-path care)
+**Files:** `server/studioDb.ts` (`getHistoryStats`, `listTenantJobsEnhanced`),
+`server/routers/studio.ts` (`generate` / `rerun` → `createJob`),
+`client/src/pages/studio/StudioHistoryV2.tsx`, + a drizzle migration.
+
+**M5a — denormalize edit type (kills the LIKE scans).** `getHistoryStats`
+computes "Top Edit Type" with **four leading-wildcard `LIKE` scans** over the
+`controls` TEXT column (unindexable) and **double-counts combined jobs**. Add a
+`studio_jobs.editType` column (or an `editTypes` bool-set) written at job
+creation in `createJob`, backfill existing rows, compute topType from it.
+- Money-path care: the write is in the `generate` / `rerun` path — keep credit
+  deduct / refund / idempotency byte-for-byte unchanged; the column is additive
+  metadata only.
+- Acceptance: no `LIKE` on `controls` in `getHistoryStats`; backfill covers all
+  existing rows; combined jobs bucketed once.
+
+**M5b — `tenant_stats` rollup** for the dashboard tiles (Total / Spent / Success
+/ Top-Type) → O(1) reads.
+- Acceptance: tiles match a live-scan oracle on a seeded 50k-job tenant.
+
+**M5c — keyset pagination** on the archive (`listTenantJobsEnhanced`): replace
+`OFFSET` with `WHERE (createdAt,id) < (?,?) ORDER BY createdAt DESC, id DESC
+LIMIT k`.
+- Acceptance: stable under concurrent inserts; O(k) at any depth.
+
+**M5d — FULLTEXT search** on `title` / `detectedElements` / `instruction`
+(replace the leading-wildcard `LIKE`).
+- Acceptance: search uses a FULLTEXT index, not a full scan.
+
+**Verify:** stat-rollup-vs-oracle eval; keyset boundary tests.
+**Interim allowed:** if M5a/M5b slip, collapse `getHistoryStats`' ~7 separate
+scans into ONE conditional-aggregate query (behavior-preserving) as a stopgap.
+
+---
+
+## TASK M6 — Billing surface  (M6b touches `shared/billing.ts` — money-path care)
+**Files:** `client/src/pages/studio/StudioBilling.tsx`, `shared/billing.ts`,
+`client/src/components/studio/ControlPanel.tsx`
+
+**M6a — individual accounts don't see Team.** The per-seat **Team** plan is
+multi-seat; hide / disable it when `tenant.type === 'individual'`.
+- Acceptance: an individual account cannot view or select Team; firm accounts
+  unchanged.
+
+**M6b — trim the dead credit-model bits.** `CREDIT_COST.highRes` is **never
+read** (not in `computeCredits`), and `variations` is clamped to 1 in `generate`
+so the extra-variation cost is dormant while `ControlPanel.tsx` still advertises
+"Each additional variation costs N credits." Either wire these for real or
+remove / guard them so the UI never advertises a cost the metering can't charge.
+- Money-path care: `shared/billing.ts` is the credit source of truth — keep
+  `computeCredits` outputs unchanged for the live single / combined cases (10 / 15).
+- Acceptance: no dead `CREDIT_COST` field; no UI copy advertising an uncharged
+  cost; live credit math unchanged (tests green).
+
+**Verify:** `studio.test.ts` credit math unchanged for active controls.
+
+---
+
 ## FLIP SEQUENCE (after M1–M3 merge; Manus prepares SHA, Frank flips)
 Per `docs/STUDIO_GO_LIVE.md §3`, in order, one at a time, smoke-test after each:
 1. Money path live (`STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` → live) — after M1–M3.
@@ -162,7 +242,7 @@ Never batch flips. One flip per change, smoke-test after (CLAUDE.md §1.4).
 ---
 
 ## DEFINITION OF DONE
-- 3 draft PRs (M1, M2, M3), each CI-green, each with acceptance criteria +
+- One PR per task (M1–M6), each CI-green, each with acceptance criteria +
   verification in the body.
 - No `*_LIVE` flag, `STUDIO_MASK_PROVIDER`, or Stripe env value set by Manus.
 - `billingClients` / "Web Maintenance" untouched.
