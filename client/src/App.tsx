@@ -19,6 +19,7 @@ import StudioAdmin from "./pages/studio/StudioAdmin";
 import StudioBilling from "./pages/studio/StudioBilling";
 import CreditLedger from "./pages/studio/CreditLedger";
 import PlatformConsole from "./pages/platform/PlatformConsole";
+import JoinPage from "./pages/JoinPage";
 
 function Router() {
   return (
@@ -29,6 +30,7 @@ function Router() {
       <Route path={"/admin/billing"} component={BillingDashboard} />
       <Route path={"/admin/logs"} component={AdminLogs} />
       <Route path="/platform" component={PlatformConsole} />
+      <Route path="/join/:token" component={JoinPage} />
       <Route path={"/privacy"} component={Privacy} />
       <Route path={"/terms"} component={Terms} />
 

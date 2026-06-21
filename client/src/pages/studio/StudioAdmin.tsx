@@ -23,6 +23,11 @@ import {
   Lock,
   Unlock,
   Trash2,
+  Link2,
+  Copy,
+  Check,
+  XCircle,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -346,6 +351,7 @@ function MembersList({ tenantId, isOwner }: { tenantId: number; isOwner: boolean
 function InviteCard({ tenantId, tenant }: { tenantId: number; tenant: any }) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"member" | "admin">("member");
+  const [copied, setCopied] = useState(false);
   const utils = trpc.useUtils();
 
   const inviteMutation = trpc.tenants.invite.useMutation({
@@ -410,8 +416,130 @@ function InviteCard({ tenantId, tenant }: { tenantId: number; tenant: any }) {
             Domain restricted: only @{tenant.allowedEmailDomain} emails can join.
           </p>
         )}
+
+        {/* Generate Join Link section */}
+        <JoinLinkSection tenantId={tenantId} tenantName={tenant.name} />
       </CardContent>
     </Card>
+  );
+}
+
+/* ─── Join Link Section ───────────────────────────────────────────────────── */
+
+function JoinLinkSection({ tenantId, tenantName }: { tenantId: number; tenantName: string }) {
+  const [copied, setCopied] = useState<string | null>(null);
+  const utils = trpc.useUtils();
+
+  const { data: links, isLoading } = trpc.inviteLinks.listForTenant.useQuery(
+    { tenantId },
+    { enabled: !!tenantId }
+  );
+
+  const createLink = trpc.inviteLinks.create.useMutation({
+    onSuccess: () => {
+      toast.success("Join link created");
+      utils.inviteLinks.listForTenant.invalidate({ tenantId });
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const revoke = trpc.inviteLinks.revoke.useMutation({
+    onSuccess: () => {
+      toast.success("Link revoked");
+      utils.inviteLinks.listForTenant.invalidate({ tenantId });
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  function copyLink(token: string) {
+    const url = `${window.location.origin}/join/${token}`;
+    navigator.clipboard.writeText(url);
+    setCopied(token);
+    toast.success("Link copied to clipboard");
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  const activeLinks = links?.filter((l) => l.effectiveStatus === "active") ?? [];
+
+  return (
+    <div className="mt-4 pt-4 border-t border-border/50">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-medium flex items-center gap-1.5">
+          <Link2 className="h-3.5 w-3.5 text-amber-500" />
+          Shareable Join Links
+        </p>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs"
+          onClick={() =>
+            createLink.mutate({
+              type: "join",
+              tenantId,
+              metadata: { role: "member" },
+              maxUses: null,
+              expiresInDays: 30,
+            })
+          }
+          disabled={createLink.isPending}
+        >
+          {createLink.isPending ? (
+            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+          ) : (
+            <Link2 className="h-3 w-3 mr-1" />
+          )}
+          New Link
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      ) : activeLinks.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          No active join links. Generate one to share with potential team members.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {activeLinks.map((link) => (
+            <div
+              key={link.id}
+              className="flex items-center gap-2 p-2 rounded-md bg-muted/30 border border-border/50"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-mono text-muted-foreground truncate">
+                  {window.location.origin}/join/{link.token.slice(0, 8)}...
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Uses: {link.useCount}/{link.maxUses ?? "\u221e"}
+                  {link.expiresAt && ` · Expires: ${new Date(link.expiresAt).toLocaleDateString()}`}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 p-0"
+                onClick={() => copyLink(link.token)}
+              >
+                {copied === link.token ? (
+                  <Check className="h-3.5 w-3.5 text-emerald-500" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" />
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                onClick={() => revoke.mutate({ token: link.token })}
+                disabled={revoke.isPending}
+              >
+                <XCircle className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

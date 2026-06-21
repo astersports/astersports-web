@@ -1,25 +1,24 @@
 /**
  * Platform Console — super_admin only.
- * Firms/Individuals toggle, account list, provision, grant credits, impersonate.
+ * Unified account management with invite links dashboard.
  */
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Building2, User, Plus, Coins, Eye, Loader2, Shield } from "lucide-react";
+import { Building2, User, Plus, Coins, Loader2, Shield, Link2 } from "lucide-react";
 import AccountList from "./AccountList";
-import ProvisionFirmDialog from "./ProvisionFirmDialog";
-import InviteIndividualDialog from "./InviteIndividualDialog";
+import AddAccountDialog from "./AddAccountDialog";
 import GrantCreditsDialog from "./GrantCreditsDialog";
+import InviteDashboard from "./InviteDashboard";
 
-type TabType = "firm" | "individual";
+type TabType = "firm" | "individual" | "links";
 
 export default function PlatformConsole() {
   const { user, loading: authLoading } = useAuth();
   const [tab, setTab] = useState<TabType>("firm");
-  const [showProvision, setShowProvision] = useState(false);
-  const [showInvite, setShowInvite] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
   const [showGrant, setShowGrant] = useState(false);
 
   // Check super_admin access
@@ -55,7 +54,7 @@ export default function PlatformConsole() {
               Platform Console
             </h1>
             <p className="text-sm text-slate-400 mt-0.5">
-              Manage all accounts
+              Manage all accounts & invite links
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -66,7 +65,7 @@ export default function PlatformConsole() {
               onClick={() => setShowGrant(true)}
             >
               <Coins className="w-4 h-4 mr-1.5" />
-              Grant Credits
+              <span className="hidden sm:inline">Grant Credits</span>
             </Button>
           </div>
         </div>
@@ -74,49 +73,67 @@ export default function PlatformConsole() {
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         {/* Segmented control */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div className="inline-flex rounded-lg bg-white/5 p-1">
             <button
               onClick={() => setTab("firm")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                 tab === "firm"
                   ? "bg-amber-500/20 text-amber-400 shadow-sm"
                   : "text-slate-400 hover:text-white"
               }`}
             >
               <Building2 className="w-4 h-4" />
-              Firms
+              <span className="hidden sm:inline">Firms</span>
             </button>
             <button
               onClick={() => setTab("individual")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                 tab === "individual"
                   ? "bg-amber-500/20 text-amber-400 shadow-sm"
                   : "text-slate-400 hover:text-white"
               }`}
             >
               <User className="w-4 h-4" />
-              Individuals
+              <span className="hidden sm:inline">Individuals</span>
+            </button>
+            <button
+              onClick={() => setTab("links")}
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                tab === "links"
+                  ? "bg-amber-500/20 text-amber-400 shadow-sm"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Link2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Invite Links</span>
             </button>
           </div>
 
           <Button
             size="sm"
             className="bg-gradient-to-r from-amber-500 to-orange-500 text-black font-medium hover:opacity-90"
-            onClick={() => (tab === "firm" ? setShowProvision(true) : setShowInvite(true))}
+            onClick={() => setShowAdd(true)}
           >
             <Plus className="w-4 h-4 mr-1.5" />
-            {tab === "firm" ? "Provision Firm" : "Invite Individual"}
+            Add Account
           </Button>
         </div>
 
-        {/* Account list */}
-        <AccountList type={tab} />
+        {/* Content */}
+        {tab === "links" ? (
+          <InviteDashboard />
+        ) : (
+          <AccountList type={tab} />
+        )}
       </main>
 
       {/* Dialogs */}
-      <ProvisionFirmDialog open={showProvision} onClose={() => setShowProvision(false)} />
-      <InviteIndividualDialog open={showInvite} onClose={() => setShowInvite(false)} />
+      <AddAccountDialog
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        defaultType={tab === "links" ? "firm" : tab}
+      />
       <GrantCreditsDialog open={showGrant} onClose={() => setShowGrant(false)} />
     </div>
   );

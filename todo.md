@@ -644,3 +644,12 @@
 - [x] Improve mobile detail view layout for small screens
 - [x] Add "Favorites only" toggle to mobile filter panel
 - [x] Persist filter state in URL params (search, status, type, favorites, page) for both desktop and mobile archive
+
+## Invite Links & Admin UX Overhaul
+- [x] Create invite_links table schema (token, type, metadata, expiry, status, usage tracking)
+- [x] Add backend procedures: createInviteLink, getInviteLink, redeemInviteLink, listInviteLinks, revokeInviteLink
+- [x] Build /join/:token self-service signup page (OAuth → auto-provision)
+- [x] Unified "Add Account" dialog in Platform Console (firm/individual + create-now or generate-link)
+- [x] Invite Dashboard section in Platform Console (list all links with status)
+- [x] Add "Copy Invite Link" button in Studio Admin alongside email invite
+- [x] Mobile-optimized for all new screens

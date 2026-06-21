@@ -329,3 +329,51 @@ export const platformAdmins = mysqlTable("platform_admins", {
 
 export type PlatformAdmin = typeof platformAdmins.$inferSelect;
 export type InsertPlatformAdmin = typeof platformAdmins.$inferInsert;
+
+/**
+ * Invite Links — shareable tokens for self-service signup.
+ * Supports three flows:
+ *   - "firm": recipient becomes owner of a new pre-configured firm
+ *   - "individual": recipient gets a single-seat individual account
+ *   - "join": recipient joins an existing tenant as a member
+ */
+export const inviteLinks = mysqlTable("invite_links", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Unique token used in the invite URL (/join/:token). */
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  /** Type of invite: firm (create org), individual (create solo account), join (join existing tenant). */
+  type: mysqlEnum("type", ["firm", "individual", "join"]).notNull(),
+  /** Status tracking. */
+  status: mysqlEnum("status", ["active", "redeemed", "expired", "revoked"]).default("active").notNull(),
+  /** For "join" type: the tenant to join. For "firm"/"individual": null (created on redeem). */
+  tenantId: int("tenantId"),
+  /** Pre-configured metadata (JSON): plan, seats, credits, firmName, domainLock, role, etc. */
+  metadata: json("metadata"),
+  /** Max number of times this link can be redeemed (null = unlimited). */
+  maxUses: int("maxUses"),
+  /** How many times this link has been redeemed. */
+  useCount: int("useCount").default(0).notNull(),
+  /** When the link expires (null = never). */
+  expiresAt: timestamp("expiresAt"),
+  /** Who created this link (platform admin or tenant admin). */
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  /** Last time the link was redeemed. */
+  lastRedeemedAt: timestamp("lastRedeemedAt"),
+});
+export type InviteLink = typeof inviteLinks.$inferSelect;
+export type InsertInviteLink = typeof inviteLinks.$inferInsert;
+
+/**
+ * Invite link redemptions — tracks who redeemed each link.
+ */
+export const inviteLinkRedemptions = mysqlTable("invite_link_redemptions", {
+  id: int("id").autoincrement().primaryKey(),
+  inviteLinkId: int("inviteLinkId").notNull(),
+  userId: int("userId").notNull(),
+  /** The tenant that was created or joined as a result. */
+  tenantId: int("tenantId").notNull(),
+  redeemedAt: timestamp("redeemedAt").defaultNow().notNull(),
+});
+export type InviteLinkRedemption = typeof inviteLinkRedemptions.$inferSelect;
+export type InsertInviteLinkRedemption = typeof inviteLinkRedemptions.$inferInsert;
