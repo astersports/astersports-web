@@ -1,0 +1,18 @@
+[
+  {
+    "id": "synthetic-redistribute-30",
+    "imageUrl": "eval/out/redistribute-scene.png",
+    "percent": 30,
+    "maskUrl": "eval/out/redistribute-mask.png",
+    "labelUrl": "eval/out/redistribute-labels.png",
+    "note": "Synthetic: 36 dots on a 6x6 grid, remove 30% (11), relocate 25 survivors to an even blue-noise layout. Assets auto-generated under eval/out (gitignored)."
+  },
+  {
+    "id": "synthetic-redistribute-50",
+    "imageUrl": "eval/out/redistribute-scene.png",
+    "percent": 50,
+    "maskUrl": "eval/out/redistribute-mask.png",
+    "labelUrl": "eval/out/redistribute-labels.png",
+    "note": "Synthetic: 36 dots, remove 50% (18), relocate 18 survivors. Stresses evenness (NNI) at lower count."
+  }
+]

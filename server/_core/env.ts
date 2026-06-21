@@ -37,6 +37,13 @@ export const ENV = {
    *  live money path. Requires SAM2 (raster + instances). Default off; flip after
    *  real-garment eval confirms countError <= 0.10 on production imagery. */
   studioDensityLive: process.env.STUDIO_DENSITY_LIVE === "true",
+  /** Density v2 (proportional redistribution, Option B): route density jobs through
+   *  the deterministic-composite densityRedistribute op (remove p%, relocate
+   *  survivors to an even blue-noise layout) instead of the v1 erase-only
+   *  densityThin. Requires SAM2 (raster + instances). Default off — lands DARK and
+   *  is NOT router-wired; wiring + the flip are Frank's after the per-route eval
+   *  gates clear. Patterned on studioDensityLive. */
+  studioDensityRedistribute: process.env.STUDIO_DENSITY_REDISTRIBUTE === "true",
   /** Replicate SAM2 (D1 = Option 2). Token + model-version id for the hosted mask source. */
   replicateApiToken: process.env.REPLICATE_API_TOKEN ?? "",
   replicateSam2Model: process.env.REPLICATE_SAM2_MODEL ?? "",
