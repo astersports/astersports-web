@@ -7,7 +7,7 @@ import { TRPCError } from "@trpc/server";
 import { router } from "../_core/trpc";
 import { tenantProcedure } from "../tenancy";
 import { storagePut, storageGetSignedUrl } from "../storage";
-import { detectPrintElements, generateEditedImage, generateRecoloredImage, NON_REPEAT_SCALE_ERROR } from "../aiEngine";
+import { detectPrintElements, generateEditedImage, NON_REPEAT_SCALE_ERROR } from "../aiEngine";
 import { runVariation } from "../studioEngine";
 import { ENV } from "../_core/env";
 import { getMaskProvider } from "../_core/masking";
@@ -30,24 +30,21 @@ import {
   analyzeTrialUsage,
   getHistoryStats,
 } from "../studioDb";
-import { buildInstruction, computeCredits, deriveEditType, describeExpectedChange, resolveTargetColorHex, type ControlSettings } from "../../shared/controls";
+import { buildInstruction, computeCredits, deriveEditType, describeExpectedChange, type ControlSettings } from "../../shared/controls";
 import { CREDIT_COST, LOW_BALANCE_THRESHOLD, PLANS, TRIAL_DURATION_DAYS, TRIAL_RECOMMENDATION_START_DAY } from "../../shared/billing";
-import { sanitizeElementName, sanitizeColorValue, sanitizeFileName, MAX_ELEMENT_NAME_LENGTH } from "../../shared/sanitize";
+import { sanitizeFileName } from "../../shared/sanitize";
 
 /** "Only this control is active" predicates — the deterministic-path gates. */
-function recolorOnly(c: ControlSettings): boolean {
-  return c.recolor.enabled && !c.scale.enabled && !c.density.enabled && !c.remove.enabled;
-}
 function densityOnly(c: ControlSettings): boolean {
-  return c.density.enabled && !c.scale.enabled && !c.recolor.enabled && !c.remove.enabled;
+  return c.density.enabled && !c.scale.enabled;
 }
 function scaleOnly(c: ControlSettings): boolean {
-  return c.scale.enabled && c.scale.percent !== 0 && !c.recolor.enabled && !c.density.enabled && !c.remove.enabled;
+  return c.scale.enabled && c.scale.percent !== 0 && !c.density.enabled;
 }
 
 /**
  * H5: the single per-variation generator shared by `generate` and `rerun`.
- * `mode` selects the deterministic op (recolor/density/scale) vs the generative
+ * `mode` selects the deterministic op (density/scale) vs the generative
  * prompt path. The density path returns no image on a degrade/no-op and THROWS
  * so the caller refunds — never billing for a count-based ask it could not meet
  * (CLAUDE.md §4). Throwing also propagates the failure to the caller's refund.
@@ -137,18 +134,6 @@ export const studioRouter = router({
             enabled: z.boolean(),
             percent: z.number().transform((v) => Math.max(0, Math.min(90, v))),
           }),
-          remove: z.object({
-            enabled: z.boolean(),
-            element: z.string().max(MAX_ELEMENT_NAME_LENGTH).transform(sanitizeElementName),
-            percent: z.number(),
-          }),
-          recolor: z.object({
-            enabled: z.boolean(),
-            element: z.string().max(MAX_ELEMENT_NAME_LENGTH).transform(sanitizeElementName),
-            fromColor: z.string().max(30).default(""),
-            targetColor: z.string().max(30).transform(sanitizeColorValue),
-            coverage: z.number().min(10).max(100),
-          }),
           // Variations parked — clamped to 1 until quality validation is added.
           variations: z.number().min(1).max(4).transform(() => 1),
         }),
@@ -167,47 +152,12 @@ export const studioRouter = router({
 
       const controls = input.controls as ControlSettings;
 
-      // Validate sanitized element names are non-empty when controls are active
-      if (controls.remove.enabled && !controls.remove.element) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Remove element name is required and must contain valid characters.",
-        });
-      }
-      if (controls.recolor.enabled && !controls.recolor.element) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Recolor element name is required and must contain valid characters.",
-        });
-      }
-      if (controls.recolor.enabled && !controls.recolor.targetColor) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Target color is required and must contain valid characters.",
-        });
-      }
-
-      // A2 live route: recolor-ONLY jobs go through the deterministic op (classical
-      // provider, no SAM2) when STUDIO_RECOLOR_LIVE is on. Everything else (combined
-      // or non-recolor) stays on the existing prompt path.
-      const recolorOnly =
-        controls.recolor.enabled && !controls.scale.enabled &&
-        !controls.density.enabled && !controls.remove.enabled;
-      const useDeterministicRecolor = ENV.studioRecolorLive && recolorOnly;
-      if (useDeterministicRecolor && !controls.recolor.fromColor) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Source color is required for recolor. Click the print color to sample it.",
-        });
-      }
-
       // D-C live route: density-ONLY jobs go through the deterministic densityThin
       // op (SAM2 raster + instances) when STUDIO_DENSITY_LIVE is on. On a provider
       // degrade, density FAILS + REFUNDS — it never prompt-falls (the generative
       // path cannot do count-based removal, so it would silently ignore the ask).
       const densityOnly =
-        controls.density.enabled && !controls.scale.enabled &&
-        !controls.recolor.enabled && !controls.remove.enabled;
+        controls.density.enabled && !controls.scale.enabled;
       // Either density flag routes density through the deterministic path: v1
       // (densityThin) under STUDIO_DENSITY_LIVE, or v2 (densityRedistribute) under
       // STUDIO_DENSITY_REDISTRIBUTE — the op selection happens at the call site.
@@ -230,8 +180,7 @@ export const studioRouter = router({
       // Scale-live route: scale-ONLY jobs go through scalePrintRepeat when
       // STUDIO_SCALE_LIVE is on AND the provider serves rasters. Dark by default.
       const scaleOnly =
-        controls.scale.enabled && controls.scale.percent !== 0 &&
-        !controls.recolor.enabled && !controls.density.enabled && !controls.remove.enabled;
+        controls.scale.enabled && controls.scale.percent !== 0 && !controls.density.enabled;
       const scaleRasterReady = getMaskProvider().rasterReady;
       const useDeterministicScale = ENV.studioScaleLive && scaleOnly && scaleRasterReady;
       // D-A: reject scale combined with other edits, gated on the live flag +
@@ -342,7 +291,7 @@ export const studioRouter = router({
       // (Density/scale returned `async` above and run via the SSE endpoint — no
       // fire-and-forget background promise here. See R1 note above.)
 
-      // ─── SYNC PATH: recolor + prompt (fast enough for inline response) ────────
+      // ─── SYNC PATH: generative prompt fallback (fast enough for inline response) ──
       // Generate variations in parallel — each is an independent AI call.
       const existingVariations = await getJobVariations(job.id);
       const nextRound = existingVariations.length > 0
@@ -351,19 +300,7 @@ export const studioRouter = router({
 
       const settled = await Promise.allSettled(
         Array.from({ length: controls.variations }, async (_unused, i) => {
-          log.info("studio", `Generating variation ${i + 1}`, { jobId: job.id, tenantId: ctx.tenant.id, userId: ctx.user.id, metadata: { round: nextRound, path: useDeterministicRecolor ? "recolor" : "prompt" } });
-          const audit = { orgId: String(ctx.tenant.id), jobId: String(job.id) };
-          if (useDeterministicRecolor) {
-            const png = await generateRecoloredImage(job.originalUrl, {
-              fromColor: controls.recolor.fromColor,
-              toColor: resolveTargetColorHex(controls.recolor.targetColor),
-              coverage: controls.recolor.coverage,
-            }, audit);
-            const key = `studio/${ctx.tenant.id}/${job.id}/recolor-${nextRound}.png`;
-            const { url } = await storagePut(key, png, "image/png");
-            await addVariation({ jobId: job.id, tenantId: ctx.tenant.id, resultKey: key, resultUrl: url, round: nextRound });
-            return { url, key };
-          }
+          log.info("studio", `Generating variation ${i + 1}`, { jobId: job.id, tenantId: ctx.tenant.id, userId: ctx.user.id, metadata: { round: nextRound, path: "prompt" } });
           const resultUrl = await generateEditedImage(job.originalUrl, instruction, "image/jpeg", expectation);
           await addVariation({
             jobId: job.id,
@@ -652,7 +589,6 @@ export const studioRouter = router({
       // so a density re-run does count-based removal (or refunds on a no-op)
       // instead of silently billing a generative result that ignored the ask.
       const mode = {
-        recolor: ENV.studioRecolorLive && recolorOnly(controls),
         density: (ENV.studioDensityLive || ENV.studioDensityRedistribute) && densityOnly(controls),
         scale: ENV.studioScaleLive && scaleOnly(controls) && getMaskProvider().rasterReady,
       };

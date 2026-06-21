@@ -15,7 +15,6 @@ import { fetchWithTimeout, TIMEOUT } from "./fetchTimeout";
 import { ENV } from "./_core/env";
 import sharp from "sharp";
 import { getMaskProvider, validateInstanceCount } from "./_core/masking";
-import { separationRemap } from "./_core/studio/ops/separationRemap";
 import { densityThin } from "./_core/studio/ops/densityThin";
 import { densityRedistribute } from "./_core/studio/ops/densityRedistribute";
 import { scalePrintRepeat } from "./_core/studio/ops/scaleRepeat";
@@ -140,21 +139,6 @@ export async function generateDensityRedistributeImage(
     .toBuffer();
 
   return { png, removed: result.removed };
-}
-
-/** Deterministic recolor (A2): classical fabric mask + separationRemap -> PNG bytes.
- *  Caller (studio.generate) stores the buffer + records the variation. No model
- *  call, no no-op guard (the op always applies). */
-export async function generateRecoloredImage(
-  originalImageUrl: string,
-  params: { fromColor: string; toColor: string; coverage: number },
-  audit?: Sam2AuditContext
-): Promise<Buffer> {
-  const srcUrl = originalImageUrl.startsWith("/manus-storage/")
-    ? await storageGetSignedUrl(originalImageUrl.replace("/manus-storage/", ""))
-    : originalImageUrl;
-  const fabric = await getMaskProvider().getFabricMask({ url: srcUrl, audit }); // classical floor (bbox)
-  return separationRemap({ url: srcUrl }, fabric, params);
 }
 
 /** D-C no-op-billing guard: true if the raster has any included pixel. */

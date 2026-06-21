@@ -5,11 +5,11 @@
 import type { ControlSettings } from "./controls";
 
 export function isDensityOnly(c: ControlSettings): boolean {
-  return c.density.enabled && !c.scale.enabled && !c.recolor.enabled && !c.remove.enabled;
+  return c.density.enabled && !c.scale.enabled;
 }
 
 export function isScaleOnly(c: ControlSettings): boolean {
-  return c.scale.enabled && c.scale.percent !== 0 && !c.recolor.enabled && !c.density.enabled && !c.remove.enabled;
+  return c.scale.enabled && c.scale.percent !== 0 && !c.density.enabled;
 }
 
 /**

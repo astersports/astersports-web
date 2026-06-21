@@ -1,8 +1,8 @@
 /**
- * Shared definitions for the four print-editing controls.
+ * Shared definitions for the two print-editing controls: SCALE and DENSITY.
+ * (recolor and remove were retired in the two-op reduction.)
  * Each percentage control supports 10% increments PLUS a custom value.
  */
-import { sanitizeElementName, sanitizeColorValue } from "./sanitize";
 
 export interface ScaleControl {
   enabled: boolean;
@@ -16,32 +16,9 @@ export interface DensityControl {
   percent: number;
 }
 
-export interface RemoveControl {
-  enabled: boolean;
-  /** Natural-language element name, e.g. "blue buds". */
-  element: string;
-  /** Percent of that element to remove. 0..100. */
-  percent: number;
-}
-
-export interface RecolorControl {
-  enabled: boolean;
-  /** Natural-language element name to recolor, e.g. "pink blossoms". */
-  element: string;
-  /** Source print color (hex) sampled via the swatch/eyedropper; identifies the
-   *  separation to recolor for the deterministic op. */
-  fromColor: string;
-  /** Target color name or hex code, e.g. "coral", "deep navy", "#2A4B7C". */
-  targetColor: string;
-  /** Optional: coverage percentage — what percent of the selected element to recolor (default 100). */
-  coverage: number;
-}
-
 export interface ControlSettings {
   scale: ScaleControl;
   density: DensityControl;
-  remove: RemoveControl;
-  recolor: RecolorControl;
   /** Number of variations to generate (1..4). */
   variations: number;
 }
@@ -50,62 +27,16 @@ export const SCALE_MIN = -50;
 export const SCALE_MAX = 100;
 export const DENSITY_MIN = 0;
 export const DENSITY_MAX = 90;
-export const REMOVE_MIN = 0;
-export const REMOVE_MAX = 100;
-export const RECOLOR_COVERAGE_MIN = 10;
-export const RECOLOR_COVERAGE_MAX = 100;
 export const MAX_VARIATIONS = 4;
 
 /** 10% increment steppers (custom values are still allowed via the input field). */
 export const SCALE_STEPS = [-50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50];
 export const PERCENT_STEPS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
-/** Curated palette of common textile recolor targets. */
-export const RECOLOR_PRESETS = [
-  { name: "Coral", value: "coral" },
-  { name: "Deep Navy", value: "deep navy" },
-  { name: "Sage Green", value: "sage green" },
-  { name: "Dusty Rose", value: "dusty rose" },
-  { name: "Ivory", value: "ivory" },
-  { name: "Burnt Sienna", value: "burnt sienna" },
-  { name: "Cobalt Blue", value: "cobalt blue" },
-  { name: "Chartreuse", value: "chartreuse" },
-  { name: "Mauve", value: "mauve" },
-  { name: "Terracotta", value: "terracotta" },
-  { name: "Midnight Black", value: "midnight black" },
-  { name: "Champagne Gold", value: "champagne gold" },
-] as const;
-
-/** Pinned hex for the descriptive preset names (not CSS colors). v1 swatches. */
-export const RECOLOR_PRESET_HEX: Record<string, string> = {
-  "coral": "#FF7F50",
-  "deep navy": "#14233A",
-  "sage green": "#9CAF88",
-  "dusty rose": "#C4979B",
-  "ivory": "#FFFFF0",
-  "burnt sienna": "#E97451",
-  "cobalt blue": "#0047AB",
-  "chartreuse": "#7FFF00",
-  "mauve": "#E0B0FF",
-  "terracotta": "#E2725B",
-  "midnight black": "#0B0B0B",
-  "champagne gold": "#F7E7CE",
-};
-
-/**
- * Resolve a recolor target (preset name | CSS name | hex) to a string the op's
- * hexToLab can parse. Presets map to pinned hex; everything else passes through.
- */
-export function resolveTargetColorHex(input: string): string {
-  return RECOLOR_PRESET_HEX[input.trim().toLowerCase()] ?? input;
-}
-
 export function defaultControls(): ControlSettings {
   return {
     scale: { enabled: false, percent: 0 },
     density: { enabled: false, percent: 0 },
-    remove: { enabled: false, element: "", percent: 0 },
-    recolor: { enabled: false, element: "", fromColor: "", targetColor: "", coverage: 100 },
     variations: 1,
   };
 }
@@ -129,9 +60,8 @@ const TEXTILE_PREAMBLE =
 
 /**
  * Server-side instruction builder: converts control settings into a single
- * natural-language editing instruction for the image-edit model.
- * Uses textile and fashion industry terminology for precision.
- * Kept in shared so tests can import it directly.
+ * natural-language editing instruction for the image-edit model (generative
+ * fallback path). Kept in shared so tests can import it directly.
  */
 export function buildInstruction(c: ControlSettings): string {
   const parts: string[] = [];
@@ -205,47 +135,6 @@ export function buildInstruction(c: ControlSettings): string {
     );
   }
 
-  if (c.remove.enabled && c.remove.element && c.remove.percent > 0) {
-    const safeRemoveElement = sanitizeElementName(c.remove.element);
-    if (!safeRemoveElement) return "Return the image unchanged.";
-    parts.push(
-      `SELECTIVE ELEMENT REMOVAL — ERASE AND DELETE: Permanently erase approximately ${c.remove.percent}% of the "${safeRemoveElement}" motifs from the print. ` +
-      `CRITICAL: "Remove" means COMPLETELY DELETE — paint over them with the base fabric background color so they VANISH entirely. ` +
-      `DO NOT move, reposition, scatter, shift, or redistribute the removed motifs to other areas of the fabric. ` +
-      `DO NOT push motifs to the edges, corners, or borders. ` +
-      `DO NOT rearrange the remaining motifs — every surviving motif must stay in its EXACT original position. ` +
-      `The removal process is: (1) Identify all instances of "${safeRemoveElement}" across the fabric. ` +
-      `(2) Select approximately ${c.remove.percent}% of them, distributed evenly across the surface. ` +
-      `(3) For each selected instance, ERASE it completely by filling that area with the surrounding base cloth ground color ` +
-      `(the fabric's background — in this case, match the exact background color visible between existing motifs). ` +
-      `(4) Blend the erased area seamlessly so it looks like bare fabric — as if the motif was never printed there. ` +
-      `The remaining ${100 - c.remove.percent}% of "${safeRemoveElement}" motifs stay EXACTLY where they are — same position, same scale, same color. ` +
-      `All other print elements (companion florals, foliage, geometric fillers, accent dots, trailing vines, ` +
-      `border motifs, and ground textures) remain completely untouched in position, scale, and color. ` +
-      `The result should have FEWER total motifs visible — more empty/bare fabric showing — NOT the same number of motifs rearranged. ` +
-      `The garment construction, fabric hand, and photographic setting are unchanged.`
-    );
-  }
-
-  if (c.recolor.enabled && c.recolor.element && c.recolor.targetColor) {
-    const safeRecolorElement = sanitizeElementName(c.recolor.element);
-    const safeTargetColor = sanitizeColorValue(c.recolor.targetColor);
-    if (!safeRecolorElement || !safeTargetColor) return "Return the image unchanged.";
-    const coverageText = c.recolor.coverage < 100
-      ? `approximately ${c.recolor.coverage}% of`
-      : "all";
-    parts.push(
-      `COLORWAY SHIFT: Recolor ${coverageText} the "${safeRecolorElement}" motifs to "${safeTargetColor}". ` +
-      `Apply the new colorway as a professional dye-lot change — shift the hue, saturation, and value ` +
-      `of the targeted motifs while preserving their internal tonal gradients, shading, highlights, and texture detail. ` +
-      `The recolored motifs should look as if they were originally printed in the target color, ` +
-      `not as if a flat color overlay was applied. Maintain natural color variation within each motif ` +
-      `(lighter petal edges, darker shadow areas, vein details) transposed into the new colorway. ` +
-      `All other print elements retain their original colors exactly. ` +
-      `The base cloth ground color, garment construction, and photographic setting remain unchanged.`
-    );
-  }
-
   if (parts.length === 0) {
     return "Return the image unchanged.";
   }
@@ -268,9 +157,7 @@ export function buildInstruction(c: ControlSettings): string {
 
 /**
  * Human-readable description of the visible change a given control set should
- * produce. Used by the server-side no-op guard (and, later, the eval harness)
- * to verify the edited image actually differs from the original as requested.
- * Returns "" when no change is expected.
+ * produce. Used by the server-side no-op guard. Returns "" when no change is expected.
  */
 export function describeExpectedChange(c: ControlSettings): string {
   const parts: string[] = [];
@@ -287,15 +174,6 @@ export function describeExpectedChange(c: ControlSettings): string {
       "there are visibly FEWER printed motifs (the print is thinned out, with more bare background fabric showing)"
     );
   }
-  if (c.remove.enabled && c.remove.element && c.remove.percent > 0) {
-    const el = sanitizeElementName(c.remove.element);
-    if (el) parts.push(`some "${el}" motifs have been erased/removed from the fabric`);
-  }
-  if (c.recolor.enabled && c.recolor.element && c.recolor.targetColor) {
-    const el = sanitizeElementName(c.recolor.element);
-    const color = sanitizeColorValue(c.recolor.targetColor);
-    if (el && color) parts.push(`the "${el}" motifs have been recolored toward "${color}"`);
-  }
 
   return parts.join("; ");
 }
@@ -311,8 +189,6 @@ export function computeCredits(
   const activeControls = [
     c.scale.enabled && c.scale.percent !== 0,
     c.density.enabled && c.density.percent > 0,
-    c.remove.enabled,
-    c.recolor.enabled,
   ].filter(Boolean).length;
   if (activeControls === 0) return 0;
   const base = activeControls > 1 ? costs.combinedControls : costs.standardGeneration;
@@ -322,19 +198,18 @@ export function computeCredits(
 
 /**
  * Single denormalized edit category for a job, derived from its controls.
- * One bucket per job — combined edits collapse to 'mixed' so History's
- * "Top Edit Type" never double-counts. Matches the legacy `.enabled` LIKE
- * semantics it replaces; returns 'none' when no control is enabled.
+ * One bucket per job — combined edits collapse to 'mixed'. Returns 'none' when
+ * no control is enabled. (Historical jobs may still carry 'recolor'/'remove' in
+ * the editType column from before the two-op reduction; those values remain valid
+ * for History display/filter but are no longer produced here.)
  */
 export function deriveEditType(
   c: ControlSettings
-): "recolor" | "scale" | "density" | "remove" | "mixed" | "none" {
+): "scale" | "density" | "mixed" | "none" {
   const active = [
-    c.recolor.enabled && "recolor",
     c.scale.enabled && "scale",
     c.density.enabled && "density",
-    c.remove.enabled && "remove",
-  ].filter(Boolean) as Array<"recolor" | "scale" | "density" | "remove">;
+  ].filter(Boolean) as Array<"scale" | "density">;
   if (active.length === 0) return "none";
   if (active.length > 1) return "mixed";
   return active[0];
