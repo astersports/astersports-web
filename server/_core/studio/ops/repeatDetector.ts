@@ -8,7 +8,8 @@
  * Algorithm (two-stage):
  *   1. FFT-propose: compute 1D power spectrum on each axis (x, y) of the luminance
  *      signal within the fabric mask. Identify peaks in the spectrum. Compute:
- *      - peakRatio: height of dominant non-DC peak / DC component
+ *      - peakRatio: magnitude of dominant non-DC peak / mean spectral energy
+ *        (peak ÷ mean-of-spectrum; NOT peak ÷ DC — DC is centered out)
  *      - periodicityEnergy: fraction of total spectral energy in periodic peaks
  *      - peakCount: number of evenly-spaced harmonic peaks per axis
  *
@@ -34,7 +35,7 @@ import { rgb255ToLab } from "../ops/color";
 
 // ─── Calibration thresholds (starting points, not frozen) ───────────────────
 
-/** Minimum peak-to-DC ratio in the power spectrum to propose a period. */
+/** Minimum peak-to-mean-energy ratio in the power spectrum to propose a period. */
 export const PEAK_RATIO_THRESHOLD = 0.30;
 
 /** Minimum fraction of spectral energy in periodic peaks. */
@@ -57,7 +58,7 @@ export interface AxisDiagnostics {
   peakBin: number;
   /** Proposed period in pixels (signal_length / peakBin). */
   proposedPeriod: number;
-  /** Peak-to-DC ratio. */
+  /** Peak-to-mean-energy ratio (dominant peak magnitude ÷ mean spectral energy). */
   peakRatio: number;
   /** Fraction of spectral energy in harmonic peaks. */
   periodicityEnergy: number;
