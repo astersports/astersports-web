@@ -643,3 +643,4 @@
 - [x] Fix detail slideshow header overflow on mobile (text overlapping)
 - [x] Improve mobile detail view layout for small screens
 - [x] Add "Favorites only" toggle to mobile filter panel
+- [x] Persist filter state in URL params (search, status, type, favorites, page) for both desktop and mobile archive

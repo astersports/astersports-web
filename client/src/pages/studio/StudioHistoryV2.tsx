@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useFilterParams } from "@/hooks/useFilterParams";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -528,16 +529,15 @@ function ArchiveTable({
   favoriteIds: Set<number>;
   onToggleFavorite: (jobId: number) => void;
 }) {
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [status, setStatus] = useState<string>("all");
-  const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<"date" | "credits" | "title">("date");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const filters = useFilterParams();
+  const { search, status, type: typeFilter, sortBy, sortDir, page, favorites: favoritesOnly } = filters;
+  const { setSearch: setSearchParam, setStatus: setStatusParam, setType: setTypeParam, setSortBy: setSortByParam, setSortDir: setSortDirParam, setPage, setFavorites: setFavoritesOnly, clearAll, hasActiveFilters } = filters;
+
+  const [localSearch, setLocalSearch] = useState(search);
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [userId, setUserId] = useState<number | undefined>(undefined);
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  const [page, setPage] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -550,14 +550,17 @@ function ArchiveTable({
   const [lookbookClient, setLookbookClient] = useState("");
   const limit = 20;
 
-  // Debounce search
+  // Debounce local search → URL param + query
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(localSearch);
+      setSearchParam(localSearch);
+    }, 300);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [localSearch, setSearchParam]);
 
-  // Reset page when filters change
-  useEffect(() => { setPage(0); }, [debouncedSearch, status, typeFilter, sortBy, sortDir, userId, startDate, endDate]);
+  // Sync URL search back to local input when navigating
+  useEffect(() => { setLocalSearch(search); }, [search]);
 
   const { tenant } = useTenant();
   const { data: stats } = trpc.studio.historyStats.useQuery(
@@ -573,8 +576,8 @@ function ArchiveTable({
       offset: page * limit,
       status: status !== "all" ? status : undefined,
       search: debouncedSearch || undefined,
-      sortBy,
-      sortDir,
+      sortBy: sortBy as "date" | "credits" | "title",
+      sortDir: sortDir as "asc" | "desc",
       userId,
       startDate: startDate ? new Date(startDate).getTime() : undefined,
       endDate: endDate ? new Date(endDate + "T23:59:59").getTime() : undefined,
@@ -614,10 +617,10 @@ function ArchiveTable({
 
   const toggleSort = (field: "date" | "credits" | "title") => {
     if (sortBy === field) {
-      setSortDir((d) => d === "desc" ? "asc" : "desc");
+      setSortDirParam(sortDir === "desc" ? "asc" : "desc");
     } else {
-      setSortBy(field);
-      setSortDir("desc");
+      setSortByParam(field);
+      setSortDirParam("desc");
     }
   };
 
@@ -820,15 +823,15 @@ function ArchiveTable({
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <input
               type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
               placeholder="Search prompts, titles, elements..."
               className="w-full pl-9 pr-4 py-2.5 rounded-lg bg-white/[0.03] border border-white/10 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500/40 focus:ring-1 focus:ring-amber-500/20 transition-all"
             />
           </div>
           <select
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            onChange={(e) => setStatusParam(e.target.value)}
             className="px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/10 text-sm text-slate-300 focus:outline-none focus:border-amber-500/40 appearance-none cursor-pointer min-w-[120px]"
           >
             <option value="all">All Status</option>
@@ -839,7 +842,7 @@ function ArchiveTable({
           </select>
           <select
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
+            onChange={(e) => setTypeParam(e.target.value)}
             className="px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/10 text-sm text-slate-300 focus:outline-none focus:border-amber-500/40 appearance-none cursor-pointer min-w-[120px]"
           >
             <option value="all">All Types</option>
@@ -1349,23 +1352,26 @@ function MobileCardList({
   onToggleFavorite: (jobId: number) => void;
   onView: (job: Job) => void;
 }) {
-  const [page, setPage] = useState(0);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [status, setStatus] = useState<string>("all");
-  const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const filters = useFilterParams();
+  const { search, status, type: typeFilter, page, favorites: favoritesOnly, hasActiveFilters } = filters;
+  const { setSearch: setSearchParam, setStatus: setStatusParam, setType: setTypeParam, setPage, setFavorites: setFavoritesOnly, clearAll } = filters;
+
+  const [localSearch, setLocalSearch] = useState(search);
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [showFilters, setShowFilters] = useState(false);
   const limit = 20;
 
-  // Debounce search
+  // Debounce local search → URL param + query
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(localSearch);
+      setSearchParam(localSearch);
+    }, 300);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [localSearch, setSearchParam]);
 
-  // Reset page when filters change
-  useEffect(() => { setPage(0); }, [debouncedSearch, status, typeFilter, favoritesOnly]);
+  // Sync URL search back to local input when navigating
+  useEffect(() => { setLocalSearch(search); }, [search]);
 
   const { tenant } = useTenant();
   const { data, isLoading, isFetching } = trpc.studio.historyArchive.useQuery(
@@ -1395,8 +1401,6 @@ function MobileCardList({
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / limit);
 
-  const hasActiveFilters = status !== "all" || typeFilter !== "all" || debouncedSearch.length > 0 || favoritesOnly;
-
   return (
     <div>
       {/* Section header with filter toggle */}
@@ -1422,8 +1426,8 @@ function MobileCardList({
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <input
               type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
               placeholder="Search titles, elements..."
               className="w-full pl-9 pr-4 py-2.5 rounded-lg bg-white/[0.03] border border-white/10 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500/40 transition-all"
             />
@@ -1432,7 +1436,7 @@ function MobileCardList({
           <div className="flex gap-2">
             <select
               value={status}
-              onChange={(e) => setStatus(e.target.value)}
+              onChange={(e) => setStatusParam(e.target.value)}
               className="flex-1 px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/10 text-sm text-slate-300 focus:outline-none focus:border-amber-500/40 appearance-none"
             >
               <option value="all">All Status</option>
@@ -1443,7 +1447,7 @@ function MobileCardList({
             </select>
             <select
               value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
+              onChange={(e) => setTypeParam(e.target.value)}
               className="flex-1 px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/10 text-sm text-slate-300 focus:outline-none focus:border-amber-500/40 appearance-none"
             >
               <option value="all">All Types</option>
@@ -1473,7 +1477,7 @@ function MobileCardList({
           {/* Clear filters */}
           {hasActiveFilters && (
             <button
-              onClick={() => { setSearch(""); setStatus("all"); setTypeFilter("all"); setFavoritesOnly(false); }}
+              onClick={() => { clearAll(); }}
               className="text-xs text-amber-400 hover:text-amber-300 underline"
             >
               Clear all filters
