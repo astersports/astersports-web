@@ -71,10 +71,14 @@ export const TOPUP_PACKS: TopupPack[] = [
   { key: "topup_large", name: "Large Pack", credits: 20000, priceUsd: 200 },
 ];
 
-/** Credit cost model per action. */
+/**
+ * Credit cost model per action. (`highRes` removed 2026-06-21 — it was never read
+ * by `computeCredits` or anywhere else. `extraVariation` is dormant while the
+ * multi-variation UI is parked (server clamps variations to 1) and is kept for
+ * when that ships.)
+ */
 export const CREDIT_COST = {
   standardGeneration: 10,
   extraVariation: 10,
   combinedControls: 15,
-  highRes: 5,
 } as const;
