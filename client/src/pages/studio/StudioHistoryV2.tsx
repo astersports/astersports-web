@@ -415,25 +415,25 @@ function DetailSlideshow({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex flex-col" onClick={onClose}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-white/5" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-3">
-          <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getTypeColor(type)} flex items-center gap-1`}>
+      {/* Header - responsive */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between px-3 sm:px-6 py-3 sm:py-4 border-b border-white/5 gap-2" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 overflow-hidden">
+          <span className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium border flex-shrink-0 ${getTypeColor(type)} flex items-center gap-1`}>
             {getTypeIcon(type)} {type}
           </span>
-          <h3 className="text-white font-medium">{job.title}</h3>
-          <span className="text-slate-500 text-sm">·</span>
-          <span className="text-slate-400 text-sm">{relativeTime(job.createdAt)}</span>
-          <span className="text-slate-500 text-sm">·</span>
-          <span className="text-slate-400 text-sm">by {job.userName}</span>
+          <h3 className="text-white font-medium text-sm sm:text-base truncate">{job.title}</h3>
+          <span className="text-slate-500 text-xs sm:text-sm hidden sm:inline">·</span>
+          <span className="text-slate-400 text-xs sm:text-sm hidden sm:inline">{relativeTime(job.createdAt)}</span>
+          <span className="text-slate-500 text-xs sm:text-sm hidden sm:inline">·</span>
+          <span className="text-slate-400 text-xs sm:text-sm hidden sm:inline">by {job.userName}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500 mr-2">
-            {currentIndex + 1} / {jobs.length}
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+          <span className="text-[10px] sm:text-xs text-slate-500 mr-1 sm:mr-2">
+            {currentIndex + 1}/{jobs.length}
           </span>
           <button
             onClick={(e) => { e.stopPropagation(); onToggleFavorite(job.id); }}
-            className={`p-2 rounded-lg border transition-all duration-200 ${
+            className={`p-1.5 sm:p-2 rounded-lg border transition-all duration-200 ${
               isFav
                 ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
                 : "border-white/10 text-slate-400 hover:text-white hover:border-white/20"
@@ -446,14 +446,14 @@ function DetailSlideshow({
             href={resultUrl || job.originalUrl}
             download
             onClick={(e) => e.stopPropagation()}
-            className="p-2 rounded-lg border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-all duration-200"
+            className="p-1.5 sm:p-2 rounded-lg border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-all duration-200"
             title="Download (D)"
           >
             <Download className="w-4 h-4" />
           </a>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-all duration-200"
+            className="p-1.5 sm:p-2 rounded-lg border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-all duration-200"
             title="Close (Esc)"
           >
             <X className="w-4 h-4" />
@@ -462,29 +462,29 @@ function DetailSlideshow({
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex items-center justify-center relative px-16" onClick={(e) => e.stopPropagation()}>
+      <div className="flex-1 flex items-center justify-center relative px-4 sm:px-16" onClick={(e) => e.stopPropagation()}>
         {/* Prev button */}
         <button
           onClick={goPrev}
           disabled={currentIndex === 0}
-          className="absolute left-4 p-3 rounded-full border border-white/10 text-white hover:bg-white/5 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+          className="absolute left-1 sm:left-4 p-2 sm:p-3 rounded-full border border-white/10 text-white hover:bg-white/5 disabled:opacity-20 disabled:cursor-not-allowed transition-all z-10"
         >
-          <ChevronLeft className="w-5 h-5" />
+          <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
         </button>
 
-        {/* Image comparison */}
-        <div className="flex gap-6 max-w-5xl w-full justify-center items-center">
-          <div className="flex-1 max-w-md">
-            <p className="text-xs text-slate-500 uppercase tracking-wider mb-2 text-center">Original</p>
+        {/* Image comparison - stacks vertically on mobile */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-6 max-w-5xl w-full justify-center items-center overflow-y-auto max-h-[70vh] sm:max-h-none">
+          <div className="flex-1 w-full sm:max-w-md">
+            <p className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider mb-1.5 sm:mb-2 text-center">Original</p>
             <div className="rounded-xl overflow-hidden border border-white/10 bg-slate-900">
-              <img src={job.originalUrl} alt="Original" className="w-full h-auto max-h-[60vh] object-contain" />
+              <img src={job.originalUrl} alt="Original" className="w-full h-auto max-h-[35vh] sm:max-h-[60vh] object-contain" />
             </div>
           </div>
           {resultUrl && (
-            <div className="flex-1 max-w-md">
-              <p className="text-xs text-slate-500 uppercase tracking-wider mb-2 text-center">Result</p>
+            <div className="flex-1 w-full sm:max-w-md">
+              <p className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider mb-1.5 sm:mb-2 text-center">Result</p>
               <div className="rounded-xl overflow-hidden border border-white/10 bg-slate-900">
-                <img src={resultUrl} alt="Result" className="w-full h-auto max-h-[60vh] object-contain" />
+                <img src={resultUrl} alt="Result" className="w-full h-auto max-h-[35vh] sm:max-h-[60vh] object-contain" />
               </div>
             </div>
           )}
@@ -494,22 +494,22 @@ function DetailSlideshow({
         <button
           onClick={goNext}
           disabled={currentIndex === jobs.length - 1}
-          className="absolute right-4 p-3 rounded-full border border-white/10 text-white hover:bg-white/5 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+          className="absolute right-1 sm:right-4 p-2 sm:p-3 rounded-full border border-white/10 text-white hover:bg-white/5 disabled:opacity-20 disabled:cursor-not-allowed transition-all z-10"
         >
-          <ChevronRight className="w-5 h-5" />
+          <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
         </button>
       </div>
 
-      {/* Footer metadata */}
-      <div className="px-6 py-3 border-t border-white/5 flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-4 text-xs text-slate-400">
+      {/* Footer metadata - responsive */}
+      <div className="px-3 sm:px-6 py-2 sm:py-3 border-t border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-1" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2 sm:gap-4 text-[10px] sm:text-xs text-slate-400 flex-wrap">
           <span>{describeChanges(job.controls)}</span>
           {job.creditsUsed && <span>· {job.creditsUsed} credits</span>}
           {job.detectedElements?.length > 0 && (
-            <span>· Elements: {job.detectedElements.slice(0, 3).join(", ")}</span>
+            <span className="hidden sm:inline">· Elements: {job.detectedElements.slice(0, 3).join(", ")}</span>
           )}
         </div>
-        <div className="text-xs text-slate-500">
+        <div className="text-[10px] sm:text-xs text-slate-500 hidden sm:block">
           ← → Navigate · Space Toggle · F Favorite · Esc Close
         </div>
       </div>
@@ -1338,7 +1338,7 @@ export default function StudioHistoryV2() {
   );
 }
 
-// ─── Mobile Card List (separate component for clean separation) ─────────────
+// ─── Mobile Card List (with search, filters, collapsible sections) ───────────
 
 function MobileCardList({
   favoriteIds,
@@ -1350,31 +1350,126 @@ function MobileCardList({
   onView: (job: Job) => void;
 }) {
   const [page, setPage] = useState(0);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [status, setStatus] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [showFilters, setShowFilters] = useState(false);
   const limit = 20;
 
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Reset page when filters change
+  useEffect(() => { setPage(0); }, [debouncedSearch, status, typeFilter]);
+
   const { tenant } = useTenant();
-  const { data, isLoading } = trpc.studio.historyArchive.useQuery(
+  const { data, isLoading, isFetching } = trpc.studio.historyArchive.useQuery(
     {
       tenantId: tenant?.id ?? 0,
       limit,
       offset: page * limit,
       sortBy: "date",
       sortDir: "desc",
+      status: status !== "all" ? status : undefined,
+      search: debouncedSearch || undefined,
     },
     { enabled: !!tenant?.id }
   );
 
-  const jobs = data?.jobs ?? [];
+  const allJobs = data?.jobs ?? [];
+  const jobs = useMemo(() => {
+    if (typeFilter === "all") return allJobs;
+    return allJobs.filter((j) => getEditType(j.controls).toLowerCase() === typeFilter);
+  }, [allJobs, typeFilter]);
   const total = data?.total ?? 0;
+  const totalPages = Math.ceil(total / limit);
+
+  const hasActiveFilters = status !== "all" || typeFilter !== "all" || debouncedSearch.length > 0;
 
   return (
     <div>
-      <h3 className="text-sm font-medium text-slate-300 uppercase tracking-wider mb-3">Archive</h3>
+      {/* Section header with filter toggle */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium text-slate-300 uppercase tracking-wider">Archive</h3>
+          <span className="text-[10px] text-slate-500 bg-white/5 px-1.5 py-0.5 rounded-full">{total}</span>
+          {isFetching && <Loader2 className="w-3 h-3 text-slate-500 animate-spin" />}
+        </div>
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className={`p-2 rounded-lg border transition-all duration-200 ${showFilters || hasActiveFilters ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-white/10 text-slate-400"}`}
+        >
+          <Filter className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Collapsible filter bar */}
+      {showFilters && (
+        <div className="space-y-2 mb-4 p-3 rounded-xl border border-white/5 bg-white/[0.02] animate-in slide-in-from-top-2 duration-200">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search titles, elements..."
+              className="w-full pl-9 pr-4 py-2.5 rounded-lg bg-white/[0.03] border border-white/10 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500/40 transition-all"
+            />
+          </div>
+          {/* Status + Type filters */}
+          <div className="flex gap-2">
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="flex-1 px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/10 text-sm text-slate-300 focus:outline-none focus:border-amber-500/40 appearance-none"
+            >
+              <option value="all">All Status</option>
+              <option value="done">Done</option>
+              <option value="failed">Failed</option>
+              <option value="processing">Processing</option>
+              <option value="pending">Pending</option>
+            </select>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="flex-1 px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/10 text-sm text-slate-300 focus:outline-none focus:border-amber-500/40 appearance-none"
+            >
+              <option value="all">All Types</option>
+              <option value="density">Density</option>
+              <option value="scale">Scale</option>
+              <option value="recolor">Recolor</option>
+              <option value="remove">Remove</option>
+            </select>
+          </div>
+          {/* Clear filters */}
+          {hasActiveFilters && (
+            <button
+              onClick={() => { setSearch(""); setStatus("all"); setTypeFilter("all"); }}
+              className="text-xs text-amber-400 hover:text-amber-300 underline"
+            >
+              Clear all filters
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Job list */}
       {isLoading ? (
         <div className="space-y-2">
           {[...Array(6)].map((_, i) => (
             <div key={i} className="h-16 rounded-xl bg-white/[0.02] animate-pulse" />
           ))}
+        </div>
+      ) : jobs.length === 0 ? (
+        <div className="py-12 text-center">
+          <ImageIcon className="w-10 h-10 text-slate-700 mx-auto mb-2" />
+          <p className="text-sm text-slate-400">No generations found</p>
+          <p className="text-xs text-slate-500 mt-1">Try adjusting your filters.</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -1389,22 +1484,29 @@ function MobileCardList({
           ))}
         </div>
       )}
-      {total > limit && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-            disabled={page === 0}
-            className="px-4 py-2 rounded-lg text-xs border border-white/10 text-slate-400 disabled:opacity-30"
-          >
-            Previous
-          </button>
-          <button
-            onClick={() => setPage((p) => p + 1)}
-            disabled={(page + 1) * limit >= total}
-            className="px-4 py-2 rounded-lg text-xs border border-white/10 text-slate-400 disabled:opacity-30"
-          >
-            Next
-          </button>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4">
+          <span className="text-[10px] text-slate-500">
+            {page * limit + 1}–{Math.min((page + 1) * limit, total)} of {total}
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="px-3 py-1.5 rounded-lg text-xs border border-white/10 text-slate-400 disabled:opacity-30"
+            >
+              Prev
+            </button>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={(page + 1) * limit >= total}
+              className="px-3 py-1.5 rounded-lg text-xs border border-white/10 text-slate-400 disabled:opacity-30"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
     </div>

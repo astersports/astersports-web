@@ -636,3 +636,9 @@
 - [x] Add elapsed timer (counting up from 0s) to the processing screen
 - [x] Add dynamic progress bar with estimated completion (based on typical 30-60s duration)
 - [x] Smooth animation on progress bar and timer updates
+
+## History Mobile UX Improvements
+- [x] Add filter bar (status + type dropdowns) to mobile MobileCardList
+- [x] Add search input to mobile archive
+- [x] Fix detail slideshow header overflow on mobile (text overlapping)
+- [x] Improve mobile detail view layout for small screens
