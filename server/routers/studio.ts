@@ -7,7 +7,7 @@ import { TRPCError } from "@trpc/server";
 import { router } from "../_core/trpc";
 import { tenantProcedure } from "../tenancy";
 import { storagePut, storageGetSignedUrl } from "../storage";
-import { detectPrintElements, generateEditedImage, generateRecoloredImage, generateDensityImage, generateScaledImage, NON_REPEAT_SCALE_ERROR } from "../aiEngine";
+import { detectPrintElements, generateEditedImage, generateRecoloredImage, generateDensityImage, generateDensityRedistributeImage, generateScaledImage, NON_REPEAT_SCALE_ERROR } from "../aiEngine";
 import { ENV } from "../_core/env";
 import { getMaskProvider } from "../_core/masking";
 import { checkUpscaleDpi } from "../_core/studio/guards/dpiGuard";
@@ -76,7 +76,14 @@ async function runVariation(opts: {
     return { url, key };
   }
   if (mode.density) {
-    const densityResult = await generateDensityImage(originalUrl, controls.density.percent, audit);
+    // Density v2 (Option B redistribution) is selected only when
+    // ENV.studioDensityRedistribute is on; otherwise the existing v1 path is
+    // byte-identical. Both share the same { png, removed } | null -> FAIL+REFUND
+    // contract, so credit handling is unchanged. The flag is default-off and the
+    // prod flip is gated (real-garment eval + Architect sign-off) — wiring only.
+    const densityResult = ENV.studioDensityRedistribute
+      ? await generateDensityRedistributeImage(originalUrl, controls.density.percent, audit)
+      : await generateDensityImage(originalUrl, controls.density.percent, audit);
     if (!densityResult) {
       throw new Error("Density processing is temporarily unavailable. Please try again in a moment.");
     }
