@@ -233,8 +233,16 @@ export default function CreditLedger() {
         Amount: e.delta,
         Balance: e.balanceAfter,
       }));
+      // Neutralize CSV formula injection: a cell starting with = + - @ (or a
+      // control char) is prefixed with a single quote so spreadsheets don't
+      // execute it as a formula. refId/note are user-influenced.
+      const csvCell = (v: unknown) => {
+        let s = String(v);
+        if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+        return `"${s.replace(/"/g, '""')}"`;
+      };
       const header = Object.keys(rows[0]).join(",");
-      const csv = [header, ...rows.map((r) => Object.values(r).map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))].join("\n");
+      const csv = [header, ...rows.map((r) => Object.values(r).map(csvCell).join(","))].join("\n");
       const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -312,7 +320,7 @@ export default function CreditLedger() {
               <TrendingDown className="h-5 w-5 text-red-400" />
             </div>
             <div>
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Spent</p>
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Spent (page)</p>
               <p className="text-xl font-bold tabular-nums text-red-400">-{stats.spent}</p>
             </div>
           </CardContent>
@@ -324,7 +332,7 @@ export default function CreditLedger() {
               <TrendingUp className="h-5 w-5 text-green-500" />
             </div>
             <div>
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Earned</p>
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Earned (page)</p>
               <p className="text-xl font-bold tabular-nums text-green-500">+{stats.earned}</p>
             </div>
           </CardContent>
