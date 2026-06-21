@@ -83,11 +83,21 @@ describe("storageProxy authorization", () => {
   it("generated/ key owned by the caller's tenant: passes authz (reaches config gate)", async () => {
     auth.mockResolvedValue({ id: 7 });
     variationByKey.mockResolvedValue({ tenantId: 5, jobId: 1 });
-    membership.mockResolvedValue({ tenantId: 5, userId: 7, role: "member" });
+    membership.mockResolvedValue({ tenantId: 5, userId: 7, role: "member", status: "active" });
     const res = mockRes();
     await getHandler()(reqFor("generated/xyz.png"), res);
     // Forge env is mocked empty -> the only way to reach this 500 is past authz.
     expect(membership).toHaveBeenCalledWith(5, 7);
     expect(res.statusCode).toBe(500);
+  });
+
+  it("generated/ key for an INACTIVE membership: 403 (ex/pending member access revoked)", async () => {
+    auth.mockResolvedValue({ id: 7 });
+    variationByKey.mockResolvedValue({ tenantId: 5, jobId: 1 });
+    membership.mockResolvedValue({ tenantId: 5, userId: 7, role: "member", status: "removed" });
+    const res = mockRes();
+    await getHandler()(reqFor("generated/xyz.png"), res);
+    expect(membership).toHaveBeenCalledWith(5, 7);
+    expect(res.statusCode).toBe(403);
   });
 });

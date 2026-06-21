@@ -58,7 +58,7 @@ export function registerStorageProxy(app: Express) {
         return;
       }
       const membership = await getMembership(ownerTenantId, userId);
-      if (!membership) {
+      if (!membership || membership.status !== "active") {
         res.status(403).send("Forbidden");
         return;
       }

@@ -58,6 +58,11 @@ export async function makeRequest<T = unknown>(
 ): Promise<T> {
   const { baseUrl, apiKey } = getMapsConfig();
 
+  // Guard the endpoint segment against path-traversal / proxy-escape before it is
+  // concatenated into the proxy URL (must be a single-slash relative path).
+  if (!endpoint.startsWith("/") || endpoint.startsWith("//") || endpoint.includes("..")) {
+    throw new Error(`Invalid maps proxy endpoint: ${endpoint}`);
+  }
   // Construct full URL: baseUrl + /v1/maps/proxy + endpoint
   const url = new URL(`${baseUrl}/v1/maps/proxy${endpoint}`);
 
