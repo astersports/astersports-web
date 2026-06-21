@@ -11,10 +11,8 @@ import {
   createMembership,
   listMemberships,
   countActiveMembers,
-  getTenantById,
 } from "../studioDb";
 import { emailAllowedForDomain } from "../../shared/domain";
-import { getUserByOpenId } from "../db";
 import { eq, and } from "drizzle-orm";
 import { getDb } from "../db";
 import { memberships, users } from "../../drizzle/schema";
@@ -40,7 +38,7 @@ export const tenantsRouter = router({
   // drift) and, as a `protectedProcedure`, let any authenticated user mint
   // credited trial tenants. Tenant creation is now INVITE-ONLY — via
   // `inviteLinks.redeem` (firm/individual tokens) and platform admins
-  // (`platform.inviteFirm` / `inviteIndividual`), all of which grant credits
+  // (`platform.provisionFirm` / `inviteIndividual`), all of which grant credits
   // through `grantCredits`, which writes the matching append-only ledger row.
 
   /** List members of a tenant (admin-only). */
