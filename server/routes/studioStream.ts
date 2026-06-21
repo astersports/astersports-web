@@ -39,7 +39,6 @@ import {
   type ControlSettings,
 } from "../../shared/controls";
 import { CREDIT_COST, LOW_BALANCE_THRESHOLD } from "../../shared/billing";
-import { sanitizeElementName, sanitizeColorValue, MAX_ELEMENT_NAME_LENGTH } from "../../shared/sanitize";
 
 /** SSE helper: write a typed event to the response stream. */
 function sendSSE(res: Response, data: Record<string, unknown>, finished: { value: boolean }) {
@@ -59,8 +58,6 @@ function validateControls(raw: any): ControlSettings {
 
   const scale = raw.scale ?? {};
   const density = raw.density ?? {};
-  const remove = raw.remove ?? {};
-  const recolor = raw.recolor ?? {};
 
   return {
     scale: {
@@ -70,18 +67,6 @@ function validateControls(raw: any): ControlSettings {
     density: {
       enabled: Boolean(density.enabled),
       percent: Math.max(0, Math.min(90, Number(density.percent) || 0)),
-    },
-    remove: {
-      enabled: Boolean(remove.enabled),
-      element: sanitizeElementName(String(remove.element ?? "").slice(0, MAX_ELEMENT_NAME_LENGTH)),
-      percent: Number(remove.percent) || 0,
-    },
-    recolor: {
-      enabled: Boolean(recolor.enabled),
-      element: sanitizeElementName(String(recolor.element ?? "").slice(0, MAX_ELEMENT_NAME_LENGTH)),
-      fromColor: String(recolor.fromColor ?? "").slice(0, 30),
-      targetColor: sanitizeColorValue(String(recolor.targetColor ?? "").slice(0, 30)),
-      coverage: Math.min(100, Math.max(10, Number(recolor.coverage) || 100)),
     },
     variations: 1, // clamped to 1
   };
@@ -155,24 +140,9 @@ export function registerStudioStreamRoutes(app: Express) {
       return;
     }
 
-    // ─── 6. Validate controls ──────────────────────────────────────────────────
-    if (controls.remove.enabled && !controls.remove.element) {
-      res.status(400).json({ error: "Remove element name is required." });
-      return;
-    }
-    if (controls.recolor.enabled && !controls.recolor.element) {
-      res.status(400).json({ error: "Recolor element name is required." });
-      return;
-    }
-    if (controls.recolor.enabled && !controls.recolor.targetColor) {
-      res.status(400).json({ error: "Target color is required." });
-      return;
-    }
-
     // ─── 7. Determine deterministic path ───────────────────────────────────────
     const densityOnly =
-      controls.density.enabled && !controls.scale.enabled &&
-      !controls.recolor.enabled && !controls.remove.enabled;
+      controls.density.enabled && !controls.scale.enabled;
     const densityDeterministic = ENV.studioDensityLive || ENV.studioDensityRedistribute;
     const useDeterministicDensity = densityDeterministic && densityOnly;
 
@@ -182,8 +152,7 @@ export function registerStudioStreamRoutes(app: Express) {
     }
 
     const scaleOnly =
-      controls.scale.enabled && controls.scale.percent !== 0 &&
-      !controls.recolor.enabled && !controls.density.enabled && !controls.remove.enabled;
+      controls.scale.enabled && controls.scale.percent !== 0 && !controls.density.enabled;
     const scaleRasterReady = getMaskProvider().rasterReady;
     const useDeterministicScale = ENV.studioScaleLive && scaleOnly && scaleRasterReady;
 
@@ -304,7 +273,6 @@ export function registerStudioStreamRoutes(app: Express) {
 
     // ─── 11. Run the generation (AWAITED, not fire-and-forget) ────────────────
     const mode = {
-      recolor: false,
       density: useDeterministicDensity,
       scale: useDeterministicScale,
     };
