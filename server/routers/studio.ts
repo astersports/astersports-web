@@ -274,6 +274,25 @@ export const studioRouter = router({
         }
       }
 
+      // R1: density/scale deterministic ops are handled exclusively by the SSE
+      // streaming endpoint (/api/studio/generate-stream), which keeps the
+      // serverless container alive via heartbeats and performs its own credit
+      // deduct + work + refund. Return `async` BEFORE deducting here, so this
+      // path can't (a) deduct then strand the job when the container is killed
+      // mid fire-and-forget, or (b) double-deduct against the stream. The client
+      // opens the stream on `async:true` (it already routes density/scale there
+      // directly via shouldUseStream).
+      if (useDeterministicDensity || useDeterministicScale) {
+        return {
+          async: true as const,
+          jobId: job.id,
+          results: [],
+          creditsUsed: 0,
+          newBalance: ctx.tenant.creditBalance,
+          lowBalance: ctx.tenant.creditBalance <= LOW_BALANCE_THRESHOLD,
+        };
+      }
+
       const creditCost = computeCredits(controls, CREDIT_COST);
 
       if (creditCost === 0) {
@@ -319,49 +338,8 @@ export const studioRouter = router({
         creditsUsed: creditCost,
       });
 
-      // ─── ASYNC PATH: density/scale deterministic ops run in background ────────
-      // These ops involve SAM2 segmentation + image processing which can exceed
-      // the gateway timeout (~30s). We return immediately with { async: true }
-      // and the frontend polls getJob for completion.
-      if (useDeterministicDensity || useDeterministicScale) {
-        const mode = {
-          recolor: false,
-          density: useDeterministicDensity,
-          scale: useDeterministicScale,
-        };
-        // Fire-and-forget background generation
-        (async () => {
-          try {
-            await runVariation({
-              controls,
-              originalUrl: job.originalUrl,
-              tenantId: ctx.tenant.id,
-              jobId: job.id,
-              instruction,
-              expectation,
-              round: 1,
-              mode,
-            });
-            await updateJobStatus(job.id, "done", { creditsUsed: creditCost });
-          } catch (err: any) {
-            const errMsg = err?.message || "Generation failed";
-            log.error("studio", `Async generation failed: ${errMsg}`, { jobId: job.id, tenantId: ctx.tenant.id, userId: ctx.user.id, metadata: { error: errMsg, path: useDeterministicDensity ? "density" : "scale" } });
-            // Refund credits on failure
-            await grantCredits(ctx.tenant.id, creditCost, "refund", `job-${job.id}-failed`, ctx.user.id);
-            await updateJobStatus(job.id, "failed", { errorMessage: errMsg });
-          }
-        })();
-
-        // Return immediately — frontend will poll getJob
-        return {
-          async: true as const,
-          jobId: job.id,
-          results: [],
-          creditsUsed: creditCost,
-          newBalance,
-          lowBalance: newBalance <= LOW_BALANCE_THRESHOLD,
-        };
-      }
+      // (Density/scale returned `async` above and run via the SSE endpoint — no
+      // fire-and-forget background promise here. See R1 note above.)
 
       // ─── SYNC PATH: recolor + prompt (fast enough for inline response) ────────
       // Generate variations in parallel — each is an independent AI call.
