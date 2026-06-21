@@ -32,6 +32,65 @@ function escapeLike(s: string): string {
   return s.replace(/[\\%_]/g, (ch) => `\\${ch}`);
 }
 
+/**
+ * M5d: FULLTEXT search capability. The `ft_studio_jobs_search` index is applied
+ * out-of-band (custom migration 0015) via db:push; until then History search
+ * falls back to substring LIKE. A definitive probe result is cached once per
+ * process (the index can't appear mid-process — it lands on a deploy/restart
+ * after db:push). A transient probe FAILURE is NOT cached, so a connection blip
+ * during the first probe doesn't pin LIKE for the process lifetime.
+ */
+let jobsFulltextAvailable: boolean | null = null;
+async function hasJobsFulltextIndex(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>
+): Promise<boolean> {
+  if (jobsFulltextAvailable !== null) return jobsFulltextAvailable;
+  try {
+    const res = await db.execute(sql`
+      SELECT 1 AS present FROM information_schema.statistics
+      WHERE table_schema = DATABASE()
+        AND table_name = 'studio_jobs'
+        AND index_type = 'FULLTEXT'
+      LIMIT 1
+    `);
+    const rows = (Array.isArray(res) ? res[0] : (res as { rows?: unknown[] })?.rows) ?? [];
+    jobsFulltextAvailable = Array.isArray(rows) && rows.length > 0;
+    return jobsFulltextAvailable;
+  } catch {
+    // Transient failure — leave the cache unset so a later call re-probes;
+    // use LIKE for this request only.
+    return false;
+  }
+}
+
+/** Minimum token length InnoDB FULLTEXT indexes by default (innodb_ft_min_token_size). */
+const FT_MIN_TOKEN = 3;
+
+/**
+ * M5d: build a BOOLEAN-mode FULLTEXT query from raw user input. Tokenizes on
+ * separators, requires each token as a prefix match (`+tok*`), and drops every
+ * FULLTEXT boolean operator so user input can't inject syntax. Returns null
+ * when the query isn't FULLTEXT-suitable (no tokens, or any token shorter than
+ * the min indexed length) — the caller then uses the LIKE path so
+ * short/punctuation-only queries still match by substring.
+ */
+export function toJobsBooleanQuery(search: string): string | null {
+  // Split on whitespace + all ASCII punctuation/operators (ranges 33-47, 58-64,
+  // 91-96, 123-126). Implemented as a separator replace rather than a `\p{L}`
+  // Unicode class with the `u` flag: tsconfig.json sets `lib` but no `target`,
+  // so tsc defaults below es6 and rejects the `u` flag at compile time (TS1501).
+  // ASCII letters/digits and any non-ASCII letters (accents) survive, while
+  // every FULLTEXT boolean operator (+ - > < ( ) ~ * " @ …) is stripped,
+  // preventing the user from injecting boolean-mode syntax.
+  const tokens = search
+    .replace(/[\s!-/:-@[-`{-~]+/g, " ")
+    .split(" ")
+    .filter(Boolean);
+  if (tokens.length === 0) return null;
+  if (tokens.some((t) => t.length < FT_MIN_TOKEN)) return null;
+  return tokens.map((t) => `+${t}*`).join(" ");
+}
+
 // ─── Categories ──────────────────────────────────────────────────────────────
 
 export async function listCategories() {
@@ -367,10 +426,21 @@ export async function listTenantJobsEnhanced(
     conditions.push(sql`${jobs.status} = ${opts.status}`);
   }
   if (opts.search) {
-    const term = `%${escapeLike(opts.search)}%`;
-    conditions.push(
-      sql`(${jobs.title} LIKE ${term} OR ${jobs.detectedElements} LIKE ${term} OR ${jobs.instruction} LIKE ${term})`
-    );
+    // M5d: FULLTEXT MATCH when the query is FULLTEXT-suitable AND the
+    // ft_studio_jobs_search index is present; substring LIKE otherwise
+    // (pre-migration, or short/punctuation-only queries the index can't serve).
+    // Tokenize first so non-suitable queries skip the information_schema probe.
+    const boolQuery = toJobsBooleanQuery(opts.search);
+    if (boolQuery && (await hasJobsFulltextIndex(db))) {
+      conditions.push(
+        sql`MATCH(${jobs.title}, ${jobs.detectedElements}, ${jobs.instruction}) AGAINST(${boolQuery} IN BOOLEAN MODE)`
+      );
+    } else {
+      const term = `%${escapeLike(opts.search)}%`;
+      conditions.push(
+        sql`(${jobs.title} LIKE ${term} OR ${jobs.detectedElements} LIKE ${term} OR ${jobs.instruction} LIKE ${term})`
+      );
+    }
   }
   if (opts.favoritesOnly) {
     conditions.push(
