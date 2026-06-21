@@ -8,15 +8,12 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { tenantAdminProcedure } from "../tenancy";
 import {
   getUserTenants,
-  createTenant,
-  ensureCategory,
   createMembership,
   listMemberships,
   countActiveMembers,
   getTenantById,
 } from "../studioDb";
 import { emailAllowedForDomain } from "../../shared/domain";
-import { TRIAL_CREDITS } from "../../shared/billing";
 import { getUserByOpenId } from "../db";
 import { eq, and } from "drizzle-orm";
 import { getDb } from "../db";
@@ -38,45 +35,13 @@ export const tenantsRouter = router({
       return t;
     }),
 
-  /** Create a new tenant (auto-creates category if needed). */
-  create: protectedProcedure
-    .input(
-      z.object({
-        name: z.string().min(1).max(255),
-        slug: z.string().min(1).max(128),
-        categoryName: z.string().min(1).max(128),
-        categorySlug: z.string().min(1).max(128),
-        allowedEmailDomain: z.string().optional(),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      // Ensure category exists
-      const category = await ensureCategory(input.categoryName, input.categorySlug);
-      if (!category) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create category" });
-
-      // Create tenant with 7-day free trial
-      const tenant = await createTenant({
-        name: input.name,
-        slug: input.slug,
-        categoryId: category.id,
-        allowedEmailDomain: input.allowedEmailDomain ?? null,
-        trialStartedAt: new Date(),
-        trialCredits: TRIAL_CREDITS,
-        creditBalance: TRIAL_CREDITS,
-      });
-
-      if (!tenant) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create tenant" });
-
-      // Add creator as owner
-      await createMembership({
-        tenantId: tenant.id,
-        userId: ctx.user.id,
-        role: "owner",
-        status: "active",
-      });
-
-      return tenant;
-    }),
+  // `create` (open self-serve tenant creation) was REMOVED 2026-06-21 (M2):
+  // it set `creditBalance` directly with NO `creditLedger` row (balance↔ledger
+  // drift) and, as a `protectedProcedure`, let any authenticated user mint
+  // credited trial tenants. Tenant creation is now INVITE-ONLY — via
+  // `inviteLinks.redeem` (firm/individual tokens) and platform admins
+  // (`platform.inviteFirm` / `inviteIndividual`), all of which grant credits
+  // through `grantCredits`, which writes the matching append-only ledger row.
 
   /** List members of a tenant (admin-only). */
   members: tenantAdminProcedure.query(async ({ ctx }) => {
