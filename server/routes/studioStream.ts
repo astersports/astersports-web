@@ -28,6 +28,7 @@ import {
   updateJobStatus,
   deductCredits,
   grantCredits,
+  countJobGenerationAttempts,
   getTrialStatus,
 } from "../studioDb";
 import { getImpersonationFromRequest } from "../impersonation";
@@ -222,9 +223,18 @@ export function registerStudioStreamRoutes(app: Express) {
       return;
     }
 
+    // Unique per-attempt deduct refId. The studio editor REUSES the same jobId
+    // across regenerates, and deductCredits is idempotent on (refId,reason) — so a
+    // fixed `job-<id>` refId made a 2nd generate a no-op (free generation) and let
+    // a refund credit an attempt that never debited (ledger drift). A per-attempt
+    // refId makes each generate charge, and `<refId>-failed` refunds only that
+    // attempt's debit.
+    const attemptN = (await countJobGenerationAttempts(job.id)) + 1;
+    const deductRef = `job-${job.id}-a${attemptN}`;
+
     let newBalance: number;
     try {
-      newBalance = await deductCredits(tenant.id, user.id, creditCost, "generation", `job-${job.id}`);
+      newBalance = await deductCredits(tenant.id, user.id, creditCost, "generation", deductRef);
     } catch (e: any) {
       const msg = e?.message === "Insufficient credits"
         ? `Insufficient credits. Need ${creditCost}, have ${tenant.creditBalance}.`
@@ -233,15 +243,23 @@ export function registerStudioStreamRoutes(app: Express) {
       return;
     }
 
-    // ─── 9. Update job to processing ──────────────────────────────────────────
+    // ─── 9. Update job to processing (guarded: a throw here must not leak the charge) ──
     const instruction = buildInstruction(controls);
     const expectation = describeExpectedChange(controls);
 
-    await updateJobStatus(job.id, "processing", {
-      instruction,
-      controls: JSON.stringify(controls),
-      creditsUsed: creditCost,
-    });
+    try {
+      await updateJobStatus(job.id, "processing", {
+        instruction,
+        controls: JSON.stringify(controls),
+        creditsUsed: creditCost,
+      });
+    } catch {
+      // Refund the just-made deduct so a status-write failure can't leave the
+      // customer charged for a job that never started.
+      await grantCredits(tenant.id, creditCost, "refund", `${deductRef}-failed`, user.id).catch(() => {});
+      res.status(500).json({ error: "Failed to start generation. Please try again." });
+      return;
+    }
 
     // ─── 10. Set SSE headers and begin streaming ──────────────────────────────
     res.writeHead(200, {
@@ -296,6 +314,7 @@ export function registerStudioStreamRoutes(app: Express) {
       expectation,
       round: 1,
       mode,
+      signal: abortController.signal,
     });
     workPromise.catch(() => {});
     try {
@@ -336,8 +355,9 @@ export function registerStudioStreamRoutes(app: Express) {
         metadata: { error: errMsg, path: useDeterministicDensity ? "density" : "scale" },
       });
 
-      // Refund credits on failure
-      await grantCredits(tenant.id, creditCost, "refund", `job-${job.id}-failed`, user.id);
+      // Refund credits on failure — keyed to THIS attempt's deduct so it only
+      // ever offsets a debit that actually happened (idempotent on the refId).
+      await grantCredits(tenant.id, creditCost, "refund", `${deductRef}-failed`, user.id);
       await updateJobStatus(job.id, "failed", { errorMessage: errMsg });
 
       // Send error event
