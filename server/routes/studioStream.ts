@@ -28,6 +28,7 @@ import {
   updateJobStatus,
   deductCredits,
   grantCredits,
+  countJobGenerationAttempts,
   getTrialStatus,
 } from "../studioDb";
 import { getImpersonationFromRequest } from "../impersonation";
@@ -45,6 +46,8 @@ function sendSSE(res: Response, data: Record<string, unknown>, finished: { value
   if (finished.value) return;
   try {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
+    // Force flush through any proxy buffering layer
+    if (typeof (res as any).flush === "function") (res as any).flush();
   } catch {
     // Connection already closed — swallow
   }
@@ -222,9 +225,18 @@ export function registerStudioStreamRoutes(app: Express) {
       return;
     }
 
+    // Unique per-attempt deduct refId. The studio editor REUSES the same jobId
+    // across regenerates, and deductCredits is idempotent on (refId,reason) — so a
+    // fixed `job-<id>` refId made a 2nd generate a no-op (free generation) and let
+    // a refund credit an attempt that never debited (ledger drift). A per-attempt
+    // refId makes each generate charge, and `<refId>-failed` refunds only that
+    // attempt's debit.
+    const attemptN = (await countJobGenerationAttempts(job.id)) + 1;
+    const deductRef = `job-${job.id}-a${attemptN}`;
+
     let newBalance: number;
     try {
-      newBalance = await deductCredits(tenant.id, user.id, creditCost, "generation", `job-${job.id}`);
+      newBalance = await deductCredits(tenant.id, user.id, creditCost, "generation", deductRef);
     } catch (e: any) {
       const msg = e?.message === "Insufficient credits"
         ? `Insufficient credits. Need ${creditCost}, have ${tenant.creditBalance}.`
@@ -233,31 +245,49 @@ export function registerStudioStreamRoutes(app: Express) {
       return;
     }
 
-    // ─── 9. Update job to processing ──────────────────────────────────────────
+    // ─── 9. Update job to processing (guarded: a throw here must not leak the charge) ──
     const instruction = buildInstruction(controls);
     const expectation = describeExpectedChange(controls);
 
-    await updateJobStatus(job.id, "processing", {
-      instruction,
-      controls: JSON.stringify(controls),
-      creditsUsed: creditCost,
-    });
+    try {
+      await updateJobStatus(job.id, "processing", {
+        instruction,
+        controls: JSON.stringify(controls),
+        creditsUsed: creditCost,
+      });
+    } catch {
+      // Refund the just-made deduct so a status-write failure can't leave the
+      // customer charged for a job that never started.
+      await grantCredits(tenant.id, creditCost, "refund", `${deductRef}-failed`, user.id).catch(() => {});
+      res.status(500).json({ error: "Failed to start generation. Please try again." });
+      return;
+    }
 
     // ─── 10. Set SSE headers and begin streaming ──────────────────────────────
+    // Disable Node.js default 2-minute socket timeout — SAM2 processing can
+    // take 30–120s and we don't want the socket killed mid-stream.
+    req.socket?.setTimeout(0);
+
     res.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       "Connection": "keep-alive",
       "X-Accel-Buffering": "no", // Disable nginx buffering
+      "X-Content-Type-Options": "nosniff", // Prevent content sniffing that could buffer
     });
+    // Flush headers immediately so the proxy starts streaming to the client NOW.
+    res.flushHeaders();
+
+    // 2KB padding to force the proxy past its buffering threshold into streaming mode.
+    res.write(`: ${"x".repeat(2048)}\n\n`);
 
     // Send initial event
     sendSSE(res, { type: "started", jobId: job.id, creditCost, newBalance }, finished);
 
-    // Start heartbeat interval (every 5s)
+    // Start heartbeat interval — every 3s to stay within proxy idle timeout.
     const heartbeatInterval = setInterval(() => {
       sendSSE(res, { type: "heartbeat", elapsed: Date.now() }, finished);
-    }, 5000);
+    }, 3000);
 
     // R2: on client disconnect, stop awaiting the work and abort the race so the
     // catch below refunds + marks the job failed PROMPTLY, instead of leaving it
@@ -296,6 +326,7 @@ export function registerStudioStreamRoutes(app: Express) {
       expectation,
       round: 1,
       mode,
+      signal: abortController.signal,
     });
     workPromise.catch(() => {});
     try {
@@ -336,8 +367,9 @@ export function registerStudioStreamRoutes(app: Express) {
         metadata: { error: errMsg, path: useDeterministicDensity ? "density" : "scale" },
       });
 
-      // Refund credits on failure
-      await grantCredits(tenant.id, creditCost, "refund", `job-${job.id}-failed`, user.id);
+      // Refund credits on failure — keyed to THIS attempt's deduct so it only
+      // ever offsets a debit that actually happened (idempotent on the refId).
+      await grantCredits(tenant.id, creditCost, "refund", `${deductRef}-failed`, user.id);
       await updateJobStatus(job.id, "failed", { errorMessage: errMsg });
 
       // Send error event

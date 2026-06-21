@@ -51,10 +51,10 @@ export const ENV = {
    *  ops. A decoded RGBA frame costs width*height*4 bytes, so an unbounded upload
    *  is a memory-exhaustion vector. 40 MP (~160 MB RGBA) covers real print artwork
    *  with headroom; raise via STUDIO_MAX_MEGAPIXELS only with the memory budget in mind. */
-  studioMaxMegapixels: Math.max(1, Number(process.env.STUDIO_MAX_MEGAPIXELS ?? "40")),
+  studioMaxMegapixels: Number(process.env.STUDIO_MAX_MEGAPIXELS) > 0 ? Number(process.env.STUDIO_MAX_MEGAPIXELS) : 40,
   /** H6: max concurrent sharp decodes. Each decode holds a full RGBA frame in
    *  memory; without a cap, N simultaneous jobs multiply the peak. Default 4. */
-  studioMaxConcurrentDecodes: Math.max(1, Number(process.env.STUDIO_MAX_CONCURRENT_DECODES ?? "4")),
+  studioMaxConcurrentDecodes: Number(process.env.STUDIO_MAX_CONCURRENT_DECODES) > 0 ? Number(process.env.STUDIO_MAX_CONCURRENT_DECODES) : 4,
   /** H2: allowlist of host[:port] values the OAuth redirect target may use. When
    *  set (comma-separated), a decoded `state` redirect whose host is not on the
    *  list is rejected — the anti-code-interception control. Empty = scheme/format

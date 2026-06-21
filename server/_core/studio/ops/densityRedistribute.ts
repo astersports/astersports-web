@@ -185,11 +185,13 @@ export async function densityRedistribute(input: RedistributeInput): Promise<Red
   if (removeN === 0) return empty();
   const M = n - removeN;
 
-  // F3: warn (don't fail) on instance-raster dim drift — markInstance falls back
-  // to a bbox rectangle, same diagnosable degrade as v1.
+  // F3: instance-raster dim drift forces a bbox-rectangle fallback in markInstance
+  // that produces a grossly-corrupted redistribute. Treat it as a DEGRADE -> refund
+  // (same as densityThin's F3), never billing for a corrupted result.
   const dimDrift = input.instances.filter((m) => !m.raster || m.raster.width !== width || m.raster.height !== height).length;
   if (dimDrift > 0) {
-    console.warn(`[density-redistribute] ${dimDrift}/${n} instance rasters not at ${width}x${height}; bbox fallback in effect.`);
+    console.warn(`[density-redistribute] ${dimDrift}/${n} instance rasters not at ${width}x${height}; degrade -> refund (no bbox over-paint).`);
+    return empty();
   }
 
   // F2: no bare ground to sample -> refuse to smear; signal no-op so caller refunds.

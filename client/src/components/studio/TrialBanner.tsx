@@ -85,10 +85,12 @@ export function TrialBanner({ tenantId }: TrialBannerProps) {
     );
   }
 
-  // Days 1-3: Simple trial progress banner
+  // Days 1-3: Simple trial progress banner. Use the tenant's actual trial grant
+  // (per-tenant; not always 150 — promos / pilots / partial grants vary).
   const creditsUsed = trial.creditsUsed ?? 0;
-  const creditsRemaining = 150 - creditsUsed;
-  const progressPct = Math.min(100, (creditsUsed / 150) * 100);
+  const trialCredits = trial.trialCredits ?? 150;
+  const creditsRemaining = Math.max(0, trialCredits - creditsUsed);
+  const progressPct = trialCredits > 0 ? Math.min(100, (creditsUsed / trialCredits) * 100) : 0;
 
   return (
     <div className="relative mx-4 mb-4 rounded-xl border border-blue-500/20 bg-blue-950/20 p-4">

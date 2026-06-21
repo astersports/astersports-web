@@ -305,9 +305,12 @@ export function computeCredits(
   c: ControlSettings,
   costs: { standardGeneration: number; extraVariation: number; combinedControls: number }
 ): number {
+  // A control enabled at a no-op value (scale or density at 0%) must not be
+  // billed — the server fails+refunds such jobs, so they must not count toward
+  // credits here either, or the user is charged for an unchanged image.
   const activeControls = [
-    c.scale.enabled,
-    c.density.enabled,
+    c.scale.enabled && c.scale.percent !== 0,
+    c.density.enabled && c.density.percent > 0,
     c.remove.enabled,
     c.recolor.enabled,
   ].filter(Boolean).length;
@@ -315,4 +318,24 @@ export function computeCredits(
   const base = activeControls > 1 ? costs.combinedControls : costs.standardGeneration;
   const extra = Math.max(0, c.variations - 1) * costs.extraVariation;
   return base + extra;
+}
+
+/**
+ * Single denormalized edit category for a job, derived from its controls.
+ * One bucket per job — combined edits collapse to 'mixed' so History's
+ * "Top Edit Type" never double-counts. Matches the legacy `.enabled` LIKE
+ * semantics it replaces; returns 'none' when no control is enabled.
+ */
+export function deriveEditType(
+  c: ControlSettings
+): "recolor" | "scale" | "density" | "remove" | "mixed" | "none" {
+  const active = [
+    c.recolor.enabled && "recolor",
+    c.scale.enabled && "scale",
+    c.density.enabled && "density",
+    c.remove.enabled && "remove",
+  ].filter(Boolean) as Array<"recolor" | "scale" | "density" | "remove">;
+  if (active.length === 0) return "none";
+  if (active.length > 1) return "mixed";
+  return active[0];
 }

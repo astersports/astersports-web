@@ -30,7 +30,7 @@ import {
   analyzeTrialUsage,
   getHistoryStats,
 } from "../studioDb";
-import { buildInstruction, computeCredits, describeExpectedChange, resolveTargetColorHex, type ControlSettings } from "../../shared/controls";
+import { buildInstruction, computeCredits, deriveEditType, describeExpectedChange, resolveTargetColorHex, type ControlSettings } from "../../shared/controls";
 import { CREDIT_COST, LOW_BALANCE_THRESHOLD, PLANS, TRIAL_DURATION_DAYS, TRIAL_RECOMMENDATION_START_DAY } from "../../shared/billing";
 import { sanitizeElementName, sanitizeColorValue, sanitizeFileName, MAX_ELEMENT_NAME_LENGTH } from "../../shared/sanitize";
 
@@ -336,6 +336,7 @@ export const studioRouter = router({
         instruction,
         controls: JSON.stringify(controls),
         creditsUsed: creditCost,
+        editType: deriveEditType(controls),
       });
 
       // (Density/scale returned `async` above and run via the SSE endpoint — no
@@ -483,6 +484,9 @@ export const studioRouter = router({
       z.object({
         limit: z.number().min(1).max(100).default(24),
         offset: z.number().min(0).default(0),
+        // M5c: keyset (load-more); precedence over offset. nullish() because
+        // tRPC useInfiniteQuery sends cursor:null on the first page.
+        cursor: z.string().max(512).nullish(),
         status: z.string().optional(),
         search: z.string().max(200).optional(),
         favoritesOnly: z.boolean().optional(),
@@ -491,12 +495,14 @@ export const studioRouter = router({
         userId: z.number().optional(),
         sortBy: z.enum(["date", "credits", "title"]).optional(),
         sortDir: z.enum(["asc", "desc"]).optional(),
+        type: z.string().max(16).optional(), // edit-type filter (matches denormalized editType)
       })
     )
     .query(async ({ ctx, input }) => {
       const result = await listTenantJobsEnhanced(ctx.tenant.id, {
         limit: input.limit,
         offset: input.offset,
+        cursor: input.cursor ?? undefined,
         status: input.status,
         search: input.search,
         favoritesOnly: input.favoritesOnly,
@@ -505,6 +511,11 @@ export const studioRouter = router({
         userId: input.userId,
         sortBy: input.sortBy,
         sortDir: input.sortDir,
+        // Server-side type filter so pagination + total reflect it. The UI's
+        // "upload" maps to the stored editType "none" (no active controls).
+        editType: input.type && input.type !== "all"
+          ? (input.type === "upload" ? "none" : input.type)
+          : undefined,
       });
       return {
         jobs: result.jobs.map((j) => ({
@@ -513,6 +524,7 @@ export const studioRouter = router({
           controls: j.controls ? JSON.parse(j.controls) : null,
         })),
         total: result.total,
+        nextCursor: result.nextCursor,
       };
     }),
 
@@ -536,6 +548,9 @@ export const studioRouter = router({
       z.object({
         limit: z.number().min(1).max(100).default(25),
         offset: z.number().min(0).default(0),
+        // M5c: keyset (load-more); precedence over offset. nullish() because
+        // tRPC useInfiniteQuery sends cursor:null on the first page.
+        cursor: z.string().max(512).nullish(),
         reason: z.string().optional(),
         from: z.number().optional(),
         to: z.number().optional(),
@@ -547,6 +562,7 @@ export const studioRouter = router({
       return listCreditLedger(ctx.tenant.id, {
         limit: input.limit,
         offset: input.offset,
+        cursor: input.cursor ?? undefined,
         reason: input.reason,
         from: input.from,
         to: input.to,
@@ -616,6 +632,7 @@ export const studioRouter = router({
         instruction,
         creditsUsed: cost,
         status: "processing",
+        editType: deriveEditType(controls),
       });
 
       // Deduct credits against the new job id (unique per attempt).
@@ -686,6 +703,7 @@ export const studioRouter = router({
     if (!trial.inTrial || trial.trialDay < TRIAL_RECOMMENDATION_START_DAY) {
       return {
         ...trial,
+        trialCredits: tenant.trialCredits,
         recommendation: null,
       };
     }
@@ -696,6 +714,7 @@ export const studioRouter = router({
 
     return {
       ...trial,
+      trialCredits: tenant.trialCredits,
       recommendation: {
         planKey: usage.recommendedPlan,
         planName: plan.name,

@@ -63,8 +63,10 @@ async function cropToFabricRegion(
 ): Promise<{ dataUrl: string; cropWidth: number; cropHeight: number }> {
   const left = Math.max(0, Math.round(bbox.x * width));
   const top = Math.max(0, Math.round(bbox.y * height));
-  const cropWidth = Math.min(width - left, Math.round(bbox.w * width));
-  const cropHeight = Math.min(height - top, Math.round(bbox.h * height));
+  // Math.max(1, …): a tiny/odd bbox can round to 0, and sharp .extract() throws
+  // "bad extract area" on a zero-dimension crop (hard-failing the job).
+  const cropWidth = Math.max(1, Math.min(width - left, Math.round(bbox.w * width)));
+  const cropHeight = Math.max(1, Math.min(height - top, Math.round(bbox.h * height)));
 
   const cropped = await sharp(buffer, { raw: { width, height, channels: 4 } })
     .extract({ left, top, width: cropWidth, height: cropHeight })

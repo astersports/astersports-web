@@ -190,8 +190,14 @@ export const creditLedger = mysqlTable("credit_ledger", {
   note: text("note"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (t) => ({
-  // H5: every ledger read is tenant-scoped and ordered by recency.
+  // H5: every ledger read is tenant-scoped and ordered by recency. Also serves
+  // firmAdmin.spendByMember's 7-day window scan (tenantId + createdAt range).
   tenantCreatedIdx: index("idx_credit_ledger_tenant_created").on(t.tenantId, t.createdAt),
+  // M4a: covering index for firmAdmin.spendByMember's all-time aggregation
+  // (WHERE tenantId=? GROUP BY userId, SUM over delta). userId follows tenantId
+  // so groups are contiguous, and delta is covered — a tight index scan with no
+  // table lookup or filesort instead of a full per-tenant ledger scan at scale.
+  tenantUserDeltaIdx: index("idx_credit_ledger_tenant_user_delta").on(t.tenantId, t.userId, t.delta),
   // H5: ledger<->jobs correlation joins on refId.
   refIdIdx: index("idx_credit_ledger_refId").on(t.refId),
   // C3: hard idempotency backstop — at most one ledger row per (refId, reason).
@@ -218,6 +224,10 @@ export const jobs = mysqlTable("studio_jobs", {
   detectedElements: text("detectedElements"),
   /** JSON of last-used ControlSettings. */
   controls: text("controls"),
+  /** Denormalized edit category derived from controls at write time:
+   *  'recolor'|'scale'|'density'|'remove'|'mixed'|'none'. Powers the History
+   *  "Top Edit Type" tile without scanning the controls TEXT column. */
+  editType: varchar("editType", { length: 16 }),
   /** Natural-language instruction sent to AI. */
   instruction: text("instruction"),
   status: mysqlEnum("status", ["pending", "processing", "done", "failed"]).default("pending").notNull(),
@@ -282,6 +292,23 @@ export const jobFavorites = mysqlTable("studio_job_favorites", {
 
 export type JobFavorite = typeof jobFavorites.$inferSelect;
 export type InsertJobFavorite = typeof jobFavorites.$inferInsert;
+
+/**
+ * Per-tenant rollup of History dashboard aggregates (total jobs, credits spent,
+ * done jobs). Recomputed from `studio_jobs` on read when stale — no cron, no
+ * write-path coupling; the tile reader falls back to a live aggregate if this
+ * table isn't present yet.
+ */
+export const tenantStats = mysqlTable("studio_tenant_stats", {
+  tenantId: int("tenantId").primaryKey(),
+  totalJobs: int("totalJobs").default(0).notNull(),
+  creditsSpent: int("creditsSpent").default(0).notNull(),
+  doneJobs: int("doneJobs").default(0).notNull(),
+  computedAt: timestamp("computedAt").defaultNow().notNull(),
+});
+
+export type TenantStats = typeof tenantStats.$inferSelect;
+export type InsertTenantStats = typeof tenantStats.$inferInsert;
 
 /**
  * Server-side structured logs for production debugging.

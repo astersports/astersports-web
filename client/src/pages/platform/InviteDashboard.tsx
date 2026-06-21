@@ -74,7 +74,10 @@ export default function InviteDashboard() {
   return (
     <div className="space-y-2">
       {links.map((link) => {
-        const status = statusConfig[link.status as keyof typeof statusConfig] ?? statusConfig.active;
+        // Use the server-computed effectiveStatus so time-expired / maxed-out
+        // links don't render as "Active" with live Copy/Revoke.
+        const linkStatus = link.effectiveStatus ?? link.status;
+        const status = statusConfig[linkStatus as keyof typeof statusConfig] ?? statusConfig.active;
         const StatusIcon = status.icon;
         const TypeIcon = typeIcons[link.type as keyof typeof typeIcons] ?? Link2;
         const metadata = (link.metadata ?? {}) as Record<string, any>;
@@ -117,7 +120,7 @@ export default function InviteDashboard() {
 
             {/* Actions */}
             <div className="flex items-center gap-1 shrink-0">
-              {link.status === "active" && (
+              {linkStatus === "active" && (
                 <>
                   <Button
                     size="sm"

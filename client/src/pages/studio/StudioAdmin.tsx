@@ -3,7 +3,7 @@
  * Pooled balance, spend-by-member bars, User/Admin role toggles,
  * invite with domain lock, transfer ownership.
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useTenant } from "@/contexts/TenantContext";
@@ -214,12 +214,19 @@ function SpendByMember({ tenantId }: { tenantId: number }) {
 
 /* ─── Members List with Role Toggles ──────────────────────────────────────── */
 
+const MEMBERS_PAGE = 20;
+
 function MembersList({ tenantId, isOwner }: { tenantId: number; isOwner: boolean }) {
   const utils = trpc.useUtils();
   const { data: members, isLoading } = trpc.tenants.members.useQuery(
     { tenantId },
     { enabled: !!tenantId }
   );
+  // M4c: reveal the roster in pages. The query stays whole (the transfer-owner
+  // picker needs every member); the table just renders a growing slice.
+  const [visibleCount, setVisibleCount] = useState(MEMBERS_PAGE);
+  // Reset paging when switching firms so the new roster starts at page one.
+  useEffect(() => setVisibleCount(MEMBERS_PAGE), [tenantId]);
 
   const toggleMutation = trpc.firmAdmin.toggleRole.useMutation({
     onSuccess: () => {
@@ -267,7 +274,7 @@ function MembersList({ tenantId, isOwner }: { tenantId: number; isOwner: boolean
               <span className="text-center">Role</span>
               <span />
             </div>
-            {members.map((m) => {
+            {members.slice(0, visibleCount).map((m) => {
               const isOwnerRow = m.role === "owner";
               const isAdminRow = m.role === "admin" || m.role === "owner";
               const displayName = m.user?.name || m.invitedEmail || "Unknown";
@@ -363,6 +370,16 @@ function MembersList({ tenantId, isOwner }: { tenantId: number; isOwner: boolean
                 </div>
               );
             })}
+            {members.length > visibleCount && (
+              <div className="flex justify-center pt-2">
+                <button
+                  onClick={() => setVisibleCount((c) => c + MEMBERS_PAGE)}
+                  className="px-4 py-1.5 rounded-lg text-xs border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                >
+                  Load more ({visibleCount} of {members.length})
+                </button>
+              </div>
+            )}
           </div>
         )}
       </CardContent>

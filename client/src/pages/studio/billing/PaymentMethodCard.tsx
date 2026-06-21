@@ -15,7 +15,10 @@ interface PaymentMethodCardProps {
 export function PaymentMethodCard({ tenantId }: PaymentMethodCardProps) {
   const portalMutation = trpc.studioBilling.portal.useMutation({
     onSuccess: (data) => {
-      if (data.portalUrl) window.open(data.portalUrl, "_blank");
+      // Same-tab redirect rather than window.open: a popup opened from an async
+      // callback (after the mutation resolves, outside the click gesture) is
+      // blocked by popup blockers.
+      if (data.portalUrl) window.location.href = data.portalUrl;
     },
     onError: (err) => toast.error(err.message),
   });
@@ -29,8 +32,8 @@ export function PaymentMethodCard({ tenantId }: PaymentMethodCardProps) {
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold">&bull;&bull;&bull;&bull; 4242</p>
-            <p className="text-xs text-muted-foreground">Managed via Stripe</p>
+            <p className="text-sm font-semibold">Card on file</p>
+            <p className="text-xs text-muted-foreground">Managed via Stripe — tap Update to view or change</p>
           </div>
           <Button
             variant="outline"

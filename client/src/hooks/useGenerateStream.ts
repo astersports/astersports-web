@@ -87,6 +87,33 @@ async function consumeSSEStream(
     }
   }
 
+  // Process any remaining data in the buffer — the final event might not
+  // have a trailing \n\n if the server closed the connection right after writing.
+  if (buffer.trim()) {
+    const dataMatch = buffer.match(/^data:\s*(.+)$/m);
+    if (dataMatch) {
+      try {
+        const parsed = JSON.parse(dataMatch[1]);
+        switch (parsed.type) {
+          case "done":
+            callbacks.onDone(parsed);
+            return;
+          case "error":
+            callbacks.onError(parsed);
+            return;
+          case "started":
+            callbacks.onStarted(parsed);
+            break;
+          case "heartbeat":
+            callbacks.onHeartbeat();
+            break;
+        }
+      } catch {
+        // Incomplete JSON — fall through to error below
+      }
+    }
+  }
+
   // The loop exits here only when the reader closes WITHOUT a terminal
   // `done`/`error` event (server crash, container kill, half-open response) and
   // the caller did not intentionally abort. Surface an error so the UI does not

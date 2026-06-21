@@ -21,8 +21,6 @@ import {
 import { Input } from "@/components/ui/input";
 import {
   Loader2,
-  ChevronLeft,
-  ChevronRight,
   ChevronDown,
   TrendingDown,
   TrendingUp,
@@ -138,7 +136,6 @@ type ViewMode = "chronological" | "by-member";
 export default function CreditLedger() {
   const { tenant } = useTenant();
   const utils = trpc.useUtils();
-  const [page, setPage] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
   const [filter, setFilter] = useState<ReasonFilter>("all");
   const [dateRange, setDateRange] = useState<DateRange>("all");
@@ -153,28 +150,32 @@ export default function CreditLedger() {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setSearchQuery(searchInput.trim());
-      setPage(0);
     }, 400);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [searchInput]);
 
   const rangeMs = useMemo(() => getDateRangeMs(dateRange), [dateRange]);
 
-  const { data, isLoading } = trpc.studio.creditLedger.useQuery(
-    {
-      tenantId: tenant?.id ?? 0,
-      limit: PAGE_SIZE,
-      offset: page * PAGE_SIZE,
-      reason: filter === "all" ? undefined : filter,
-      from: rangeMs.from,
-      to: rangeMs.to,
-      search: searchQuery || undefined,
-    },
-    { enabled: !!tenant && viewMode === "chronological" }
-  );
+  // M5c: load-more via keyset cursor. The query key includes the filters, so
+  // changing any filter/search starts a fresh first page automatically.
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    trpc.studio.creditLedger.useInfiniteQuery(
+      {
+        tenantId: tenant?.id ?? 0,
+        limit: PAGE_SIZE,
+        reason: filter === "all" ? undefined : filter,
+        from: rangeMs.from,
+        to: rangeMs.to,
+        search: searchQuery || undefined,
+      },
+      {
+        enabled: !!tenant && viewMode === "chronological",
+        getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+      }
+    );
 
-  const entries = data?.entries ?? [];
-  const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0;
+  const entries = useMemo(() => data?.pages.flatMap((p) => p.entries) ?? [], [data]);
+  const total = data?.pages[0]?.total ?? 0;
 
   // Compute summary stats from visible entries
   const stats = useMemo(() => {
@@ -233,8 +234,16 @@ export default function CreditLedger() {
         Amount: e.delta,
         Balance: e.balanceAfter,
       }));
+      // Neutralize CSV formula injection: a cell starting with = + - @ (or a
+      // control char) is prefixed with a single quote so spreadsheets don't
+      // execute it as a formula. refId/note are user-influenced.
+      const csvCell = (v: unknown) => {
+        let s = String(v);
+        if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+        return `"${s.replace(/"/g, '""')}"`;
+      };
       const header = Object.keys(rows[0]).join(",");
-      const csv = [header, ...rows.map((r) => Object.values(r).map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))].join("\n");
+      const csv = [header, ...rows.map((r) => Object.values(r).map(csvCell).join(","))].join("\n");
       const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -312,7 +321,7 @@ export default function CreditLedger() {
               <TrendingDown className="h-5 w-5 text-red-400" />
             </div>
             <div>
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Spent</p>
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Spent (loaded)</p>
               <p className="text-xl font-bold tabular-nums text-red-400">-{stats.spent}</p>
             </div>
           </CardContent>
@@ -324,7 +333,7 @@ export default function CreditLedger() {
               <TrendingUp className="h-5 w-5 text-green-500" />
             </div>
             <div>
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Earned</p>
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Earned (loaded)</p>
               <p className="text-xl font-bold tabular-nums text-green-500">+{stats.earned}</p>
             </div>
           </CardContent>
@@ -352,9 +361,9 @@ export default function CreditLedger() {
         <ChronologicalView
           entries={entries}
           grouped={grouped}
-          totalPages={totalPages}
-          page={page}
-          setPage={setPage}
+          hasNextPage={!!hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          onLoadMore={() => fetchNextPage()}
           filter={filter}
           setFilter={setFilter}
           dateRange={dateRange}
@@ -363,7 +372,7 @@ export default function CreditLedger() {
           setSearchInput={setSearchInput}
           expandedId={expandedId}
           setExpandedId={setExpandedId}
-          total={data?.total ?? 0}
+          total={total}
           onExport={handleExportAll}
           isExporting={isExporting}
         />
@@ -379,9 +388,9 @@ export default function CreditLedger() {
 function ChronologicalView({
   entries,
   grouped,
-  totalPages,
-  page,
-  setPage,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
   filter,
   setFilter,
   dateRange,
@@ -396,9 +405,9 @@ function ChronologicalView({
 }: {
   entries: any[];
   grouped: Record<string, any[]>;
-  totalPages: number;
-  page: number;
-  setPage: (p: number | ((p: number) => number)) => void;
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  onLoadMore: () => void;
   filter: ReasonFilter;
   setFilter: (f: ReasonFilter) => void;
   dateRange: DateRange;
@@ -424,7 +433,7 @@ function ChronologicalView({
             className="pl-8 h-8 text-sm"
           />
         </div>
-        <Select value={filter} onValueChange={(v) => { setFilter(v as ReasonFilter); setPage(0); }}>
+        <Select value={filter} onValueChange={(v) => setFilter(v as ReasonFilter)}>
           <SelectTrigger className="w-[180px]" size="sm">
             <SelectValue placeholder="Filter by type" />
           </SelectTrigger>
@@ -439,7 +448,7 @@ function ChronologicalView({
             <SelectItem value="adjustment">Adjustment</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={dateRange} onValueChange={(v) => { setDateRange(v as DateRange); setPage(0); }}>
+        <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
           <SelectTrigger className="w-[140px]" size="sm">
             <CalendarDays className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
             <SelectValue placeholder="Date range" />
@@ -509,109 +518,24 @@ function ChronologicalView({
         </Card>
       )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-3">
-          <p className="text-xs text-muted-foreground">
-            Page {page + 1} of {totalPages}
-          </p>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              disabled={page === 0}
-              onClick={() => setPage(0)}
-              title="First page"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-              <ChevronLeft className="w-3.5 h-3.5 -ml-2" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              disabled={page === 0}
-              onClick={() => setPage((p) => p - 1)}
-              title="Previous page"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-
-            {/* Page numbers with ellipsis */}
-            {(() => {
-              const pages: (number | "...")[] = [];
-              if (totalPages <= 7) {
-                for (let i = 0; i < totalPages; i++) pages.push(i);
-              } else {
-                pages.push(0);
-                if (page > 3) pages.push("...");
-                const start = Math.max(1, page - 1);
-                const end = Math.min(totalPages - 2, page + 1);
-                for (let i = start; i <= end; i++) pages.push(i);
-                if (page < totalPages - 4) pages.push("...");
-                pages.push(totalPages - 1);
-              }
-              return pages.map((p, idx) =>
-                p === "..." ? (
-                  <span key={`ellipsis-${idx}`} className="px-1.5 text-xs text-muted-foreground">...</span>
-                ) : (
-                  <Button
-                    key={p}
-                    variant={p === page ? "default" : "outline"}
-                    size="icon"
-                    className="h-8 w-8 text-xs"
-                    onClick={() => setPage(p)}
-                  >
-                    {p + 1}
-                  </Button>
-                )
-              );
-            })()}
-
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              disabled={page >= totalPages - 1}
-              onClick={() => setPage((p) => p + 1)}
-              title="Next page"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              disabled={page >= totalPages - 1}
-              onClick={() => setPage(totalPages - 1)}
-              title="Last page"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-              <ChevronRight className="w-3.5 h-3.5 -ml-2" />
-            </Button>
-
-            {/* Jump to page */}
-            <div className="ml-2 flex items-center gap-1.5">
-              <span className="text-xs text-muted-foreground">Go to</span>
-              <Input
-                type="number"
-                min={1}
-                max={totalPages}
-                className="h-8 w-14 text-xs text-center"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    const val = parseInt((e.target as HTMLInputElement).value, 10);
-                    if (val >= 1 && val <= totalPages) {
-                      setPage(val - 1);
-                      (e.target as HTMLInputElement).value = "";
-                    }
-                  }
-                }}
-                placeholder={String(page + 1)}
-              />
-            </div>
-          </div>
+      {/* Load more (M5c keyset pagination) */}
+      {hasNextPage && (
+        <div className="flex justify-center pt-3">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isFetchingNextPage}
+            onClick={onLoadMore}
+          >
+            {isFetchingNextPage ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              `Load more (${entries.length} of ${total})`
+            )}
+          </Button>
         </div>
       )}
     </>

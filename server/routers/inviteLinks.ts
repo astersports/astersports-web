@@ -5,7 +5,7 @@
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql, lt } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
@@ -264,6 +264,29 @@ export const inviteLinksRouter = router({
         throw new TRPCError({ code: "CONFLICT", message: "You have already used this invite link" });
       }
 
+      // Atomically CLAIM a usage slot BEFORE creating any tenant/credits. The old
+      // code incremented useCount only at the end, so two concurrent redemptions
+      // of a near-limit / single-use link both passed the check above and both
+      // minted a tenant + credits (free-credit mint). This conditional update
+      // increments useCount only while a slot remains and aborts if it didn't
+      // claim one. maxUses falsy (0/null) = unlimited.
+      const claim = await db
+        .update(inviteLinks)
+        .set({
+          useCount: sql`${inviteLinks.useCount} + 1`,
+          lastRedeemedAt: new Date(),
+          ...(link.maxUses === 1 ? { status: "redeemed" } : {}),
+        })
+        .where(
+          and(
+            eq(inviteLinks.id, link.id),
+            link.maxUses ? lt(inviteLinks.useCount, link.maxUses) : undefined
+          )
+        );
+      if (((claim as any)?.[0]?.affectedRows ?? 0) === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This invite link has reached its usage limit" });
+      }
+
       const metadata = (link.metadata ?? {}) as Record<string, any>;
       let resultTenantId: number;
 
@@ -422,23 +445,12 @@ export const inviteLinksRouter = router({
         resultTenantId = link.tenantId;
       }
 
-      // Record redemption
+      // Record redemption (the usage slot was already claimed atomically above).
       await db.insert(inviteLinkRedemptions).values({
         inviteLinkId: link.id,
         userId: ctx.user.id,
         tenantId: resultTenantId,
       });
-
-      // Update link usage
-      await db
-        .update(inviteLinks)
-        .set({
-          useCount: link.useCount + 1,
-          lastRedeemedAt: new Date(),
-          // Auto-mark as redeemed if single-use
-          ...(link.maxUses === 1 ? { status: "redeemed" } : {}),
-        })
-        .where(eq(inviteLinks.id, link.id));
 
       return { success: true, tenantId: resultTenantId };
     }),

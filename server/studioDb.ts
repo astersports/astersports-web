@@ -12,6 +12,7 @@ import {
   jobs,
   jobVariations,
   jobFavorites,
+  tenantStats,
   users,
   type Tenant,
   type InsertTenant,
@@ -21,6 +22,7 @@ import {
   type InsertCreditLedgerEntry,
 } from "../drizzle/schema";
 import { TRIAL_DURATION_DAYS } from "../shared/billing";
+import { encodeCursor, decodeCursor } from "./cursor";
 
 /**
  * M6: escape LIKE metacharacters in user-supplied search terms so `%`/`_` are
@@ -29,6 +31,65 @@ import { TRIAL_DURATION_DAYS } from "../shared/billing";
  */
 function escapeLike(s: string): string {
   return s.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
+/**
+ * M5d: FULLTEXT search capability. The `ft_studio_jobs_search` index is applied
+ * out-of-band (custom migration 0015) via db:push; until then History search
+ * falls back to substring LIKE. A definitive probe result is cached once per
+ * process (the index can't appear mid-process — it lands on a deploy/restart
+ * after db:push). A transient probe FAILURE is NOT cached, so a connection blip
+ * during the first probe doesn't pin LIKE for the process lifetime.
+ */
+let jobsFulltextAvailable: boolean | null = null;
+async function hasJobsFulltextIndex(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>
+): Promise<boolean> {
+  if (jobsFulltextAvailable !== null) return jobsFulltextAvailable;
+  try {
+    const res = await db.execute(sql`
+      SELECT 1 AS present FROM information_schema.statistics
+      WHERE table_schema = DATABASE()
+        AND table_name = 'studio_jobs'
+        AND index_type = 'FULLTEXT'
+      LIMIT 1
+    `);
+    const rows = (Array.isArray(res) ? res[0] : (res as { rows?: unknown[] })?.rows) ?? [];
+    jobsFulltextAvailable = Array.isArray(rows) && rows.length > 0;
+    return jobsFulltextAvailable;
+  } catch {
+    // Transient failure — leave the cache unset so a later call re-probes;
+    // use LIKE for this request only.
+    return false;
+  }
+}
+
+/** Minimum token length InnoDB FULLTEXT indexes by default (innodb_ft_min_token_size). */
+const FT_MIN_TOKEN = 3;
+
+/**
+ * M5d: build a BOOLEAN-mode FULLTEXT query from raw user input. Tokenizes on
+ * separators, requires each token as a prefix match (`+tok*`), and drops every
+ * FULLTEXT boolean operator so user input can't inject syntax. Returns null
+ * when the query isn't FULLTEXT-suitable (no tokens, or any token shorter than
+ * the min indexed length) — the caller then uses the LIKE path so
+ * short/punctuation-only queries still match by substring.
+ */
+export function toJobsBooleanQuery(search: string): string | null {
+  // Split on whitespace + all ASCII punctuation/operators (ranges 33-47, 58-64,
+  // 91-96, 123-126). Implemented as a separator replace rather than a `\p{L}`
+  // Unicode class with the `u` flag: tsconfig.json sets `lib` but no `target`,
+  // so tsc defaults below es6 and rejects the `u` flag at compile time (TS1501).
+  // ASCII letters/digits and any non-ASCII letters (accents) survive, while
+  // every FULLTEXT boolean operator (+ - > < ( ) ~ * " @ …) is stripped,
+  // preventing the user from injecting boolean-mode syntax.
+  const tokens = search
+    .replace(/[\s!-/:-@[-`{-~]+/g, " ")
+    .split(" ")
+    .filter(Boolean);
+  if (tokens.length === 0) return null;
+  if (tokens.some((t) => t.length < FT_MIN_TOKEN)) return null;
+  return tokens.map((t) => `+${t}*`).join(" ");
 }
 
 // ─── Categories ──────────────────────────────────────────────────────────────
@@ -222,6 +283,23 @@ export async function deductCredits(
 }
 
 /**
+ * Count prior generation deduct attempts for a job — ledger rows with
+ * reason='generation' and a refId of `job-<id>-a*`. The SSE endpoint uses this to
+ * mint a UNIQUE per-attempt deduct refId, so a regenerate on the same jobId
+ * actually charges (a fixed `job-<id>` refId becomes an idempotent no-op → free
+ * generation) and a refund only ever offsets the attempt that debited.
+ */
+export async function countJobGenerationAttempts(jobId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const rows = await db
+    .select({ id: creditLedger.id })
+    .from(creditLedger)
+    .where(and(eq(creditLedger.reason, "generation"), like(creditLedger.refId, `job-${jobId}-a%`)));
+  return rows.length;
+}
+
+/**
  * Grant credits to a tenant (subscription renewal, top-up, admin adjustment).
  */
 export async function grantCredits(
@@ -291,7 +369,7 @@ export async function createJob(data: InsertJob) {
 export async function updateJobStatus(
   jobId: number,
   status: "pending" | "processing" | "done" | "failed",
-  extra?: { instruction?: string; creditsUsed?: number; controls?: string; detectedElements?: string; errorMessage?: string }
+  extra?: { instruction?: string; creditsUsed?: number; controls?: string; detectedElements?: string; errorMessage?: string; editType?: string }
 ) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -328,6 +406,7 @@ export async function listTenantJobsEnhanced(
   opts: {
     limit?: number;
     offset?: number;
+    cursor?: string;    // M5c: keyset cursor (load-more); takes precedence over offset
     status?: string;
     search?: string;
     favoritesOnly?: boolean;
@@ -336,10 +415,11 @@ export async function listTenantJobsEnhanced(
     userId?: number;    // filter by creator
     sortBy?: "date" | "credits" | "title";
     sortDir?: "asc" | "desc";
+    editType?: string;  // filter by denormalized edit type (M5a)
   } = {}
 ) {
   const db = await getDb();
-  if (!db) return { jobs: [], total: 0 };
+  if (!db) return { jobs: [], total: 0, nextCursor: null };
 
   const limit = opts.limit ?? 24;
   const offset = opts.offset ?? 0;
@@ -349,10 +429,21 @@ export async function listTenantJobsEnhanced(
     conditions.push(sql`${jobs.status} = ${opts.status}`);
   }
   if (opts.search) {
-    const term = `%${escapeLike(opts.search)}%`;
-    conditions.push(
-      sql`(${jobs.title} LIKE ${term} OR ${jobs.detectedElements} LIKE ${term} OR ${jobs.instruction} LIKE ${term})`
-    );
+    // M5d: FULLTEXT MATCH when the query is FULLTEXT-suitable AND the
+    // ft_studio_jobs_search index is present; substring LIKE otherwise
+    // (pre-migration, or short/punctuation-only queries the index can't serve).
+    // Tokenize first so non-suitable queries skip the information_schema probe.
+    const boolQuery = toJobsBooleanQuery(opts.search);
+    if (boolQuery && (await hasJobsFulltextIndex(db))) {
+      conditions.push(
+        sql`MATCH(${jobs.title}, ${jobs.detectedElements}, ${jobs.instruction}) AGAINST(${boolQuery} IN BOOLEAN MODE)`
+      );
+    } else {
+      const term = `%${escapeLike(opts.search)}%`;
+      conditions.push(
+        sql`(${jobs.title} LIKE ${term} OR ${jobs.detectedElements} LIKE ${term} OR ${jobs.instruction} LIKE ${term})`
+      );
+    }
   }
   if (opts.favoritesOnly) {
     conditions.push(
@@ -368,35 +459,72 @@ export async function listTenantJobsEnhanced(
   if (opts.userId) {
     conditions.push(eq(jobs.userId, opts.userId));
   }
+  if (opts.editType) {
+    conditions.push(eq(jobs.editType, opts.editType));
+  }
   const condition = and(...conditions);
 
-  // Determine sort order
-  let orderClause;
+  // M5c: order by the chosen column with the PK as a tiebreaker, so the order is
+  // total and keyset cursors stay stable across rows with equal sort keys.
+  // creditsUsed is nullable — coalesce so ordering/keyset stay stable across NULLs.
+  const sortBy = opts.sortBy ?? "date";
   const dir = opts.sortDir ?? "desc";
-  switch (opts.sortBy) {
-    case "credits":
-      orderClause = dir === "asc" ? sql`${jobs.creditsUsed} ASC` : sql`${jobs.creditsUsed} DESC`;
-      break;
-    case "title":
-      orderClause = dir === "asc" ? sql`${jobs.title} ASC` : sql`${jobs.title} DESC`;
-      break;
-    default:
-      orderClause = dir === "asc" ? sql`${jobs.createdAt} ASC` : sql`${jobs.createdAt} DESC`;
+  const sortCol =
+    sortBy === "credits"
+      ? sql`COALESCE(${jobs.creditsUsed}, 0)`
+      : sortBy === "title"
+      ? jobs.title
+      : jobs.createdAt;
+  const dirKw = dir === "asc" ? sql`asc` : sql`desc`;
+  const orderClause = sql`${sortCol} ${dirKw}, ${jobs.id} ${dirKw}`;
+
+  // M5c keyset predicate (load-more): rows strictly past the cursor in sort
+  // order. Ignore a cursor whose key type doesn't match the active sort (stale,
+  // cross-sort, or tampered) so we degrade to the first page instead of coercing
+  // it into NaN dates / bad comparisons. Built separately from `condition` so the
+  // total count ignores the cursor; a cursor pins offset to 0.
+  const expectKey = sortBy === "title" ? "string" : "number";
+  const rawDecoded = opts.cursor ? decodeCursor(opts.cursor) : null;
+  const decoded = rawDecoded && typeof rawDecoded.k === expectKey ? rawDecoded : null;
+  let rowCondition = condition;
+  if (decoded) {
+    const kVal = sortBy === "date" ? new Date(Number(decoded.k)) : decoded.k;
+    const keyset =
+      dir === "asc"
+        ? sql`(${sortCol} > ${kVal} OR (${sortCol} = ${kVal} AND ${jobs.id} > ${decoded.id}))`
+        : sql`(${sortCol} < ${kVal} OR (${sortCol} = ${kVal} AND ${jobs.id} < ${decoded.id}))`;
+    rowCondition = and(condition, keyset);
   }
+  const effectiveOffset = decoded ? 0 : offset;
 
   const [jobRows, countResult] = await Promise.all([
     db
       .select()
       .from(jobs)
-      .where(condition)
+      .where(rowCondition)
       .orderBy(orderClause)
       .limit(limit)
-      .offset(offset),
+      .offset(effectiveOffset),
     db
       .select({ count: sql<number>`count(*)` })
       .from(jobs)
       .where(condition),
   ]);
+
+  // M5c: nextCursor when a full page came back (more may remain) — encodes the
+  // last row's sort-key value + id for the following keyset page.
+  const lastJob = jobRows[jobRows.length - 1];
+  const nextCursor =
+    jobRows.length === limit && lastJob
+      ? encodeCursor(
+          sortBy === "credits"
+            ? lastJob.creditsUsed ?? 0
+            : sortBy === "title"
+            ? lastJob.title
+            : lastJob.createdAt.getTime(),
+          lastJob.id
+        )
+      : null;
 
   // Fetch variations for all returned jobs in one query
   const jobIds = jobRows.map((j) => j.id);
@@ -438,7 +566,132 @@ export async function listTenantJobsEnhanced(
     userName: userMap[j.userId]?.name || userMap[j.userId]?.email?.split("@")[0] || "Unknown",
   }));
 
-  return { jobs: enrichedJobs, total: countResult[0]?.count ?? 0 };
+  return { jobs: enrichedJobs, total: countResult[0]?.count ?? 0, nextCursor };
+}
+
+/**
+ * Top edit type for the History tile. Prefers the denormalized `editType`
+ * column (one bucket per job, no double-count); falls back to the legacy
+ * controls-LIKE scan if the column isn't present yet (migration 0012 not
+ * applied) — so this is safe to merge ahead of `db:push`.
+ */
+async function computeTopEditType(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  tenantId: number
+): Promise<string> {
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  try {
+    const rows = await db
+      .select({ editType: jobs.editType, count: sql<number>`count(*)` })
+      .from(jobs)
+      .where(
+        and(
+          eq(jobs.tenantId, tenantId),
+          sql`${jobs.editType} IS NOT NULL`,
+          sql`${jobs.editType} <> 'none'`
+        )
+      )
+      .groupBy(jobs.editType)
+      .orderBy(sql`count(*) DESC`)
+      .limit(1);
+    if (rows.length > 0 && (rows[0].count ?? 0) > 0 && rows[0].editType) {
+      return cap(rows[0].editType);
+    }
+    return "None";
+  } catch {
+    // Legacy fallback: editType column not present yet (pre-migration). Scan the
+    // controls TEXT per single control (combined jobs are not de-duped here).
+    const types = ["recolor", "scale", "density", "remove"] as const;
+    const counts = await Promise.all(
+      types.map(async (t) => {
+        const [r] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(jobs)
+          .where(and(eq(jobs.tenantId, tenantId), sql`${jobs.controls} LIKE ${`%"${t}":%"enabled":true%`}`));
+        return { type: cap(t), count: r?.count ?? 0 };
+      })
+    );
+    counts.sort((a, b) => b.count - a.count);
+    return counts[0]?.count > 0 ? counts[0].type : "None";
+  }
+}
+
+/** Single-scan aggregate of a tenant's job stats (total / credits / done). */
+async function computeJobAggregates(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  tenantId: number
+): Promise<{ totalJobs: number; creditsSpent: number; doneJobs: number }> {
+  const [agg] = await db
+    .select({
+      totalJobs: sql<number>`count(*)`,
+      creditsSpent: sql<number>`COALESCE(SUM(${jobs.creditsUsed}), 0)`,
+      doneJobs: sql<number>`SUM(CASE WHEN ${jobs.status} = 'done' THEN 1 ELSE 0 END)`,
+    })
+    .from(jobs)
+    .where(eq(jobs.tenantId, tenantId));
+  return {
+    totalJobs: Number(agg?.totalJobs ?? 0),
+    creditsSpent: Number(agg?.creditsSpent ?? 0),
+    doneJobs: Number(agg?.doneJobs ?? 0),
+  };
+}
+
+const TENANT_STATS_FRESH_MS = 5 * 60 * 1000;
+
+/**
+ * True only for the MySQL "table doesn't exist" error (errno 1146 /
+ * ER_NO_SUCH_TABLE). Lets the rollup reader tolerate `studio_tenant_stats` not
+ * being present yet (migration 0013 not applied via db:push) while still
+ * surfacing every other DB error instead of silently swallowing it.
+ */
+function isMissingTableError(err: unknown): boolean {
+  const e = err as { code?: string; errno?: number; message?: string } | null;
+  return (
+    e?.code === "ER_NO_SUCH_TABLE" ||
+    e?.errno === 1146 ||
+    (typeof e?.message === "string" && /doesn'?t exist|no such table|ER_NO_SUCH_TABLE/i.test(e.message))
+  );
+}
+
+/**
+ * History tile aggregates served from the `studio_tenant_stats` rollup. Returns
+ * the cached row when fresh; otherwise recomputes from live data (one scan) and
+ * upserts it — O(1) reads within the freshness window, with no cron and no
+ * write-path coupling. Recomputed-from-live so it matches a live-scan oracle by
+ * construction. Falls back to a pure live aggregate if `studio_tenant_stats`
+ * isn't present yet (migration 0013 not applied) — safe to merge ahead of
+ * `db:push`.
+ */
+async function getHistoryAggregates(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  tenantId: number
+): Promise<{ totalJobs: number; creditsSpent: number; doneJobs: number }> {
+  try {
+    const [cached] = await db
+      .select({
+        totalJobs: tenantStats.totalJobs,
+        creditsSpent: tenantStats.creditsSpent,
+        doneJobs: tenantStats.doneJobs,
+        computedAt: tenantStats.computedAt,
+      })
+      .from(tenantStats)
+      .where(eq(tenantStats.tenantId, tenantId))
+      .limit(1);
+    if (cached && Date.now() - new Date(cached.computedAt).getTime() < TENANT_STATS_FRESH_MS) {
+      return { totalJobs: cached.totalJobs, creditsSpent: cached.creditsSpent, doneJobs: cached.doneJobs };
+    }
+    const agg = await computeJobAggregates(db, tenantId);
+    await db
+      .insert(tenantStats)
+      .values({ tenantId, ...agg, computedAt: new Date() })
+      .onDuplicateKeyUpdate({ set: { ...agg, computedAt: new Date() } });
+    return agg;
+  } catch (err) {
+    // Tolerate the rollup table not being present yet (pre-db:push); surface
+    // every other DB error rather than masking it behind a silent live fallback.
+    if (!isMissingTableError(err)) throw err;
+    return computeJobAggregates(db, tenantId);
+  }
 }
 
 /**
@@ -448,55 +701,15 @@ export async function getHistoryStats(tenantId: number) {
   const db = await getDb();
   if (!db) return { totalJobs: 0, creditsSpent: 0, successRate: 0, topType: "none" };
 
-  // Total jobs
-  const [totalResult] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(jobs)
-    .where(eq(jobs.tenantId, tenantId));
-  const totalJobs = totalResult?.count ?? 0;
+  // Total jobs / credits spent / done jobs — served from the studio_tenant_stats
+  // rollup (recompute-on-read when stale); falls back to a live aggregate if the
+  // rollup table isn't present yet (migration 0013 not applied).
+  const { totalJobs, creditsSpent, doneJobs } = await getHistoryAggregates(db, tenantId);
+  const successRate = totalJobs > 0 ? Math.round((doneJobs / totalJobs) * 100) : 0;
 
-  // Credits spent (all time)
-  const [creditsResult] = await db
-    .select({ total: sql<number>`COALESCE(SUM(${jobs.creditsUsed}), 0)` })
-    .from(jobs)
-    .where(eq(jobs.tenantId, tenantId));
-  const creditsSpent = creditsResult?.total ?? 0;
-
-  // Success rate
-  const [doneResult] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(jobs)
-    .where(and(eq(jobs.tenantId, tenantId), eq(jobs.status, "done")));
-  const doneCount = doneResult?.count ?? 0;
-  const successRate = totalJobs > 0 ? Math.round((doneCount / totalJobs) * 100) : 0;
-
-  // Most used edit type (parse controls JSON to determine)
-  // We'll do a simple approach: count by checking controls text patterns
-  const [recolorCount] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(jobs)
-    .where(and(eq(jobs.tenantId, tenantId), sql`${jobs.controls} LIKE '%"recolor":%"enabled":true%'`));
-  const [scaleCount] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(jobs)
-    .where(and(eq(jobs.tenantId, tenantId), sql`${jobs.controls} LIKE '%"scale":%"enabled":true%'`));
-  const [densityCount] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(jobs)
-    .where(and(eq(jobs.tenantId, tenantId), sql`${jobs.controls} LIKE '%"density":%"enabled":true%'`));
-  const [removeCount] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(jobs)
-    .where(and(eq(jobs.tenantId, tenantId), sql`${jobs.controls} LIKE '%"remove":%"enabled":true%'`));
-
-  const typeCounts = [
-    { type: "Recolor", count: recolorCount?.count ?? 0 },
-    { type: "Scale", count: scaleCount?.count ?? 0 },
-    { type: "Density", count: densityCount?.count ?? 0 },
-    { type: "Remove", count: removeCount?.count ?? 0 },
-  ];
-  typeCounts.sort((a, b) => b.count - a.count);
-  const topType = typeCounts[0]?.count > 0 ? typeCounts[0].type : "None";
+  // Top edit type — denormalized `editType` column with a legacy LIKE fallback
+  // (safe to merge ahead of `db:push`; see computeTopEditType above).
+  const topType = await computeTopEditType(db, tenantId);
 
   // Members who have generated (for the "Created by" filter)
   const memberRows = await db
@@ -560,10 +773,10 @@ export async function getVariationByResultKey(resultKey: string) {
 
 export async function listCreditLedger(
   tenantId: number,
-  opts: { limit?: number; offset?: number; reason?: string; from?: number; to?: number; search?: string; userId?: number } = {}
+  opts: { limit?: number; offset?: number; cursor?: string; reason?: string; from?: number; to?: number; search?: string; userId?: number } = {}
 ) {
   const db = await getDb();
-  if (!db) return { entries: [], total: 0 };
+  if (!db) return { entries: [], total: 0, nextCursor: null };
 
   const limit = opts.limit ?? 50;
   const offset = opts.offset ?? 0;
@@ -590,6 +803,23 @@ export async function listCreditLedger(
   }
   const condition = and(...conditions);
 
+  // M5c keyset (load-more): rows past the cursor in (createdAt, id) DESC order.
+  // Separate from `condition` so the total count ignores the cursor; a cursor
+  // pins offset to 0 (cursor and offset are mutually exclusive). Ignore a cursor
+  // whose key isn't a numeric epoch-ms (stale/tampered) so we degrade to the
+  // first page instead of new Date(NaN) / confusing empty pages.
+  const rawDecoded = opts.cursor ? decodeCursor(opts.cursor) : null;
+  const decoded = rawDecoded && typeof rawDecoded.k === "number" ? rawDecoded : null;
+  let rowCondition = condition;
+  if (decoded) {
+    const kVal = new Date(decoded.k);
+    rowCondition = and(
+      condition,
+      sql`(${creditLedger.createdAt} < ${kVal} OR (${creditLedger.createdAt} = ${kVal} AND ${creditLedger.id} < ${decoded.id}))`
+    );
+  }
+  const effectiveOffset = decoded ? 0 : offset;
+
   const [entries, countResult] = await Promise.all([
     db
       .select({
@@ -615,17 +845,25 @@ export async function listCreditLedger(
         // numeric refId collision could surface another tenant's job metadata.
         sql`${creditLedger.refId} IS NOT NULL AND ${jobs.tenantId} = ${creditLedger.tenantId} AND ${jobs.id} = CAST(REPLACE(REPLACE(${creditLedger.refId}, 'job-', ''), '-failed', '') AS UNSIGNED)`
       )
-      .where(condition)
-      .orderBy(desc(creditLedger.createdAt))
+      .where(rowCondition)
+      .orderBy(desc(creditLedger.createdAt), desc(creditLedger.id))
       .limit(limit)
-      .offset(offset),
+      .offset(effectiveOffset),
     db
       .select({ count: sql<number>`count(*)` })
       .from(creditLedger)
       .where(condition),
   ]);
 
-  return { entries, total: countResult[0]?.count ?? 0 };
+  // M5c: nextCursor when a full page came back — (createdAt ms, id) of the last
+  // entry for the following keyset page.
+  const lastEntry = entries[entries.length - 1];
+  const nextCursor =
+    entries.length === limit && lastEntry
+      ? encodeCursor(lastEntry.createdAt.getTime(), lastEntry.id)
+      : null;
+
+  return { entries, total: countResult[0]?.count ?? 0, nextCursor };
 }
 
 // ─── Favorites ──────────────────────────────────────────────────────────────

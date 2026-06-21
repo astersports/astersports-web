@@ -61,8 +61,8 @@ export default function ProvisionFirmDialog({ open, onClose }: Props) {
       name: name.trim(),
       slug: slug.trim(),
       plan,
-      seats: parseInt(seats) || 5,
-      initialCredits: parseInt(credits) || 0,
+      seats: Math.max(1, parseInt(seats) || 5),
+      initialCredits: Math.max(0, parseInt(credits) || 0),
       ownerEmail: ownerEmail.trim() || undefined,
       domainLock: domainLock.trim() || undefined,
     });
