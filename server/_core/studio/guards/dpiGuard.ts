@@ -85,7 +85,11 @@ export async function checkUpscaleDpi(
     sourceDpi = null;
   }
 
-  if (sourceDpi === null || sourceDpi <= 0) {
+  // sharp/libvips reports density 72 for images with NO embedded DPI (e.g. a JPEG
+  // without a JFIF density unit), so a literal 72 is the "unknown" sentinel, not a
+  // real basis. Treat it as unknown → warn-only, rather than hard-rejecting a
+  // legitimate upscale pre-deduct off a fabricated 72 DPI.
+  if (sourceDpi === null || sourceDpi <= 0 || sourceDpi === 72) {
     // No DPI metadata — warn-only (Decision 2: "the basis is unknown")
     return {
       reject: false,
