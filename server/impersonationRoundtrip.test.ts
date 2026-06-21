@@ -173,29 +173,45 @@ describe("impersonation round-trip (real JWT)", () => {
 });
 
 describe("tenancy middleware impersonation bypass", () => {
-  it("grants synthetic owner membership when impersonation matches tenantId", () => {
-    // Simulates the logic in tenancy.ts lines 37-59
+  it("acts as the tenant's real owner membership when impersonating", () => {
+    // Simulates tenancy.ts: impersonation mirrors the tenant's real owner row so
+    // mutations keyed on ctx.membership.id (e.g. transferOwnership's demotion)
+    // hit a real row instead of a synthetic id:-1 no-op.
     const impersonation = { adminId: 1, tenantId: 42, tenantName: "Jaya" };
     const inputTenantId = 42;
-    const tenant = { id: 42, name: "Jaya", slug: "jaya" };
-    const userId = 1;
+    const ownerMembership = {
+      id: 77,
+      userId: 9,
+      tenantId: 42,
+      role: "owner" as const,
+      status: "active" as const,
+      invitedEmail: null,
+      createdAt: new Date(),
+    };
 
-    // The middleware check
     if (impersonation && impersonation.tenantId === inputTenantId) {
-      const syntheticMembership = {
+      const membership = ownerMembership ?? {
         id: -1,
-        userId,
-        tenantId: tenant.id,
+        userId: 1,
+        tenantId: 42,
         role: "owner" as const,
         status: "active" as const,
+        invitedEmail: null,
         createdAt: new Date(),
-        updatedAt: new Date(),
       };
 
-      expect(syntheticMembership.role).toBe("owner");
-      expect(syntheticMembership.tenantId).toBe(42);
-      expect(syntheticMembership.id).toBe(-1); // Synthetic marker
+      expect(membership.role).toBe("owner");
+      expect(membership.tenantId).toBe(42);
+      expect(membership.id).toBe(77); // real owner row, not synthetic -1
     }
+  });
+
+  it("falls back to a synthetic owner row when the tenant has no active owner", () => {
+    const ownerMembership: { id: number; role: "owner" } | undefined = undefined;
+    const membership = ownerMembership ?? { id: -1, role: "owner" as const };
+
+    expect(membership.id).toBe(-1);
+    expect(membership.role).toBe("owner");
   });
 
   it("does NOT bypass when impersonation tenantId does not match input", () => {

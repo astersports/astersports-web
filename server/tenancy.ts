@@ -35,22 +35,41 @@ export const tenantProcedure = protectedProcedure
     // Check for server-side impersonation cookie
     const impersonation = await getImpersonationFromRequest(ctx.req);
     if (impersonation && impersonation.tenantId === input.tenantId) {
-      // Super_admin impersonating this tenant — grant synthetic owner membership
-      const syntheticMembership = {
+      // Super_admin impersonating this tenant — act AS the tenant's real owner.
+      // Mirroring the real owner row (not a synthetic id:-1) means mutations
+      // keyed on ctx.membership.id — notably transferOwnership's current-owner
+      // demotion — operate on a real row instead of no-op'ing and leaving the
+      // tenant with two owners.
+      const [ownerMembership] = await db
+        .select()
+        .from(memberships)
+        .where(
+          and(
+            eq(memberships.tenantId, tenant.id),
+            eq(memberships.role, "owner"),
+            eq(memberships.status, "active")
+          )
+        )
+        .limit(1);
+
+      // Fallback to a synthetic owner row only when the tenant has no active
+      // owner (shouldn't happen for a provisioned tenant) so read access still
+      // works; there is simply no real owner to demote on transfer in that case.
+      const membership = ownerMembership ?? {
         id: -1,
         userId: ctx.user.id,
         tenantId: tenant.id,
         role: "owner" as const,
         status: "active" as const,
+        invitedEmail: null,
         createdAt: new Date(),
-        updatedAt: new Date(),
       };
 
       return next({
         ctx: {
           ...ctx,
           tenant,
-          membership: syntheticMembership,
+          membership,
           isImpersonating: true,
           impersonationAdminId: impersonation.adminId,
         },
