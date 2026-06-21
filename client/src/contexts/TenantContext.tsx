@@ -16,6 +16,7 @@ interface TenantWithRole {
   slug: string;
   categoryId: number;
   plan: string;
+  type: "firm" | "individual";
   creditBalance: number;
   seats: number;
   allowedEmailDomain: string | null;
@@ -86,6 +87,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       slug: "",
       categoryId: 0,
       plan: "",
+      type: "firm",
       creditBalance: 0,
       seats: 0,
       allowedEmailDomain: null,
