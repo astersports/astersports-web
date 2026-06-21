@@ -86,6 +86,14 @@ async function consumeSSEStream(
       }
     }
   }
+
+  // The loop exits here only when the reader closes WITHOUT a terminal
+  // `done`/`error` event (server crash, container kill, half-open response) and
+  // the caller did not intentionally abort. Surface an error so the UI does not
+  // hang in the "processing" state forever.
+  if (!abortRef.aborted) {
+    callbacks.onError({ message: "Connection closed before the job finished. Please try again." });
+  }
 }
 
 export function useGenerateStream(callbacks: StreamCallbacks) {

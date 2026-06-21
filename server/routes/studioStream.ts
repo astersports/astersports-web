@@ -98,8 +98,13 @@ export function registerStudioStreamRoutes(app: Express) {
     }
 
     // ─── 2. Parse body ─────────────────────────────────────────────────────────
-    const { tenantId, jobId, controls: rawControls } = req.body ?? {};
-    if (!tenantId || !jobId) {
+    const body = req.body ?? {};
+    // Coerce to numbers up-front: the tenant-scoping check below compares against
+    // numeric `job.tenantId`, so a string id (e.g. "1") would make `!==` unreliable.
+    const tenantId = Number(body.tenantId);
+    const jobId = Number(body.jobId);
+    const rawControls = body.controls;
+    if (!Number.isInteger(tenantId) || !Number.isInteger(jobId)) {
       res.status(400).json({ error: "Missing tenantId or jobId" });
       return;
     }
@@ -267,17 +272,30 @@ export function registerStudioStreamRoutes(app: Express) {
       scale: useDeterministicScale,
     };
 
+    // Hard wall-clock cap so a hung mask provider / sharp call can't heartbeat
+    // forever without settling. On timeout we fall into the catch below, which
+    // refunds and marks the job failed — the same path as any other failure.
+    const GENERATION_TIMEOUT_MS = 180_000;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
-      const result = await runVariation({
-        controls,
-        originalUrl: job.originalUrl,
-        tenantId: tenant.id,
-        jobId: job.id,
-        instruction,
-        expectation,
-        round: 1,
-        mode,
-      });
+      const result = await Promise.race([
+        runVariation({
+          controls,
+          originalUrl: job.originalUrl,
+          tenantId: tenant.id,
+          jobId: job.id,
+          instruction,
+          expectation,
+          round: 1,
+          mode,
+        }),
+        new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(
+            () => reject(new Error("Generation timed out")),
+            GENERATION_TIMEOUT_MS
+          );
+        }),
+      ]);
 
       await updateJobStatus(job.id, "done", { creditsUsed: creditCost });
 
@@ -312,6 +330,7 @@ export function registerStudioStreamRoutes(app: Express) {
       }, finished);
     } finally {
       // Cleanup
+      if (timeoutId) clearTimeout(timeoutId);
       clearInterval(heartbeatInterval);
       finished.value = true;
       if (!res.writableEnded) {
