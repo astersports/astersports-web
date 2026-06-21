@@ -4,7 +4,7 @@
  * count accuracy (R1), survivor integrity, infill, and bg-excluded-from-pass.
  */
 import { describe, it, expect } from "vitest";
-import { computeDensityMetrics, densityVerdict, type DensityMetricInput } from "./_core/studio/eval/densityMetrics";
+import { computeDensityMetrics, densityVerdict, computeNNI, type DensityMetricInput, type DensityMetrics } from "./_core/studio/eval/densityMetrics";
 
 const W = 96, H = 96, P = 12, OFF = 6, N = 8, R = 3;
 const MOTIF = [200, 80, 90];
@@ -130,5 +130,81 @@ describe("computeDensityMetrics", () => {
     expect(m.nniDispersion).toBeLessThan(1.0);
     const v = densityVerdict(m);
     expect(v.nniPass).toBe(false);
+  });
+});
+
+describe("computeNNI — true fabric-mask perimeter (Change A)", () => {
+  // A solid NON-square rectangle, inset from the image edges so its exposed-edge
+  // perimeter is exactly 2·RW + 2·RH — hand-computable and != 4·√A.
+  const IW = 64, IH = 64, RX = 2, RY = 2, RW = 40, RH = 8;
+  const mask = new Uint8Array(IW * IH);
+  for (let y = RY; y < RY + RH; y++) for (let x = RX; x < RX + RW; x++) mask[y * IW + x] = 1;
+  const area = RW * RH;                       // 320
+  const truePerimeter = 2 * RW + 2 * RH;      // 96 (exposed-edge length of a solid rect)
+  const sqApprox = 4 * Math.sqrt(area);       // ~71.55
+
+  // Two centroids 20px apart -> observed mean NN distance = 20.
+  const pts: Array<[number, number]> = [[RX + 5, RY + 4], [RX + 25, RY + 4]];
+
+  // NNI under a given perimeter, recomputed from the same Clark-Evans + Donnelly formula.
+  const expectedNNI = (perimeter: number) => {
+    const n = 2, observedMean = 20;
+    const expectedBase = 1 / (2 * Math.sqrt(n / area));
+    const donnelly = (0.0514 + 0.041 / Math.sqrt(n)) * perimeter / n;
+    return observedMean / (expectedBase + donnelly);
+  };
+
+  it("uses the true boundary perimeter, not the 4·√A square approximation", () => {
+    expect(truePerimeter).not.toBeCloseTo(sqApprox, 0); // 92 != 71.55 — the masks differ
+    const got = computeNNI(pts, mask, IW, IH);
+    expect(got).toBeCloseTo(expectedNNI(truePerimeter), 4);             // matches true-P formula
+    expect(Math.abs(got - expectedNNI(truePerimeter)))
+      .toBeLessThan(Math.abs(got - expectedNNI(sqApprox)));             // not the 4·√A value
+  });
+
+  it("shifts NNI in the stricter (smaller) direction vs the old approximation", () => {
+    // true P (92) > 4·√A (71.55) -> larger Donnelly term -> larger expected -> smaller NNI.
+    expect(computeNNI(pts, mask, IW, IH)).toBeLessThan(expectedNNI(sqApprox));
+  });
+});
+
+describe("densityVerdict — NNI band gate (Change B), non-regressive by default", () => {
+  // Metrics that pass every gate except (optionally) NNI, so v.pass tracks the band.
+  const m = (nni: number): DensityMetrics => ({
+    measuredRemoval: 0.25, countError: 0, survivorIntegrity: 0, evenness: 0,
+    nniDispersion: nni, infillCleanliness: 0, bgDeltaE: 0,
+    totalInstances: 64, removedInstances: 16,
+  });
+
+  it("CSR-ish (R≈1) passes with defaults", () => {
+    expect(densityVerdict(m(1.0)).nniPass).toBe(true);
+    expect(densityVerdict(m(1.0)).pass).toBe(true);
+  });
+
+  it("near-lattice (R≈2.1) PASSES with default nniMax=Infinity (regression guard)", () => {
+    expect(densityVerdict(m(2.1)).nniPass).toBe(true);
+    expect(densityVerdict(m(5.0)).nniPass).toBe(true); // no upper cap by default at all
+  });
+
+  it("near-lattice (R≈2.1) FAILS once nniMax is capped below it", () => {
+    expect(densityVerdict(m(2.1), { nniMax: 1.9 }).nniPass).toBe(false);
+    expect(densityVerdict(m(2.1), { nniMax: 1.9 }).pass).toBe(false);
+  });
+
+  it("clustered (R<1) fails on the floor", () => {
+    expect(densityVerdict(m(0.8)).nniPass).toBe(false);
+  });
+
+  it("nniMin raises the floor; legacy nniDispersion still works as the lower bound", () => {
+    expect(densityVerdict(m(1.2)).nniPass).toBe(true);                       // default floor 1.0
+    expect(densityVerdict(m(1.2), { nniMin: 1.5 }).nniPass).toBe(false);     // raised floor
+    expect(densityVerdict(m(1.2), { nniDispersion: 1.5 }).nniPass).toBe(false); // back-compat key
+  });
+
+  it("band gate: even-but-not-crystalline window passes, both extremes fail", () => {
+    const band = { nniMin: 1.0, nniMax: 1.9 };
+    expect(densityVerdict(m(1.4), band).nniPass).toBe(true);  // even
+    expect(densityVerdict(m(0.8), band).nniPass).toBe(false); // clustered
+    expect(densityVerdict(m(2.1), band).nniPass).toBe(false); // lattice
   });
 });
