@@ -137,7 +137,9 @@ type ViewMode = "chronological" | "by-member";
 
 export default function CreditLedger() {
   const { tenant } = useTenant();
+  const utils = trpc.useUtils();
   const [page, setPage] = useState(0);
+  const [isExporting, setIsExporting] = useState(false);
   const [filter, setFilter] = useState<ReasonFilter>("all");
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [searchInput, setSearchInput] = useState("");
@@ -196,6 +198,54 @@ export default function CreditLedger() {
     }
     return groups;
   }, [entries]);
+
+  // Export the FULL filtered set (not just the visible page) by paging through
+  // the server with the active filters, then build one CSV.
+  async function handleExportAll() {
+    if (!tenant || isExporting) return;
+    setIsExporting(true);
+    try {
+      const EXPORT_PAGE = 100;
+      const MAX_ROWS = 50_000; // safety cap against a runaway export
+      const all: any[] = [];
+      let offset = 0;
+      let total = Infinity;
+      while (offset < total && all.length < MAX_ROWS) {
+        const res = await utils.studio.creditLedger.fetch({
+          tenantId: tenant.id,
+          limit: EXPORT_PAGE,
+          offset,
+          reason: filter === "all" ? undefined : filter,
+          from: rangeMs.from,
+          to: rangeMs.to,
+          search: searchQuery || undefined,
+        });
+        total = res.total;
+        all.push(...res.entries);
+        if (res.entries.length < EXPORT_PAGE) break;
+        offset += EXPORT_PAGE;
+      }
+      if (all.length === 0) return;
+      const rows = all.map((e) => ({
+        Date: new Date(e.createdAt).toISOString(),
+        Type: REASON_LABELS[e.reason] || e.reason,
+        Reference: e.refId || e.note || "",
+        Amount: e.delta,
+        Balance: e.balanceAfter,
+      }));
+      const header = Object.keys(rows[0]).join(",");
+      const csv = [header, ...rows.map((r) => Object.values(r).map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))].join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `credit-ledger-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   if (isLoading && viewMode === "chronological") {
     return (
@@ -314,6 +364,8 @@ export default function CreditLedger() {
           expandedId={expandedId}
           setExpandedId={setExpandedId}
           total={data?.total ?? 0}
+          onExport={handleExportAll}
+          isExporting={isExporting}
         />
       ) : (
         <MemberGroupView tenantId={tenant?.id ?? 0} />
@@ -339,6 +391,8 @@ function ChronologicalView({
   expandedId,
   setExpandedId,
   total,
+  onExport,
+  isExporting,
 }: {
   entries: any[];
   grouped: Record<string, any[]>;
@@ -354,6 +408,8 @@ function ChronologicalView({
   expandedId: number | null;
   setExpandedId: (id: number | null) => void;
   total: number;
+  onExport: () => void;
+  isExporting: boolean;
 }) {
   return (
     <>
@@ -403,27 +459,14 @@ function ChronologicalView({
           <Button
             variant="outline"
             size="sm"
-            disabled={entries.length === 0}
-            onClick={() => {
-              const rows = entries.map((e) => ({
-                Date: new Date(e.createdAt).toISOString(),
-                Type: REASON_LABELS[e.reason] || e.reason,
-                Reference: e.refId || e.note || "",
-                Amount: e.delta,
-                Balance: e.balanceAfter,
-              }));
-              const header = Object.keys(rows[0] || {}).join(",");
-              const csv = [header, ...rows.map((r) => Object.values(r).map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))].join("\n");
-              const blob = new Blob([csv], { type: "text/csv" });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = `credit-ledger-${new Date().toISOString().slice(0, 10)}.csv`;
-              a.click();
-              URL.revokeObjectURL(url);
-            }}
+            disabled={total === 0 || isExporting}
+            onClick={onExport}
           >
-            <Download className="w-4 h-4 mr-1" />
+            {isExporting ? (
+              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4 mr-1" />
+            )}
             Export CSV
           </Button>
         </div>

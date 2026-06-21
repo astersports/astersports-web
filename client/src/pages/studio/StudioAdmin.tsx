@@ -4,6 +4,7 @@
  * invite with domain lock, transfer ownership.
  */
 import { useState } from "react";
+import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useTenant } from "@/contexts/TenantContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,6 +48,29 @@ export default function StudioAdmin() {
         <p className="text-muted-foreground mt-2">
           This page is restricted to account admins and owners.
         </p>
+      </div>
+    );
+  }
+
+  // Single-seat individual accounts have no team to manage. Plan, balance, and
+  // usage live on Billing/History — so the org admin surface doesn't apply.
+  if (tenant.type === "individual") {
+    return (
+      <div className="max-w-2xl mx-auto py-12 text-center">
+        <CreditCard className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+        <h2 className="text-xl font-semibold">Individual account</h2>
+        <p className="text-muted-foreground mt-2">
+          This is a single-seat account, so there's no team to manage. Your plan,
+          credit balance, and usage live on the Billing and History pages.
+        </p>
+        <div className="mt-6 flex items-center justify-center gap-3">
+          <Link href="/studio/billing">
+            <Button>Go to Billing</Button>
+          </Link>
+          <Link href="/studio/history">
+            <Button variant="outline">View History</Button>
+          </Link>
+        </div>
       </div>
     );
   }

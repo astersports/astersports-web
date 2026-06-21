@@ -32,6 +32,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { tenant, tenants, setActiveTenant } = useTenant();
   const { user } = useAuth();
   const isAdmin = tenant?.role === "owner" || tenant?.role === "admin";
+  // Individual (single-seat) accounts have no team to manage — hide the Admin tab.
+  const isIndividual = tenant?.type === "individual";
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
@@ -68,7 +70,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Navigation */}
         <nav className="flex-1 p-3 space-y-1">
-          {NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin).map((item) => {
+          {NAV_ITEMS.filter((item) => !item.adminOnly || (isAdmin && !isIndividual)).map((item) => {
             const isActive = location === item.href || (item.href !== "/studio" && location.startsWith(item.href));
             const Icon = item.icon;
             return (
@@ -127,7 +129,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           )}
         </div>
         <nav className="flex border-t border-border overflow-x-auto">
-          {NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin).map((item) => {
+          {NAV_ITEMS.filter((item) => !item.adminOnly || (isAdmin && !isIndividual)).map((item) => {
             const isActive = location === item.href || (item.href !== "/studio" && location.startsWith(item.href));
             const Icon = item.icon;
             return (
