@@ -151,6 +151,7 @@ export default function BeforeAfter({ beforeUrl, afterUrl, onDownload }: Props) 
             className="h-8 w-8 bg-card"
             onClick={zoomOut}
             disabled={zoom <= MIN_ZOOM}
+            aria-label="Zoom out"
           >
             <ZoomOut className="h-4 w-4" />
           </Button>
@@ -163,6 +164,7 @@ export default function BeforeAfter({ beforeUrl, afterUrl, onDownload }: Props) 
             className="h-8 w-8 bg-card"
             onClick={zoomIn}
             disabled={zoom >= MAX_ZOOM}
+            aria-label="Zoom in"
           >
             <ZoomIn className="h-4 w-4" />
           </Button>
@@ -172,6 +174,7 @@ export default function BeforeAfter({ beforeUrl, afterUrl, onDownload }: Props) 
             className="h-8 w-8 bg-card ml-1"
             onClick={resetView}
             disabled={zoom === 1}
+            aria-label="Reset zoom"
           >
             <Maximize2 className="h-4 w-4" />
           </Button>
