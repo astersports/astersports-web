@@ -19,6 +19,7 @@ import {
 import { hexToLab } from "./_core/studio/ops/color";
 import { CREDIT_COST, PLANS, TOPUP_PACKS } from "../shared/billing";
 import { emailAllowedForDomain } from "../shared/domain";
+import { toJobsBooleanQuery } from "./studioDb";
 
 describe("buildInstruction", () => {
   it("returns unchanged instruction when no controls enabled", () => {
@@ -355,6 +356,32 @@ describe("deriveEditType", () => {
       variations: 1,
     };
     expect(deriveEditType(c)).toBe("mixed");
+  });
+});
+
+describe("toJobsBooleanQuery (M5d)", () => {
+  it("requires each token as a prefix match", () => {
+    expect(toJobsBooleanQuery("red shirt")).toBe("+red* +shirt*");
+  });
+
+  it("tokenizes on non-alphanumerics and is Unicode-aware", () => {
+    expect(toJobsBooleanQuery("logo-front, café")).toBe("+logo* +front* +café*");
+  });
+
+  it("strips FULLTEXT boolean operators so input can't inject syntax", () => {
+    // The +, -, (, ), <, >, ~, *, " operators are dropped by tokenization.
+    expect(toJobsBooleanQuery('-red +(shirt) "logo*"')).toBe("+red* +shirt* +logo*");
+  });
+
+  it("returns null for empty / punctuation-only queries (caller uses LIKE)", () => {
+    expect(toJobsBooleanQuery("")).toBeNull();
+    expect(toJobsBooleanQuery("  -+() ")).toBeNull();
+  });
+
+  it("returns null when any token is shorter than the min indexed length", () => {
+    // "of" (< 3 chars) isn't indexable; fall back to LIKE so it still matches.
+    expect(toJobsBooleanQuery("of red")).toBeNull();
+    expect(toJobsBooleanQuery("ab")).toBeNull();
   });
 });
 
