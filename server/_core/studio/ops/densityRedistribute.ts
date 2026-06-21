@@ -246,6 +246,9 @@ export async function densityRedistribute(input: RedistributeInput): Promise<Red
         const sx = bb.x0 + x, sy = bb.y0 + y;
         const dX = sx + dx, dY = sy + dy;
         if (dX < 0 || dX >= width || dY < 0 || dY >= height) continue;
+        // Clip to the fabric raster: a survivor relocated near the garment edge
+        // must never paint motif pixels onto the background outside the fabric.
+        if (raster.data[dY * width + dX] <= 127) continue;
         const sp = (sy * width + sx) * 4;
         const dp = (dY * width + dX) * 4;
         out[dp] = Math.round(out[dp] * (1 - sa) + buffer[sp] * sa);

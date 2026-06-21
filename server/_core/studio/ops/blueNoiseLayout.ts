@@ -121,8 +121,10 @@ export function blueNoiseLayout(
     x1: (fabricBbox.x + fabricBbox.w) * w,
     y1: (fabricBbox.y + fabricBbox.h) * h,
   };
-  const bw = Math.max(1, pb.x1 - pb.x0);
-  const bh = Math.max(1, pb.y1 - pb.y0);
+  // pb is an INCLUSIVE pixel bbox (x1/y1 are the last included pixel), so width/
+  // height are +1. (Omitting it made the inset region 1px short per axis.)
+  const bw = Math.max(1, pb.x1 - pb.x0 + 1);
+  const bh = Math.max(1, pb.y1 - pb.y0 + 1);
   const ix0 = pb.x0 + bw * margin;
   const iy0 = pb.y0 + bh * margin;
   const iw = Math.max(1, bw * (1 - 2 * margin));
