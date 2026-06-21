@@ -218,6 +218,10 @@ export const jobs = mysqlTable("studio_jobs", {
   detectedElements: text("detectedElements"),
   /** JSON of last-used ControlSettings. */
   controls: text("controls"),
+  /** Denormalized edit category derived from controls at write time:
+   *  'recolor'|'scale'|'density'|'remove'|'mixed'|'none'. Powers the History
+   *  "Top Edit Type" tile without scanning the controls TEXT column. */
+  editType: varchar("editType", { length: 16 }),
   /** Natural-language instruction sent to AI. */
   instruction: text("instruction"),
   status: mysqlEnum("status", ["pending", "processing", "done", "failed"]).default("pending").notNull(),

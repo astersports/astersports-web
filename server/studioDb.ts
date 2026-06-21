@@ -291,7 +291,7 @@ export async function createJob(data: InsertJob) {
 export async function updateJobStatus(
   jobId: number,
   status: "pending" | "processing" | "done" | "failed",
-  extra?: { instruction?: string; creditsUsed?: number; controls?: string; detectedElements?: string; errorMessage?: string }
+  extra?: { instruction?: string; creditsUsed?: number; controls?: string; detectedElements?: string; errorMessage?: string; editType?: string }
 ) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -442,6 +442,53 @@ export async function listTenantJobsEnhanced(
 }
 
 /**
+ * Top edit type for the History tile. Prefers the denormalized `editType`
+ * column (one bucket per job, no double-count); falls back to the legacy
+ * controls-LIKE scan if the column isn't present yet (migration 0012 not
+ * applied) — so this is safe to merge ahead of `db:push`.
+ */
+async function computeTopEditType(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  tenantId: number
+): Promise<string> {
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  try {
+    const rows = await db
+      .select({ editType: jobs.editType, count: sql<number>`count(*)` })
+      .from(jobs)
+      .where(
+        and(
+          eq(jobs.tenantId, tenantId),
+          sql`${jobs.editType} IS NOT NULL`,
+          sql`${jobs.editType} <> 'none'`
+        )
+      )
+      .groupBy(jobs.editType)
+      .orderBy(sql`count(*) DESC`)
+      .limit(1);
+    if (rows.length > 0 && (rows[0].count ?? 0) > 0 && rows[0].editType) {
+      return cap(rows[0].editType);
+    }
+    return "None";
+  } catch {
+    // Legacy fallback: editType column not present yet (pre-migration). Scan the
+    // controls TEXT per single control (combined jobs are not de-duped here).
+    const types = ["recolor", "scale", "density", "remove"] as const;
+    const counts = await Promise.all(
+      types.map(async (t) => {
+        const [r] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(jobs)
+          .where(and(eq(jobs.tenantId, tenantId), sql`${jobs.controls} LIKE ${`%"${t}":%"enabled":true%`}`));
+        return { type: cap(t), count: r?.count ?? 0 };
+      })
+    );
+    counts.sort((a, b) => b.count - a.count);
+    return counts[0]?.count > 0 ? counts[0].type : "None";
+  }
+}
+
+/**
  * Get summary stats for the History page dashboard cards.
  */
 export async function getHistoryStats(tenantId: number) {
@@ -470,33 +517,9 @@ export async function getHistoryStats(tenantId: number) {
   const doneCount = doneResult?.count ?? 0;
   const successRate = totalJobs > 0 ? Math.round((doneCount / totalJobs) * 100) : 0;
 
-  // Most used edit type (parse controls JSON to determine)
-  // We'll do a simple approach: count by checking controls text patterns
-  const [recolorCount] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(jobs)
-    .where(and(eq(jobs.tenantId, tenantId), sql`${jobs.controls} LIKE '%"recolor":%"enabled":true%'`));
-  const [scaleCount] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(jobs)
-    .where(and(eq(jobs.tenantId, tenantId), sql`${jobs.controls} LIKE '%"scale":%"enabled":true%'`));
-  const [densityCount] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(jobs)
-    .where(and(eq(jobs.tenantId, tenantId), sql`${jobs.controls} LIKE '%"density":%"enabled":true%'`));
-  const [removeCount] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(jobs)
-    .where(and(eq(jobs.tenantId, tenantId), sql`${jobs.controls} LIKE '%"remove":%"enabled":true%'`));
-
-  const typeCounts = [
-    { type: "Recolor", count: recolorCount?.count ?? 0 },
-    { type: "Scale", count: scaleCount?.count ?? 0 },
-    { type: "Density", count: densityCount?.count ?? 0 },
-    { type: "Remove", count: removeCount?.count ?? 0 },
-  ];
-  typeCounts.sort((a, b) => b.count - a.count);
-  const topType = typeCounts[0]?.count > 0 ? typeCounts[0].type : "None";
+  // Top edit type — denormalized `editType` column with a legacy LIKE fallback
+  // (safe to merge ahead of `db:push`; see computeTopEditType above).
+  const topType = await computeTopEditType(db, tenantId);
 
   // Members who have generated (for the "Created by" filter)
   const memberRows = await db

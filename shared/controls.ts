@@ -316,3 +316,23 @@ export function computeCredits(
   const extra = Math.max(0, c.variations - 1) * costs.extraVariation;
   return base + extra;
 }
+
+/**
+ * Single denormalized edit category for a job, derived from its controls.
+ * One bucket per job — combined edits collapse to 'mixed' so History's
+ * "Top Edit Type" never double-counts. Matches the legacy `.enabled` LIKE
+ * semantics it replaces; returns 'none' when no control is enabled.
+ */
+export function deriveEditType(
+  c: ControlSettings
+): "recolor" | "scale" | "density" | "remove" | "mixed" | "none" {
+  const active = [
+    c.recolor.enabled && "recolor",
+    c.scale.enabled && "scale",
+    c.density.enabled && "density",
+    c.remove.enabled && "remove",
+  ].filter(Boolean) as Array<"recolor" | "scale" | "density" | "remove">;
+  if (active.length === 0) return "none";
+  if (active.length > 1) return "mixed";
+  return active[0];
+}

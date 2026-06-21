@@ -30,7 +30,7 @@ import {
   analyzeTrialUsage,
   getHistoryStats,
 } from "../studioDb";
-import { buildInstruction, computeCredits, describeExpectedChange, resolveTargetColorHex, type ControlSettings } from "../../shared/controls";
+import { buildInstruction, computeCredits, deriveEditType, describeExpectedChange, resolveTargetColorHex, type ControlSettings } from "../../shared/controls";
 import { CREDIT_COST, LOW_BALANCE_THRESHOLD, PLANS, TRIAL_DURATION_DAYS, TRIAL_RECOMMENDATION_START_DAY } from "../../shared/billing";
 import { sanitizeElementName, sanitizeColorValue, sanitizeFileName, MAX_ELEMENT_NAME_LENGTH } from "../../shared/sanitize";
 
@@ -336,6 +336,7 @@ export const studioRouter = router({
         instruction,
         controls: JSON.stringify(controls),
         creditsUsed: creditCost,
+        editType: deriveEditType(controls),
       });
 
       // (Density/scale returned `async` above and run via the SSE endpoint — no
@@ -616,6 +617,7 @@ export const studioRouter = router({
         instruction,
         creditsUsed: cost,
         status: "processing",
+        editType: deriveEditType(controls),
       });
 
       // Deduct credits against the new job id (unique per attempt).
