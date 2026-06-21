@@ -288,6 +288,23 @@ export type JobFavorite = typeof jobFavorites.$inferSelect;
 export type InsertJobFavorite = typeof jobFavorites.$inferInsert;
 
 /**
+ * Per-tenant rollup of History dashboard aggregates (total jobs, credits spent,
+ * done jobs). Recomputed from `studio_jobs` on read when stale — no cron, no
+ * write-path coupling; the tile reader falls back to a live aggregate if this
+ * table isn't present yet.
+ */
+export const tenantStats = mysqlTable("studio_tenant_stats", {
+  tenantId: int("tenantId").primaryKey(),
+  totalJobs: int("totalJobs").default(0).notNull(),
+  creditsSpent: int("creditsSpent").default(0).notNull(),
+  doneJobs: int("doneJobs").default(0).notNull(),
+  computedAt: timestamp("computedAt").defaultNow().notNull(),
+});
+
+export type TenantStats = typeof tenantStats.$inferSelect;
+export type InsertTenantStats = typeof tenantStats.$inferInsert;
+
+/**
  * Server-side structured logs for production debugging.
  * Captures generation pipeline events, errors, and audit trail.
  */
