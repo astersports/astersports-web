@@ -85,6 +85,13 @@
       "when": 1782009372022,
       "tag": "0011_kind_dakota_north",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1782071512371,
+      "tag": "0012_moaning_lady_mastermind",
+      "breakpoints": true
     }
   ]
 }

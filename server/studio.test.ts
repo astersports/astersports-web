@@ -8,6 +8,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildInstruction,
   computeCredits,
+  deriveEditType,
   defaultControls,
   describeExpectedChange,
   resolveTargetColorHex,
@@ -331,6 +332,29 @@ describe("computeCredits", () => {
     const cost = computeCredits(controls, CREDIT_COST);
     // combined (15) + 1 extra * 10 = 25
     expect(cost).toBe(CREDIT_COST.combinedControls + 1 * CREDIT_COST.extraVariation);
+  });
+});
+
+describe("deriveEditType", () => {
+  it("returns 'none' when no control is enabled", () => {
+    expect(deriveEditType(defaultControls())).toBe("none");
+  });
+
+  it("returns the single enabled control", () => {
+    const c = defaultControls();
+    c.recolor.enabled = true;
+    expect(deriveEditType(c)).toBe("recolor");
+  });
+
+  it("returns 'mixed' when more than one control is enabled (one bucket, no double-count)", () => {
+    const c: ControlSettings = {
+      scale: { enabled: true, percent: 20 },
+      density: { enabled: true, percent: 30 },
+      remove: { enabled: false, element: "", percent: 0 },
+      recolor: { enabled: false, element: "", targetColor: "", coverage: 100 },
+      variations: 1,
+    };
+    expect(deriveEditType(c)).toBe("mixed");
   });
 });
 
