@@ -188,8 +188,6 @@ describe("tenancy middleware impersonation bypass", () => {
         tenantId: tenant.id,
         role: "owner" as const,
         status: "active" as const,
-        isUser: true,
-        isAdmin: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       };

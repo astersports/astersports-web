@@ -208,6 +208,7 @@ export const studioBillingRouter = router({
       role,
       isOwner,
       plan: ctx.tenant.plan,
+      type: ctx.tenant.type,
       creditBalance: ctx.tenant.creditBalance,
       seats: ctx.tenant.seats,
       stripeCustomerId: ctx.tenant.stripeCustomerId,
