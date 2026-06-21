@@ -178,6 +178,24 @@ export async function deductCredits(
   if (!db) throw new Error("DB unavailable");
 
   return db.transaction(async (tx) => {
+    // Idempotent on (refId, reason), mirroring grantCredits. A retry of the same
+    // deduct (e.g. a client re-submitting `job-<id>` after a network timeout, or
+    // the tRPC+SSE paths colliding) must not debit twice. If a ledger row already
+    // exists for this (refId, reason), return the current balance unchanged. The
+    // unique (refId, reason) index is the hard backstop; this check turns a retry
+    // into a clean no-op instead of a dup-key error / stuck job.
+    if (refId) {
+      const [existing] = await tx
+        .select({ id: creditLedger.id })
+        .from(creditLedger)
+        .where(and(eq(creditLedger.refId, refId), eq(creditLedger.reason, reason)))
+        .limit(1);
+      if (existing) {
+        const [t] = await tx.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+        return t?.creditBalance ?? 0;
+      }
+    }
+
     // Atomic conditional debit: succeeds only if the balance is still sufficient.
     // The row lock serializes concurrent generates on the same tenant.
     const res = await tx
