@@ -50,6 +50,9 @@ export const tenantProcedure = protectedProcedure
             eq(memberships.status, "active")
           )
         )
+        // Deterministic if a tenant somehow has >1 active owner (legacy data
+        // from the very bug this fixes): always mirror the earliest (lowest id).
+        .orderBy(memberships.id)
         .limit(1);
 
       // Fallback to a synthetic owner row only when the tenant has no active
