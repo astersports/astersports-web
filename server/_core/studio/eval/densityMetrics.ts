@@ -38,7 +38,9 @@ export interface DensityThresholds {
   countError?: number;        // default 0.10
   survivorIntegrity?: number; // default 2
   evenness?: number;          // default 1.5 (index of dispersion)
-  nniDispersion?: number;     // default 1.0 (R >= 1 means dispersed)
+  nniDispersion?: number;     // default 1.0 (R >= 1 means dispersed) — back-compat lower bound
+  nniMin?: number;            // default 1.0  (R >= 1 means dispersed, not clustered)
+  nniMax?: number;            // default Infinity (no cap → preserves today's floor-only behavior)
   infillCleanliness?: number; // default 2.5 (× ground baseline)
   bgDeltaE?: number;          // default 2
   removedTau?: number;        // default 5 — ΔE to ground that counts a motif "erased"
@@ -132,7 +134,7 @@ function meanGradient(buf: Buffer, w: number, h: number, pixels: number[] | null
  * R = observedMeanNN / expectedMeanNN. R=1 random, R>1 dispersed, R<1 clustered.
  * Returns 1.0 (neutral) when fewer than 2 points exist.
  */
-function computeNNI(
+export function computeNNI(
   centroids: Array<[number, number]>,
   fabricMask: Uint8Array,
   width: number,
@@ -166,10 +168,28 @@ function computeNNI(
   // Expected mean NN distance for a random pattern in area A with n points:
   // E(r) = 1 / (2 * sqrt(density)) where density = n / A
   // Donnelly correction adds boundary term: + (0.0514 + 0.041/sqrt(n)) * P/n
-  // We approximate perimeter P from fabric area as P ≈ 4 * sqrt(A) (square approx)
   const density = n / fabricArea;
   const expectedBase = 1 / (2 * Math.sqrt(density));
-  const perimeter = 4 * Math.sqrt(fabricArea); // approximate
+
+  // True window perimeter P: fabric pixels touching non-fabric or the image edge
+  // (4-connected). Replaces the square approximation 4·√A; Donnelly's P is the
+  // study-window perimeter, and the fabric mask IS that window. 4·√A is the
+  // MINIMUM-perimeter (square/near-circular) assumption — it undersizes P for
+  // irregular silhouettes, undersizing the Donnelly term and OVERsizing NNI (gate
+  // too lenient). Counting the real boundary removes that bias.
+  let perimeter = 0;
+  for (let i = 0; i < fabricMask.length; i++) {
+    if (!fabricMask[i]) continue;
+    const x = i % width, y = (i / width) | 0;
+    const up = y > 0          ? fabricMask[i - width] : 0;
+    const dn = y < height - 1 ? fabricMask[i + width] : 0;
+    const lf = x > 0          ? fabricMask[i - 1]     : 0;
+    const rt = x < width - 1  ? fabricMask[i + 1]     : 0;
+    if (!up || !dn || !lf || !rt) perimeter++;
+  }
+  // Optional digital-perimeter (staircase) correction: perimeter *= 0.948 (Kulpa).
+  // Left as TODO(calibration) — the raw count is already a strict improvement over
+  // 4·√A for irregular shapes.
   const donnellyCorrection = (0.0514 + 0.041 / Math.sqrt(n)) * perimeter / n;
   const expectedMean = expectedBase + donnellyCorrection;
 
@@ -269,7 +289,9 @@ export function densityVerdict(m: DensityMetrics, thresholds: DensityThresholds 
   const countPass = m.countError <= (thresholds.countError ?? 0.10);
   const survivorPass = m.survivorIntegrity <= (thresholds.survivorIntegrity ?? 2);
   const evennessPass = m.evenness <= (thresholds.evenness ?? 1.5);
-  const nniPass = m.nniDispersion >= (thresholds.nniDispersion ?? 1.0);
+  const nniLo = thresholds.nniMin ?? thresholds.nniDispersion ?? 1.0;
+  const nniHi = thresholds.nniMax ?? Infinity; // cap rejects over-regularization (hex lattice → 2.1491)
+  const nniPass = m.nniDispersion >= nniLo && m.nniDispersion <= nniHi;
   const infillPass = m.infillCleanliness <= (thresholds.infillCleanliness ?? 2.5);
   const bgPass = m.bgDeltaE <= (thresholds.bgDeltaE ?? 2);
   return { countPass, survivorPass, evennessPass, nniPass, infillPass, bgPass, pass: countPass && survivorPass && evennessPass && nniPass && infillPass };
