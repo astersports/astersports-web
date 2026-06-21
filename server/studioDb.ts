@@ -415,6 +415,7 @@ export async function listTenantJobsEnhanced(
     userId?: number;    // filter by creator
     sortBy?: "date" | "credits" | "title";
     sortDir?: "asc" | "desc";
+    editType?: string;  // filter by denormalized edit type (M5a)
   } = {}
 ) {
   const db = await getDb();
@@ -457,6 +458,9 @@ export async function listTenantJobsEnhanced(
   }
   if (opts.userId) {
     conditions.push(eq(jobs.userId, opts.userId));
+  }
+  if (opts.editType) {
+    conditions.push(eq(jobs.editType, opts.editType));
   }
   const condition = and(...conditions);
 

@@ -493,6 +493,7 @@ export const studioRouter = router({
         userId: z.number().optional(),
         sortBy: z.enum(["date", "credits", "title"]).optional(),
         sortDir: z.enum(["asc", "desc"]).optional(),
+        type: z.string().max(16).optional(), // edit-type filter (matches denormalized editType)
       })
     )
     .query(async ({ ctx, input }) => {
@@ -508,6 +509,11 @@ export const studioRouter = router({
         userId: input.userId,
         sortBy: input.sortBy,
         sortDir: input.sortDir,
+        // Server-side type filter so pagination + total reflect it. The UI's
+        // "upload" maps to the stored editType "none" (no active controls).
+        editType: input.type && input.type !== "all"
+          ? (input.type === "upload" ? "none" : input.type)
+          : undefined,
       });
       return {
         jobs: result.jobs.map((j) => ({
@@ -695,6 +701,7 @@ export const studioRouter = router({
     if (!trial.inTrial || trial.trialDay < TRIAL_RECOMMENDATION_START_DAY) {
       return {
         ...trial,
+        trialCredits: tenant.trialCredits,
         recommendation: null,
       };
     }
@@ -705,6 +712,7 @@ export const studioRouter = router({
 
     return {
       ...trial,
+      trialCredits: tenant.trialCredits,
       recommendation: {
         planKey: usage.recommendedPlan,
         planName: plan.name,

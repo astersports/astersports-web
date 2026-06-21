@@ -579,17 +579,17 @@ function ArchiveTable({
       sortBy: sortBy as "date" | "credits" | "title",
       sortDir: sortDir as "asc" | "desc",
       userId,
+      type: typeFilter !== "all" ? typeFilter : undefined,
       startDate: startDate ? new Date(startDate).getTime() : undefined,
       endDate: endDate ? new Date(endDate + "T23:59:59").getTime() : undefined,
     },
     { enabled: !!tenant?.id }
   );
 
-  const jobs = useMemo(() => {
-    if (!data?.jobs) return [];
-    if (typeFilter === "all") return data.jobs;
-    return data.jobs.filter((j) => getEditType(j.controls).toLowerCase() === typeFilter);
-  }, [data?.jobs, typeFilter]);
+  // Type filter is applied SERVER-side now (see historyArchive), so the page's
+  // jobs, total, and pagination all reflect it. No client-side filtering — that
+  // was producing empty/short pages and a wrong total.
+  const jobs = useMemo(() => data?.jobs ?? [], [data?.jobs]);
 
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / limit);
