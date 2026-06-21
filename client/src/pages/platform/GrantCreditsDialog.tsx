@@ -1,7 +1,7 @@
 /**
  * Dialog to grant credits to any account.
  */
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,10 @@ export default function GrantCreditsDialog({ open, onClose }: Props) {
   const [tenantId, setTenantId] = useState("");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
+  // Stable idempotency key per grant action: reused across a retry of the same
+  // submit (so a double-submit/retry can't double-grant), regenerated after a
+  // successful grant so a deliberate second grant is allowed.
+  const idemKey = useRef<string | null>(null);
 
   // Fetch all accounts for the dropdown
   const { data: accounts } = trpc.platform.listAccounts.useQuery(
@@ -31,6 +35,7 @@ export default function GrantCreditsDialog({ open, onClose }: Props) {
     onSuccess: (data) => {
       toast.success(`Credits granted. New balance: ${data.newBalance.toLocaleString()}`);
       utils.platform.listAccounts.invalidate();
+      idemKey.current = null; // next grant gets a fresh key
       setTenantId("");
       setAmount("");
       setNote("");
@@ -47,7 +52,8 @@ export default function GrantCreditsDialog({ open, onClose }: Props) {
       toast.error("Select an account and enter a valid amount");
       return;
     }
-    grant.mutate({ tenantId: tid, amount: amt, note: note.trim() || undefined });
+    if (!idemKey.current) idemKey.current = crypto.randomUUID();
+    grant.mutate({ tenantId: tid, amount: amt, note: note.trim() || undefined, idempotencyKey: idemKey.current });
   }
 
   return (

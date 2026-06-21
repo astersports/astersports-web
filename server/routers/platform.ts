@@ -228,6 +228,9 @@ export const platformRouter = router({
         tenantId: z.number().int(),
         amount: z.number().int().min(1),
         note: z.string().max(500).optional(),
+        // Client-supplied idempotency key so a double-submit / retry can't
+        // double-grant (grantCredits is idempotent on (refId, reason)).
+        idempotencyKey: z.string().max(100).optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -235,7 +238,7 @@ export const platformRouter = router({
         input.tenantId,
         input.amount,
         "grant",
-        undefined,
+        input.idempotencyKey ? `admin-grant-${input.idempotencyKey}` : undefined,
         undefined
       );
       return { newBalance };
