@@ -13,7 +13,7 @@ import {
   countActiveMembers,
 } from "../studioDb";
 import { emailAllowedForDomain } from "../../shared/domain";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { getDb } from "../db";
 import { memberships, users } from "../../drizzle/schema";
 
@@ -46,18 +46,16 @@ export const tenantsRouter = router({
     const db = await getDb();
     if (!db) return [];
     const mems = await listMemberships(ctx.tenant.id);
-    // Enrich with user info
-    const enriched = await Promise.all(
-      mems.map(async (m) => {
-        const [user] = await db
-          .select({ id: users.id, name: users.name, email: users.email })
-          .from(users)
-          .where(eq(users.id, m.userId))
-          .limit(1);
-        return { ...m, user: user ?? null };
-      })
-    );
-    return enriched;
+    if (mems.length === 0) return [];
+    // M4c: enrich with user info via ONE batched lookup (was an N+1 — a separate
+    // user query per member).
+    const userIds = Array.from(new Set(mems.map((m) => m.userId)));
+    const userRows = await db
+      .select({ id: users.id, name: users.name, email: users.email })
+      .from(users)
+      .where(inArray(users.id, userIds));
+    const userMap = new Map(userRows.map((u) => [u.id, u]));
+    return mems.map((m) => ({ ...m, user: userMap.get(m.userId) ?? null }));
   }),
 
   /** Invite a member by email (admin-only). Validates domain restriction. */
