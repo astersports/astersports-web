@@ -95,3 +95,59 @@ export async function ensureProducts(): Promise<{ productId: string; priceId: st
 
   return { productId, priceId };
 }
+
+// ─── Studio plan/pack prices (created on-demand) ──────────────────────────────
+
+const studioPriceCache: Map<string, string> = new Map();
+
+/**
+ * Ensure a Studio product + price exist in Stripe; return the price id.
+ * Recurring when `interval` is given, one-time otherwise. Cached per
+ * (name, amount, interval). Shared by studioBilling (subscribe/topup) AND
+ * shadowBilling (trial conversion) — kept here in the neutral stripe module so
+ * the two don't have to import each other (avoids a circular import).
+ */
+export async function ensureStudioPrice(
+  productName: string,
+  amountCents: number,
+  interval?: "month"
+): Promise<string> {
+  const cacheKey = `${productName}-${amountCents}-${interval ?? "once"}`;
+  if (studioPriceCache.has(cacheKey)) return studioPriceCache.get(cacheKey)!;
+
+  // Escape backslash/quote so a future product name with those chars can't break
+  // or distort the Stripe search query.
+  const safeName = productName.replace(/[\\"]/g, "\\$&");
+  const products = await stripe.products.search({ query: `name:"${safeName}"` });
+  let productId: string;
+  if (products.data.length > 0) {
+    productId = products.data[0].id;
+  } else {
+    const product = await stripe.products.create({
+      name: productName,
+      description: `Aster Print Studio - ${productName}`,
+    });
+    productId = product.id;
+  }
+
+  const prices = await stripe.prices.list({ product: productId, active: true, limit: 100 });
+  const match = prices.data.find(
+    (p) =>
+      p.unit_amount === amountCents &&
+      (interval ? p.recurring?.interval === interval : !p.recurring)
+  );
+  if (match) {
+    studioPriceCache.set(cacheKey, match.id);
+    return match.id;
+  }
+
+  const priceData: Stripe.PriceCreateParams = {
+    product: productId,
+    unit_amount: amountCents,
+    currency: "usd",
+  };
+  if (interval) priceData.recurring = { interval };
+  const price = await stripe.prices.create(priceData);
+  studioPriceCache.set(cacheKey, price.id);
+  return price.id;
+}

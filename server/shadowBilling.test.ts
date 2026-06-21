@@ -45,7 +45,14 @@ vi.mock("./stripe", () => ({
         status: "succeeded",
       }),
     },
+    subscriptions: {
+      create: vi.fn().mockResolvedValue({
+        id: "sub_test123",
+        status: "active",
+      }),
+    },
   },
+  ensureStudioPrice: vi.fn().mockResolvedValue("price_test123"),
 }));
 
 vi.mock("./studioDb", () => ({
@@ -236,6 +243,18 @@ describe("shadowBilling", () => {
     it("throws for 'none' plan", async () => {
       const { convertTrialToPaid } = await import("./shadowBilling");
       await expect(convertTrialToPaid(5, "none" as any, "ref")).rejects.toThrow();
+    });
+
+    it("stores the subscription id and grants once when a subscription is provided", async () => {
+      const { convertTrialToPaid } = await import("./shadowBilling");
+      const { grantCredits } = await import("./studioDb");
+
+      await convertTrialToPaid(5, "starter", "sub_x", "sub_x");
+
+      expect(mockDb._updateChain.set).toHaveBeenCalledWith(
+        expect.objectContaining({ plan: "starter", stripeSubscriptionId: "sub_x" })
+      );
+      expect(grantCredits).toHaveBeenCalledWith(5, 100, "subscription_start", "sub_x");
     });
   });
 });
