@@ -190,8 +190,14 @@ export const creditLedger = mysqlTable("credit_ledger", {
   note: text("note"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (t) => ({
-  // H5: every ledger read is tenant-scoped and ordered by recency.
+  // H5: every ledger read is tenant-scoped and ordered by recency. Also serves
+  // firmAdmin.spendByMember's 7-day window scan (tenantId + createdAt range).
   tenantCreatedIdx: index("idx_credit_ledger_tenant_created").on(t.tenantId, t.createdAt),
+  // M4a: covering index for firmAdmin.spendByMember's all-time aggregation
+  // (WHERE tenantId=? GROUP BY userId, SUM over delta). userId follows tenantId
+  // so groups are contiguous, and delta is covered — a tight index scan with no
+  // table lookup or filesort instead of a full per-tenant ledger scan at scale.
+  tenantUserDeltaIdx: index("idx_credit_ledger_tenant_user_delta").on(t.tenantId, t.userId, t.delta),
   // H5: ledger<->jobs correlation joins on refId.
   refIdIdx: index("idx_credit_ledger_refId").on(t.refId),
   // C3: hard idempotency backstop — at most one ledger row per (refId, reason).

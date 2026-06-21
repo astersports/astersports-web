@@ -99,6 +99,13 @@
       "when": 1782072836791,
       "tag": "0013_dry_gressill",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1782073480374,
+      "tag": "0014_elite_weapon_omega",
+      "breakpoints": true
     }
   ]
 }
