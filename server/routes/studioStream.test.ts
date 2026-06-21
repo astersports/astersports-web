@@ -53,6 +53,7 @@ vi.mock("../studioDb", () => ({
   updateJobStatus: vi.fn(async () => {}),
   deductCredits: vi.fn(async () => 990),
   grantCredits: vi.fn(async () => 1000),
+  countJobGenerationAttempts: vi.fn(async () => 0),
   getTrialStatus: vi.fn(() => ({ inTrial: false, daysRemaining: 0, trialDay: 0, expired: false })),
 }));
 

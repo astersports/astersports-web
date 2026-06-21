@@ -222,6 +222,23 @@ export async function deductCredits(
 }
 
 /**
+ * Count prior generation deduct attempts for a job — ledger rows with
+ * reason='generation' and a refId of `job-<id>-a*`. The SSE endpoint uses this to
+ * mint a UNIQUE per-attempt deduct refId, so a regenerate on the same jobId
+ * actually charges (a fixed `job-<id>` refId becomes an idempotent no-op → free
+ * generation) and a refund only ever offsets the attempt that debited.
+ */
+export async function countJobGenerationAttempts(jobId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const rows = await db
+    .select({ id: creditLedger.id })
+    .from(creditLedger)
+    .where(and(eq(creditLedger.reason, "generation"), like(creditLedger.refId, `job-${jobId}-a%`)));
+  return rows.length;
+}
+
+/**
  * Grant credits to a tenant (subscription renewal, top-up, admin adjustment).
  */
 export async function grantCredits(

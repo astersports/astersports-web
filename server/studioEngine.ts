@@ -30,10 +30,19 @@ export async function runVariation(opts: {
   expectation: string;
   round: number;
   mode: { recolor: boolean; density: boolean; scale: boolean };
+  /** Aborted when the SSE client disconnects — checked before persisting so an
+   *  abandoned (and refunded) job never delivers a free asset to history. */
+  signal?: AbortSignal;
 }): Promise<{ url: string; key: string }> {
-  const { controls, originalUrl, tenantId, jobId, instruction, expectation, round, mode } = opts;
+  const { controls, originalUrl, tenantId, jobId, instruction, expectation, round, mode, signal } = opts;
   // C5: per-request audit context stamped on every outbound SAM2 call.
   const audit = { orgId: String(tenantId), jobId: String(jobId) };
+  // If the caller aborted (client disconnect/timeout) while the work was running,
+  // do NOT persist: the SSE handler has already refunded, so persisting would
+  // hand the tenant a free, paid-for-then-refunded asset.
+  const assertNotAborted = () => {
+    if (signal?.aborted) throw new Error("aborted before persist");
+  };
 
   if (mode.recolor) {
     const png = await generateRecoloredImage(originalUrl, {
@@ -41,6 +50,7 @@ export async function runVariation(opts: {
       toColor: resolveTargetColorHex(controls.recolor.targetColor),
       coverage: controls.recolor.coverage,
     }, audit);
+    assertNotAborted();
     const key = `studio/${tenantId}/${jobId}/recolor-${round}.png`;
     const { url } = await storagePut(key, png, "image/png");
     await addVariation({ jobId, tenantId, resultKey: key, resultUrl: url, round });
@@ -54,6 +64,7 @@ export async function runVariation(opts: {
     if (!densityResult) {
       throw new Error("Density processing is temporarily unavailable. Please try again in a moment.");
     }
+    assertNotAborted();
     const key = `studio/${tenantId}/${jobId}/density-${round}.png`;
     const { url } = await storagePut(key, densityResult.png, "image/png");
     await addVariation({ jobId, tenantId, resultKey: key, resultUrl: url, round });
@@ -64,6 +75,7 @@ export async function runVariation(opts: {
     const png = await generateScaledImage(originalUrl, {
       targetFraction: (100 + controls.scale.percent) / 100,
     }, audit);
+    assertNotAborted();
     const key = `studio/${tenantId}/${jobId}/scale-${round}.png`;
     const { url } = await storagePut(key, png, "image/png");
     await addVariation({ jobId, tenantId, resultKey: key, resultUrl: url, round });
@@ -72,6 +84,7 @@ export async function runVariation(opts: {
 
   // Generative (prompt) path
   const resultUrl = await generateEditedImage(originalUrl, instruction, "image/jpeg", expectation);
+  assertNotAborted();
   await addVariation({
     jobId,
     tenantId,
