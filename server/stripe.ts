@@ -115,7 +115,10 @@ export async function ensureStudioPrice(
   const cacheKey = `${productName}-${amountCents}-${interval ?? "once"}`;
   if (studioPriceCache.has(cacheKey)) return studioPriceCache.get(cacheKey)!;
 
-  const products = await stripe.products.search({ query: `name:"${productName}"` });
+  // Escape backslash/quote so a future product name with those chars can't break
+  // or distort the Stripe search query.
+  const safeName = productName.replace(/[\\"]/g, "\\$&");
+  const products = await stripe.products.search({ query: `name:"${safeName}"` });
   let productId: string;
   if (products.data.length > 0) {
     productId = products.data[0].id;
@@ -127,7 +130,7 @@ export async function ensureStudioPrice(
     productId = product.id;
   }
 
-  const prices = await stripe.prices.list({ product: productId, active: true, limit: 20 });
+  const prices = await stripe.prices.list({ product: productId, active: true, limit: 100 });
   const match = prices.data.find(
     (p) =>
       p.unit_amount === amountCents &&
@@ -138,7 +141,11 @@ export async function ensureStudioPrice(
     return match.id;
   }
 
-  const priceData: any = { product: productId, unit_amount: amountCents, currency: "usd" };
+  const priceData: Stripe.PriceCreateParams = {
+    product: productId,
+    unit_amount: amountCents,
+    currency: "usd",
+  };
   if (interval) priceData.recurring = { interval };
   const price = await stripe.prices.create(priceData);
   studioPriceCache.set(cacheKey, price.id);

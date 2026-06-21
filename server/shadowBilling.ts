@@ -189,7 +189,7 @@ export async function processTrialAutoCharges(): Promise<{
       // (caught below → failed). Renewals then fire invoice.paid →
       // handleStudioInvoicePaid — which the one-off PaymentIntent never did.
       const plan = PLANS.starter;
-      const amountCents = plan.priceMonthly * 100; // $39.00 = 3900 cents
+      const amountCents = Math.round(plan.priceMonthly * 100); // $39.00 = 3900 cents
       const priceId = await ensureStudioPrice("Print Studio Starter", amountCents, "month");
 
       const subscription = await stripe.subscriptions.create({
