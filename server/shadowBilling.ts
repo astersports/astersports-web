@@ -378,7 +378,10 @@ export async function restoreFrozenCreditsIfEligible(tenantId: number): Promise<
 
   // Restore: add frozen credits back to balance
   const restored = tenant.trialFrozenCredits;
-  await grantCredits(tenantId, restored, "frozen_credits_restored", `restore-${tenantId}`);
+  // refId is unique per freeze EVENT (includes frozenAt), so a 2nd legitimate
+  // freeze→restore cycle isn't silently dropped by grantCredits' (refId,reason)
+  // idempotency — while a retry of the same restore stays idempotent.
+  await grantCredits(tenantId, restored, "frozen_credits_restored", `restore-${tenantId}-${frozenAt}`);
 
   // Clear frozen state
   await db

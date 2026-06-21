@@ -66,10 +66,15 @@ export async function scalePrintRepeat(input: ScaleInput): Promise<ScaleResult> 
 
   // Resample + refill the bbox.
   let filled: Buffer;
+  // EFFECT (not intent): true only if the resample dimensions actually differ
+  // from the source bbox. A near-unity fraction on a small motif can round back
+  // to the original size (e.g. round(64 * 1.001) === 64) — that is a no-op.
+  let dimsChanged = false;
   if (f === 1) {
     filled = patch;
   } else {
     const rw = Math.max(1, Math.round(bw * f)), rh = Math.max(1, Math.round(bh * f));
+    dimsChanged = rw !== bw || rh !== bh;
     const resized = await sharp(patch).resize(rw, rh, { kernel: "lanczos3" }).png().toBuffer();
     filled = f > 1
       ? await sharp(resized).extract({ left: Math.floor((rw - bw) / 2), top: Math.floor((rh - bh) / 2), width: bw, height: bh }).png().toBuffer()
@@ -102,7 +107,8 @@ export async function scalePrintRepeat(input: ScaleInput): Promise<ScaleResult> 
     out[p + 2] = Math.round(buffer[p + 2] + (scaledFull[p + 2] - buffer[p + 2]) * a);
     // alpha channel (p + 3) preserved from the original copy
   }
-  // f===1 is a near-passthrough (the composite still runs but pixels are identical).
-  // Signal changed:false so the caller's no-op guard can refund.
-  return { data: out, width, height, changed: f !== 1 };
+  // Report EFFECT, not intent. `changed:false` when the requested fraction rounded
+  // the bbox back to its original dimensions (or f===1) so the caller's no-op guard
+  // refunds instead of billing for an unchanged print (CLAUDE.md §4).
+  return { data: out, width, height, changed: dimsChanged };
 }

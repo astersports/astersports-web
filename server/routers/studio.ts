@@ -620,14 +620,11 @@ export const studioRouter = router({
       const controls: ControlSettings = JSON.parse(originalJob.controls);
       const cost = computeCredits(controls, CREDIT_COST);
 
-      // Deduct credits
-      try {
-        await deductCredits(ctx.tenant.id, ctx.user?.id ?? 0, cost, "generation", `rerun-${originalJob.id}`);
-      } catch {
-        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Insufficient credits" });
-      }
-
-      // Create new job
+      // Create the new job FIRST so the deduct/refund share a unique per-attempt
+      // refId (`job-<newJobId>`), mirroring `generate`. The previous
+      // `rerun-<originalJobId>` collided on the unique (refId,reason) index when a
+      // job was re-run twice — dup-keying the deduct and surfacing a misleading
+      // "Insufficient credits" to a user with ample balance.
       const instruction = buildInstruction(controls);
       const expectation = describeExpectedChange(controls);
       const newJob = await createJob({
@@ -642,6 +639,19 @@ export const studioRouter = router({
         creditsUsed: cost,
         status: "processing",
       });
+
+      // Deduct credits against the new job id (unique per attempt).
+      try {
+        await deductCredits(ctx.tenant.id, ctx.user?.id ?? 0, cost, "generation", `job-${newJob.id}`);
+      } catch (e: any) {
+        await updateJobStatus(newJob.id, "failed", { errorMessage: "Credit reservation failed" }).catch(() => {});
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: e?.message === "Insufficient credits"
+            ? "Insufficient credits"
+            : "Failed to reserve credits. Please try again.",
+        });
+      }
 
       // H5: re-run honors the SAME deterministic-vs-prompt routing as `generate`
       // so a density re-run does count-based removal (or refunds on a no-op)
