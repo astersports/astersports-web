@@ -261,14 +261,19 @@ export const studioRouter = router({
       const densityOnly =
         controls.density.enabled && !controls.scale.enabled &&
         !controls.recolor.enabled && !controls.remove.enabled;
-      const useDeterministicDensity = ENV.studioDensityLive && densityOnly;
+      // Either density flag routes density through the deterministic path: v1
+      // (densityThin) under STUDIO_DENSITY_LIVE, or v2 (densityRedistribute) under
+      // STUDIO_DENSITY_REDISTRIBUTE — the op selection happens at the call site.
+      // Both off => unchanged (generative path).
+      const densityDeterministic = ENV.studioDensityLive || ENV.studioDensityRedistribute;
+      const useDeterministicDensity = densityDeterministic && densityOnly;
 
       // D-A (density): reject density combined with other edits, gated on the live
       // flag (pre-deduct; flag off => unchanged). The reason is stronger than scale's:
       // a combined density+other job on the prompt path silently UNMETS the count-based
       // density intent, so reject honestly rather than return a generative result that
       // ignored it. Mirrors scale's D-A.
-      if (ENV.studioDensityLive && controls.density.enabled && controls.density.percent > 0 && !densityOnly) {
+      if (densityDeterministic && controls.density.enabled && controls.density.percent > 0 && !densityOnly) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Density can't yet combine with other edits — run it separately.",
@@ -692,7 +697,7 @@ export const studioRouter = router({
       // instead of silently billing a generative result that ignored the ask.
       const mode = {
         recolor: ENV.studioRecolorLive && recolorOnly(controls),
-        density: ENV.studioDensityLive && densityOnly(controls),
+        density: (ENV.studioDensityLive || ENV.studioDensityRedistribute) && densityOnly(controls),
         scale: ENV.studioScaleLive && scaleOnly(controls) && getMaskProvider().rasterReady,
       };
 
