@@ -252,13 +252,16 @@ function analyzeAxis(
   for (let h = 2; h <= 8; h++) {
     const hBin = Math.round(dominant.bin * h);
     if (hBin < spectrum.length) {
-      // Find nearest peak within tolerance
+      // Add the strongest spectrum value in the tolerance window around the
+      // expected harmonic bin. (Previously a stray `break` ended the loop after
+      // the first bin, so only `hBin - tol` was ever inspected instead of the
+      // nearest peak across the window.)
       const tol = Math.max(1, Math.round(dominant.bin * 0.15));
+      let bestHarmonic = spectrum[hBin];
       for (let b = Math.max(0, hBin - tol); b <= Math.min(spectrum.length - 1, hBin + tol); b++) {
-        if (spectrum[b] > spectrum[hBin]) periodicEnergy += spectrum[b];
-        else periodicEnergy += spectrum[hBin];
-        break;
+        if (spectrum[b] > bestHarmonic) bestHarmonic = spectrum[b];
       }
+      periodicEnergy += bestHarmonic;
     }
   }
   const periodicityEnergy = periodicEnergy / totalEnergy;
