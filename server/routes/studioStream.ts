@@ -259,10 +259,17 @@ export function registerStudioStreamRoutes(app: Express) {
       sendSSE(res, { type: "heartbeat", elapsed: Date.now() }, finished);
     }, 5000);
 
-    // Handle client disconnect
+    // R2: on client disconnect, stop awaiting the work and abort the race so the
+    // catch below refunds + marks the job failed PROMPTLY, instead of leaving it
+    // "processing" until the timeout fires. (The in-flight SAM2 prediction runs
+    // remotely and can't be truly cancelled, so the abandoned runVariation is
+    // allowed to settle in the background with a no-op catch — the job is already
+    // reconciled by then.)
+    const abortController = new AbortController();
     req.on("close", () => {
       finished.value = true;
       clearInterval(heartbeatInterval);
+      abortController.abort();
     });
 
     // ─── 11. Run the generation (AWAITED, not fire-and-forget) ────────────────
@@ -273,26 +280,38 @@ export function registerStudioStreamRoutes(app: Express) {
     };
 
     // Hard wall-clock cap so a hung mask provider / sharp call can't heartbeat
-    // forever without settling. On timeout we fall into the catch below, which
-    // refunds and marks the job failed — the same path as any other failure.
+    // forever without settling. On timeout OR client disconnect we fall into the
+    // catch below, which refunds and marks the job failed — the same path as any
+    // other failure.
     const GENERATION_TIMEOUT_MS = 180_000;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    // Keep a handle so we can stop awaiting it on timeout/disconnect without an
+    // unhandled rejection.
+    const workPromise = runVariation({
+      controls,
+      originalUrl: job.originalUrl,
+      tenantId: tenant.id,
+      jobId: job.id,
+      instruction,
+      expectation,
+      round: 1,
+      mode,
+    });
+    workPromise.catch(() => {});
     try {
       const result = await Promise.race([
-        runVariation({
-          controls,
-          originalUrl: job.originalUrl,
-          tenantId: tenant.id,
-          jobId: job.id,
-          instruction,
-          expectation,
-          round: 1,
-          mode,
-        }),
+        workPromise,
         new Promise<never>((_, reject) => {
           timeoutId = setTimeout(
             () => reject(new Error("Generation timed out")),
             GENERATION_TIMEOUT_MS
+          );
+        }),
+        new Promise<never>((_, reject) => {
+          abortController.signal.addEventListener(
+            "abort",
+            () => reject(new Error("Client disconnected before the job finished")),
+            { once: true }
           );
         }),
       ]);
