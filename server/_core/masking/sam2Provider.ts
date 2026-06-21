@@ -27,7 +27,7 @@
 import sharp from "sharp";
 import type { FabricMask, InstanceMask, MaskImageInput, MaskProvider, BBoxNormalized, Sam2AuditContext } from "./types";
 import { decodeUpright } from "../image/decodeUpright";
-import { locateFabricRegion } from "./locateFabricRegion";
+import { locateFabricRegion, locateFabricRegionForDensity } from "./locateFabricRegion";
 import { decodeMaskToRaster, instancesFromMasks } from "./sam2Mask";
 import { defaultSam2Client, type Sam2Client } from "./replicateSam2";
 
@@ -126,11 +126,13 @@ interface CropSegment {
 
 /** locate (or reuse) fabric region -> crop -> ONE autoSegment call. The shared
  *  primitive so density gets fabric + instances from a SINGLE SAM2 call. Pass
- *  `known` to skip the vision-LLM locate (e.g. getInstanceMasks with a fabric hint). */
+ *  `known` to skip the vision-LLM locate (e.g. getInstanceMasks with a fabric hint).
+ *  `forDensity` selects the density-specific locator (full-garment coverage). */
 async function cropAndSegment(
   client: Sam2Client,
   image: MaskImageInput,
-  known?: BBoxNormalized
+  known?: BBoxNormalized,
+  forDensity?: boolean
 ): Promise<CropSegment> {
   let bbox: BBoxNormalized;
   let confidence: number;
@@ -138,7 +140,10 @@ async function cropAndSegment(
     bbox = known;
     confidence = 1;
   } else {
-    const region = await locateFabricRegion(image.url); // vision LLM bbox; no data leaves
+    // SAFEGUARD 1: density uses its own locator with stricter full-garment prompt
+    const region = forDensity
+      ? await locateFabricRegionForDensity(image.url)
+      : await locateFabricRegion(image.url);
     bbox = region.bbox;
     confidence = region.confidence;
   }
@@ -220,9 +225,10 @@ export function createSam2Provider(client: Sam2Client): MaskProvider {
       return instancesFromSegment(await cropAndSegment(client, image, fabric?.bbox));
     },
 
-    /** SINGLE SAM2 call -> fabric + instances (density's single-call path). */
+    /** SINGLE SAM2 call -> fabric + instances (density's single-call path).
+     *  Uses the density-specific locator (forDensity=true) for full-garment coverage. */
     async getSegmentation(image: MaskImageInput): Promise<{ fabric: FabricMask; instances: InstanceMask[] }> {
-      const s = await cropAndSegment(client, image);
+      const s = await cropAndSegment(client, image, undefined, true); // forDensity=true
       const [fabric, instances] = await Promise.all([fabricFromSegment(s), instancesFromSegment(s)]);
       return { fabric, instances };
     },

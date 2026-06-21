@@ -14,7 +14,7 @@ import { storageGetSignedUrl } from "./storage";
 import { fetchWithTimeout, TIMEOUT } from "./fetchTimeout";
 import { ENV } from "./_core/env";
 import sharp from "sharp";
-import { getMaskProvider } from "./_core/masking";
+import { getMaskProvider, validateInstanceCount } from "./_core/masking";
 import { separationRemap } from "./_core/studio/ops/separationRemap";
 import { densityThin } from "./_core/studio/ops/densityThin";
 import { densityRedistribute } from "./_core/studio/ops/densityRedistribute";
@@ -48,6 +48,21 @@ export async function generateDensityImage(
     console.warn(`[density-live] Provider degraded (no/empty raster or 0 instances); fail + refund.`);
     return null;
   }
+
+  // SAFEGUARD 3: Instance count sanity check
+  const bboxArea = fabric.bbox.w * fabric.bbox.h;
+  const instanceCheck = validateInstanceCount(instances.length, bboxArea);
+  if (!instanceCheck.valid) {
+    console.warn(`[density-live] Instance count safeguard triggered: ${instanceCheck.reason}`);
+    // Don't fail outright — log the warning but proceed. The densityThin op will
+    // still refund if it can't remove enough motifs (removeN === 0).
+  }
+
+  // Log instance count for production monitoring
+  console.log(
+    `[density-live] Segmentation result: ${instances.length} instances detected, ` +
+    `fabric bbox area=${(bboxArea * 100).toFixed(1)}%, percent=${percent}%`
+  );
 
   const result = await densityThin({ image: { url: srcUrl }, fabric, instances, percent });
 
@@ -94,6 +109,19 @@ export async function generateDensityRedistributeImage(
     console.warn(`[density-redistribute-live] Provider degraded (no/empty raster or 0 instances); fail + refund.`);
     return null;
   }
+
+  // SAFEGUARD 3: Instance count sanity check
+  const bboxArea = fabric.bbox.w * fabric.bbox.h;
+  const instanceCheck = validateInstanceCount(instances.length, bboxArea);
+  if (!instanceCheck.valid) {
+    console.warn(`[density-redistribute-live] Instance count safeguard triggered: ${instanceCheck.reason}`);
+  }
+
+  // Log instance count for production monitoring
+  console.log(
+    `[density-redistribute-live] Segmentation result: ${instances.length} instances detected, ` +
+    `fabric bbox area=${(bboxArea * 100).toFixed(1)}%, percent=${percent}%`
+  );
 
   const result = await densityRedistribute({ image: { url: srcUrl }, fabric, instances, percent });
 

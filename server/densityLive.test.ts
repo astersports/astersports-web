@@ -7,7 +7,10 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("./_core/masking", () => ({ getMaskProvider: vi.fn() }));
+vi.mock("./_core/masking", () => ({
+  getMaskProvider: vi.fn(),
+  validateInstanceCount: vi.fn().mockReturnValue({ valid: true }),
+}));
 vi.mock("./_core/studio/ops/densityThin", () => ({ densityThin: vi.fn() }));
 vi.mock("./storage", () => ({ storageGetSignedUrl: vi.fn() }));
 vi.mock("sharp", () => {

@@ -669,3 +669,9 @@
 - [x] Update default fallback from center-crop (40%) to full-garment (90%)
 - [x] Update masking tests for new expansion behavior
 - [x] Verify densityThin operates on all detected instances across the full garment
+
+## Density Reduction Safeguards
+- [x] Minimum area threshold: auto-expand bbox to full garment if LLM returns < 35% (general) or < 40% (density)
+- [x] Instance count sanity check: warn if SAM2 detects < 5 instances in large bbox (> 50% area)
+- [x] Bbox logging: log returned bbox dimensions + area + confidence on every density job
+- [x] Separate density-specific locator (locateFabricRegionForDensity): aggressive full-coverage prompt, stricter threshold
