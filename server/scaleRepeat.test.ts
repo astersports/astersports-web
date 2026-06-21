@@ -83,6 +83,13 @@ describe("scalePrintRepeat", () => {
     expect(maxDiff).toBeLessThanOrEqual(2);
   });
 
+  it("near-unity fraction that rounds to identity dims reports changed:false (no-op refund)", async () => {
+    // bbox is 64px; round(64 * 1.001) === 64 → no real rescale, so the caller
+    // must refund rather than bill for an unchanged print (CLAUDE.md §4).
+    const r = await scalePrintRepeat({ image: { url: "x" }, fabric: fabric(), targetFraction: 1.001 });
+    expect(r.changed).toBe(false);
+  });
+
   it("respects a notched silhouette (masked-out notch keeps the original)", async () => {
     const { data: out } = await scalePrintRepeat({ image: { url: "x" }, fabric: fabric(true), targetFraction: 0.5 });
     const input = scene();
