@@ -67,8 +67,8 @@ export default function StudioBilling() {
         <PaymentMethodCard tenantId={tenant.id} />
       )}
 
-      {/* Subscription Plans (visible to all, purchase gated to owner) */}
-      {isAdmin && <PlansSection tenantId={tenant.id} currentPlan={status.plan} isOwner={isOwner} tenantType={tenant.type} />}
+      {/* Subscription Plans (admins + owner only; purchase gated to owner) */}
+      {isAdmin && <PlansSection tenantId={tenant.id} currentPlan={status.plan} isOwner={isOwner} tenantType={status.type} />}
 
       {/* Credit Packs (visible to all, purchase gated to owner) */}
       <PacksSection tenantId={tenant.id} isOwner={isOwner} />
@@ -128,7 +128,7 @@ function StatusCard({ status, tenantId }: { status: any; tenantId: number }) {
   );
 }
 
-function PlansSection({ tenantId, currentPlan, isOwner, tenantType }: { tenantId: number; currentPlan: string; isOwner: boolean; tenantType: string }) {
+function PlansSection({ tenantId, currentPlan, isOwner, tenantType }: { tenantId: number; currentPlan: string; isOwner: boolean; tenantType: "firm" | "individual" }) {
   const subscribeMutation = trpc.studioBilling.subscribe.useMutation({
     onSuccess: (data) => {
       if (data.checkoutUrl) {
