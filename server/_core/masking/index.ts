@@ -18,7 +18,7 @@ import { classicalProvider } from "./classicalProvider";
 import { sam2Provider } from "./sam2Provider";
 
 export * from "./types";
-export { locateFabricRegion } from "./locateFabricRegion";
+export { locateFabricRegion, locateFabricRegionForDensity, validateInstanceCount, MIN_DENSITY_INSTANCES, expandBbox } from "./locateFabricRegion";
 export type { FabricRegionResult } from "./locateFabricRegion";
 export { createSam2Provider, setSam2AuditContext, clearSam2AuditContext } from "./sam2Provider";
 export { defaultSam2Client, type Sam2Client } from "./replicateSam2";

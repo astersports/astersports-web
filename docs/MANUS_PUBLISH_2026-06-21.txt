@@ -1,0 +1,88 @@
+MANUS — PUBLISH STUDIO ADMIN/PERF CHANGES (2026-06-21)
+======================================================
+
+GOAL
+  Get every merged change from the 2026-06-21 CC session live, including the
+  DB schema. Source of truth = astersports/astersports-web `main` @ 8f5d93f
+  (verify it is still HEAD before you start; other lanes may have landed more).
+
+SCOPE / SAFETY
+  All changes are History / Credit Ledger / Members-admin READ & ADMIN
+  surfaces, plus 4 additive, non-destructive migrations. There are NO
+  editor / generate / rerun / masking / controls / credit-math changes, and
+  NO *_LIVE, env, or STUDIO_MASK_PROVIDER changes — nothing here is in Flip
+  Authority's scope, and nothing requires a flip.
+
+MERGED PRs (all on main @ 8f5d93f)
+  #37  M5b   studio_tenant_stats rollup — History tile aggregates
+  #40  M4a   covering index on credit_ledger for spend-by-member
+  #42  M5d   FULLTEXT History search + MATCH..AGAINST with LIKE fallback
+  #45  M5cA  keyset cursor pagination (server) — nextCursor on history+ledger
+  #48  M5cB  Credit Ledger -> load-more
+  #50  M5cC  History (both views) -> load-more; type+favorites server-side
+  #52  M4c   members roster paging + N+1 -> batched inArray lookup
+
+
+STEP 1 — SYNC THE DEPLOY ORIGIN TO CURRENT main
+  The earlier symptom was the Forge deploy origin lagging GitHub main. Make the
+  studio deploy pull from origin/main HEAD (8f5d93f), not a stale snapshot. This is
+  the "Publish" / GitHub-sync action. Confirm the deployed commit == 8f5d93f
+  before continuing.
+
+
+STEP 2 — PRE-FLIGHT THE DB MIGRATION STATE
+  The 4 new migrations must be exactly the pending set. With the prod
+  DATABASE_URL in scope, confirm the last applied drizzle migration is 0011:
+
+      SELECT * FROM __drizzle_migrations ORDER BY id DESC LIMIT 3;
+
+  If prod is NOT at 0011 (e.g., a migration was applied out-of-band), STOP and
+  reconcile __drizzle_migrations before applying — do not blind-run.
+
+
+STEP 3 — APPLY THE 4 MIGRATIONS (drizzle-kit migrate)
+  Run `drizzle-kit migrate` directly (NOT the repo's `db:push` script — that
+  also runs `drizzle-kit generate` first, which is unnecessary here since the
+  migration files are already generated + committed).
+      DATABASE_URL='<prod-mysql-url>' pnpm drizzle-kit migrate
+
+  Applies and records, in order:
+    0012  studio_jobs.editType      ALTER studio_jobs ADD editType varchar(16)
+                                    + one-time backfill (CASE over controls)
+    0013  studio_tenant_stats       CREATE TABLE studio_tenant_stats
+    0014  credit_ledger index       CREATE INDEX idx_credit_ledger_tenant_user_delta
+                                    ON credit_ledger (tenantId, userId, delta)
+    0015  studio_jobs FULLTEXT      ALTER studio_jobs ADD FULLTEXT
+                                    ft_studio_jobs_search (title,
+                                    detectedElements, instruction)
+
+  All additive. The shipped code is backward-tolerant — it falls back to live
+  aggregates / substring LIKE until these land — so applying before OR after the
+  Step-1 deploy is safe.
+
+
+STEP 4 — BUILD + PUBLISH THE APP
+  Deploy the app at 8f5d93f so the new client/server code is live: load-more
+  UIs, the tenant_stats rollup reader, FULLTEXT search, batched members lookup.
+
+
+STEP 5 — VERIFY
+
+  DB (4 objects exist):
+      SHOW COLUMNS FROM studio_jobs LIKE 'editType';                              -- 0012
+      SHOW TABLES LIKE 'studio_tenant_stats';                                     -- 0013
+      SHOW INDEX FROM credit_ledger WHERE Key_name='idx_credit_ledger_tenant_user_delta';  -- 0014
+      SHOW INDEX FROM studio_jobs WHERE Key_name='ft_studio_jobs_search';         -- 0015
+
+  UI (3 surfaces):
+    1. History (grid + compact): "Load more" appends older jobs; type/favorites/
+       sort reset to top; search returns results.
+    2. Credit Ledger -> Timeline: "Load more" appends; CSV export covers the
+       full filtered set.
+    3. Admin -> Members (>20 members): "Load more" reveals the rest; role toggle
+       / remove / transfer work; switching firms resets to page one.
+
+
+ROLLBACK
+  Migrations are additive — rollback is "leave them" (harmless) or drop the new
+  column/table/indexes. Code is safe with or without them.

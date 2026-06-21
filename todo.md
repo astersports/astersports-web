@@ -669,3 +669,21 @@
 - [x] Update default fallback from center-crop (40%) to full-garment (90%)
 - [x] Update masking tests for new expansion behavior
 - [x] Verify densityThin operates on all detected instances across the full garment
+
+## SSE Proxy Buffering Fixes (Deploy to Production)
+- [x] Merge user_github/main into origin/main (resolve 30-commit divergence)
+- [x] req.socket.setTimeout(0) — disable Node.js 2-min socket timeout
+- [x] res.flushHeaders() — flush headers immediately for GCL proxy
+- [x] 2KB padding comment — push past proxy buffering threshold
+- [x] Heartbeat reduced from 5s to 3s — stay within proxy idle timeout
+- [x] res.flush() after every res.write() in sendSSE
+- [x] Frontend buffer parser fix (process remaining buffer when stream ends)
+- [x] Per-attempt deductRef (job-N-aN) — prevents duplicate-free-generation bug
+- [x] signal: AbortSignal passed to runVariation for client disconnect
+- [x] All 407 tests pass, TypeScript clean
+
+## Density Reduction Safeguards
+- [x] Minimum area threshold: auto-expand bbox to full garment if LLM returns < 35% (general) or < 40% (density)
+- [x] Instance count sanity check: warn if SAM2 detects < 5 instances in large bbox (> 50% area)
+- [x] Bbox logging: log returned bbox dimensions + area + confidence on every density job
+- [x] Separate density-specific locator (locateFabricRegionForDensity): aggressive full-coverage prompt, stricter threshold
