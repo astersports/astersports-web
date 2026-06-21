@@ -171,12 +171,13 @@ export function computeNNI(
   const density = n / fabricArea;
   const expectedBase = 1 / (2 * Math.sqrt(density));
 
-  // True window perimeter P: fabric pixels touching non-fabric or the image edge
-  // (4-connected). Replaces the square approximation 4·√A; Donnelly's P is the
-  // study-window perimeter, and the fabric mask IS that window. 4·√A is the
-  // MINIMUM-perimeter (square/near-circular) assumption — it undersizes P for
-  // irregular silhouettes, undersizing the Donnelly term and OVERsizing NNI (gate
-  // too lenient). Counting the real boundary removes that bias.
+  // True window perimeter P: count EXPOSED pixel EDGES (4-connected) of the fabric
+  // window — each fabric pixel contributes 1 per side facing non-fabric or the
+  // image edge. Donnelly's P is a perimeter LENGTH, so edges (not boundary pixels)
+  // are the right primitive: a solid W×H rectangle -> 2W+2H (a boundary-PIXEL count
+  // gives 2W+2H−4, undersizing P -> oversizing NNI). For a SQUARE window this equals
+  // 4·√A exactly, so rectangular-fabric evals are unchanged; the 4·√A approximation
+  // only undersized P for elongated/irregular silhouettes.
   let perimeter = 0;
   for (let i = 0; i < fabricMask.length; i++) {
     if (!fabricMask[i]) continue;
@@ -185,7 +186,7 @@ export function computeNNI(
     const dn = y < height - 1 ? fabricMask[i + width] : 0;
     const lf = x > 0          ? fabricMask[i - 1]     : 0;
     const rt = x < width - 1  ? fabricMask[i + 1]     : 0;
-    if (!up || !dn || !lf || !rt) perimeter++;
+    perimeter += (up ? 0 : 1) + (dn ? 0 : 1) + (lf ? 0 : 1) + (rt ? 0 : 1);
   }
   // Optional digital-perimeter (staircase) correction: perimeter *= 0.948 (Kulpa).
   // Left as TODO(calibration) — the raw count is already a strict improvement over

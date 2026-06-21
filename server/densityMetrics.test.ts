@@ -134,13 +134,13 @@ describe("computeDensityMetrics", () => {
 });
 
 describe("computeNNI — true fabric-mask perimeter (Change A)", () => {
-  // A solid NON-square rectangle, inset from the image edges so its 4-connected
-  // boundary is a clean ring (2·RW + 2·RH − 4) — hand-computable and != 4·√A.
+  // A solid NON-square rectangle, inset from the image edges so its exposed-edge
+  // perimeter is exactly 2·RW + 2·RH — hand-computable and != 4·√A.
   const IW = 64, IH = 64, RX = 2, RY = 2, RW = 40, RH = 8;
   const mask = new Uint8Array(IW * IH);
   for (let y = RY; y < RY + RH; y++) for (let x = RX; x < RX + RW; x++) mask[y * IW + x] = 1;
   const area = RW * RH;                       // 320
-  const truePerimeter = 2 * RW + 2 * RH - 4;  // 92 (boundary ring)
+  const truePerimeter = 2 * RW + 2 * RH;      // 96 (exposed-edge length of a solid rect)
   const sqApprox = 4 * Math.sqrt(area);       // ~71.55
 
   // Two centroids 20px apart -> observed mean NN distance = 20.
