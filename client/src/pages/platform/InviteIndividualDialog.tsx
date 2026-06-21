@@ -42,7 +42,9 @@ export default function InviteIndividualDialog({ open, onClose }: Props) {
     }
     invite.mutate({
       email: email.trim(),
-      initialCredits: parseInt(credits) || 50,
+      // Distinguish an explicit 0 (valid) from blank/invalid (default 50); never
+      // pass a negative. `parseInt || 50` silently turned 0 into a 50-credit grant.
+      initialCredits: Number.isNaN(parseInt(credits, 10)) ? 50 : Math.max(0, parseInt(credits, 10)),
     });
   }
 
