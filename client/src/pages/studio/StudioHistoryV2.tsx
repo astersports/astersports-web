@@ -530,8 +530,8 @@ function ArchiveTable({
   onToggleFavorite: (jobId: number) => void;
 }) {
   const filters = useFilterParams();
-  const { search, status, type: typeFilter, sortBy, sortDir, page, favorites: favoritesOnly } = filters;
-  const { setSearch: setSearchParam, setStatus: setStatusParam, setType: setTypeParam, setSortBy: setSortByParam, setSortDir: setSortDirParam, setPage, setFavorites: setFavoritesOnly, clearAll, hasActiveFilters } = filters;
+  const { search, status, type: typeFilter, sortBy, sortDir, favorites: favoritesOnly } = filters;
+  const { setSearch: setSearchParam, setStatus: setStatusParam, setType: setTypeParam, setSortBy: setSortByParam, setSortDir: setSortDirParam } = filters;
 
   const [localSearch, setLocalSearch] = useState(search);
   const [debouncedSearch, setDebouncedSearch] = useState(search);
@@ -569,30 +569,35 @@ function ArchiveTable({
   );
   const members = stats?.members ?? [];
 
-  const { data, isLoading, isFetching } = trpc.studio.historyArchive.useQuery(
-    {
-      tenantId: tenant?.id ?? 0,
-      limit,
-      offset: page * limit,
-      status: status !== "all" ? status : undefined,
-      search: debouncedSearch || undefined,
-      sortBy: sortBy as "date" | "credits" | "title",
-      sortDir: sortDir as "asc" | "desc",
-      userId,
-      type: typeFilter !== "all" ? typeFilter : undefined,
-      startDate: startDate ? new Date(startDate).getTime() : undefined,
-      endDate: endDate ? new Date(endDate + "T23:59:59").getTime() : undefined,
-    },
-    { enabled: !!tenant?.id }
-  );
+  // M5c: load-more via keyset cursor. Filters are part of the query key, so any
+  // change starts a fresh first page automatically. Type + favorites are filtered
+  // SERVER-side (per #51) so jobs, total, and "load more" all reflect them —
+  // client-side filtering over loaded pages produced wrong totals/short pages.
+  const { data, isLoading, isFetching, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    trpc.studio.historyArchive.useInfiniteQuery(
+      {
+        tenantId: tenant?.id ?? 0,
+        limit,
+        status: status !== "all" ? status : undefined,
+        search: debouncedSearch || undefined,
+        sortBy: sortBy as "date" | "credits" | "title",
+        sortDir: sortDir as "asc" | "desc",
+        userId,
+        type: typeFilter !== "all" ? typeFilter : undefined,
+        favoritesOnly: favoritesOnly || undefined,
+        startDate: startDate ? new Date(startDate).getTime() : undefined,
+        endDate: endDate ? new Date(endDate + "T23:59:59").getTime() : undefined,
+      },
+      {
+        enabled: !!tenant?.id,
+        getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+      }
+    );
 
-  // Type filter is applied SERVER-side now (see historyArchive), so the page's
-  // jobs, total, and pagination all reflect it. No client-side filtering — that
-  // was producing empty/short pages and a wrong total.
-  const jobs = useMemo(() => data?.jobs ?? [], [data?.jobs]);
+  const jobs = useMemo(() => data?.pages.flatMap((p) => p.jobs) ?? [], [data]);
 
-  const total = data?.total ?? 0;
-  const totalPages = Math.ceil(total / limit);
+
+  const total = data?.pages[0]?.total ?? 0;
 
   // Batch selection
   const toggleSelect = (id: number, shiftKey: boolean) => {
@@ -964,53 +969,21 @@ function ArchiveTable({
         )}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 px-1">
-          <p className="text-xs text-slate-500">
-            Showing {page * limit + 1}–{Math.min((page + 1) * limit, total)} of {total}
+      {/* Load more (M5c keyset pagination) */}
+      {jobs.length > 0 && (
+        <div className="flex flex-col items-center gap-1.5 mt-4">
+          {hasNextPage && (
+            <button
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+              className="px-4 py-2 rounded-md text-xs border border-white/10 text-slate-300 hover:text-white hover:border-white/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            >
+              {isFetchingNextPage ? "Loading…" : "Load more"}
+            </button>
+          )}
+          <p className="text-[11px] text-slate-500">
+            Showing {jobs.length} of {total}
           </p>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
-              className="px-3 py-1.5 rounded-md text-xs border border-white/10 text-slate-400 hover:text-white hover:border-white/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-            >
-              Previous
-            </button>
-            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-              let pageNum: number;
-              if (totalPages <= 5) {
-                pageNum = i;
-              } else if (page < 3) {
-                pageNum = i;
-              } else if (page > totalPages - 4) {
-                pageNum = totalPages - 5 + i;
-              } else {
-                pageNum = page - 2 + i;
-              }
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => setPage(pageNum)}
-                  className={`w-8 h-8 rounded-md text-xs transition-all ${
-                    page === pageNum
-                      ? "bg-amber-500/20 border border-amber-500/30 text-amber-400 font-medium"
-                      : "border border-white/5 text-slate-400 hover:text-white hover:border-white/20"
-                  }`}
-                >
-                  {pageNum + 1}
-                </button>
-              );
-            })}
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={page >= totalPages - 1}
-              className="px-3 py-1.5 rounded-md text-xs border border-white/10 text-slate-400 hover:text-white hover:border-white/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-            >
-              Next
-            </button>
-          </div>
         </div>
       )}
 
@@ -1353,8 +1326,8 @@ function MobileCardList({
   onView: (job: Job) => void;
 }) {
   const filters = useFilterParams();
-  const { search, status, type: typeFilter, page, favorites: favoritesOnly, hasActiveFilters } = filters;
-  const { setSearch: setSearchParam, setStatus: setStatusParam, setType: setTypeParam, setPage, setFavorites: setFavoritesOnly, clearAll } = filters;
+  const { search, status, type: typeFilter, favorites: favoritesOnly, hasActiveFilters } = filters;
+  const { setSearch: setSearchParam, setStatus: setStatusParam, setType: setTypeParam, setFavorites: setFavoritesOnly, clearAll } = filters;
 
   const [localSearch, setLocalSearch] = useState(search);
   const [debouncedSearch, setDebouncedSearch] = useState(search);
@@ -1374,32 +1347,29 @@ function MobileCardList({
   useEffect(() => { setLocalSearch(search); }, [search]);
 
   const { tenant } = useTenant();
-  const { data, isLoading, isFetching } = trpc.studio.historyArchive.useQuery(
-    {
-      tenantId: tenant?.id ?? 0,
-      limit,
-      offset: page * limit,
-      sortBy: "date",
-      sortDir: "desc",
-      status: status !== "all" ? status : undefined,
-      search: debouncedSearch || undefined,
-    },
-    { enabled: !!tenant?.id }
-  );
+  // M5c: load-more via keyset cursor. Type + favorites are filtered SERVER-side
+  // (per #51) so jobs, total, and "load more" all reflect them; filters are part
+  // of the query key, so any change starts a fresh first page automatically.
+  const { data, isLoading, isFetching, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    trpc.studio.historyArchive.useInfiniteQuery(
+      {
+        tenantId: tenant?.id ?? 0,
+        limit,
+        sortBy: "date",
+        sortDir: "desc",
+        status: status !== "all" ? status : undefined,
+        search: debouncedSearch || undefined,
+        type: typeFilter !== "all" ? typeFilter : undefined,
+        favoritesOnly: favoritesOnly || undefined,
+      },
+      {
+        enabled: !!tenant?.id,
+        getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+      }
+    );
 
-  const allJobs = data?.jobs ?? [];
-  const jobs = useMemo(() => {
-    let filtered = allJobs;
-    if (favoritesOnly) {
-      filtered = filtered.filter((j) => favoriteIds.has(j.id));
-    }
-    if (typeFilter !== "all") {
-      filtered = filtered.filter((j) => getEditType(j.controls).toLowerCase() === typeFilter);
-    }
-    return filtered;
-  }, [allJobs, typeFilter, favoritesOnly, favoriteIds]);
-  const total = data?.total ?? 0;
-  const totalPages = Math.ceil(total / limit);
+  const jobs = useMemo(() => data?.pages.flatMap((p) => p.jobs) ?? [], [data]);
+  const total = data?.pages[0]?.total ?? 0;
 
   return (
     <div>
@@ -1470,7 +1440,7 @@ function MobileCardList({
             <span className="text-sm font-medium">Favorites only</span>
             {favoritesOnly && (
               <span className="ml-auto text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded-full">
-                {allJobs.filter((j) => favoriteIds.has(j.id)).length}
+                {total}
               </span>
             )}
           </button>
@@ -1513,28 +1483,21 @@ function MobileCardList({
         </div>
       )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4">
+      {/* Load more (M5c keyset pagination) */}
+      {jobs.length > 0 && (
+        <div className="flex flex-col items-center gap-1.5 mt-4">
+          {hasNextPage && (
+            <button
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+              className="px-4 py-2 rounded-lg text-xs border border-white/10 text-slate-300 hover:text-white hover:border-white/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            >
+              {isFetchingNextPage ? "Loading…" : "Load more"}
+            </button>
+          )}
           <span className="text-[10px] text-slate-500">
-            {page * limit + 1}–{Math.min((page + 1) * limit, total)} of {total}
+            Showing {jobs.length} of {total}
           </span>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
-              className="px-3 py-1.5 rounded-lg text-xs border border-white/10 text-slate-400 disabled:opacity-30"
-            >
-              Prev
-            </button>
-            <button
-              onClick={() => setPage((p) => p + 1)}
-              disabled={(page + 1) * limit >= total}
-              className="px-3 py-1.5 rounded-lg text-xs border border-white/10 text-slate-400 disabled:opacity-30"
-            >
-              Next
-            </button>
-          </div>
         </div>
       )}
     </div>

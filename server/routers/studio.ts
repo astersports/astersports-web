@@ -484,7 +484,9 @@ export const studioRouter = router({
       z.object({
         limit: z.number().min(1).max(100).default(24),
         offset: z.number().min(0).default(0),
-        cursor: z.string().max(512).optional(), // M5c: keyset (load-more); precedence over offset
+        // M5c: keyset (load-more); precedence over offset. nullish() because
+        // tRPC useInfiniteQuery sends cursor:null on the first page.
+        cursor: z.string().max(512).nullish(),
         status: z.string().optional(),
         search: z.string().max(200).optional(),
         favoritesOnly: z.boolean().optional(),
@@ -500,7 +502,7 @@ export const studioRouter = router({
       const result = await listTenantJobsEnhanced(ctx.tenant.id, {
         limit: input.limit,
         offset: input.offset,
-        cursor: input.cursor,
+        cursor: input.cursor ?? undefined,
         status: input.status,
         search: input.search,
         favoritesOnly: input.favoritesOnly,
