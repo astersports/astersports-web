@@ -1,14 +1,16 @@
-# FINAL SPEC — Studio Density v2: Proportional Redistribution (**Option B**)
+# SPEC — Studio Density v2: Proportional Redistribution (**Option B**)
 
 **Repo:** `astersports/astersports-web` · **Area:** `server/_core/studio/` · **Verified against commit `55577c7`** (SHAs in §10).
 **Executor:** Claude Code (chat) or Crostini (terminal) — §1 protocol is identical for both.
-**Status:** DARK. New op + new flag, not router-wired. **Draft PR only — do not merge, do not flip the flag.**
+**Status:** DARK. New op + new flag, not router-wired. Implementation shipped dark in #16; **the flag is not flipped.**
+
+> **Status (as merged).** This spec is merged as the **record** for Density v2. Its **deterministic core** (the §2–§7 composite path) shipped **dark** in **#16** (`STUDIO_DENSITY_REDISTRIBUTE` default off, not router-wired). The **generative-render** alternative noted in D1 / §8 is **deferred** and stays gated on the SAM2 provider flip (G2 privacy) + a real-garment per-route eval (G3). The open review threads on this PR track that deferred path's safety requirements and are intentionally left open for it. Merging this doc flips nothing.
 
 ## 0. Governance (non-negotiable — this repo had a live-flag incident; `CLAUDE.md` governs)
 1. **Branch, never `main`.** `feat/density-redistribute`. Open a **DRAFT** PR. No merge, no force-push to main.
 2. **Your own identity.** Commit as the executing agent. Do **NOT** author as Frank / `admin@legacyhoopers.org`. `Co-Authored-By:` is fine.
 3. **Ship dark behind a NEW flag.** `ENV.studioDensityRedistribute` (`STUDIO_DENSITY_REDISTRIBUTE === "true"`, default **off**), patterned on `studioDensityLive`. Not router-wired. Wiring + flip are **Frank's**, after gates.
-4. **Don't alter live behavior.** Do not change `densityThin`, `generateDensityImage`, or the `studioDensityLive` path. The only edit to existing code is adding `export` to `computeNNI` in `eval/densityMetrics.ts` (one word, behavior-preserving). Everything else is new files.
+4. **Don't alter live behavior.** Do not change `densityThin`, `generateDensityImage`, or the `studioDensityLive` path. Edits to existing files are **additive only** and enumerated in §5 — a new `STUDIO_DENSITY_REDISTRIBUTE` flag in `_core/env.ts`, `export computeNNI` in `eval/densityMetrics.ts`, and a new `generateDensityRedistributeImage` entrypoint in `aiEngine.ts`; **no existing function is modified.** Everything else is new files.
 5. **Never touch the money path.** No edits to `billing.ts`, `studioDb.ts`, `webhook.ts`, `shadowBilling.ts`. Preserve the count-based refund contract (§4.5). Anything implying a billing change → `TODO(architect)` and stop (Architect-scoped, `CLAUDE.md` §4).
 6. **Respect existing guards.** Honor `ENV.studioMaxMegapixels` (40MP decode cap) and `studioMaxConcurrentDecodes` (H6). Thread `Sam2AuditContext` through the new live entrypoint exactly as `generateDensityImage` does (C5).
 7. **Eval runs ungated** (Decision 5 in `env.ts`). Do not add an eval flag.
@@ -22,7 +24,7 @@ npx tsc --noEmit
 npx vitest run server/densityRedistribute.test.ts server/blueNoiseLayout.test.ts \
                server/assignTargets.test.ts server/redistributeMetrics.test.ts
 npx tsx server/_core/studio/eval/redistributeEval.ts eval/samples/redistribute.manifest.json
-git commit -am "feat(studio): density v2 proportional redistribution (dark, behind STUDIO_DENSITY_REDISTRIBUTE)"
+git add -A && git commit -m "feat(studio): density v2 proportional redistribution (dark, behind STUDIO_DENSITY_REDISTRIBUTE)"  # add -A: new files won't be staged by commit -am
 git push -u origin feat/density-redistribute && gh pr create --draft   # body = §9 checklist
 ```
 **Definition of done:** typecheck clean; 4 test files pass; eval `verdict.pass` on the synthetic manifest; flag default off; `densityThin`/`generateDensityImage` untouched; PR is a **draft**. **Do not merge. Do not flip the flag.**
@@ -91,7 +93,7 @@ export async function generateDensityRedistributeImage(
   originalImageUrl: string, percent: number, audit?: Sam2AuditContext
 ): Promise<{ png: Buffer; removed: number } | null>
 ```
-`studio.generate` selects it only when `ENV.studioDensityRedistribute` is on; otherwise the existing path is untouched.
+**Router wiring is deferred to Frank — not in the implementation PR.** When wired, `studio.generate` will select it only when `ENV.studioDensityRedistribute` is on; until then `studio.generate` stays unchanged and the op is unreachable.
 
 ## 8. Open questions for Frank / Architect
 - Ratify D1–D4 (esp. D1 deterministic-composite-first; D3 orientation).
