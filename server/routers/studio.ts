@@ -484,6 +484,7 @@ export const studioRouter = router({
       z.object({
         limit: z.number().min(1).max(100).default(24),
         offset: z.number().min(0).default(0),
+        cursor: z.string().max(512).optional(), // M5c: keyset (load-more); precedence over offset
         status: z.string().optional(),
         search: z.string().max(200).optional(),
         favoritesOnly: z.boolean().optional(),
@@ -498,6 +499,7 @@ export const studioRouter = router({
       const result = await listTenantJobsEnhanced(ctx.tenant.id, {
         limit: input.limit,
         offset: input.offset,
+        cursor: input.cursor,
         status: input.status,
         search: input.search,
         favoritesOnly: input.favoritesOnly,
@@ -514,6 +516,7 @@ export const studioRouter = router({
           controls: j.controls ? JSON.parse(j.controls) : null,
         })),
         total: result.total,
+        nextCursor: result.nextCursor,
       };
     }),
 
@@ -537,6 +540,7 @@ export const studioRouter = router({
       z.object({
         limit: z.number().min(1).max(100).default(25),
         offset: z.number().min(0).default(0),
+        cursor: z.string().max(512).optional(), // M5c: keyset (load-more); precedence over offset
         reason: z.string().optional(),
         from: z.number().optional(),
         to: z.number().optional(),
@@ -548,6 +552,7 @@ export const studioRouter = router({
       return listCreditLedger(ctx.tenant.id, {
         limit: input.limit,
         offset: input.offset,
+        cursor: input.cursor,
         reason: input.reason,
         from: input.from,
         to: input.to,

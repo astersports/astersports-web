@@ -22,6 +22,7 @@ import {
   type InsertCreditLedgerEntry,
 } from "../drizzle/schema";
 import { TRIAL_DURATION_DAYS } from "../shared/billing";
+import { encodeCursor, decodeCursor } from "./cursor";
 
 /**
  * M6: escape LIKE metacharacters in user-supplied search terms so `%`/`_` are
@@ -405,6 +406,7 @@ export async function listTenantJobsEnhanced(
   opts: {
     limit?: number;
     offset?: number;
+    cursor?: string;    // M5c: keyset cursor (load-more); takes precedence over offset
     status?: string;
     search?: string;
     favoritesOnly?: boolean;
@@ -416,7 +418,7 @@ export async function listTenantJobsEnhanced(
   } = {}
 ) {
   const db = await getDb();
-  if (!db) return { jobs: [], total: 0 };
+  if (!db) return { jobs: [], total: 0, nextCursor: null };
 
   const limit = opts.limit ?? 24;
   const offset = opts.offset ?? 0;
@@ -458,33 +460,67 @@ export async function listTenantJobsEnhanced(
   }
   const condition = and(...conditions);
 
-  // Determine sort order
-  let orderClause;
+  // M5c: order by the chosen column with the PK as a tiebreaker, so the order is
+  // total and keyset cursors stay stable across rows with equal sort keys.
+  // creditsUsed is nullable — coalesce so ordering/keyset stay stable across NULLs.
+  const sortBy = opts.sortBy ?? "date";
   const dir = opts.sortDir ?? "desc";
-  switch (opts.sortBy) {
-    case "credits":
-      orderClause = dir === "asc" ? sql`${jobs.creditsUsed} ASC` : sql`${jobs.creditsUsed} DESC`;
-      break;
-    case "title":
-      orderClause = dir === "asc" ? sql`${jobs.title} ASC` : sql`${jobs.title} DESC`;
-      break;
-    default:
-      orderClause = dir === "asc" ? sql`${jobs.createdAt} ASC` : sql`${jobs.createdAt} DESC`;
+  const sortCol =
+    sortBy === "credits"
+      ? sql`COALESCE(${jobs.creditsUsed}, 0)`
+      : sortBy === "title"
+      ? jobs.title
+      : jobs.createdAt;
+  const dirKw = dir === "asc" ? sql`asc` : sql`desc`;
+  const orderClause = sql`${sortCol} ${dirKw}, ${jobs.id} ${dirKw}`;
+
+  // M5c keyset predicate (load-more): rows strictly past the cursor in sort
+  // order. Ignore a cursor whose key type doesn't match the active sort (stale,
+  // cross-sort, or tampered) so we degrade to the first page instead of coercing
+  // it into NaN dates / bad comparisons. Built separately from `condition` so the
+  // total count ignores the cursor; a cursor pins offset to 0.
+  const expectKey = sortBy === "title" ? "string" : "number";
+  const rawDecoded = opts.cursor ? decodeCursor(opts.cursor) : null;
+  const decoded = rawDecoded && typeof rawDecoded.k === expectKey ? rawDecoded : null;
+  let rowCondition = condition;
+  if (decoded) {
+    const kVal = sortBy === "date" ? new Date(Number(decoded.k)) : decoded.k;
+    const keyset =
+      dir === "asc"
+        ? sql`(${sortCol} > ${kVal} OR (${sortCol} = ${kVal} AND ${jobs.id} > ${decoded.id}))`
+        : sql`(${sortCol} < ${kVal} OR (${sortCol} = ${kVal} AND ${jobs.id} < ${decoded.id}))`;
+    rowCondition = and(condition, keyset);
   }
+  const effectiveOffset = decoded ? 0 : offset;
 
   const [jobRows, countResult] = await Promise.all([
     db
       .select()
       .from(jobs)
-      .where(condition)
+      .where(rowCondition)
       .orderBy(orderClause)
       .limit(limit)
-      .offset(offset),
+      .offset(effectiveOffset),
     db
       .select({ count: sql<number>`count(*)` })
       .from(jobs)
       .where(condition),
   ]);
+
+  // M5c: nextCursor when a full page came back (more may remain) — encodes the
+  // last row's sort-key value + id for the following keyset page.
+  const lastJob = jobRows[jobRows.length - 1];
+  const nextCursor =
+    jobRows.length === limit && lastJob
+      ? encodeCursor(
+          sortBy === "credits"
+            ? lastJob.creditsUsed ?? 0
+            : sortBy === "title"
+            ? lastJob.title
+            : lastJob.createdAt.getTime(),
+          lastJob.id
+        )
+      : null;
 
   // Fetch variations for all returned jobs in one query
   const jobIds = jobRows.map((j) => j.id);
@@ -526,7 +562,7 @@ export async function listTenantJobsEnhanced(
     userName: userMap[j.userId]?.name || userMap[j.userId]?.email?.split("@")[0] || "Unknown",
   }));
 
-  return { jobs: enrichedJobs, total: countResult[0]?.count ?? 0 };
+  return { jobs: enrichedJobs, total: countResult[0]?.count ?? 0, nextCursor };
 }
 
 /**
@@ -733,10 +769,10 @@ export async function getVariationByResultKey(resultKey: string) {
 
 export async function listCreditLedger(
   tenantId: number,
-  opts: { limit?: number; offset?: number; reason?: string; from?: number; to?: number; search?: string; userId?: number } = {}
+  opts: { limit?: number; offset?: number; cursor?: string; reason?: string; from?: number; to?: number; search?: string; userId?: number } = {}
 ) {
   const db = await getDb();
-  if (!db) return { entries: [], total: 0 };
+  if (!db) return { entries: [], total: 0, nextCursor: null };
 
   const limit = opts.limit ?? 50;
   const offset = opts.offset ?? 0;
@@ -763,6 +799,23 @@ export async function listCreditLedger(
   }
   const condition = and(...conditions);
 
+  // M5c keyset (load-more): rows past the cursor in (createdAt, id) DESC order.
+  // Separate from `condition` so the total count ignores the cursor; a cursor
+  // pins offset to 0 (cursor and offset are mutually exclusive). Ignore a cursor
+  // whose key isn't a numeric epoch-ms (stale/tampered) so we degrade to the
+  // first page instead of new Date(NaN) / confusing empty pages.
+  const rawDecoded = opts.cursor ? decodeCursor(opts.cursor) : null;
+  const decoded = rawDecoded && typeof rawDecoded.k === "number" ? rawDecoded : null;
+  let rowCondition = condition;
+  if (decoded) {
+    const kVal = new Date(decoded.k);
+    rowCondition = and(
+      condition,
+      sql`(${creditLedger.createdAt} < ${kVal} OR (${creditLedger.createdAt} = ${kVal} AND ${creditLedger.id} < ${decoded.id}))`
+    );
+  }
+  const effectiveOffset = decoded ? 0 : offset;
+
   const [entries, countResult] = await Promise.all([
     db
       .select({
@@ -788,17 +841,25 @@ export async function listCreditLedger(
         // numeric refId collision could surface another tenant's job metadata.
         sql`${creditLedger.refId} IS NOT NULL AND ${jobs.tenantId} = ${creditLedger.tenantId} AND ${jobs.id} = CAST(REPLACE(REPLACE(${creditLedger.refId}, 'job-', ''), '-failed', '') AS UNSIGNED)`
       )
-      .where(condition)
-      .orderBy(desc(creditLedger.createdAt))
+      .where(rowCondition)
+      .orderBy(desc(creditLedger.createdAt), desc(creditLedger.id))
       .limit(limit)
-      .offset(offset),
+      .offset(effectiveOffset),
     db
       .select({ count: sql<number>`count(*)` })
       .from(creditLedger)
       .where(condition),
   ]);
 
-  return { entries, total: countResult[0]?.count ?? 0 };
+  // M5c: nextCursor when a full page came back — (createdAt ms, id) of the last
+  // entry for the following keyset page.
+  const lastEntry = entries[entries.length - 1];
+  const nextCursor =
+    entries.length === limit && lastEntry
+      ? encodeCursor(lastEntry.createdAt.getTime(), lastEntry.id)
+      : null;
+
+  return { entries, total: countResult[0]?.count ?? 0, nextCursor };
 }
 
 // ─── Favorites ──────────────────────────────────────────────────────────────
