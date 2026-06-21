@@ -642,3 +642,4 @@
 - [x] Add search input to mobile archive
 - [x] Fix detail slideshow header overflow on mobile (text overlapping)
 - [x] Improve mobile detail view layout for small screens
+- [x] Add "Favorites only" toggle to mobile filter panel

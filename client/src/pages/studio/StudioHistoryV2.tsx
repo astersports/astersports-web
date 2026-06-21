@@ -1354,6 +1354,7 @@ function MobileCardList({
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const limit = 20;
 
@@ -1364,7 +1365,7 @@ function MobileCardList({
   }, [search]);
 
   // Reset page when filters change
-  useEffect(() => { setPage(0); }, [debouncedSearch, status, typeFilter]);
+  useEffect(() => { setPage(0); }, [debouncedSearch, status, typeFilter, favoritesOnly]);
 
   const { tenant } = useTenant();
   const { data, isLoading, isFetching } = trpc.studio.historyArchive.useQuery(
@@ -1382,13 +1383,19 @@ function MobileCardList({
 
   const allJobs = data?.jobs ?? [];
   const jobs = useMemo(() => {
-    if (typeFilter === "all") return allJobs;
-    return allJobs.filter((j) => getEditType(j.controls).toLowerCase() === typeFilter);
-  }, [allJobs, typeFilter]);
+    let filtered = allJobs;
+    if (favoritesOnly) {
+      filtered = filtered.filter((j) => favoriteIds.has(j.id));
+    }
+    if (typeFilter !== "all") {
+      filtered = filtered.filter((j) => getEditType(j.controls).toLowerCase() === typeFilter);
+    }
+    return filtered;
+  }, [allJobs, typeFilter, favoritesOnly, favoriteIds]);
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / limit);
 
-  const hasActiveFilters = status !== "all" || typeFilter !== "all" || debouncedSearch.length > 0;
+  const hasActiveFilters = status !== "all" || typeFilter !== "all" || debouncedSearch.length > 0 || favoritesOnly;
 
   return (
     <div>
@@ -1446,10 +1453,27 @@ function MobileCardList({
               <option value="remove">Remove</option>
             </select>
           </div>
+          {/* Favorites toggle */}
+          <button
+            onClick={() => setFavoritesOnly(!favoritesOnly)}
+            className={`flex items-center gap-2 w-full px-3 py-2.5 rounded-lg border transition-all duration-200 ${
+              favoritesOnly
+                ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
+                : "border-white/10 bg-white/[0.03] text-slate-400"
+            }`}
+          >
+            <Star className={`w-4 h-4 ${favoritesOnly ? "fill-amber-400" : ""}`} />
+            <span className="text-sm font-medium">Favorites only</span>
+            {favoritesOnly && (
+              <span className="ml-auto text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded-full">
+                {allJobs.filter((j) => favoriteIds.has(j.id)).length}
+              </span>
+            )}
+          </button>
           {/* Clear filters */}
           {hasActiveFilters && (
             <button
-              onClick={() => { setSearch(""); setStatus("all"); setTypeFilter("all"); }}
+              onClick={() => { setSearch(""); setStatus("all"); setTypeFilter("all"); setFavoritesOnly(false); }}
               className="text-xs text-amber-400 hover:text-amber-300 underline"
             >
               Clear all filters
