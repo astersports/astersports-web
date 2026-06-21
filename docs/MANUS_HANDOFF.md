@@ -24,6 +24,10 @@ M5b, M6b.**
 Already shipped (CC lane, merged — do not redo): #24 individual-account Admin
 scoping + full-export ledger CSV.
 
+**Label note:** the task labels **M1–M6** in this order are local to it and are
+**distinct** from the `M1`/`M2` in `STUDIO_REVIEW.md` (scale no-op-billing /
+frozen-restore — already merged). Different items, same letters.
+
 ---
 
 ## 0. RULES OF ENGAGEMENT — read first, do not deviate
@@ -35,10 +39,13 @@ scoping + full-export ledger CSV.
 3. **Never flip.** Do not set or change any `*_LIVE` flag, `STUDIO_MASK_PROVIDER`,
    or any prod env/secret (incl. live Stripe keys). Those are Frank's by-hand
    action (CLAUDE.md §1). You **prepare + hand Frank the verified SHA**; he flips.
-4. **Do not weaken the credit primitives.** `grantCredits` (check-first idempotent
-   on `(refId, reason)` + unique index), `deductCredits` (atomic conditional
-   `UPDATE … WHERE creditBalance >= amount` under row lock), and the `stripeEvents`
-   PK webhook dedupe are correct. Build **on** them; never bypass or alter them.
+4. **Do not weaken the credit primitives.** `grantCredits` **and** `deductCredits`
+   are **both** now check-first idempotent on `(refId, reason)` (+ the unique-index
+   backstop), on top of `deductCredits`' atomic conditional
+   `UPDATE … WHERE creditBalance >= amount` under row lock; the `stripeEvents` PK
+   dedupes webhooks. (deductCredits idempotency landed in the merged money-path
+   fixes on `main`, PR #25 — re-pin before building.) Build **on** these; never
+   bypass or alter them.
 5. **Do not touch the legacy `billingClients` / "Web Maintenance" path.** Frank
    said keep it untouched. It is separate from Studio.
 6. **Green gates.** Before marking any PR ready: `pnpm run check` and
@@ -50,7 +57,17 @@ scoping + full-export ledger CSV.
 ---
 
 ## TASK M1 — Reverse-trial must create a recurring subscription
-**File:** `server/shadowBilling.ts` (`processTrialAutoCharges`, `convertTrialToPaid`)
+**Files:** `server/shadowBilling.ts` (`processTrialAutoCharges`, `convertTrialToPaid`)
++ `server/routers/studioBilling.ts` (export `ensureStudioPrice`).
+
+> **Scope note (resolves Rule #1):** reusing `ensureStudioPrice` requires
+> exporting it — it is currently a **private** `async function` in
+> `studioBilling.ts`. Export it (or relocate it to `server/stripe.ts`); either
+> way that file is **in M1's scope**, so touching it does not breach Rule #1. Its
+> signature already accepts the `'month'` interval. **Re-pin against current
+> `main` first:** `deductCredits` is now idempotent (PR #25) and several
+> money-path fixes (scale no-op-billing, frozen-restore refId, rerun refId)
+> merged since this order was drafted.
 
 **Verified problem:** `processTrialAutoCharges` charges a **one-off PaymentIntent**;
 `convertTrialToPaid` sets `plan='starter'` + grants credits but **creates no Stripe
