@@ -105,7 +105,7 @@ export function registerStudioStreamRoutes(app: Express) {
     const jobId = Number(body.jobId);
     const rawControls = body.controls;
     if (!Number.isInteger(tenantId) || !Number.isInteger(jobId)) {
-      res.status(400).json({ error: "Missing or invalid tenantId or jobId" });
+      res.status(400).json({ error: "Missing tenantId or jobId" });
       return;
     }
 
