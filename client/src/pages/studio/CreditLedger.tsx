@@ -531,6 +531,7 @@ function ChronologicalView({
               disabled={page === 0}
               onClick={() => setPage(0)}
               title="First page"
+              aria-label="First page"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
               <ChevronLeft className="w-3.5 h-3.5 -ml-2" />
@@ -542,6 +543,7 @@ function ChronologicalView({
               disabled={page === 0}
               onClick={() => setPage((p) => p - 1)}
               title="Previous page"
+              aria-label="Previous page"
             >
               <ChevronLeft className="w-4 h-4" />
             </Button>
@@ -584,6 +586,7 @@ function ChronologicalView({
               disabled={page >= totalPages - 1}
               onClick={() => setPage((p) => p + 1)}
               title="Next page"
+              aria-label="Next page"
             >
               <ChevronRight className="w-4 h-4" />
             </Button>
@@ -594,6 +597,7 @@ function ChronologicalView({
               disabled={page >= totalPages - 1}
               onClick={() => setPage(totalPages - 1)}
               title="Last page"
+              aria-label="Last page"
             >
               <ChevronRight className="w-3.5 h-3.5" />
               <ChevronRight className="w-3.5 h-3.5 -ml-2" />
