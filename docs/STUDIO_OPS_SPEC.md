@@ -48,7 +48,7 @@ Worked examples (the contract, in plain terms):
 
 **Invariants.** Layout type and spacing ratios constant; coverage constant (this is what keeps Scale orthogonal to Density); garment frozen; byte-identical outside mask; deterministic.
 
-**Acceptance.** `scaleRatioError ≤ 0.15` (lattice-vector ratio primary; log-polar phase-correlation cross-check); `paletteDeltaE ≤ 5`; `poseBgDeltaE ≤ 2` excluded; **coverage-delta ≈ 0** (orthogonality). Metric confidence = MIN across axes.
+**Acceptance.** `scaleRatioError ≤ 0.15` (lattice-vector ratio primary; log-polar phase-correlation cross-check); `paletteDeltaE ≤ 5`; `poseBgDeltaE ≤ 2` excluded; **coverage-delta ≤ 0.02** — coverage = (motif pixels inside the fabric mask) / (fabric-mask pixels); require `|coverage_out − coverage_in| ≤ 0.02` (orthogonality: Scale must not move Density's count axis; tolerance is a calibration start). Metric confidence = MIN across axes.
 
 **Guards.** Empty → NO_OP; upscale DPI guard `effectiveDPI = sourceDPI/f`, reject `< 150` if DPI present; shrink min-feature advisory `0.02"` (wire it); non-repeat → router (center-resize), not reject.
 

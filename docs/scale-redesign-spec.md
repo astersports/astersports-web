@@ -1,7 +1,7 @@
 # Scale Redesign Spec — Industry-Standard Repeat-Scale (lattice-aware)
 
 **Status:** DRAFT for review (Architect sign-off + Frank flag control required before any flip).
-**Repo:** `astersports/astersports-web` — code claims pinned at `main` HEAD `d6fdc9fb38f562190938f3ce336adb57d9276194` (re-validated 2026-06-21: the only commit since baseline `99166fb` was an invite-links / admin-UX checkpoint that touched none of the files cited here, so every blob SHA below is byte-identical at HEAD).
+**Repo:** `astersports/astersports-web` — code claims pinned at `main` HEAD `d6fdc9fb38f562190938f3ce336adb57d9276194` (re-validated 2026-06-21: the only commit since baseline `99166fb` was an invite-links / admin-UX checkpoint that touched none of the files cited here, so every blob SHA below is byte-identical at HEAD). *Re-pin these SHAs against current `main` before implementation — `main` moves continuously; this provenance is a snapshot, not a standing guarantee.*
 **Scope:** redesign the Print Studio **Scale** op to the textile/industry standard so it composes cleanly with **Density**. Standalone-first; chaining designed-in.
 **Provenance of this doc:** authored from (a) a verbatim read of the existing scale code at the pinned commit and (b) a cited literature pass (see §13). It supersedes nothing on its own — it is handoff text for the agent with write access to commit, and a replacement Scale section for `docs/STUDIO_OPS_SPEC.md` (the replacement block, formerly §11 of this handoff, has been spliced into `STUDIO_OPS_SPEC.md` under "## 2. SCALE").
 
@@ -98,7 +98,7 @@ A prior direction was "motifs change size but **not** position" (resize each mot
 Keep the spec-of-record pass bar and add an orthogonality check:
 - **Primary — lattice-vector-length ratio.** `f_achieved = ‖v1_out‖ / ‖v1_in‖` (and `v2`), compared to target `f`. This is the 2-D generalization of the period estimator that `scaleMetrics.ts` already calls primary (autocorr out/in ratio) [code @f632eb8, Architect ruling R3].
 - **Global cross-check — log-polar scale.** Reddy–Chatterji: the log-polar transform of the Fourier magnitude turns scale into a shift recoverable by phase correlation [9][10]; gives a whole-image `f` estimate independent of the lattice fit.
-- **Orthogonality invariant — coverage-delta ≈ 0.** Scale must not change motif coverage fraction (that's Density's axis). Measure `|coverage_out − coverage_in|`; require ≈ 0. **This is the new check** that protects the Scale/Density split (§10).
+- **Orthogonality invariant — coverage-delta (numeric, testable).** Scale must not change motif coverage fraction (that's Density's axis). Define **coverage = (motif pixels inside the fabric mask) / (fabric-mask pixels)** — the figure-to-ground ratio over the fabric window, measured from the instance/segmentation masks. Require **`|coverage_out − coverage_in| ≤ 0.02`** (≤ 2 percentage points; resampling + feather quantization make an exact 0 unattainable). The `0.02` tolerance is a calibration starting point — tune on the labeled set. **This is the new check** that protects the Scale/Density split (§10).
 - **Unchanged pass thresholds** (match §2.4/§8 [code @9c023b8] and `scaleMetrics.ts` [code @f632eb8]): `scaleRatioError ≤ 0.15`, `paletteDeltaE ≤ 5` (reuse `fabricPalette` kmeans-5 LAB), `poseBgDeltaE ≤ 2` **excluded** from pass. Metric confidence = MIN across axes (the conservative reading the metric already uses).
 
 ---
