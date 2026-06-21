@@ -540,7 +540,9 @@ export const studioRouter = router({
       z.object({
         limit: z.number().min(1).max(100).default(25),
         offset: z.number().min(0).default(0),
-        cursor: z.string().max(512).optional(), // M5c: keyset (load-more); precedence over offset
+        // M5c: keyset (load-more); precedence over offset. nullish() because
+        // tRPC useInfiniteQuery sends cursor:null on the first page.
+        cursor: z.string().max(512).nullish(),
         reason: z.string().optional(),
         from: z.number().optional(),
         to: z.number().optional(),
@@ -552,7 +554,7 @@ export const studioRouter = router({
       return listCreditLedger(ctx.tenant.id, {
         limit: input.limit,
         offset: input.offset,
-        cursor: input.cursor,
+        cursor: input.cursor ?? undefined,
         reason: input.reason,
         from: input.from,
         to: input.to,
