@@ -46,6 +46,8 @@ function sendSSE(res: Response, data: Record<string, unknown>, finished: { value
   if (finished.value) return;
   try {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
+    // Force flush through any proxy buffering layer
+    if (typeof (res as any).flush === "function") (res as any).flush();
   } catch {
     // Connection already closed — swallow
   }
@@ -262,20 +264,30 @@ export function registerStudioStreamRoutes(app: Express) {
     }
 
     // ─── 10. Set SSE headers and begin streaming ──────────────────────────────
+    // Disable Node.js default 2-minute socket timeout — SAM2 processing can
+    // take 30–120s and we don't want the socket killed mid-stream.
+    req.socket?.setTimeout(0);
+
     res.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       "Connection": "keep-alive",
       "X-Accel-Buffering": "no", // Disable nginx buffering
+      "X-Content-Type-Options": "nosniff", // Prevent content sniffing that could buffer
     });
+    // Flush headers immediately so the proxy starts streaming to the client NOW.
+    res.flushHeaders();
+
+    // 2KB padding to force the proxy past its buffering threshold into streaming mode.
+    res.write(`: ${"x".repeat(2048)}\n\n`);
 
     // Send initial event
     sendSSE(res, { type: "started", jobId: job.id, creditCost, newBalance }, finished);
 
-    // Start heartbeat interval (every 5s)
+    // Start heartbeat interval — every 3s to stay within proxy idle timeout.
     const heartbeatInterval = setInterval(() => {
       sendSSE(res, { type: "heartbeat", elapsed: Date.now() }, finished);
-    }, 5000);
+    }, 3000);
 
     // R2: on client disconnect, stop awaiting the work and abort the race so the
     // catch below refunds + marks the job failed PROMPTLY, instead of leaving it

@@ -89,6 +89,7 @@ function createMockReq(body: any = {}) {
   return {
     body,
     headers: { cookie: "session=abc" },
+    socket: { setTimeout: vi.fn() },
     on: vi.fn((event: string, cb: Function) => {
       if (!listeners[event]) listeners[event] = [];
       listeners[event].push(cb);
@@ -105,6 +106,7 @@ function createMockRes() {
     status: vi.fn().mockReturnThis(),
     json: vi.fn().mockReturnThis(),
     writeHead: vi.fn(),
+    flushHeaders: vi.fn(),
     write: vi.fn((chunk: string) => {
       chunks.push(chunk);
       return true;
