@@ -38,6 +38,28 @@ Worked examples (the contract, in plain terms):
 
 ## 2. SCALE
 
+> **REDESIGN (draft, pending Architect SHA sign-off — see `docs/scale-redesign-spec.md`).** The lattice-aware repeat-scale section below supersedes the v1 §2.1–§2.7 mechanism that follows it. The v1 text is retained beneath for review diff and is deleted on adoption. No flag flip, no money-path change: `STUDIO_SCALE_LIVE` stays default-off; the detector-calibration gate still governs the flip.
+
+### Scale (vN+1 — lattice-aware repeat-scale)
+
+**Definition.** Scale resizes the entire repeat by one factor `f` — motifs and spacing together — preserving coverage and layout type. Shrink fits more of the repeat in view; enlarge fits less. (`targetFraction = (100+percent)/100`; `percent` clamped `[-50,+100]` at the tRPC boundary → `f ∈ [0.5, 2.0]`.)
+
+**Mechanism (built target).** (1) Recover the 2-D lattice — two generating vectors — from the masked fabric via 2-D autocorrelation-surface peaks, with robust/symmetry variants. (2) Classify layout from the lattice offset: full-drop (offset ≈ 0), half-drop (½H on the horizontal step), brick (½W on the vertical step), mirror (reflection symmetry). (3) Route: true repeat → lattice re-tile; single placed graphic / aperiodic → resize about centroid; border → frieze-axis scale. (4) Lattice path: scale tile + generating vectors by `f` (map `L→Lr`, warp), re-tile on the scaled lattice preserving original phase, seam via min-error-cut quilting / graph-cut / symmetry-guided. (5) Anti-alias on shrink (lanczos3 v1; content-adaptive / perceptual follow-up). (6) Composite with existing 1-σ feather, byte-identical-outside, alpha-preserve.
+
+**Invariants.** Layout type and spacing ratios constant; coverage constant (this is what keeps Scale orthogonal to Density); garment frozen; byte-identical outside mask; deterministic.
+
+**Acceptance.** `scaleRatioError ≤ 0.15` (lattice-vector ratio primary; log-polar phase-correlation cross-check); `paletteDeltaE ≤ 5`; `poseBgDeltaE ≤ 2` excluded; **coverage-delta ≈ 0** (orthogonality). Metric confidence = MIN across axes.
+
+**Guards.** Empty → NO_OP; upscale DPI guard `effectiveDPI = sourceDPI/f`, reject `< 150` if DPI present; shrink min-feature advisory `0.02"` (wire it); non-repeat → router (center-resize), not reject.
+
+**Go-live gate (unchanged).** `repeatDetector.ts` graduates from dormant to the live analyzer and is the hard Scale blocker; its thresholds are **calibrated on a labeled allover/border/placement garment set before the flag flips**. Interim `MIN_REPEAT_CONFIDENCE = 0.2` floor stays live until then. `STUDIO_SCALE_LIVE` default off; SAM2 live + real-garment eval + prod-dark + Architect SHA sign-off; Frank flips one flag at a time.
+
+**Composability.** Scale (size axis) and Density (count axis) are orthogonal and commute; both land at motif size `f·s`, coverage `(1−p)·C`. Canonical chain order scale → density (re-segment instances after Scale). v1 runs standalone (D-A reject retained); chaining is a later flag-flip over shared machinery.
+
+---
+
+> **SUPERSEDED v1 mechanism (retained for review diff; delete on adoption of the redesign above).**
+
 ### 2.1 Fashion definition
 Scaling a print is uniformly enlarging or reducing the entire repeat, every motif and the spacing between motifs, by one proportional factor. It is a single transform of the repeat unit. Individual motifs are never redrawn, distorted, or resized relative to one another. They stay identical to each other and to the original artwork; only their absolute size changes. After scaling, the design must still tile continuously and read as the same print at a new size. Scaling down means smaller motifs, and because the repeat is smaller more of it appears in the same area, so the eye sees more motifs. Scaling up means larger motifs and fewer in view. The change in how many motifs appear is a consequence of resizing the one repeat, not the addition or removal of motifs.
 
