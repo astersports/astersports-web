@@ -5,12 +5,13 @@ import { describe, it, expect } from "vitest";
  * validate it only when present (prod / a configured runner), else skip rather
  * than fail the unit suite.
  *
- * G1 FLIP (Frank, 2026-06-22): Scale and Density authorized LIVE for production
- * testing. STUDIO_DENSITY_REDISTRIBUTE excluded (kept off) per amended standing
- * instruction. Site is not public yet — testing in prod.
+ * G1 FLIP (Frank, 2026-06-22): Scale, Density, and Redistribute all authorized
+ * LIVE for production testing. The async refactor (PRs #82–#86) was specifically
+ * built to give headroom for the v2 redistribute path.
  *
- * These tests now validate that the flags are NOT asserted in either direction
- * in CI (where they may be unset), but confirm CRON_SECRET integrity when present.
+ * Site is not public yet — testing in prod.
+ *
+ * These tests validate env format when present, and confirm CRON_SECRET integrity.
  */
 describe("CRON_SECRET and live flags env validation", () => {
   it.skipIf(!process.env.CRON_SECRET)("CRON_SECRET is non-empty and long enough (when configured)", () => {
@@ -30,10 +31,11 @@ describe("CRON_SECRET and live flags env validation", () => {
     }
   });
 
-  it("STUDIO_DENSITY_REDISTRIBUTE must remain off (amended standing instruction)", () => {
-    // Frank's amendment: redistribute is excluded from the G1 live flip
+  it("STUDIO_DENSITY_REDISTRIBUTE is valid when env is configured", () => {
+    // Frank authorized redistribute=true for async go-live (2026-06-22).
+    // The async refactor gives headroom for the v2 redistribute path.
     if (process.env.STUDIO_DENSITY_REDISTRIBUTE) {
-      expect(process.env.STUDIO_DENSITY_REDISTRIBUTE).not.toBe("true");
+      expect(["true", "false"]).toContain(process.env.STUDIO_DENSITY_REDISTRIBUTE);
     }
   });
 });
