@@ -11,6 +11,7 @@ import { detectPrintElements, generateEditedImage, NON_REPEAT_SCALE_ERROR } from
 import { runVariation } from "../studioEngine";
 import { ENV } from "../_core/env";
 import { getMaskProvider } from "../_core/masking";
+import { startSam2Segmentation } from "../_core/masking/sam2Provider";
 import { checkUpscaleDpi } from "../_core/studio/guards/dpiGuard";
 import { log } from "../serverLog";
 import {
@@ -29,6 +30,8 @@ import {
   getTrialStatus,
   analyzeTrialUsage,
   getHistoryStats,
+  countJobGenerationAttempts,
+  markJobEnqueued,
 } from "../studioDb";
 import { buildInstruction, computeCredits, deriveEditType, describeExpectedChange, type ControlSettings } from "../../shared/controls";
 import { CREDIT_COST, LOW_BALANCE_THRESHOLD, PLANS, TRIAL_DURATION_DAYS, TRIAL_RECOMMENDATION_START_DAY } from "../../shared/billing";
@@ -235,6 +238,58 @@ export const studioRouter = router({
       // opens the stream on `async:true` (it already routes density/scale there
       // directly via shouldUseStream).
       if (useDeterministicDensity || useDeterministicScale) {
+        // Async path (STUDIO_ASYNC_JOBS): deduct -> locate/crop + startPrediction -> persist, then
+        // return immediately so the request clears the Manus 60s cap; the worker (webhook/cron)
+        // finishes off-request. Flag OFF preserves the exact prior SSE deferral (the SSE endpoint
+        // deducts + runs), so nothing changes until the flip.
+        if (ENV.studioAsyncJobs) {
+          const creditCost = computeCredits(controls, CREDIT_COST);
+          if (creditCost === 0) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "No controls are active" });
+          }
+          if (ctx.tenant.creditBalance < creditCost) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: `Insufficient credits. Need ${creditCost}, have ${ctx.tenant.creditBalance}.` });
+          }
+          // Unique per-attempt deduct refId (mirrors the SSE path) so a regenerate charges.
+          const attemptN = (await countJobGenerationAttempts(job.id)) + 1;
+          const deductRef = `job-${job.id}-a${attemptN}`;
+          let newBalance: number;
+          try {
+            newBalance = await deductCredits(ctx.tenant.id, ctx.user.id, creditCost, "generation", deductRef);
+          } catch (e: any) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: e?.message === "Insufficient credits"
+                ? `Insufficient credits. Need ${creditCost}, have ${ctx.tenant.creditBalance}.`
+                : "Failed to reserve credits. Please try again.",
+            });
+          }
+          try {
+            const { predictionId, meta } = await startSam2Segmentation(
+              { url: job.originalUrl, audit: { orgId: String(ctx.tenant.id), jobId: String(job.id) } },
+              { forDensity: useDeterministicDensity }
+            );
+            await markJobEnqueued(job.id, predictionId, meta, creditCost, JSON.stringify(controls));
+          } catch {
+            // locate/crop/startPrediction failed BEFORE the job was enqueued -> refund + fail, so a
+            // start error never leaves the customer charged for a job the worker will never see.
+            await grantCredits(ctx.tenant.id, creditCost, "refund", `${deductRef}-failed`, ctx.user.id).catch(() => {});
+            await updateJobStatus(job.id, "failed", { errorMessage: "Failed to start generation." }).catch(() => {});
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Couldn't start generation. Your credits have been refunded — please try again in a moment.",
+            });
+          }
+          return {
+            async: true as const,
+            jobId: job.id,
+            status: "sam2_processing" as const,
+            results: [],
+            creditsUsed: creditCost,
+            newBalance,
+            lowBalance: newBalance <= LOW_BALANCE_THRESHOLD,
+          };
+        }
         return {
           async: true as const,
           jobId: job.id,
