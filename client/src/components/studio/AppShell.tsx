@@ -1,6 +1,6 @@
 /**
  * AppShell — Studio layout wrapper with sidebar navigation.
- * Provides consistent nav, tenant selector, and credit balance display.
+ * Provides consistent nav, org switcher, and credit balance display.
  */
 import { Link, useLocation } from "wouter";
 import { useTenant } from "@/contexts/TenantContext";
@@ -9,33 +9,31 @@ import {
   Paintbrush,
   History,
   CreditCard,
-  Users,
+  Building2,
   ChevronLeft,
   Sparkles,
   AlertTriangle,
   BookOpen,
   Shield,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { LOW_BALANCE_THRESHOLD } from "@shared/billing";
 import { TrialBanner } from "./TrialBanner";
+import OrgSwitcher from "./OrgSwitcher";
 
 const NAV_ITEMS = [
   { href: "/studio", label: "Editor", icon: Paintbrush },
   { href: "/studio/history", label: "History", icon: History },
   { href: "/studio/ledger", label: "Credit Ledger", icon: BookOpen },
   { href: "/studio/billing", label: "Billing", icon: CreditCard },
-  { href: "/studio/admin", label: "Admin", icon: Users, adminOnly: true },
+  { href: "/studio/admin", label: "Organizations", icon: Building2 },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { tenant, tenants, setActiveTenant } = useTenant();
+  const { tenant } = useTenant();
   const { user } = useAuth();
-  const isAdmin = tenant?.role === "owner" || tenant?.role === "admin";
-  // Individual (single-seat) accounts have no team to manage — hide the Admin tab.
-  const isIndividual = tenant?.type === "individual";
-  // Super_admin: platform owner (role=admin + matching openId)
+  // Super_admin: platform owner (role=admin + matching openId). Keeps the
+  // Platform Console entry point (org checkpoint 2c00e38).
   const isSuperAdmin = user?.role === "admin" && user?.openId === import.meta.env.VITE_OWNER_OPEN_ID;
 
   return (
@@ -54,26 +52,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* Tenant selector */}
-        {tenants.length > 1 && (
+        {/* Org switcher */}
+        {tenant && (
           <div className="p-3 border-b border-border">
-            <select
-              value={tenant?.id ?? ""}
-              onChange={(e) => setActiveTenant(Number(e.target.value))}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-            >
-              {tenants.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+            <OrgSwitcher />
           </div>
         )}
 
         {/* Navigation */}
         <nav className="flex-1 p-3 space-y-1">
-          {NAV_ITEMS.filter((item) => !item.adminOnly || (isAdmin && !isIndividual)).map((item) => {
+          {NAV_ITEMS.map((item) => {
             const isActive = location === item.href || (item.href !== "/studio" && location.startsWith(item.href));
             const Icon = item.icon;
             return (
@@ -133,19 +121,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b border-border">
-        <div className="flex items-center justify-between px-4 h-14">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-primary" />
+        <div className="flex items-center gap-2 px-3 h-14">
+          <Sparkles className="w-4 h-4 shrink-0 text-primary" />
+          {tenant ? (
+            <div className="min-w-0 flex-1">
+              <OrgSwitcher />
+            </div>
+          ) : (
             <span className="font-semibold">Print Studio</span>
-          </div>
-          {tenant && (
-            <span className="text-xs font-medium tabular-nums text-muted-foreground">
-              {tenant.creditBalance.toLocaleString()} cr
-            </span>
           )}
         </div>
         <nav className="flex border-t border-border overflow-x-auto">
-          {NAV_ITEMS.filter((item) => !item.adminOnly || (isAdmin && !isIndividual)).map((item) => {
+          {NAV_ITEMS.map((item) => {
             const isActive = location === item.href || (item.href !== "/studio" && location.startsWith(item.href));
             const Icon = item.icon;
             return (
@@ -162,7 +149,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 {item.label}
               </Link>
             );
-                    })}
+          })}
           {isSuperAdmin && (
             <Link
               href="/platform"
@@ -178,6 +165,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           )}
         </nav>
       </div>
+
       {/* Main content */}
       <main className="flex-1 min-w-0 md:p-6 p-4 pt-[7.5rem] md:pt-6">
         {tenant && <TrialBanner tenantId={tenant.id} />}

@@ -1,29 +1,31 @@
 /**
- * Platform Console — super_admin only.
- * Unified account management with invite links dashboard.
+ * Platform Console — super_admin only. Unified operations dashboard: aggregate
+ * stats, a global impersonation launchpad, one searchable/filterable accounts table
+ * (Accounts ⇆ Invite links), an account detail drawer, plus add-account / grant.
  */
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import { Building2, User, Plus, Coins, Loader2, Shield, Link2, ArrowLeft } from "lucide-react";
+import { Coins, Plus, Loader2, Shield, Layers, Link2, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
-import AccountList from "./AccountList";
 import AddAccountDialog from "./AddAccountDialog";
 import GrantCreditsDialog from "./GrantCreditsDialog";
 import InviteDashboard from "./InviteDashboard";
 import PlatformStats from "./PlatformStats";
+import AccountsTable from "./AccountsTable";
+import AccountDetailDrawer from "./AccountDetailDrawer";
+import ImpersonationLaunchpad from "./ImpersonationLaunchpad";
 
-type TabType = "firm" | "individual" | "links";
+type View = "accounts" | "links";
 
 export default function PlatformConsole() {
-  const { user, loading: authLoading } = useAuth();
-  const [tab, setTab] = useState<TabType>("firm");
+  const { loading: authLoading } = useAuth();
+  const [view, setView] = useState<View>("accounts");
   const [showAdd, setShowAdd] = useState(false);
   const [showGrant, setShowGrant] = useState(false);
+  const [detailId, setDetailId] = useState<number | null>(null);
 
-  // Check super_admin access
   const { data: whoami, isLoading: adminLoading, error } = trpc.platform.whoami.useQuery();
 
   if (authLoading || adminLoading) {
@@ -46,18 +48,20 @@ export default function PlatformConsole() {
     );
   }
 
+  const tabs: { v: View; label: string; icon: typeof Layers }[] = [
+    { v: "accounts", label: "Accounts", icon: Layers },
+    { v: "links", label: "Invite links", icon: Link2 },
+  ];
+
   return (
     <div className="min-h-screen bg-[#0a0e1a] text-white">
-      {/* Header */}
       <header className="border-b border-white/5 bg-[#0a0e1a]/95 backdrop-blur-xl sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
               Platform Console
             </h1>
-            <p className="text-sm text-slate-400 mt-0.5">
-              Manage all accounts & invite links
-            </p>
+            <p className="text-sm text-slate-400 mt-0.5">Every firm & individual, one place</p>
           </div>
           <div className="flex items-center gap-2">
             <Link
@@ -67,6 +71,7 @@ export default function PlatformConsole() {
               <ArrowLeft className="w-4 h-4" />
               <span className="hidden sm:inline">Back to Studio</span>
             </Link>
+            <ImpersonationLaunchpad />
             <Button
               variant="outline"
               size="sm"
@@ -81,45 +86,25 @@ export default function PlatformConsole() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        {/* Cross-org rollup */}
         <PlatformStats />
 
-        {/* Segmented control */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div className="inline-flex rounded-lg bg-white/5 p-1">
-            <button
-              onClick={() => setTab("firm")}
-              className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                tab === "firm"
-                  ? "bg-amber-500/20 text-amber-400 shadow-sm"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <Building2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Firms</span>
-            </button>
-            <button
-              onClick={() => setTab("individual")}
-              className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                tab === "individual"
-                  ? "bg-amber-500/20 text-amber-400 shadow-sm"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <User className="w-4 h-4" />
-              <span className="hidden sm:inline">Individuals</span>
-            </button>
-            <button
-              onClick={() => setTab("links")}
-              className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                tab === "links"
-                  ? "bg-amber-500/20 text-amber-400 shadow-sm"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <Link2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Invite Links</span>
-            </button>
+            {tabs.map((t) => {
+              const Icon = t.icon;
+              return (
+                <button
+                  key={t.v}
+                  onClick={() => setView(t.v)}
+                  className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    view === t.v ? "bg-amber-500/20 text-amber-400" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {t.label}
+                </button>
+              );
+            })}
           </div>
 
           <Button
@@ -132,21 +117,13 @@ export default function PlatformConsole() {
           </Button>
         </div>
 
-        {/* Content */}
-        {tab === "links" ? (
-          <InviteDashboard />
-        ) : (
-          <AccountList type={tab} />
-        )}
+        {view === "links" ? <InviteDashboard /> : <AccountsTable onManage={setDetailId} />}
       </main>
 
-      {/* Dialogs */}
-      <AddAccountDialog
-        open={showAdd}
-        onClose={() => setShowAdd(false)}
-        defaultType={tab === "links" ? "firm" : tab}
-      />
+      {/* Dialogs + drawer */}
+      <AddAccountDialog open={showAdd} onClose={() => setShowAdd(false)} defaultType="firm" />
       <GrantCreditsDialog open={showGrant} onClose={() => setShowGrant(false)} />
+      <AccountDetailDrawer tenantId={detailId} onClose={() => setDetailId(null)} />
     </div>
   );
 }

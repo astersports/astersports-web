@@ -33,6 +33,19 @@ export const tenantsRouter = router({
       return t;
     }),
 
+  /**
+   * Multi-org overview: every org the user belongs to, enriched with the active
+   * member count, for the Studio Admin "Your organizations" grid (Zone A). Reuses
+   * getUserTenants (role + all tenant fields incl. `type`) + countActiveMembers.
+   * Read-only; no money-path.
+   */
+  overview: protectedProcedure.query(async ({ ctx }) => {
+    const orgs = await getUserTenants(ctx.user.id);
+    return Promise.all(
+      orgs.map(async (t) => ({ ...t, memberCount: await countActiveMembers(t.id) }))
+    );
+  }),
+
   // `create` (open self-serve tenant creation) was REMOVED 2026-06-21 (M2):
   // it set `creditBalance` directly with NO `creditLedger` row (balance↔ledger
   // drift) and, as a `protectedProcedure`, let any authenticated user mint

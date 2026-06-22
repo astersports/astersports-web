@@ -1,93 +1,133 @@
 /**
- * Studio Admin page — Firm Detail (Spec Screen 2).
- * Pooled balance, spend-by-member bars, User/Admin role toggles,
- * invite with domain lock, transfer ownership.
+ * Studio Admin page — multi-org rebuild (spec §4/§5).
+ * Org-identity header + Zone A (OrganizationsOverview) + Zone B branching
+ * (firm admin/owner management · firm member MemberView · individual panel).
+ * Zone B is collapsible (PR #6) so the overview stays reachable.
  */
-import { useState, type ReactNode } from "react";
-import { Link } from "wouter";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useTenant } from "@/contexts/TenantContext";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Loader2,
   UserPlus,
   Users,
   CreditCard,
   BarChart3,
+  Crown,
   Shield,
   ArrowRightLeft,
   Lock,
   Unlock,
+  Trash2,
   Link2,
   Copy,
   Check,
   XCircle,
-  Clock,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
-import MembersList from "./MembersList";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
+import { LOW_BALANCE_THRESHOLD } from "@shared/billing";
+import { OrgAvatar } from "@/components/studio/OrgAvatar";
+import { TypeBadge, RoleBadge } from "@/components/studio/badges";
+import { OrganizationsOverview } from "@/components/studio/admin/OrganizationsOverview";
+import { IndividualAccountPanel } from "@/components/studio/admin/IndividualAccountPanel";
 
 export default function StudioAdmin() {
   const { tenant } = useTenant();
+  const [manageOpen, setManageOpen] = useState(true);
 
   if (!tenant) return null;
 
   const isOwner = tenant.role === "owner";
   const isAdmin = tenant.role === "admin" || isOwner;
+  const isFirm = tenant.type === "firm";
 
-  if (!isAdmin) {
-    return (
-      <div className="max-w-4xl mx-auto py-12 text-center">
-        <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-        <h2 className="text-xl font-semibold">Admin Access Required</h2>
-        <p className="text-muted-foreground mt-2">
-          This page is restricted to account admins and owners.
-        </p>
-      </div>
+  // "Manage" from Zone A expands the section and scrolls to it.
+  const scrollToManage = () => {
+    setManageOpen(true);
+    requestAnimationFrame(() =>
+      document.getElementById("active-org")?.scrollIntoView({ behavior: "smooth", block: "start" })
     );
-  }
-
-  // Single-seat individual accounts have no team to manage. Plan, balance, and
-  // usage live on Billing/History — so the org admin surface doesn't apply.
-  if (tenant.type === "individual") {
-    return (
-      <div className="max-w-2xl mx-auto py-12 text-center">
-        <CreditCard className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-        <h2 className="text-xl font-semibold">Individual account</h2>
-        <p className="text-muted-foreground mt-2">
-          This is a single-seat account, so there's no team to manage. Your plan,
-          credit balance, and usage live on the Billing and History pages.
-        </p>
-        <div className="mt-6 flex items-center justify-center gap-3">
-          <Link href="/studio/billing">
-            <Button>Go to Billing</Button>
-          </Link>
-          <Link href="/studio/history">
-            <Button variant="outline">View History</Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Admin</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Manage {tenant.name} — members, roles, and credit usage.
-        </p>
+    <div className="max-w-5xl mx-auto space-y-8">
+      {/* Header — active org identity */}
+      <div className="flex items-center gap-3">
+        <OrgAvatar name={tenant.name} type={tenant.type} className="h-11 w-11 text-base" />
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl font-bold truncate">{tenant.name}</h1>
+            <TypeBadge type={tenant.type} />
+            <RoleBadge role={tenant.role} />
+          </div>
+          <p className="text-muted-foreground text-sm mt-0.5">Organizations &amp; account management</p>
+        </div>
       </div>
 
-      <MetricCards tenantId={tenant.id} tenant={tenant} />
-      <SpendByMember tenantId={tenant.id} />
-      <MembersList tenantId={tenant.id} isOwner={isOwner} />
-      <InviteCard tenantId={tenant.id} tenant={tenant} />
-      {isOwner && <FirmSettings tenantId={tenant.id} tenant={tenant} />}
+      {/* Zone A — all your organizations */}
+      <OrganizationsOverview onManage={scrollToManage} />
+
+      {/* Zone B — manage the active org (collapsible, so the overview stays
+          reachable without scrolling past a long management block) */}
+      <section id="active-org" className="scroll-mt-24">
+        <Collapsible open={manageOpen} onOpenChange={setManageOpen}>
+          <CollapsibleTrigger className="flex w-full items-center gap-2 text-left">
+            <h2 className="text-lg font-semibold">Manage {tenant.name}</h2>
+            <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", !manageOpen && "-rotate-90")} />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-4">
+            {isFirm ? (
+              isAdmin ? (
+                <div className="space-y-6">
+                  <MetricCards tenantId={tenant.id} tenant={tenant} />
+                  <SpendByMember tenantId={tenant.id} />
+                  <MembersList tenantId={tenant.id} isOwner={isOwner} />
+                  <InviteCard tenantId={tenant.id} tenant={tenant} />
+                  {isOwner && <FirmSettings tenantId={tenant.id} tenant={tenant} />}
+                </div>
+              ) : (
+                <MemberView tenant={tenant} />
+              )
+            ) : (
+              <IndividualAccountPanel tenant={tenant} />
+            )}
+          </CollapsibleContent>
+        </Collapsible>
+      </section>
     </div>
+  );
+}
+
+/* ─── Member view (firm member, non-admin) ─────────────────────────────────── */
+
+function MemberView({ tenant }: { tenant: any }) {
+  const low = tenant.creditBalance <= LOW_BALANCE_THRESHOLD;
+  return (
+    <Card>
+      <CardContent className="p-5 flex items-center justify-between gap-4">
+        <div>
+          <p className="font-medium">Your access</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            You're a member of {tenant.name}. Member and billing management is handled by the
+            organization's admins.
+          </p>
+        </div>
+        <div className="text-right shrink-0">
+          <p className={cn("text-2xl font-bold tabular-nums", low && "text-destructive")}>
+            {tenant.creditBalance.toLocaleString()}
+          </p>
+          <p className="text-xs text-muted-foreground">pool credits</p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -100,50 +140,49 @@ function MetricCards({ tenantId, tenant }: { tenantId: number; tenant: any }) {
   );
 
   return (
-    // M-mobile: compact 3-up on phones (was grid-cols-1 → three tall stacked
-    // cards); icon stacks above the number on mobile, inline on desktop.
-    <div className="grid grid-cols-3 gap-2 sm:gap-4">
-      <StatCard
-        icon={<CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500" />}
-        value={tenant.creditBalance.toLocaleString()}
-        label="Pool balance"
-      />
-      <StatCard
-        icon={<BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500" />}
-        value={(spend?.totalSpent7d ?? 0).toLocaleString()}
-        label="Spent (7 days)"
-      />
-      <StatCard
-        icon={<Users className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />}
-        value={spend?.members.length ?? 0}
-        label={`Active / ${tenant.seats} seats`}
-        iconBg="bg-primary/10"
-      />
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <Card>
+        <CardContent className="p-4 flex items-center gap-3">
+          <div className="rounded-lg bg-amber-500/10 p-2.5">
+            <CreditCard className="h-5 w-5 text-amber-500" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold tabular-nums">
+              {tenant.creditBalance.toLocaleString()}
+            </p>
+            <p className="text-xs text-muted-foreground">Pool balance</p>
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4 flex items-center gap-3">
+          <div className="rounded-lg bg-amber-500/10 p-2.5">
+            <BarChart3 className="h-5 w-5 text-amber-500" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold tabular-nums">
+              {(spend?.totalSpent7d ?? 0).toLocaleString()}
+            </p>
+            <p className="text-xs text-muted-foreground">Spent (7 days)</p>
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4 flex items-center gap-3">
+          <div className="rounded-lg bg-primary/10 p-2.5">
+            <Users className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold tabular-nums">
+              {spend?.members.length ?? 0}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Active / {tenant.seats} seats
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
-  );
-}
-
-function StatCard({
-  icon,
-  value,
-  label,
-  iconBg = "bg-amber-500/10",
-}: {
-  icon: ReactNode;
-  value: string | number;
-  label: string;
-  iconBg?: string;
-}) {
-  return (
-    <Card>
-      <CardContent className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3">
-        <div className={`rounded-lg ${iconBg} p-2 sm:p-2.5 w-fit`}>{icon}</div>
-        <div className="min-w-0">
-          <p className="text-lg sm:text-2xl font-bold tabular-nums truncate">{value}</p>
-          <p className="text-[11px] sm:text-xs text-muted-foreground leading-tight">{label}</p>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -211,13 +250,161 @@ function SpendByMember({ tenantId }: { tenantId: number }) {
   );
 }
 
+/* ─── Members List with Role Toggles ──────────────────────────────────────── */
+
+function MembersList({ tenantId, isOwner }: { tenantId: number; isOwner: boolean }) {
+  const utils = trpc.useUtils();
+  const { data: members, isLoading } = trpc.tenants.members.useQuery(
+    { tenantId },
+    { enabled: !!tenantId }
+  );
+
+  const toggleMutation = trpc.firmAdmin.toggleRole.useMutation({
+    onSuccess: () => {
+      utils.tenants.members.invalidate({ tenantId });
+      toast.success("Role updated");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const removeMutation = trpc.firmAdmin.removeMember.useMutation({
+    onSuccess: () => {
+      utils.tenants.members.invalidate({ tenantId });
+      toast.success("Member removed");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Users className="h-4 w-4" />
+          Members
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        ) : !members || members.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No members yet.</p>
+        ) : (
+          <div className="space-y-1">
+            {/* Header row */}
+            <div className="hidden sm:grid grid-cols-[1fr_80px_80px_40px] gap-2 px-2 py-1 text-xs text-muted-foreground font-medium">
+              <span>Member</span>
+              <span className="text-center">Admin</span>
+              <span className="text-center">Role</span>
+              <span />
+            </div>
+            {members.map((m) => {
+              const isOwnerRow = m.role === "owner";
+              const isAdminRow = m.role === "admin" || m.role === "owner";
+              const displayName = m.user?.name || m.invitedEmail || "Unknown";
+              const displayEmail = m.user?.email || m.invitedEmail || "";
+
+              return (
+                <div
+                  key={m.id}
+                  className="grid grid-cols-1 sm:grid-cols-[1fr_80px_80px_40px] gap-2 items-center px-2 py-2.5 rounded-lg hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0"
+                >
+                  {/* Name + email */}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-medium truncate">
+                          {displayName}
+                        </span>
+                        {isOwnerRow && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0 border-amber-500/50 text-amber-500"
+                          >
+                            <Crown className="h-2.5 w-2.5 mr-0.5" />
+                            Owner
+                          </Badge>
+                        )}
+                        {m.status === "invited" && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                            Invited
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {displayEmail}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Admin toggle (amber) */}
+                  <div className="flex justify-center">
+                    <Switch
+                      checked={isAdminRow}
+                      disabled={isOwnerRow || toggleMutation.isPending}
+                      onCheckedChange={(checked) => {
+                        if (isOwnerRow) return;
+                        toggleMutation.mutate({
+                          tenantId,
+                          membershipId: m.id,
+                          field: "role",
+                          value: checked ? "admin" : "member",
+                        });
+                      }}
+                      className="data-[state=checked]:bg-amber-500"
+                    />
+                  </div>
+
+                  {/* Role badge */}
+                  <div className="flex justify-center">
+                    <Badge
+                      variant={isAdminRow ? "default" : "secondary"}
+                      className={`text-[10px] capitalize ${
+                        isOwnerRow
+                          ? "bg-amber-500/20 text-amber-500 border-amber-500/30"
+                          : isAdminRow
+                          ? "bg-amber-500/10 text-amber-400"
+                          : "bg-[#4a8fd4]/10 text-[#4a8fd4]"
+                      }`}
+                    >
+                      {m.role}
+                    </Badge>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex justify-end">
+                    {!isOwnerRow && m.status === "active" && (
+                      <div className="flex gap-1">
+                        {isOwner && (
+                          <button
+                            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                            title="Remove member"
+                            onClick={() => {
+                              if (confirm(`Remove ${displayName} from this firm?`)) {
+                                removeMutation.mutate({ tenantId, membershipId: m.id });
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 /* ─── Invite Card ──────────────────────────────────────────────────────────── */
 
 function InviteCard({ tenantId, tenant }: { tenantId: number; tenant: any }) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"member" | "admin">("member");
-  const [copied, setCopied] = useState(false);
   const utils = trpc.useUtils();
 
   const inviteMutation = trpc.tenants.invite.useMutation({
@@ -376,7 +563,7 @@ function JoinLinkSection({ tenantId, tenantName }: { tenantId: number; tenantNam
                   {window.location.origin}/join/{link.token.slice(0, 8)}...
                 </p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">
-                  Uses: {link.useCount}/{link.maxUses ?? "\u221e"}
+                  Uses: {link.useCount}/{link.maxUses ?? "∞"}
                   {link.expiresAt && ` · Expires: ${new Date(link.expiresAt).toLocaleDateString()}`}
                 </p>
               </div>
@@ -415,9 +602,9 @@ function FirmSettings({ tenantId, tenant }: { tenantId: number; tenant: any }) {
   const [domain, setDomain] = useState(tenant.allowedEmailDomain ?? "");
   const [transferEmail, setTransferEmail] = useState("");
   const utils = trpc.useUtils();
-  const { user } = useAuth();
   const { isImpersonating } = useTenant();
-  // Only platform super_admin (impersonating) can modify domain lock
+  // Only platform super_admin (impersonating) can modify domain lock (org guard,
+  // checkpoint 2c00e38 — firmAdmin.updateDomainLock throws FORBIDDEN otherwise).
   const canEditDomain = isImpersonating;
 
   const domainMutation = trpc.firmAdmin.updateDomainLock.useMutation({
@@ -470,7 +657,7 @@ function FirmSettings({ tenantId, tenant }: { tenantId: number; tenant: any }) {
             Domain Lock
           </label>
           {canEditDomain ? (
-            /* Super_admin can edit */
+            /* Super_admin (impersonating) can edit */
             <>
               <div className="flex gap-2">
                 <Input
