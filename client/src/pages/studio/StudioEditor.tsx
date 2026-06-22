@@ -2,7 +2,7 @@
  * Studio Editor page — the main editing workflow:
  * 1. Upload garment image
  * 2. AI detects print elements
- * 3. Configure controls (Scale, Density, Remove)
+ * 3. Configure controls (Scale, Density)
  * 4. Generate → view before/after
  *
  * Density and Scale use SSE streaming: the frontend opens a long-lived POST
@@ -301,7 +301,7 @@ export default function StudioEditor() {
         <div>
           <h1 className="text-2xl font-bold">Print Studio Editor</h1>
           <p className="text-muted-foreground mt-1">
-            Upload a garment photo to adjust scale, density, or remove elements from the print.
+            Upload a garment photo to adjust the scale or density of the print.
           </p>
         </div>
 
