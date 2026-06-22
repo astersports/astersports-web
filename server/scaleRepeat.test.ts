@@ -57,6 +57,14 @@ function borderIdentical(out: Buffer, input: Buffer): boolean {
 }
 
 describe("scalePrintRepeat", () => {
+  it("refuses to mirror-tile (no-op) on shrink when confirmedRepeat is false (anti-duplication net)", async () => {
+    // f=0.5 would tile the bbox 2x2; with confirmedRepeat:false the op must NOT
+    // duplicate the region — it returns a byte-identical no-op so the caller refunds.
+    const r = await scalePrintRepeat({ image: { url: "x" }, fabric: fabric(), targetFraction: 0.5, confirmedRepeat: false });
+    expect(r.changed).toBe(false);
+    expect(Buffer.compare(r.data, scene())).toBe(0);
+  });
+
   it("a disconnected mask speck does not change the scaled output (LCC denoise)", async () => {
     const clean = new Uint8Array(W * H);
     for (let y = M0; y < M1; y++) for (let x = M0; x < M1; x++) clean[y * W + x] = 255;

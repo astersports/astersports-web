@@ -18,7 +18,7 @@ import { getMaskProvider, validateInstanceCount } from "./_core/masking";
 import { densityThin } from "./_core/studio/ops/densityThin";
 import { densityRedistribute } from "./_core/studio/ops/densityRedistribute";
 import { scalePrintRepeat } from "./_core/studio/ops/scaleRepeat";
-import { checkRepeat, MIN_REPEAT_CONFIDENCE } from "./_core/studio/ops/repeatGuard";
+import { checkRepeatAdvanced } from "./_core/studio/ops/repeatDetector";
 import { decodeUpright } from "./_core/image/decodeUpright";
 import type { RasterMask, Sam2AuditContext } from "./_core/masking/types";
 
@@ -158,9 +158,10 @@ export const NON_REPEAT_SCALE_ERROR = "NON_REPEAT_SCALE";
  *  fires (D-C; scalePrintRepeat itself passes through on an empty mask, which would
  *  otherwise bill for a no-op). No model call, no generative no-op guard.
  *
- *  Non-repeat guard (Flag 2): before running the op, estimates periodConfidence
- *  on the source image. If below MIN_REPEAT_CONFIDENCE, throws NON_REPEAT_SCALE_ERROR
- *  so the caller rejects pre-deduct with an honest message. */
+ *  Non-repeat guard (Flag 2): before running the op, classifies the source via the
+ *  advanced FFT + autocorrelation ALLOVER detector. If it is not a confirmed repeat,
+ *  throws NON_REPEAT_SCALE_ERROR so the caller rejects pre-deduct with an honest
+ *  message (a placement/single-graphic print can't be tiled without duplication). */
 export async function generateScaledImage(
   originalImageUrl: string,
   params: { targetFraction: number },
@@ -174,21 +175,26 @@ export async function generateScaledImage(
     throw new Error(NO_OP_SCALE_ERROR);
   }
 
-  // Non-repeat guard: decode the source, run periodConfidence check.
-  // This runs BEFORE the expensive scale op to fail fast.
+  // Non-repeat guard: decode the source, run the FFT + autocorrelation ALLOVER
+  // classifier. This runs BEFORE the expensive scale op to fail fast. The advanced
+  // detector requires two-axis periodicity + harmonic peaks + >= MIN_TILE_REPEATS
+  // (2.5) repeats, so a single placement print on a draped garment is rejected —
+  // closing the weak-guard false-positive that mirror-tiled a garment "in two".
   const decoded = await decodeUpright(srcUrl);
-  const repeatCheck = checkRepeat(
+  const repeatCheck = checkRepeatAdvanced(
     decoded.buffer, decoded.width, decoded.height, fabric.raster.data
   );
   if (!repeatCheck.isRepeat) {
     console.warn(
-      `[scale-live] non-repeat guard fired: confidence=${repeatCheck.confidence.toFixed(3)} ` +
-      `(threshold=${MIN_REPEAT_CONFIDENCE}); axes=${JSON.stringify(repeatCheck.axes)}`
+      `[scale-live] non-repeat guard fired (advanced): confidence=${repeatCheck.confidence.toFixed(3)} ` +
+      `class=${repeatCheck.classification}; axes=${JSON.stringify(repeatCheck.axes)}`
     );
     throw new Error(NON_REPEAT_SCALE_ERROR);
   }
 
-  const r = await scalePrintRepeat({ image: { url: srcUrl }, fabric, targetFraction: params.targetFraction });
+  // confirmedRepeat is an in-op defense-in-depth net: the op refuses to mirror-tile
+  // (duplicate) the region when the caller did not confirm a real repeat.
+  const r = await scalePrintRepeat({ image: { url: srcUrl }, fabric, targetFraction: params.targetFraction, confirmedRepeat: repeatCheck.isRepeat });
   // Second-layer no-op guard (parity with density's `removed === 0` check):
   // scalePrintRepeat ran but didn't change pixels (f===1 or degenerate mask).
   if (!r.changed) {
