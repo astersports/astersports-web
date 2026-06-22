@@ -55,6 +55,21 @@ export const ENV = {
   /** H6: max concurrent sharp decodes. Each decode holds a full RGBA frame in
    *  memory; without a cap, N simultaneous jobs multiply the peak. Default 4. */
   studioMaxConcurrentDecodes: Number(process.env.STUDIO_MAX_CONCURRENT_DECODES) > 0 ? Number(process.env.STUDIO_MAX_CONCURRENT_DECODES) : 4,
+  /** SAM2 automatic-mask sampling density — the DOMINANT cost of a density job.
+   *  64 (~4096 points) routinely runs 60-120s and a ~60s hosting/proxy request cap
+   *  kills the SSE stream mid-run ("finalizing" then timeout). 32 (~1024 points) is
+   *  ~4x faster and still resolves dense prints for count-based thinning. Tune via
+   *  STUDIO_SAM2_POINTS_PER_SIDE; raise once the request timeout is raised. */
+  studioSam2PointsPerSide: Number(process.env.STUDIO_SAM2_POINTS_PER_SIDE) > 0 ? Number(process.env.STUDIO_SAM2_POINTS_PER_SIDE) : 32,
+  /** SAM2 mask-to-mask refinement pass (~2x latency). Density fills the whole crop
+   *  and area-filters instances, so motif-edge precision isn't needed — default off
+   *  for speed. Set STUDIO_SAM2_USE_M2M=true to re-enable. */
+  studioSam2UseM2m: process.env.STUDIO_SAM2_USE_M2M === "true",
+  /** Cap on detected instances handed to the density ops. Each instance is remapped
+   *  to a full-image raster, so a pathological SAM2 over-segmentation is an OOM
+   *  vector; density only needs a representative motif set. Default 200; tune via
+   *  STUDIO_MAX_INSTANCES. */
+  studioMaxInstances: Number(process.env.STUDIO_MAX_INSTANCES) > 0 ? Number(process.env.STUDIO_MAX_INSTANCES) : 200,
   /** H2: allowlist of host[:port] values the OAuth redirect target may use. When
    *  set (comma-separated), a decoded `state` redirect whose host is not on the
    *  list is rejected — the anti-code-interception control. Empty = scheme/format

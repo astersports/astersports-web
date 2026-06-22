@@ -93,6 +93,18 @@ describe("createSam2Provider (mocked client)", () => {
     expect(seg.instances.length).toBe(2);
   });
 
+  it("caps instances at STUDIO_MAX_INSTANCES (default 200) to bound memory", async () => {
+    mockLLM.mockResolvedValue({ choices: [{ message: { content: JSON.stringify({ x: 0, y: 0, w: 1, h: 1, confidence: 0.9 }) } }] });
+    const one = await maskPng(W, H, 4, 4, 20, 20); // 16x16 motif, survives the filters
+    const many = Array.from({ length: 205 }, () => one); // pathological over-segmentation
+    const capClient: Sam2Client = {
+      ...client,
+      autoSegment: async () => ({ combined: await maskPng(W, H, 8, 8, 40, 40), individuals: many }),
+    };
+    const seg = await createSam2Provider(capClient).getSegmentation({ url: "http://x/g.png" });
+    expect(seg.instances.length).toBe(200); // capped from 205
+  });
+
   it("getFabricMask returns a raster mask tagged sam2", async () => {
     mockLLM.mockResolvedValue({ choices: [{ message: { content: JSON.stringify({ x: 0.1, y: 0.1, w: 0.8, h: 0.8, confidence: 0.9 }) } }] });
     const fm = await createSam2Provider(client).getFabricMask({ url: "http://x/g.png" });
