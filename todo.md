@@ -697,3 +697,11 @@
 - [x] Update cronSecret.test.ts to reflect authorized live posture (STUDIO_DENSITY_REDISTRIBUTE=true)
 - [x] Delete stale GitHub branches (jolly-pascal-k9tw4r, print-studio-build-r8k25e, consolidate-followup, compassionate-ramanujan-7qs8px)
 - [x] Verify async generation smoke test readiness on production
+
+## 60s Timeout Diagnosis & Fix (Jun 22)
+- [x] Diagnose 60s timeout: root cause is STUDIO_ASYNC_JOBS=false (SSE path killed by platform 60s cap)
+- [x] Manually reap 16 stuck jobs and refund 160 credits
+- [x] Add DB-persisted error logging to reaper and poll-predictions cron endpoints
+- [ ] SETTINGS FIX NEEDED: Set STUDIO_ASYNC_JOBS=true in Settings → Secrets
+- [ ] SETTINGS FIX NEEDED: Set STUDIO_DENSITY_REDISTRIBUTE=true in Settings → Secrets
+- [ ] Investigate why reaper cron is failing silently (likely sdk.authenticateRequest rejecting cron session)

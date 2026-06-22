@@ -16,6 +16,7 @@ import { fetchAllGames, invalidateAllCaches, getTournamentRegistry } from "./scr
 import { notifyOwner } from "./_core/notification";
 import { sdk } from "./_core/sdk";
 import { pruneOldLogs } from './logRetention';
+import { log } from './serverLog';
 import { processTrialReminders } from './trialReminders';
 import { reapStuckJobs, listSam2ProcessingJobs } from './studioDb';
 import { processAsyncJob } from './studioAsyncWorker';
@@ -397,19 +398,21 @@ export function registerScheduledRoutes(app: any) {
   app.post('/api/scheduled/reap-stuck-jobs', async (req: any, res: any) => {
     try {
       if (!cronSecretOk(req)) {
+        log.error('cron', '[reap-stuck-jobs] cronSecretOk failed', { metadata: { headers: Object.keys(req.headers).join(',') } });
         return res.status(403).json({ error: 'forbidden' });
       }
       const user = await sdk.authenticateRequest(req);
       if (!user.isCron || !user.taskUid) {
+        log.error('cron', `[reap-stuck-jobs] cron-only check failed: isCron=${user.isCron}, taskUid=${user.taskUid}`);
         return res.status(403).json({ error: 'cron-only' });
       }
 
       const result = await reapStuckJobs(10 * 60 * 1000);
-      console.log(`[reap-stuck-jobs] reaped ${result.reaped}, refunded ${result.refunded}`);
+      log.info('cron', `[reap-stuck-jobs] reaped ${result.reaped}, refunded ${result.refunded}`);
 
       res.json({ success: true, ...result, timestamp: new Date().toISOString() });
     } catch (error) {
-      console.error('[reap-stuck-jobs] Error:', (error as Error).message);
+      log.error('cron', `[reap-stuck-jobs] Error: ${(error as Error).message}`);
       res.status(500).json({ success: false, error: 'reap failed', timestamp: new Date().toISOString() });
     }
   });
