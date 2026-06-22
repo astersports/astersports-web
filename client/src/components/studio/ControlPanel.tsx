@@ -25,12 +25,19 @@ interface Props {
   onGenerate: (controls: ControlSettings) => void;
   isGenerating: boolean;
   creditBalance: number;
+  /** Op availability from studio.config. Default true so existing callers/tests
+   *  are unaffected; when false the control is disabled and shows "temporarily
+   *  unavailable" instead of letting the user trigger a server-side rejection. */
+  scaleLive?: boolean;
+  densityLive?: boolean;
 }
 
 export default function ControlPanel({
   onGenerate,
   isGenerating,
   creditBalance,
+  scaleLive = true,
+  densityLive = true,
 }: Props) {
   // Variations parked — always locked to 1 until quality validation is added.
   const [controls, setControls] = useState<ControlSettings>({ ...defaultControls(), variations: 1 });
@@ -44,12 +51,19 @@ export default function ControlPanel({
 
   return (
     <div className="space-y-6">
+      {!scaleLive && !densityLive && (
+        <div className="rounded-lg border border-amber-300/40 bg-amber-50/60 dark:bg-amber-950/20 p-3 text-xs text-amber-700 dark:text-amber-400">
+          Scale and Density are temporarily unavailable while we fine-tune them. Please check back soon.
+        </div>
+      )}
+
       {/* Scale Control */}
       <div className="space-y-3 rounded-lg border border-border p-4 bg-card">
         <div className="flex items-center justify-between">
           <Label className="text-sm font-semibold">Adjustable Scale</Label>
           <Switch
-            checked={controls.scale.enabled}
+            disabled={!scaleLive}
+            checked={scaleLive && controls.scale.enabled}
             onCheckedChange={(checked) =>
               update({ scale: { ...controls.scale, enabled: checked } })
             }
@@ -58,7 +72,10 @@ export default function ControlPanel({
         <p className="text-xs text-muted-foreground">
           Enlarge or reduce all print objects evenly.
         </p>
-        {controls.scale.enabled && (
+        {!scaleLive && (
+          <p className="text-xs text-amber-600 dark:text-amber-500">Temporarily unavailable.</p>
+        )}
+        {scaleLive && controls.scale.enabled && (
           <PercentStepper
             value={controls.scale.percent}
             onChange={(percent) => update({ scale: { ...controls.scale, percent } })}
@@ -74,7 +91,8 @@ export default function ControlPanel({
         <div className="flex items-center justify-between">
           <Label className="text-sm font-semibold">Density Reduction</Label>
           <Switch
-            checked={controls.density.enabled}
+            disabled={!densityLive}
+            checked={densityLive && controls.density.enabled}
             onCheckedChange={(checked) =>
               update({ density: { ...controls.density, enabled: checked } })
             }
@@ -83,7 +101,10 @@ export default function ControlPanel({
         <p className="text-xs text-muted-foreground">
           Thin out the print evenly by removing motifs.
         </p>
-        {controls.density.enabled && (
+        {!densityLive && (
+          <p className="text-xs text-amber-600 dark:text-amber-500">Temporarily unavailable.</p>
+        )}
+        {densityLive && controls.density.enabled && (
           <PercentStepper
             value={controls.density.percent}
             onChange={(percent) => update({ density: { ...controls.density, percent } })}

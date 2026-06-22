@@ -186,6 +186,14 @@ export default function StudioEditor() {
     { enabled: !!tenant }
   );
 
+  // Op availability (scale/density live flags + provider readiness). Drives the
+  // control panel so dark/gated ops show as "temporarily unavailable" rather than
+  // letting a click hit the SSE endpoint and bounce a raw 400.
+  const { data: studioConfig } = trpc.studio.config.useQuery(
+    { tenantId: tenant?.id ?? 0 },
+    { enabled: !!tenant }
+  );
+
   // Show confirmation dialog before generating
   const requestGenerate = useCallback(
     (controls: ControlSettings) => {
@@ -205,6 +213,18 @@ export default function StudioEditor() {
     setConfirmOpen(false);
     const controls = pendingControls;
     setPendingControls(null);
+
+    // Fail-safe: never fire a request for an op the server has gated off. The
+    // control panel already disables unavailable ops, but guard here too so a
+    // stale client can't hit the SSE endpoint and bounce a raw 400.
+    if (
+      (controls.scale.enabled && !studioConfig?.scaleLive) ||
+      (controls.density.enabled && !studioConfig?.densityLive)
+    ) {
+      toast.error("Scale and Density are temporarily unavailable while we fine-tune them. Please check back soon — you have not been charged.");
+      return;
+    }
+
     setIsGenerating(true);
 
     // Determine if this should use the SSE streaming path
@@ -254,7 +274,7 @@ export default function StudioEditor() {
         toast.error(error.message || "Generation failed. Please try again.");
       }
     }
-  }, [pendingControls, jobId, tenant, generateMutation, utils, startStream]);
+  }, [pendingControls, jobId, tenant, generateMutation, utils, startStream, studioConfig]);
 
   const handleRegenerate = () => {
     setStep("controls");
@@ -474,6 +494,8 @@ export default function StudioEditor() {
               onGenerate={requestGenerate}
               isGenerating={isGenerating}
               creditBalance={tenant?.creditBalance ?? 0}
+              scaleLive={studioConfig?.scaleLive ?? false}
+              densityLive={studioConfig?.densityLive ?? false}
             />
           </div>
         </div>
