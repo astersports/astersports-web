@@ -46,15 +46,22 @@ Spec: `docs/ASYNC_GENERATION_SPEC.md`. Phases 1–4: PRs #82–#86.
   `REPLICATE_SAM2_MODEL`, `STUDIO_SAM2_POINTS_PER_SIDE=16`.
 
 ## 4. The flip — Frank's hand, not Manus's (CLAUDE.md §1/§3)
-The only new env change. Set **only on Frank's explicit instruction**, as one deliberate flip
-(never batched with other flag changes):
+The new env settings for this go-live. Set **only on Frank's explicit instruction** (§1/§3
+human-on-flip — Manus/agents never set these):
 
 ```
-STUDIO_ASYNC_JOBS = true
+STUDIO_ASYNC_JOBS           = true
+STUDIO_DENSITY_REDISTRIBUTE = true   # currently FALSE in prod — stale from the earlier,
+                                     # since-LIFTED restriction. Flip back to true so the async
+                                     # path runs v2 (even / no-clustering). Left false => v1
+                                     # erase-only (clustering), which the lifted restriction
+                                     # exists to avoid.
 ```
 
-Leave `STUDIO_DENSITY_LIVE=true`, `STUDIO_DENSITY_REDISTRIBUTE=true`, `STUDIO_MASK_PROVIDER=sam2`
-unchanged. **Do not touch any other `*_LIVE` flag or the mask provider.**
+Keep `STUDIO_DENSITY_LIVE=true` and `STUDIO_MASK_PROVIDER=sam2` unchanged. **Do not touch any other
+`*_LIVE` flag or the mask provider.** Optional isolation: flip `STUDIO_ASYNC_JOBS` first to confirm
+the async transport clears the 60s wall on v1, then `STUDIO_DENSITY_REDISTRIBUTE` to get v2's even
+output — or set both together to test the target config directly.
 
 ## 5. Post-flip smoke
 - `GET /api/studio/posture` (with `x-cron-secret`) → expect:
