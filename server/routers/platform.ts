@@ -187,6 +187,63 @@ export const platformRouter = router({
     };
   }),
 
+  /** Full detail for one account — members, spend, recent ledger. Powers the
+   *  account detail drawer (super-admins aren't tenant members, so firmAdmin.* —
+   *  which is tenantAdminProcedure — can't be reused). Read-only. */
+  accountDetail: superAdminProcedure
+    .input(z.object({ tenantId: z.number().int() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const [tenant] = await db.select().from(tenants).where(eq(tenants.id, input.tenantId)).limit(1);
+      if (!tenant) throw new TRPCError({ code: "NOT_FOUND", message: "Account not found" });
+
+      const mems = await db.select().from(memberships).where(eq(memberships.tenantId, input.tenantId));
+      const members = await Promise.all(
+        mems.map(async (m) => {
+          let user: { id: number; name: string | null; email: string | null } | null = null;
+          if (m.userId) {
+            const [u] = await db
+              .select({ id: users.id, name: users.name, email: users.email })
+              .from(users)
+              .where(eq(users.id, m.userId))
+              .limit(1);
+            user = u ?? null;
+          }
+          return { id: m.id, role: m.role, status: m.status, invitedEmail: m.invitedEmail ?? null, user };
+        })
+      );
+
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const spentExpr = sql<number>`COALESCE(SUM(CASE WHEN ${creditLedger.delta} < 0 THEN -${creditLedger.delta} ELSE 0 END), 0)`;
+      const [allRow] = await db.select({ total: spentExpr }).from(creditLedger).where(eq(creditLedger.tenantId, input.tenantId));
+      const [weekRow] = await db
+        .select({ total: spentExpr })
+        .from(creditLedger)
+        .where(and(eq(creditLedger.tenantId, input.tenantId), gte(creditLedger.createdAt, sevenDaysAgo)));
+      const recentLedger = await db
+        .select({
+          id: creditLedger.id,
+          delta: creditLedger.delta,
+          balanceAfter: creditLedger.balanceAfter,
+          reason: creditLedger.reason,
+          createdAt: creditLedger.createdAt,
+        })
+        .from(creditLedger)
+        .where(eq(creditLedger.tenantId, input.tenantId))
+        .orderBy(desc(creditLedger.createdAt))
+        .limit(8);
+
+      return {
+        tenant,
+        members,
+        spent7d: Number(weekRow?.total ?? 0),
+        spentAll: Number(allRow?.total ?? 0),
+        recentLedger,
+      };
+    }),
+
   /** Provision a new firm account. */
   provisionFirm: superAdminProcedure
     .input(
