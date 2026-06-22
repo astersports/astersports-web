@@ -15,17 +15,23 @@ import {
   AlertTriangle,
   BookOpen,
   Shield,
+  type LucideIcon,
 } from "lucide-react";
 import { LOW_BALANCE_THRESHOLD } from "@shared/billing";
 import { TrialBanner } from "./TrialBanner";
 import OrgSwitcher from "./OrgSwitcher";
 
-const NAV_ITEMS = [
+// `mobileLabel` keeps the mobile tab row legible: the full sidebar labels
+// ("Credit Ledger", "Organizations") collide and clip in the ~375px scroll strip,
+// so mobile shows short, distinct words. Desktop keeps the full `label`.
+type NavItem = { href: string; label: string; mobileLabel?: string; icon: LucideIcon };
+
+const NAV_ITEMS: NavItem[] = [
   { href: "/studio", label: "Editor", icon: Paintbrush },
   { href: "/studio/history", label: "History", icon: History },
-  { href: "/studio/ledger", label: "Credit Ledger", icon: BookOpen },
+  { href: "/studio/ledger", label: "Credit Ledger", mobileLabel: "Ledger", icon: BookOpen },
   { href: "/studio/billing", label: "Billing", icon: CreditCard },
-  { href: "/studio/admin", label: "Organizations", icon: Building2 },
+  { href: "/studio/admin", label: "Organizations", mobileLabel: "Orgs", icon: Building2 },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -139,21 +145,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
+                className={`flex shrink-0 items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
                   isActive
                     ? "border-primary text-primary"
                     : "border-transparent text-muted-foreground"
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
-                {item.label}
+                {item.mobileLabel ?? item.label}
               </Link>
             );
           })}
           {isSuperAdmin && (
             <Link
               href="/platform"
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
+              className={`flex shrink-0 items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
                 location === "/platform"
                   ? "border-amber-500 text-amber-500"
                   : "border-transparent text-amber-500/70"
