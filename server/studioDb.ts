@@ -205,6 +205,54 @@ export async function countActiveMembers(tenantId: number): Promise<number> {
   return result[0]?.count ?? 0;
 }
 
+/**
+ * Count the tenants a user OWNS (role='owner' membership). Backs the self-serve
+ * `tenants.create` lifetime rate cap. Counts every owner membership regardless of
+ * how the org was provisioned (self-serve, invite-redeem, admin) — the
+ * conservative bound: each owned org seeds trial credits, so this caps a user's
+ * total trial-credit minting without needing a "created-via-self-serve" marker.
+ */
+export async function countUserOwnedTenants(userId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(memberships)
+    .where(and(eq(memberships.userId, userId), eq(memberships.role, "owner")));
+  return result[0]?.count ?? 0;
+}
+
+/** Count the tenants a user has come to OWN since `since` — the self-serve
+ *  `tenants.create` burst cap (membership.createdAt ≈ org-creation time). */
+export async function countUserOwnedTenantsSince(userId: number, since: Date): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(memberships)
+    .where(and(
+      eq(memberships.userId, userId),
+      eq(memberships.role, "owner"),
+      gte(memberships.createdAt, since),
+    ));
+  return result[0]?.count ?? 0;
+}
+
+/**
+ * Best-effort teardown of a just-created tenant whose downstream provisioning
+ * (owner membership / trial grant) failed, so a self-serve `tenants.create` error
+ * never strands a half-provisioned org. Deletes children (memberships, any ledger
+ * rows) before the tenant to satisfy FK order. Callers wrap this in try/catch and
+ * log — cleanup failure must not mask the original provisioning error.
+ */
+export async function deleteTenantCascade(tenantId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(memberships).where(eq(memberships.tenantId, tenantId));
+  await db.delete(creditLedger).where(eq(creditLedger.tenantId, tenantId));
+  await db.delete(tenants).where(eq(tenants.id, tenantId));
+}
+
 // ─── Credit Ledger ───────────────────────────────────────────────────────────
 
 export async function addCreditEntry(entry: InsertCreditLedgerEntry) {

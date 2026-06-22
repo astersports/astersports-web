@@ -50,6 +50,14 @@ export const ENV = {
    *  is NOT router-wired; wiring + the flip are Frank's after the per-route eval
    *  gates clear. Patterned on studioDensityLive. */
   studioDensityRedistribute: process.env.STUDIO_DENSITY_REDISTRIBUTE === "true",
+  /** Self-serve org creation (`tenants.create`). Mints TRIAL_CREDITS through the
+   *  ledger-safe `grantCredits` path and is per-user rate-limited. Default off —
+   *  this is the Flip-Authority-governed money-path flip (CLAUDE.md §1). It gates
+   *  the credit-minting tRPC procedure itself; the client `VITE_CREATE_ORG_LIVE`
+   *  only un-disables the dialog button (a direct API call still hits this gate).
+   *  Unlike scale/density it has NO sam2/raster co-requirement, so validateEnv
+   *  adds no boot guard for it. */
+  studioCreateOrgLive: process.env.STUDIO_CREATE_ORG_LIVE === "true",
   /** Replicate SAM2 (D1 = Option 2). Token + model-version id for the hosted mask source. */
   replicateApiToken: process.env.REPLICATE_API_TOKEN ?? "",
   replicateSam2Model: process.env.REPLICATE_SAM2_MODEL ?? "",

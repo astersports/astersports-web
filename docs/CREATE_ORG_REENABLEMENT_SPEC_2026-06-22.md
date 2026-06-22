@@ -1,10 +1,10 @@
 # Spec / Architect decision request — Create-org re-enablement (ledger-safe `tenants.create`)
 
-> **Status:** DECISION REQUEST + build spec. No money-path code is written yet —
-> this is the coordinate-don't-patch artifact required by CLAUDE.md §4 (money-path
-> changes are Architect-scoped) and §1 (Flip Authority). Per AP-style discipline
-> each open fork carries a labeled **LEAN**; the Architect/Frank rule, then I build
-> **dark** behind the server flag in a follow-up draft PR.
+> **Status:** RULED + IMPLEMENTED (dark). Frank ruled all five forks 2026-06-22
+> (all leans — see "Rulings" below); the ledger-safe, rate-limited `tenants.create`
+> is built **dark** behind `STUDIO_CREATE_ORG_LIVE` (default off) in this PR. The
+> flip itself stays Frank's hand per CLAUDE.md §1/§4 (G0 dark-verify + G1 Architect
+> SHA verify). The forks + evidence below are retained as the decision record.
 >
 > **Repo:** `astersports/astersports-web` · **Branch:** `claude/keen-hypatia-65jrof`
 > · **`main` HEAD at writing:** `474ea69` · **Date:** 2026-06-22
@@ -33,6 +33,29 @@
    F2 rate-limit mechanism (lean: query-based caps, no new table), F3 trial-credit
    semantics (lean: 150 + lifetime cap), F4 cross-op atomicity (lean: parity with
    redeem, don't expand), F5 eligibility (lean: any auth user + caps).
+
+---
+
+## Rulings (2026-06-22, Frank) — all leans, + implementation notes
+
+| Fork | Ruling | Built as |
+|---|---|---|
+| **F1** server dark gating | Add `STUDIO_CREATE_ORG_LIVE` | `env.ts` flag (default off); `tenants.create` throws `FORBIDDEN` when off; surfaced in `/api/studio/posture` `flags.createOrgLive` + folded into `dark` |
+| **F2** rate limits | Lifetime 2 + burst 3/24h, query-based | `countUserOwnedTenants` / `countUserOwnedTenantsSince` in `studioDb.ts`; caps enforced with `>=` (block the 3rd lifetime / 4th in 24h) → `TOO_MANY_REQUESTS` |
+| **F3** trial credits | 150 + lifetime cap | `grantCredits(tenant.id, TRIAL_CREDITS, "trial_creation", \`signup-trial-${id}\`, userId)` — never a direct `creditBalance` write |
+| **F4** atomicity | Redeem-parity + cleanup | owner membership + grant in a try/catch; `deleteTenantCascade` best-effort on failure; full single-tx refactor stays open item #3 |
+| **F5** eligibility | Any auth user + caps | `create` is a plain `protectedProcedure`, gated only by F1 + F2 |
+
+Two reconciliations against the relayed plan, applied: (a) `grantCredits` is
+**positional** with a **string** `refId` (not an object / numeric id), so the call
+is `grantCredits(id, amount, reason, refId, userId)`; (b) caps use `>=` to enforce
+exactly "2" / "3" (a `>` would permit 3 / 4). The posture-endpoint surfacing was
+pulled in per Frank's Step 1 (so the create-org flip is G0-verifiable, Flip
+Authority §5). Files: `server/_core/env.ts`, `server/routers/tenants.ts`,
+`server/studioDb.ts`, `server/routes/studioPosture.ts`,
+`client/src/components/studio/admin/CreateOrgDialog.tsx`; tests
+`server/tenantsCreate.test.ts`, `server/cronSecret.test.ts`,
+`server/routes/studioPosture.test.ts`.
 
 ---
 
