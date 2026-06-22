@@ -174,6 +174,10 @@ export async function densityRedistribute(input: RedistributeInput): Promise<Red
     throw new Error(`densityRedistribute: raster dims ${raster.width}x${raster.height} != image ${width}x${height}`);
   }
 
+  // DUAL MASK (Option B): Use the garment silhouette boundary for layout + clip.
+  // Falls back to the full-crop sampling raster if boundaryRaster is absent (classical provider).
+  const boundary = input.fabric.boundaryRaster ?? raster;
+
   // No-op/passthrough: image returned unchanged, so all N motifs are still present
   // (kept = N, removed = 0). Keeps removed + kept === instances.length. removed === 0
   // still drives the caller's FAIL+REFUND, so billing is unaffected.
@@ -198,14 +202,17 @@ export async function densityRedistribute(input: RedistributeInput): Promise<Red
   }
 
   // F2: no bare ground to sample -> refuse to smear; signal no-op so caller refunds.
-  const baseClothLab = baseClothAnchor(buffer, width, height, raster, input.instances);
+  // Use the BOUNDARY raster for base-cloth sampling so we only sample pixels that are
+  // actually on the garment (not the background wall visible through the crop bbox).
+  const baseClothLab = baseClothAnchor(buffer, width, height, boundary, input.instances);
   if (!baseClothLab) {
     console.warn("[density-redistribute] no bare-ground pixels to sample base cloth; no-op -> refund");
     return empty();
   }
 
-  // 4.2 even target layout — exactly M blue-noise points inside the fabric.
-  const targets = blueNoiseLayout(raster, input.fabric.bbox, M, { seed: input.seed ?? 1 });
+  // 4.2 even target layout — exactly M blue-noise points inside the GARMENT SILHOUETTE.
+  // Uses boundaryRaster so points are constrained to the actual garment, not the full crop.
+  const targets = blueNoiseLayout(boundary, input.fabric.bbox, M, { seed: input.seed ?? 1 });
   if (targets.length === 0) return empty();
 
   // 4.3 assignment + survivor selection (min squared displacement).
@@ -251,9 +258,9 @@ export async function densityRedistribute(input: RedistributeInput): Promise<Red
         const sx = bb.x0 + x, sy = bb.y0 + y;
         const dX = sx + dx, dY = sy + dy;
         if (dX < 0 || dX >= width || dY < 0 || dY >= height) continue;
-        // Clip to the fabric raster: a survivor relocated near the garment edge
-        // must never paint motif pixels onto the background outside the fabric.
-        if (raster.data[dY * width + dX] <= 127) continue;
+        // Clip to the garment BOUNDARY: a survivor relocated near the garment edge
+        // must never paint motif pixels onto the background outside the silhouette.
+        if (boundary.data[dY * width + dX] <= 127) continue;
         const sp = (sy * width + sx) * 4;
         const dp = (dY * width + dX) * 4;
         out[dp] = Math.round(out[dp] * (1 - sa) + buffer[sp] * sa);
