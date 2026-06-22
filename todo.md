@@ -702,6 +702,8 @@
 - [x] Diagnose 60s timeout: root cause is STUDIO_ASYNC_JOBS=false (SSE path killed by platform 60s cap)
 - [x] Manually reap 16 stuck jobs and refund 160 credits
 - [x] Add DB-persisted error logging to reaper and poll-predictions cron endpoints
-- [ ] SETTINGS FIX NEEDED: Set STUDIO_ASYNC_JOBS=true in Settings → Secrets
-- [ ] SETTINGS FIX NEEDED: Set STUDIO_DENSITY_REDISTRIBUTE=true in Settings → Secrets
-- [ ] Investigate why reaper cron is failing silently (likely sdk.authenticateRequest rejecting cron session)
+- [x] SETTINGS FIX NEEDED: Set STUDIO_ASYNC_JOBS=true in Settings → Secrets
+- [x] SETTINGS FIX NEEDED: Set STUDIO_DENSITY_REDISTRIBUTE=true in Settings → Secrets
+- [x] Investigate why reaper cron is failing silently — ROOT CAUSE: cronSecretOk rejects platform requests (no x-cron-secret header sent)
+- [x] Fix cronAuth.ts to accept x-webdev-schedule-uid header from Manus Heartbeat platform
+- [ ] Investigate redistribute output quality (white space in result instead of proper motif redistribution)
