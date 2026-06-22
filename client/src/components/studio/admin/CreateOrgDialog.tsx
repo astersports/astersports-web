@@ -1,24 +1,15 @@
 /**
  * CreateOrgDialog — self-serve organization creation (spec §8.4).
  *
- * MONEY-PATH / FLIP AUTHORITY NOTE (port reconciliation, do not "fix" reactively):
- * The source (personal) repo wired this dialog to `tenants.create`, which seeds a
- * 7-day trial + TRIAL_CREDITS and makes the caller owner. The ORG repo deliberately
- * REMOVED `tenants.create` on 2026-06-21 (M2): as an open `protectedProcedure` it let
- * any authenticated user MINT credited trial tenants, and it wrote `creditBalance`
- * directly with NO matching `creditLedger` row (balance↔ledger drift). Tenant creation
- * in the org repo is now invite-only (`inviteLinks.redeem`, `platform.provisionFirm`,
- * `platform.inviteIndividual`), all of which grant credits through `grantCredits`
- * (which writes the append-only ledger row).
- *
- * Restoring `tenants.create` would re-introduce the exact money-path bug the org guarded
- * against, AND it's an Architect-sign-off-gated, money-path change (CLAUDE.md §1/§4).
- * Per the port brief, a builder PREPARES but never SETS a money-path flip. So this UI is
- * ported with its confirm-gate intact but its create action SHIPS DARK behind
- * `VITE_CREATE_ORG_LIVE` (default off) — and, while a `tenants.create` procedure does
- * not exist in this repo, the action is a guarded no-op that explains the state.
- * Architect: to enable, (1) re-add a ledger-safe, rate-limited `tenants.create` server
- * procedure, then (2) wire it here and flip `VITE_CREATE_ORG_LIVE`. One flip, logged.
+ * MONEY-PATH / FLIP AUTHORITY: this dialog calls `tenants.create`, which mints a
+ * 7-day trial + TRIAL_CREDITS via the ledger-safe `grantCredits` path (re-enabled
+ * 2026-06-22 after the M2 removal, which had written `creditBalance` directly with
+ * no `creditLedger` row → balance↔ledger drift). The credit-minting procedure ships
+ * DARK behind the SERVER flag `STUDIO_CREATE_ORG_LIVE` — the Flip-Authority-governed
+ * flip (CLAUDE.md §1) that Frank sets by hand. `VITE_CREATE_ORG_LIVE` below is a
+ * COSMETIC client gate: it only un-disables this button, it is NOT the security
+ * boundary — the server procedure refuses until its own flag is flipped, so a direct
+ * API call can't mint credits either. Both default off; build dark.
  */
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
@@ -37,9 +28,8 @@ import { Button } from "@/components/ui/button";
 import { Building2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
-// Dark by default. Flipping this on requires a ledger-safe server procedure +
-// Architect sign-off (see file header). It is NOT a *_LIVE money-path env on its own
-// because no server create procedure is wired; it only un-disables the UI affordance.
+// Cosmetic UI gate (build-time). Un-disables the button only; the server's
+// STUDIO_CREATE_ORG_LIVE flag is the real money-path gate (see file header).
 const CREATE_ORG_LIVE = import.meta.env.VITE_CREATE_ORG_LIVE === "true";
 
 export function CreateOrgDialog({
@@ -55,22 +45,31 @@ export function CreateOrgDialog({
   const [ack, setAck] = useState(false);
   const utils = trpc.useUtils();
 
-  // The create action is intentionally NOT wired to a server mutation in the org repo
-  // (see header). When CREATE_ORG_LIVE is flipped on after a ledger-safe procedure is
-  // restored, replace this with the real mutation call (kept here as the wiring point).
+  const createOrg = trpc.tenants.create.useMutation({
+    onSuccess: async (tenant) => {
+      // Refresh the org lists the switcher + Zone A read from.
+      await Promise.all([
+        utils.tenants.overview.invalidate(),
+        utils.tenants.myTenants.invalidate(),
+      ]);
+      toast.success(`Created ${tenant.name}.`);
+      onCreated?.(tenant.id);
+      onOpenChange(false);
+      setName("");
+      setAck(false);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   const submit = () => {
     if (!CREATE_ORG_LIVE) {
       toast.error("Create-org is pending Architect sign-off and is not enabled.");
       return;
     }
-    // Reserved for the re-enabled, ledger-safe create procedure.
-    toast.error("Create-org server procedure is not available in this build.");
-    // Keep onCreated / cache-invalidation references live for the wired path:
-    void onCreated;
-    void utils;
+    createOrg.mutate({ name: name.trim() });
   };
 
-  const canSubmit = CREATE_ORG_LIVE && name.trim().length > 0 && ack;
+  const canSubmit = CREATE_ORG_LIVE && name.trim().length > 0 && ack && !createOrg.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -119,7 +118,7 @@ export function CreateOrgDialog({
             Cancel
           </Button>
           <Button disabled={!canSubmit} onClick={submit}>
-            Create organization
+            {createOrg.isPending ? "Creating…" : "Create organization"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -10,6 +10,7 @@ vi.mock("../_core/env", () => ({
     studioScaleLive: false,
     studioDensityLive: false,
     studioDensityRedistribute: false,
+    studioCreateOrgLive: false,
     maskProvider: "sam2",
     replicateApiToken: "replicate-token-must-not-leak",
     replicateSam2Model: "meta/sam-2",
@@ -39,6 +40,7 @@ describe("GET /api/studio/posture", () => {
     ENV.studioScaleLive = false;
     ENV.studioDensityLive = false;
     ENV.studioDensityRedistribute = false;
+    ENV.studioCreateOrgLive = false;
   });
 
   it("403 when the x-cron-secret header is missing or wrong", () => {
@@ -64,7 +66,7 @@ describe("GET /api/studio/posture", () => {
     handler({ headers: { "x-cron-secret": SECRET } }, r);
     expect(r.status).not.toHaveBeenCalledWith(403);
     const body = (r.json as any).mock.calls[0][0];
-    expect(body.flags).toEqual({ scaleLive: false, densityLive: false, densityRedistribute: false });
+    expect(body.flags).toEqual({ scaleLive: false, densityLive: false, densityRedistribute: false, createOrgLive: false });
     expect(body.dark).toBe(true);
     expect(body.maskProvider).toBe("sam2");
     expect(body.rasterReady).toBe(true);

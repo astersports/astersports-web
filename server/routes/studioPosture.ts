@@ -29,8 +29,16 @@ export function registerStudioPostureRoute(app: Express) {
         scaleLive: ENV.studioScaleLive,
         densityLive: ENV.studioDensityLive,
         densityRedistribute: ENV.studioDensityRedistribute,
+        createOrgLive: ENV.studioCreateOrgLive,
       },
-      dark: !ENV.studioScaleLive && !ENV.studioDensityLive && !ENV.studioDensityRedistribute,
+      // dark = every money-path *_LIVE flag is off. createOrgLive (self-serve
+      // credit-minting) is one too, so a future create-org flip correctly flips
+      // dark→false; it ships off, so today's incident #61 G0 read stays dark:true.
+      dark:
+        !ENV.studioScaleLive &&
+        !ENV.studioDensityLive &&
+        !ENV.studioDensityRedistribute &&
+        !ENV.studioCreateOrgLive,
       maskProvider: ENV.maskProvider,
       rasterReady,
       replicateConfigured: Boolean(ENV.replicateApiToken && ENV.replicateSam2Model),
