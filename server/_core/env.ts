@@ -10,6 +10,12 @@ export const ENV = {
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
+  /** Manus Agent API (api.manus.ai) — optional outbound integration. Ships DARK:
+   *  an absent key disables it (the client throws ManusUnavailableError). This is
+   *  NOT a `*_LIVE` flag and NOT on the money/credit path — it gates an inert
+   *  client only, so it warns (feature-degrading), never blocks boot. */
+  manusApiKey: process.env.MANUS_API_KEY ?? "",
+  manusApiBaseUrl: process.env.MANUS_API_BASE_URL ?? "https://api.manus.ai",
   /**
    * Studio no-op guard: when enabled (default), an edited image is QA-checked
    * against the original and, if the requested change was not applied, the job
@@ -135,6 +141,7 @@ export function validateEnv(): { errors: string[]; warnings: string[] } {
     ["STRIPE_SECRET_KEY", ENV.stripeSecretKey, "billing/checkout"],
     ["STRIPE_WEBHOOK_SECRET", ENV.stripeWebhookSecret, "Stripe webhook verification"],
     ["RESEND_API_KEY", ENV.resendApiKey, "transactional email"],
+    ["MANUS_API_KEY", ENV.manusApiKey, "Manus Agent API integration"],
     ["BUILT_IN_FORGE_API_URL", ENV.forgeApiUrl, "Forge LLM/image generation"],
     ["BUILT_IN_FORGE_API_KEY", ENV.forgeApiKey, "Forge LLM/image generation"],
   ];
