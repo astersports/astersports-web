@@ -43,6 +43,9 @@ export function registerStudioPostureRoute(app: Express) {
       rasterReady,
       replicateConfigured: Boolean(ENV.replicateApiToken && ENV.replicateSam2Model),
       noOpGuard: ENV.studioNoOpGuard,
+      // Async generation processor (ASYNC_GENERATION_SPEC) — an architecture toggle, not a
+      // money-path *_LIVE flag, so it sits here (operational state) not in `flags`/`dark`.
+      asyncJobs: ENV.studioAsyncJobs,
       sam2: {
         pointsPerSide: ENV.studioSam2PointsPerSide,
         useM2m: ENV.studioSam2UseM2m,
