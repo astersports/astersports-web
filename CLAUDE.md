@@ -63,7 +63,7 @@ ritual during testing.
 
 ---
 
-## 1. Flip Authority (single authority, env-verified) — HARD RULE
+## 1. Flip Authority (single authority, env-verified)
 
 > **Scope:** LIVE phase only (≥1 onboarded client). Pre-onboarding, §0 governs — see §0.
 
