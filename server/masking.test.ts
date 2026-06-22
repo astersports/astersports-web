@@ -7,6 +7,19 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("./_core/llm", () => ({ invokeLLM: vi.fn() }));
 vi.mock("./storage", () => ({ storageGetSignedUrl: vi.fn().mockResolvedValue("http://signed.url") }));
+// Phase 5: locate now fetches + downscales (sharp) before the LLM — mock that path so the
+// vision-LLM bbox-parsing tests below exercise invokeLLM instead of hitting the fetch/decode.
+vi.mock("./_core/net/safeFetch", () => ({
+  safeFetchBuffer: vi.fn().mockResolvedValue({ buffer: Buffer.from([0, 1, 2, 3]), response: { ok: true, status: 200 } }),
+}));
+vi.mock("sharp", () => {
+  const chain: any = {};
+  chain.rotate = vi.fn(() => chain);
+  chain.resize = vi.fn(() => chain);
+  chain.jpeg = vi.fn(() => chain);
+  chain.toBuffer = vi.fn(async () => Buffer.from([1, 2, 3]));
+  return { default: vi.fn(() => chain) };
+});
 import { invokeLLM } from "./_core/llm";
 import {
   getMaskProvider,
