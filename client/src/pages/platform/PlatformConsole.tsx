@@ -12,6 +12,7 @@ import AccountList from "./AccountList";
 import AddAccountDialog from "./AddAccountDialog";
 import GrantCreditsDialog from "./GrantCreditsDialog";
 import InviteDashboard from "./InviteDashboard";
+import PlatformStats from "./PlatformStats";
 
 type TabType = "firm" | "individual" | "links";
 
@@ -72,6 +73,9 @@ export default function PlatformConsole() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+        {/* Cross-org rollup */}
+        <PlatformStats />
+
         {/* Segmented control */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div className="inline-flex rounded-lg bg-white/5 p-1">
