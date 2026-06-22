@@ -1,7 +1,7 @@
 /**
  * Dialog to grant credits to any account.
  */
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,16 +19,25 @@ export default function GrantCreditsDialog({ open, onClose }: Props) {
   const [tenantId, setTenantId] = useState("");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
+  const [search, setSearch] = useState("");
+  const [debounced, setDebounced] = useState("");
   // Stable idempotency key per grant action: reused across a retry of the same
   // submit (so a double-submit/retry can't double-grant), regenerated after a
   // successful grant so a deliberate second grant is allowed.
   const idemKey = useRef<string | null>(null);
 
-  // Fetch all accounts for the dropdown
-  const { data: accounts } = trpc.platform.listAccounts.useQuery(
-    { type: "all" },
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Search accounts for the picker — scales past a flat dropdown of every
+  // account (type to narrow; capped at 50 results).
+  const { data } = trpc.platform.listAccounts.useQuery(
+    { type: "all", search: debounced || undefined, limit: 50 },
     { enabled: open }
   );
+  const accounts = data?.accounts ?? [];
 
   const utils = trpc.useUtils();
   const grant = trpc.platform.grantCredits.useMutation({
@@ -66,13 +75,19 @@ export default function GrantCreditsDialog({ open, onClose }: Props) {
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div className="space-y-1.5">
             <Label className="text-slate-300 text-sm">Account</Label>
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name…"
+              className="bg-white/5 border-white/10 text-white mb-1.5"
+            />
             <select
               value={tenantId}
               onChange={(e) => setTenantId(e.target.value)}
               className="w-full h-9 rounded-md bg-white/5 border border-white/10 text-white text-sm px-3"
             >
               <option value="">Select account...</option>
-              {accounts?.map((a) => (
+              {accounts.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name} ({a.creditBalance.toLocaleString()} credits)
                 </option>
