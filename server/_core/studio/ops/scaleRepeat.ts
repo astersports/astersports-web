@@ -25,6 +25,11 @@ export interface ScaleInput {
   targetFraction: number;
   /** Optional boundary-cleanup anchor only; not load-bearing for tiling. */
   baseClothLab?: { L: number; a: number; b: number };
+  /** Defense-in-depth: the caller's confirmed-repeat verdict. When explicitly
+   *  `false`, the shrink path refuses to mirror-tile (which would duplicate a
+   *  non-repeating garment into a grid) and returns a no-op instead. Omitted
+   *  (undefined) preserves the prior behavior for the eval runner / unit tests. */
+  confirmedRepeat?: boolean;
 }
 
 export interface ScaleResult {
@@ -73,6 +78,17 @@ export async function scalePrintRepeat(input: ScaleInput): Promise<ScaleResult> 
   } else {
     const rw = Math.max(1, Math.round(bw * f)), rh = Math.max(1, Math.round(bh * f));
     dimsChanged = rw !== bw || rh !== bh;
+    // Defense-in-depth: shrinking refills the bbox by mirror-tiling the resized
+    // patch. If that would lay down >1 tile on an axis but the caller did NOT
+    // confirm a real repeat, tiling would duplicate a whole non-repeating garment
+    // into a grid (the "split in two" failure). Refuse: return a no-op so the
+    // caller refunds instead of shipping a duplicated image. (Confirmed repeats —
+    // the only case reaching here in prod, since checkRepeatAdvanced gates the
+    // caller — tile legitimately. Undefined preserves eval/test behavior.)
+    if (f < 1 && input.confirmedRepeat === false) {
+      const cols = Math.ceil(bw / rw), rows = Math.ceil(bh / rh);
+      if (cols > 1 || rows > 1) return { data: buffer, width, height, changed: false };
+    }
     const resized = await sharp(patch).resize(rw, rh, { kernel: "lanczos3" }).png().toBuffer();
     filled = f > 1
       ? await sharp(resized).extract({ left: Math.floor((rw - bw) / 2), top: Math.floor((rh - bh) / 2), width: bw, height: bh }).png().toBuffer()
