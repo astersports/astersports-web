@@ -88,10 +88,9 @@ export async function generateDensityImage(
  * call). Same single-getSegmentation + null-on-degrade/no-op -> FAIL+REFUND
  * contract as generateDensityImage, and the SAME count-based refund (`removed`).
  *
- * NOT router-wired and NOT a behavioural change: studio.generate must select this
- * (over generateDensityImage) only when ENV.studioDensityRedistribute is on — that
- * wiring + the flag flip are Frank's after the per-route eval gates clear. This
- * function deliberately does not touch generateDensityImage or the money path.
+ * Wired + flag-gated: studioEngine.runVariation selects this (over generateDensityImage)
+ * on the live density money path when ENV.studioDensityRedistribute is on. The flag flip
+ * itself stays Frank's (CLAUDE.md §1 human-on-flip).
  */
 export async function generateDensityRedistributeImage(
   originalImageUrl: string,
