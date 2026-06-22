@@ -701,6 +701,9 @@ export const studioRouter = router({
     return {
       scaleLive: ENV.studioScaleLive && rasterReady,
       densityLive: (ENV.studioDensityLive || ENV.studioDensityRedistribute) && rasterReady,
+      // Async processor on? Drives the client to enqueue + poll instead of opening the SSE stream
+      // (ASYNC_GENERATION_SPEC §4). The client can't see the server flag otherwise.
+      asyncJobs: ENV.studioAsyncJobs,
     };
   }),
 
