@@ -6,8 +6,11 @@
  * makes ONE getSegmentation call (fabric + instances from a single SAM2 call), runs
  * densityRedistribute, encodes to PNG, returns { png, removed }. Also verifies null
  * on degrade (no raster / no instances) and the removed===0 no-op guard — all of
- * which the SSE caller turns into FAIL + REFUND (never prompt-fall). This is the
- * effect-based no-op-billing guard (CLAUDE.md §1) for the CURRENTLY-LIVE v2 path.
+ * which the SSE caller turns into FAIL + REFUND (never prompt-fall). This locks the
+ * effect-based no-op-billing guard (CLAUDE.md §1) for the v2 path, which is wired but
+ * flag-gated: STUDIO_DENSITY_REDISTRIBUTE stays OFF per standing instruction (only
+ * STUDIO_SCALE_LIVE + STUDIO_DENSITY_LIVE are authorized live), so this covers the path
+ * that would run if/when Frank flips it — the guard is in place before that ever happens.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
