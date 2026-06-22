@@ -4,11 +4,12 @@
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { eq, sql, and, like, desc, inArray } from "drizzle-orm";
+import { eq, sql, and, like, desc, inArray, gte } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { tenants, memberships, platformAdmins, users, creditLedger } from "../../drizzle/schema";
 import { grantCredits, createTenant, createMembership, escapeLike } from "../studioDb";
+import { TRIAL_DURATION_DAYS } from "../../shared/billing";
 import { signImpersonationToken, setImpersonationCookie, clearImpersonationCookie, getImpersonationFromRequest } from "../impersonation";
 
 // ─── Super Admin Middleware ──────────────────────────────────────────────────
@@ -103,6 +104,93 @@ export const platformRouter = router({
 
       return { accounts, total };
     }),
+
+  /**
+   * Cross-org rollup for the platform dashboard: account mix, credits
+   * outstanding, trial pipeline, and the 7-day top spenders across ALL tenants.
+   * A handful of aggregate queries (no per-account fan-out), so it scales.
+   */
+  stats: superAdminProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) {
+      return {
+        firmCount: 0, individualCount: 0, totalAccounts: 0,
+        totalCreditsOutstanding: 0, paidCount: 0, inTrialCount: 0,
+        trialsExpiringSoon: 0, spent7dTotal: 0, topSpenders: [],
+      };
+    }
+
+    // One pass over the tenant rows for the mix / credits / trial pipeline.
+    const allTenants = await db
+      .select({
+        type: tenants.type,
+        plan: tenants.plan,
+        creditBalance: tenants.creditBalance,
+        trialStartedAt: tenants.trialStartedAt,
+        trialConvertedAt: tenants.trialConvertedAt,
+      })
+      .from(tenants);
+
+    const now = Date.now();
+    const TRIAL_MS = TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000;
+    const EXPIRING_MS = 3 * 24 * 60 * 60 * 1000; // "soon" = within 3 days
+    let firmCount = 0, individualCount = 0, totalCreditsOutstanding = 0;
+    let paidCount = 0, inTrialCount = 0, trialsExpiringSoon = 0;
+    for (const t of allTenants) {
+      if (t.type === "firm") firmCount++; else individualCount++;
+      totalCreditsOutstanding += t.creditBalance;
+      if (t.plan !== "none") paidCount++;
+      if (t.trialStartedAt && !t.trialConvertedAt) {
+        const end = new Date(t.trialStartedAt).getTime() + TRIAL_MS;
+        if (now < end) {
+          inTrialCount++;
+          if (end - now <= EXPIRING_MS) trialsExpiringSoon++;
+        }
+      }
+    }
+
+    // 7-day spend per tenant → total + top 5. Number()-coerce the SQL SUM
+    // (mysql2 returns aggregates as strings — see firmAdmin spend fix).
+    const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+    const spendRows = await db
+      .select({
+        tenantId: creditLedger.tenantId,
+        spent: sql<number>`ABS(SUM(CASE WHEN ${creditLedger.delta} < 0 THEN ${creditLedger.delta} ELSE 0 END))`,
+      })
+      .from(creditLedger)
+      .where(gte(creditLedger.createdAt, sevenDaysAgo))
+      .groupBy(creditLedger.tenantId);
+
+    const spend = spendRows
+      .map((r) => ({ tenantId: r.tenantId, spent: Number(r.spent ?? 0) }))
+      .filter((s) => s.spent > 0)
+      .sort((a, b) => b.spent - a.spent);
+    const spent7dTotal = spend.reduce((sum, r) => sum + r.spent, 0);
+    const top = spend.slice(0, 5);
+
+    const topIds = top.map((t) => t.tenantId);
+    const nameRows = topIds.length
+      ? await db.select({ id: tenants.id, name: tenants.name }).from(tenants).where(inArray(tenants.id, topIds))
+      : [];
+    const nameMap = new Map(nameRows.map((t) => [t.id, t.name]));
+    const topSpenders = top.map((t) => ({
+      tenantId: t.tenantId,
+      name: nameMap.get(t.tenantId) ?? "Unknown",
+      spent7d: t.spent,
+    }));
+
+    return {
+      firmCount,
+      individualCount,
+      totalAccounts: firmCount + individualCount,
+      totalCreditsOutstanding,
+      paidCount,
+      inTrialCount,
+      trialsExpiringSoon,
+      spent7dTotal,
+      topSpenders,
+    };
+  }),
 
   /** Provision a new firm account. */
   provisionFirm: superAdminProcedure
