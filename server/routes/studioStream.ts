@@ -179,7 +179,7 @@ export function registerStudioStreamRoutes(app: Express) {
 
     // This endpoint only handles density/scale deterministic paths
     if (!useDeterministicDensity && !useDeterministicScale) {
-      res.status(400).json({ error: "This endpoint only handles density/scale deterministic generation. Use the standard generate mutation for other paths." });
+      res.status(400).json({ error: "Scale and Density are temporarily unavailable while we fine-tune them. Please check back soon — you have not been charged." });
       return;
     }
 

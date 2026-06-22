@@ -631,6 +631,21 @@ export const studioRouter = router({
     }),
 
   /** Get the current trial status and plan recommendation for the tenant. */
+  /** Studio op availability — drives the editor UI so dark/gated ops render as
+   *  "temporarily unavailable" instead of letting a click reach the SSE endpoint
+   *  and bounce a raw 400. Scale needs its live flag + a raster-capable provider;
+   *  density needs its live flag(s) + a raster-capable provider (the op consumes
+   *  SAM2 instances, which the classical provider cannot serve). Mirrors the
+   *  server-side gates in generate/studioStream so the client never offers an op
+   *  the server will reject. */
+  config: tenantProcedure.query(async () => {
+    const rasterReady = getMaskProvider().rasterReady;
+    return {
+      scaleLive: ENV.studioScaleLive && rasterReady,
+      densityLive: (ENV.studioDensityLive || ENV.studioDensityRedistribute) && rasterReady,
+    };
+  }),
+
   trialStatus: tenantProcedure.query(async ({ ctx }) => {
     const tenant = ctx.tenant;
     const trial = getTrialStatus(tenant);

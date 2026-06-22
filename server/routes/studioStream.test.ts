@@ -180,7 +180,7 @@ describe("registerStudioStreamRoutes", () => {
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ error: expect.stringContaining("only handles density/scale") })
+      expect.objectContaining({ error: expect.stringContaining("temporarily unavailable") })
     );
   });
 
