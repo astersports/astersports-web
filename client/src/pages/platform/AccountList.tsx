@@ -2,17 +2,40 @@
  * Account list for the Platform Console.
  * Desktop: table layout. Mobile: card layout.
  */
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Eye, Loader2, Building2, User, Inbox } from "lucide-react";
+import { Eye, Loader2, Building2, User, Inbox, Search } from "lucide-react";
 
 interface AccountListProps {
   type: "firm" | "individual";
 }
 
+const PAGE = 30;
+
 export default function AccountList({ type }: AccountListProps) {
-  const { data: accounts, isLoading } = trpc.platform.listAccounts.useQuery({ type });
+  const [search, setSearch] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const [limit, setLimit] = useState(PAGE);
+
+  // Debounce the search box → query input.
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+  // Reset the "load more" window whenever the search or the tab changes.
+  useEffect(() => setLimit(PAGE), [debounced, type]);
+
+  const { data, isLoading } = trpc.platform.listAccounts.useQuery({
+    type,
+    search: debounced || undefined,
+    limit,
+  });
+  const accounts = data?.accounts ?? [];
+  const total = data?.total ?? 0;
+
   const impersonate = trpc.platform.impersonate.useMutation({
     onSuccess: (data) => {
       toast.success(`Viewing as ${data.tenantName}`, {
@@ -24,32 +47,43 @@ export default function AccountList({ type }: AccountListProps) {
     onError: (err) => toast.error(err.message),
   });
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
-      </div>
-    );
-  }
-
-  if (!accounts || accounts.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <Inbox className="w-12 h-12 text-slate-600 mb-4" />
-        <p className="text-slate-400">
-          No {type === "firm" ? "firms" : "individuals"} yet.
-        </p>
-        <p className="text-sm text-slate-500 mt-1">
-          {type === "firm"
-            ? "Provision your first firm to get started."
-            : "Invite an individual to get started."}
-        </p>
-      </div>
-    );
-  }
+  const label = type === "firm" ? "firms" : "individuals";
 
   return (
     <div className="space-y-3">
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={`Search ${label} by name…`}
+          className="pl-9 bg-white/[0.02] border-white/10 text-white placeholder:text-slate-500"
+        />
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
+        </div>
+      ) : accounts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <Inbox className="w-12 h-12 text-slate-600 mb-4" />
+          <p className="text-slate-400">
+            {debounced
+              ? `No ${label} match “${debounced}”.`
+              : `No ${label} yet.`}
+          </p>
+          {!debounced && (
+            <p className="text-sm text-slate-500 mt-1">
+              {type === "firm"
+                ? "Provision your first firm to get started."
+                : "Invite an individual to get started."}
+            </p>
+          )}
+        </div>
+      ) : (
+        <>
       {/* Desktop table */}
       <div className="hidden md:block rounded-xl border border-white/5 bg-white/[0.02] overflow-hidden">
         <div className="grid grid-cols-[1fr_100px_80px_100px_100px_60px] gap-4 px-4 py-3 border-b border-white/5 text-xs font-medium text-slate-400 uppercase tracking-wider">
@@ -147,6 +181,25 @@ export default function AccountList({ type }: AccountListProps) {
           </div>
         ))}
       </div>
+
+          {/* Load more + running count */}
+          <div className="flex flex-col items-center gap-1.5 pt-2">
+            {accounts.length < total && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setLimit((l) => l + PAGE)}
+                className="border-white/10 text-slate-300 hover:text-white hover:bg-white/5"
+              >
+                Load more
+              </Button>
+            )}
+            <p className="text-xs text-slate-500">
+              Showing {accounts.length} of {total} {label}
+            </p>
+          </div>
+        </>
+      )}
     </div>
   );
 }
