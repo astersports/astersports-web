@@ -1,109 +1,167 @@
 # CLAUDE.md — Operating agreement (astersports-web)
 
-**Phase: PRE-ONBOARDING, Claude-led.** Zero clients onboarded; one signed, not yet
-live. Claude Code (CC) does the majority of the work autonomously; the Architect
-(Claude.ai) designs + reviews; Frank is oversight + relay and the human confirm on
-the few highest-risk actions. This replaces the prior gate-heavy posture (which
-assumed live customers) and **re-tightens at onboarding** (§4).
-
-Read order: §0 (how CC operates) → §1 (how the lanes collaborate) → §2–§4 as needed.
+Phase-aware. **§0 sets the phase and how strictly the rest binds.** §1–§2 are how CC
+works and how the lanes collaborate (both phases). §3–§4 (Flip Authority + Launch
+Gates) are the LIVE-phase hard rules; §0 scopes when they bind. §5–§7 are standing
+conventions, airtight-build standards, and the onboarding gate.
 
 ---
 
-## 0. Operating model — Claude-led, Frank oversight
+## 0. Operating Phase (read first)
 
-### CC runs autonomously (no per-action approval)
-- Build end-to-end: design, implement, test, refactor, fix.
-- Open PRs **ready**, **auto-merge on green CI**, auto-deploy (Manus from `main`).
-- Run the toolchain (git, pnpm, gh/MCP) without per-step prompts.
-- **Prepare** every flag/secret flip with full evidence: flag, old→new value,
-  target SHA, what it turns on, a one-line smoke plan.
+**Current phase: PRE-ONBOARDING BUILD/TEST.** Zero clients onboarded; one signed, not
+yet live. Until onboarding, **production is our test bed, not a customer surface.**
+
+Pre-onboarding (lean):
+- Prod is a test bed; deploys are routine; routine PRs auto-merge on green CI (§2.4).
+- `*_LIVE` flags MAY be flipped on in prod **to test** — expected, not an incident.
+  The §3 ritual and §4 gate sequence do NOT gate testing now. CC prepares the flip;
+  **Frank sets it** (§1). (Scale/density still require `STUDIO_MASK_PROVIDER=sam2` +
+  Replicate creds or the app won't boot — `validateEnv` fail-fast.)
+
+Always-on, even now (these survive to the live client): the §1 invariants (ledger
+integrity, no-op billing, secrets) and the two human confirms.
+
+**Transition to LIVE phase:** the moment the first client onboards, §3 (Flip
+Authority) and §4 (Launch Gates) re-bind in full — gated flips, dark-by-default. §7
+is the one-time readiness gate before that client goes live.
+
+---
+
+## 1. Operating model — Claude-led, Frank oversight
+
+CC runs autonomously (no per-action approval):
+- Build end-to-end; open PRs ready; **auto-merge routine PRs on green CI** (§2.4);
+  auto-deploy (Manus from `main`); run the toolchain without per-step prompts.
+- **Architect-scoped PRs (§2.4) hold for Architect approval, relayed by Frank — never
+  auto-merged.**
+- **Prepare** every flip with evidence: flag, old→new value, target SHA, what it
+  turns on, a one-line smoke plan.
+- **Post-deploy smoke + rollback.** After each deploy, run a smoke check (app boots
+  green; a health/posture read succeeds). If a merged PR breaks `main` or fails the
+  smoke, **immediately `git revert` the offending PR and push** to restore green —
+  never fix-forward on a broken `main`; diagnose after.
 - Keep a running log in chat of what merged / deployed / is queued / awaits a confirm.
 
-### Frank's oversight — the limited checks (two confirms only)
-1. **Production flip of the money / mask-provider / sub-processor path** (`*_LIVE`,
-   `STUDIO_MASK_PROVIDER`, any prod secret moving credits/billing or a sub-processor).
-   CC prepares + proposes; **Frank executes/confirms the flip.** It's the only action
-   that can mis-bill a client or expose customer images — rare, and it *is* the
-   oversight. CC never sets it unilaterally.
+Frank's oversight — two confirms:
+1. **Production flip of the money / mask-provider / sub-processor path** — CC prepares
+   + proposes; **Frank executes/confirms.** (Live phase adds §3/§4 on top.)
 2. **Irreversible data ops** — `DROP`/`TRUNCATE`, prod-data wipe, history rewrite,
    force-push to a shared branch: explicit human OK first.
 
-### Always-on invariants (automated; never relax)
-- **CI green before merge** — the two CI checks gate every PR; red blocks.
+Always-on invariants (automated; never relax):
+- **CI green before merge.**
 - **Ledger integrity** — `deduct`/`grant` idempotent on `(refId, reason)`; no direct
-  `creditBalance` writes; never force the `credit_ledger` unique index over
-  duplicates. (This data survives to the live client.)
-- **Never bill for a no-op** — effect fields reflect the EFFECT of an op, not intent;
-  a byte-identical result is fail+refund, not a charge.
-- **Secrets** are never printed, committed, or echoed.
+  `creditBalance` writes; never force the `credit_ledger` unique index over duplicates.
+- **Never bill for a no-op** — effect fields reflect the EFFECT, not intent.
+- **Secrets** never printed, committed, or echoed.
 
 ---
 
-## 1. Collaboration model — CC ↔ Architect ↔ Frank
+## 2. Collaboration model — CC ↔ Architect ↔ Frank
 
-### 1.1 Three lanes, clear roles
+### 2.1 Three lanes, clear roles
 - **CC (Claude Code)** — implements, tests, **verifies against ground truth**
   (file:line, query results, CI, deployed state), ships. Surfaces evidence + a
   labeled lean; never settles an architectural fork alone.
-- **Architect (Claude.ai)** — designs, reviews CC's artifacts, ratifies forks, owns
-  safety-doc wording. Reads only the artifact, not CC's working chat.
-- **Frank** — oversight + relay between lanes; the human confirm in §0.
+- **Architect (Claude.ai)** — designs, reviews CC's artifacts, **approves
+  Architect-scoped PRs (§2.4)**, ratifies forks, owns safety-doc wording. Reads only
+  the artifact, not CC's working chat.
+- **Frank** — oversight + relay between lanes; the human confirm in §1.
 
-### 1.2 Doc-to-doc round-trip (no summaries, no deferral)
+### 2.2 Doc-to-doc round-trip
 Every cross-lane artifact (gap findings, build specs, decision requests, close-outs)
 is a plain-text doc pasted **in full** in chat for Frank to relay, AND committed to
-`docs/*.txt`. Never a summary-instead-of-paste; never "I'll write it next." The doc
-IS the deliverable. A decision request carries, per fork: the request, the evidence
-(file:line / query result), the options + what each entails, and a labeled lean —
-the Architect/Frank decide.
+`docs/*.txt`. No summaries, no deferral. A decision request carries, per fork: the
+request, the evidence (file:line / query), the options + what each entails, a labeled
+lean.
 
-### 1.3 Fact-grounding — no inference where verification is possible
-Verify against the closest to ground truth before claiming. Source hierarchy:
-1. **Live system state** — DB query, CI, deployed runtime, file read.
-2. **Frank's empirical report** — if he says "X is broken / used to work," that's
-   authoritative; reframe the model, don't defend the inference.
-3. **Installed source / types / migrations** — actual code, not docstrings.
-4. **Vendor / tool docs.**
-5. **Inference / memory** — only when 1–4 are unreachable, and **labeled** as such.
+### 2.3 Fact-grounding — no inference where verification is possible
+Source hierarchy: 1) live system state (query/CI/runtime/file), 2) Frank's empirical
+report (authoritative — reframe, don't defend), 3) installed source/types/migrations,
+4) vendor docs, 5) inference (labeled). Tag shared-doc claims `[GROUNDED]` vs
+`[VERIFY]`. Stop-and-verify before writing "the system always/only does X."
 
-Stop-and-verify trigger: about to write "the system always/only does X," or Frank
-pushes back with an empirical contradiction → verify, or ask the one specific
-question that resolves it. Tag claims in shared docs `[GROUNDED]` vs `[VERIFY]`.
+### 2.4 Architect-scoped vs. routine (what auto-merges)
+- **Architect-scoped** — design reviewed before code; PR **holds for Architect
+  approval (Frank relays), no auto-merge**: money/credit/Stripe/webhook logic; DB
+  schema + migrations; auth / permissions / tenant-isolation; mask-provider /
+  sub-processor; any architectural fork.
+- **Routine** — **auto-merges on green CI**: UI/cosmetic, refactors, tests, docs,
+  dependency bumps, bug fixes not touching the above.
+- **Money-path boundary:** the guard is **backend** credit/ledger/Stripe logic +
+  credentials/flips. **Cosmetic billing UI** (pricing copy, layout) is routine.
 
 ---
 
-## 2. Standing technical conventions
+## 3. Flip Authority (LIVE phase) — HARD RULE
+> Scope: binds in the LIVE phase (≥1 onboarded client). Pre-onboarding (§0) relaxes
+> the gate ceremony — but the human-on-flip below holds in both phases.
 
-- **Branch / commit.** Develop on your assigned branch; PRs target `main`. Commit
-  trailers on every commit:
+A "flip" is any change that moves a feature dark→live: setting, changing, or
+deploying a `*_LIVE` flag, `STUDIO_MASK_PROVIDER`, or any prod secret that moves the
+money/credit path, the mask provider, or a sub-processor.
+1. No lane (CC, Manus, any agent) sets, changes, or deploys any such flag/secret.
+   Sole exception: Frank's explicit flip on an Architect-verified SHA after gates clear.
+2. The flip is a deliberate env change Frank makes or names by hand — never a side
+   effect of a builder checkpoint, deploy, or PR merge.
+3. Builders may PREPARE a flip (exact secret, value, target SHA). Builders never SET it.
+4. Every flip is logged: flag, old→new, SHA, who, gate-clearance ref. One flip per
+   change, smoke-tested after. Never batch flips.
+5. Default posture (live): every `*_LIVE` ships dark and stays dark until the ritual.
+   "Dark" is true only when verified against the live deploy env (G0), never inferred.
+6. Gate order before any flip: G0→G4 (§4).
+
+---
+
+## 4. Launch Gates G0–G4 (LIVE phase)
+> Scope: LIVE phase. Pre-onboarding, these are the one-time onboarding-readiness gate
+> (§7), not a per-flip ritual.
+
+Nothing re-flips to live until ALL clear, in sequence:
+- **G0 — prod env verified dark.** A production env read (via `/api/studio/posture` →
+  `dark:true`, or the deploy platform's env panel) showing the relevant `*_LIVE`
+  unset/false and `STUDIO_MASK_PROVIDER` unset/`classical`. Owned by Frank. [deploy
+  platform: VERIFY Vercel vs Manus]
+- **G1 — Architect verifies the live-candidate SHA** (reads the actual commit/diff).
+- **G2 — credentialed SAM2 privacy re-confirmation** (mask-provider flip only):
+  crop-to-fabric minimization, `org_id` stamped on every outbound call, sub-processor
+  disclosure published, fail-safe verified.
+- **G3 — real-garment per-route eval on fixed runners** (a synthetic-only "pass"
+  doesn't count).
+- **G4 — live-surface hardening merged** and verified at the head SHA.
+
+Re-flip order: recolor (classical) → SAM2 provider (own flip, gated on G2) → scale
+(after its eval) → density (after its eval; the credit no-op surface, last).
+
+---
+
+## 5. Standing technical conventions
+- **Branch / commit.** Develop on your assigned branch; PRs target `main`. Trailers:
   ```
-  Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+  Co-Authored-By: Claude Code <noreply@anthropic.com>
   Claude-Session: <session url>
   ```
   Never put the model identifier in commits, PR text, code, or any pushed artifact.
-- **Money path (`generate` / `rerun`).** Credit logic, idempotency, webhook/Stripe
-  semantics — change deliberately; the §0 ledger invariants hold.
+- **Money path (`generate`/`rerun`).** Backend credit logic, idempotency,
+  webhook/Stripe semantics are Architect-scoped (§2.4); the §1 ledger invariants hold.
 - **Deterministic image ops & mask provider.** All raster ops decode through
   `server/_core/image/decodeUpright.ts` (single orientation boundary).
-  `STUDIO_MASK_PROVIDER` is `classical` (default) or `sam2` (hosted; hard-requires
-  Replicate creds, enforced at boot by `validateEnv`). Keep new fetch/decode paths
-  behind the resource guards (`server/_core/image/guards.ts`) and the SSRF guard
+  `STUDIO_MASK_PROVIDER` is `classical` (default) or `sam2` (hard-requires Replicate
+  creds, enforced at boot by `validateEnv`). Keep new fetch/decode paths behind the
+  resource guards (`server/_core/image/guards.ts`) and SSRF guard
   (`server/_core/net/ssrfGuard.ts`).
-- **Build / test / CI.** `pnpm run check` (tsc) and `pnpm run test` (vitest;
+- **Build / test / CI.** `pnpm run check` (tsc) + `pnpm run test` (vitest;
   credential-dependent tests self-skip). CI runs both on every PR and blocks merge on
-  red. A gate must actually gate — never green for the wrong reason or red for
-  reasons orthogonal to the change.
+  red. A gate must actually gate.
 
 ---
 
-## 3. Airtight-build standards (keep these true continuously)
-
-- **Dependency security.** Keep Dependabot **criticals/highs at 0**. (As of
-  2026-06-22 the default branch reports 2 critical / 28 high / 48 moderate / 7 low —
-  triage before onboarding.)
+## 6. Airtight-build standards (keep true continuously)
+- **Dependency security.** Keep Dependabot criticals/highs at 0; triage and resolve
+  all outstanding vulnerabilities before onboarding. (Live counts: handoff doc.)
 - **Ledger reconciliation.** Per tenant, `SUM(credit_ledger.delta) ==
-  tenants.creditBalance`. Cover with a test and/or a periodic check.
+  tenants.creditBalance`. Cover with a test and/or periodic check.
 - **Multi-tenant isolation.** One firm can never read or spend another's data/credits.
   Cover with cross-tenant isolation tests + an impersonation audit.
 - **Sub-processor privacy (sam2 / Replicate).** Before any real customer image flows:
@@ -114,27 +172,18 @@ question that resolves it. Tag claims in shared docs `[GROUNDED]` vs `[VERIFY]`.
 
 ---
 
-## 4. Onboarding transition + readiness gate
-
-At the first client onboard, the posture re-tightens: production flips of the
-money/mask/sub-processor path get a deliberate gate (prod state verified → the
-live-candidate SHA verified → sub-processor privacy confirmed for a mask flip), and
-live surfaces ship dark-by-default. Re-flip order when it applies: **recolor
-(classical) → sam2 provider → scale → density.** Close incident **#61** (the
-unauthorized flip) via the G0 posture read (`/api/studio/posture` → `dark:true`)
-before onboarding.
-
-Run this readiness checklist **once** before the signed client goes live:
+## 7. Onboarding readiness gate (run once before the signed client goes live)
 - [ ] Billing tested end-to-end (Stripe dry run + refund path)
-- [ ] Privacy / sub-processor disclosure published (§3)
-- [ ] Scale/density calibrated + verified on real garments
-- [ ] Multi-tenant isolation verified (§3)
-- [ ] Ledger reconciled (§3)
-- [ ] Dependabot criticals/highs = 0 (§3)
-- [ ] Backups + a tested restore confirmed  *(verify exists — don't assume)*
+- [ ] Privacy / sub-processor disclosure published (§6)
+- [ ] Scale/density calibrated + verified on real garments (G3)
+- [ ] Multi-tenant isolation verified (§6)
+- [ ] Ledger reconciled (§6)
+- [ ] Dependabot criticals/highs = 0 (§6)
+- [ ] G0 dark-posture read verified (§4)
+- [ ] Backups + a tested restore confirmed  *(verify — don't assume)*
 - [ ] Error tracking + money-path/auth alerting confirmed  *(verify)*
 - [ ] Unit economics: credit price > per-op Replicate/compute cost  *(verify)*
 - [ ] Legal: privacy policy, sub-processor list, DPA, terms  *(verify with counsel)*
 
-Items marked *(verify)* are **not** yet confirmed to exist — confirm or build them;
-never record them as done on assumption.
+Items marked *(verify)* are **not** confirmed to exist — confirm or build them; never
+record them as done on assumption.
