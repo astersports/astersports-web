@@ -102,6 +102,19 @@ export function validateEnv(): { errors: string[]; warnings: string[] } {
     if (!ENV.replicateSam2Model) errors.push("STUDIO_MASK_PROVIDER=sam2 requires REPLICATE_SAM2_MODEL");
   }
 
+  // Inverse guard: the deterministic scale/density ops consume SAM2 rasters +
+  // instances; the classical provider can't serve them, so a live flag without
+  // sam2 would deduct, call out, and refund on every request (charge-for-nothing).
+  // Fail fast at boot instead of per-request.
+  if (
+    (ENV.studioScaleLive || ENV.studioDensityLive || ENV.studioDensityRedistribute) &&
+    ENV.maskProvider !== "sam2"
+  ) {
+    errors.push(
+      "STUDIO_SCALE_LIVE / STUDIO_DENSITY_LIVE / STUDIO_DENSITY_REDISTRIBUTE require STUDIO_MASK_PROVIDER=sam2 (deterministic ops need SAM2 rasters + instances)"
+    );
+  }
+
   // Feature-degrading: present-but-empty means that feature is dark. Warn only.
   const optional: Array<[string, string, string]> = [
     ["STRIPE_SECRET_KEY", ENV.stripeSecretKey, "billing/checkout"],

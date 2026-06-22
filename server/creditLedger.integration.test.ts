@@ -10,8 +10,8 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { getDb } from "./db";
-import { deductCredits, grantCredits, countJobGenerationAttempts } from "./studioDb";
-import { tenants, creditLedger } from "../drizzle/schema";
+import { deductCredits, grantCredits, countJobGenerationAttempts, reapStuckJobs } from "./studioDb";
+import { tenants, creditLedger, jobs } from "../drizzle/schema";
 
 const RUN = process.env.RUN_DB_TESTS === "1";
 
@@ -88,5 +88,56 @@ describe.skipIf(!RUN)("credit primitives (real MySQL)", () => {
     await deductCredits(tid, 1, 10, "generation", `job-${tid}-a1`);
     await deductCredits(tid, 1, 10, "generation", `job-${tid}-a2`);
     expect(await countJobGenerationAttempts(tid)).toBe(2);
+  });
+});
+
+describe.skipIf(!RUN)("reapStuckJobs (real MySQL) — B2 stranded-job backstop", () => {
+  beforeAll(async () => {
+    db = await getDb();
+    if (!db) throw new Error("RUN_DB_TESTS set but getDb() returned null (DATABASE_URL?)");
+  });
+
+  async function seedProcessingJob(tid: number, cost: number): Promise<number> {
+    const res = await db.insert(jobs).values({
+      tenantId: tid, userId: 1, title: "stuck", originalKey: "k", originalUrl: "u",
+      status: "processing", creditsUsed: cost,
+    });
+    return (res as any)[0].insertId as number;
+  }
+  const refundRows = async (tid: number) =>
+    (await db.select().from(creditLedger).where(eq(creditLedger.tenantId, tid))).filter((x: any) => x.reason === "refund");
+
+  // negative threshold => cutoff in the future => the just-created job is in scope
+  // (sidesteps the 10-min age window without backdating updatedAt).
+  const SWEEP_MS = -60_000;
+
+  it("refunds + fails a stranded processing job, and a second sweep does not double-refund", async () => {
+    const tid = await seedTenant(100);
+    await deductCredits(tid, 1, 30, "generation", `job-${tid}-a1`); // balance 70 (the original deduct)
+    const jid = await seedProcessingJob(tid, 30);
+
+    const r1 = await reapStuckJobs(SWEEP_MS);
+    expect(r1.refunded).toBeGreaterThanOrEqual(1);
+    expect(await balanceOf(tid)).toBe(100); // 70 + 30 refund
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, jid)).limit(1);
+    expect(job.status).toBe("failed");
+    expect((await refundRows(tid)).length).toBe(1);
+
+    await reapStuckJobs(SWEEP_MS); // idempotent
+    expect(await balanceOf(tid)).toBe(100);
+    expect((await refundRows(tid)).length).toBe(1);
+  });
+
+  it("does not refund a job an in-process catch already refunded (no double-refund)", async () => {
+    const tid = await seedTenant(100);
+    await deductCredits(tid, 1, 20, "generation", `job-${tid}-a1`); // balance 80
+    const jid = await seedProcessingJob(tid, 20);
+    await grantCredits(tid, 20, "refund", `job-${jid}-a1-failed`); // in-process refund -> balance 100
+
+    await reapStuckJobs(SWEEP_MS);
+    expect(await balanceOf(tid)).toBe(100); // reaper sees the existing refund, skips
+    expect((await refundRows(tid)).length).toBe(1);
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, jid)).limit(1);
+    expect(job.status).toBe("failed"); // still marked failed
   });
 });

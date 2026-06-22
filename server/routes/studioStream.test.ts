@@ -21,7 +21,7 @@ vi.mock("../_core/env", () => ({
 }));
 
 vi.mock("../_core/masking", () => ({
-  getMaskProvider: vi.fn(() => ({ rasterReady: false })),
+  getMaskProvider: vi.fn(() => ({ rasterReady: true })),
 }));
 
 vi.mock("../_core/studio/guards/dpiGuard", () => ({
@@ -72,6 +72,7 @@ vi.mock("../serverLog", () => ({
 import { registerStudioStreamRoutes } from "./studioStream";
 import { sdk } from "../_core/sdk";
 import { runVariation } from "../studioEngine";
+import { getMaskProvider } from "../_core/masking";
 
 // Capture the registered route handler
 let routeHandler: (req: any, res: any) => Promise<void>;
@@ -218,6 +219,35 @@ describe("registerStudioStreamRoutes", () => {
 
     // Should have ended the response
     expect(res.end).toHaveBeenCalled();
+  });
+
+  it("rejects density (no charge) when the provider has no raster — never charge-then-refund (B3)", async () => {
+    const app = createMockApp();
+    registerStudioStreamRoutes(app as any);
+
+    (sdk.authenticateRequest as any).mockResolvedValue({ id: 1, name: "Test" });
+    // Classical provider: cannot serve SAM2 instances -> density must NOT deduct.
+    (getMaskProvider as any).mockReturnValueOnce({ rasterReady: false });
+
+    const req = createMockReq({
+      tenantId: 1,
+      jobId: 1,
+      controls: {
+        scale: { enabled: false, percent: 0 },
+        density: { enabled: true, percent: 30 },
+      },
+    });
+    const res = createMockRes();
+
+    await routeHandler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.stringContaining("temporarily unavailable") })
+    );
+    // Must NOT have deducted or opened an SSE stream.
+    expect(res.writeHead).not.toHaveBeenCalled();
+    expect(runVariation).not.toHaveBeenCalled();
   });
 
   it("streams an error event and refunds on generation failure", async () => {

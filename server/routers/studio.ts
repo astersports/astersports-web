@@ -161,8 +161,11 @@ export const studioRouter = router({
       // Either density flag routes density through the deterministic path: v1
       // (densityThin) under STUDIO_DENSITY_LIVE, or v2 (densityRedistribute) under
       // STUDIO_DENSITY_REDISTRIBUTE — the op selection happens at the call site.
-      // Both off => unchanged (generative path).
-      const densityDeterministic = ENV.studioDensityLive || ENV.studioDensityRedistribute;
+      // Both off => unchanged (generative path). Also requires a raster-capable
+      // provider: density needs SAM2 instances; on the classical provider it would
+      // only deduct -> call out -> refund, so degrade to generative instead.
+      const densityDeterministic =
+        (ENV.studioDensityLive || ENV.studioDensityRedistribute) && getMaskProvider().rasterReady;
       const useDeterministicDensity = densityDeterministic && densityOnly;
 
       // D-A (density): reject density combined with other edits, gated on the live
@@ -589,7 +592,7 @@ export const studioRouter = router({
       // so a density re-run does count-based removal (or refunds on a no-op)
       // instead of silently billing a generative result that ignored the ask.
       const mode = {
-        density: (ENV.studioDensityLive || ENV.studioDensityRedistribute) && densityOnly(controls),
+        density: (ENV.studioDensityLive || ENV.studioDensityRedistribute) && densityOnly(controls) && getMaskProvider().rasterReady,
         scale: ENV.studioScaleLive && scaleOnly(controls) && getMaskProvider().rasterReady,
       };
 
