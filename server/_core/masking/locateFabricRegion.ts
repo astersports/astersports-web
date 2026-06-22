@@ -14,8 +14,10 @@
  *  3. Bbox expansion: 5% padding on each side to catch edge motifs.
  *  4. Bbox logging: every call logs the returned bbox for production audit.
  */
+import sharp from "sharp";
 import { invokeLLM } from "../llm";
 import { storageGetSignedUrl } from "../../storage";
+import { safeFetchBuffer } from "../net/safeFetch";
 import type { BBoxNormalized } from "./types";
 
 export interface FabricRegionResult {
@@ -108,59 +110,98 @@ async function resolveAccessibleUrl(url: string): Promise<string> {
   return url;
 }
 
+// ─── PHASE 5: bound the locate so it can never blow the 60s platform request cap ──────────────
+const LOCATE_TIMEOUT_MS = 20_000;
+const LOCATE_MAX_DIM = 768;
+
+/**
+ * Download + downscale the source to a small inline JPEG data-URL, so the vision provider does NOT
+ * fetch the full multi-MB image from the signed URL — that provider-side fetch was eating the whole
+ * 60s budget (the call already uses detail:"low", so inference is cheap; the fetch was the cost).
+ * Server-side fetch is SSRF-guarded (CLAUDE.md §5).
+ */
+async function toDownscaledDataUrl(imageUrl: string): Promise<string> {
+  const url = await resolveAccessibleUrl(imageUrl);
+  const { buffer } = await safeFetchBuffer(url, { timeoutMs: 15_000 });
+  const small = await sharp(buffer)
+    .rotate() // honor EXIF orientation before resize
+    .resize(LOCATE_MAX_DIM, LOCATE_MAX_DIM, { fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 80 })
+    .toBuffer();
+  return `data:image/jpeg;base64,${small.toString("base64")}`;
+}
+
+/** Race a promise against a deadline; rejects on timeout so the caller's DEFAULT_REGION catch fires. */
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([p, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  }) as Promise<T>;
+}
+
 // ─── CORE LOCATOR ───────────────────────────────────────────────────────────
 
 async function callVisionLLM(imageUrl: string, systemPrompt: string): Promise<FabricRegionResult> {
-  const url = await resolveAccessibleUrl(imageUrl);
-  const response = await invokeLLM({
-    messages: [
-      { role: "system" as const, content: systemPrompt },
-      {
-        role: "user" as const,
-        content: [
-          {
-            type: "text" as const,
-            text: "Return the bounding box that covers ALL printed fabric on this garment.",
+  // Phase 5: bound the ENTIRE locate (fetch + downscale + LLM) under a hard timeout so a slow image
+  // fetch or model call can never blow the 60s platform request cap. On timeout this rejects, and
+  // the caller (locateFabricRegion*) catches it and returns DEFAULT_REGION (full-garment fallback).
+  return withTimeout((async (): Promise<FabricRegionResult> => {
+    // Downscaled inline data-URL instead of the signed URL: the provider no longer fetches the full
+    // multi-MB source — the URL-fetch latency that was eating the whole budget.
+    const dataUrl = await toDownscaledDataUrl(imageUrl);
+    const response = await invokeLLM({
+      messages: [
+        { role: "system" as const, content: systemPrompt },
+        {
+          role: "user" as const,
+          content: [
+            {
+              type: "text" as const,
+              text: "Return the bounding box that covers ALL printed fabric on this garment.",
+            },
+            { type: "image_url" as const, image_url: { url: dataUrl, detail: "low" as const } },
+          ],
+        },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "fabric_region",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              x: { type: "number" },
+              y: { type: "number" },
+              w: { type: "number" },
+              h: { type: "number" },
+              confidence: { type: "number" },
+            },
+            required: ["x", "y", "w", "h", "confidence"],
+            additionalProperties: false,
           },
-          { type: "image_url" as const, image_url: { url, detail: "low" as const } },
-        ],
-      },
-    ],
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        name: "fabric_region",
-        strict: true,
-        schema: {
-          type: "object",
-          properties: {
-            x: { type: "number" },
-            y: { type: "number" },
-            w: { type: "number" },
-            h: { type: "number" },
-            confidence: { type: "number" },
-          },
-          required: ["x", "y", "w", "h", "confidence"],
-          additionalProperties: false,
         },
       },
-    },
-  });
+    });
 
-  const raw = response.choices?.[0]?.message?.content ?? "{}";
-  const content = typeof raw === "string" ? raw : JSON.stringify(raw);
-  const p = JSON.parse(content) as Record<string, unknown>;
+    const raw = response.choices?.[0]?.message?.content ?? "{}";
+    const content = typeof raw === "string" ? raw : JSON.stringify(raw);
+    const p = JSON.parse(content) as Record<string, unknown>;
 
-  // A zero-area box is unusable — fall back rather than divide by zero downstream.
-  const w = clamp01(p.w);
-  const h = clamp01(p.h);
-  if (w <= 0 || h <= 0) return DEFAULT_REGION;
+    // A zero-area box is unusable — fall back rather than divide by zero downstream.
+    const w = clamp01(p.w);
+    const h = clamp01(p.h);
+    if (w <= 0 || h <= 0) return DEFAULT_REGION;
 
-  const rawBbox = { x: clamp01(p.x), y: clamp01(p.y), w, h };
-  return {
-    bbox: rawBbox,
-    confidence: clamp01(p.confidence),
-  };
+    const rawBbox = { x: clamp01(p.x), y: clamp01(p.y), w, h };
+    return {
+      bbox: rawBbox,
+      confidence: clamp01(p.confidence),
+    };
+  })(), LOCATE_TIMEOUT_MS, "locateFabricRegion vision call");
 }
 
 // ─── PUBLIC API ─────────────────────────────────────────────────────────────
