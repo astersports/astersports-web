@@ -14,7 +14,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLoginUrl } from "@/const";
 import { useRoute } from "wouter";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Building2,
   User,
@@ -24,7 +26,6 @@ import {
   Clock,
   Loader2,
   ArrowRight,
-  ShieldCheck,
 } from "lucide-react";
 
 export default function JoinPage() {
@@ -33,17 +34,31 @@ export default function JoinPage() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
   const [redeemed, setRedeemed] = useState(false);
   const [redeemError, setRedeemError] = useState<string | null>(null);
+  // Firm links only: the new owner can name their org before accepting.
+  const [orgName, setOrgName] = useState("");
 
-  // Fetch link details
+  // Fetch link details. Public query (no auth gate) so the recipient can preview
+  // what they're accepting before being sent through OAuth.
   const { data: link, isLoading: linkLoading, error: linkError } = trpc.inviteLinks.getByToken.useQuery(
     { token },
-    { enabled: !!token && isAuthenticated, retry: false }
+    { enabled: !!token, retry: false }
   );
 
   const redeemMutation = trpc.inviteLinks.redeem.useMutation({
     onSuccess: () => setRedeemed(true),
     onError: (err) => setRedeemError(err.message),
   });
+
+  // Seed the org-name field from the link's preset (firm links only), exactly
+  // once. A ref guard (rather than reading orgName) keeps the dependency list
+  // complete and still lets the user clear the field freely afterward.
+  const orgNameSeeded = useRef(false);
+  useEffect(() => {
+    if (orgNameSeeded.current || link?.type !== "firm") return;
+    const preset = (link.metadata as Record<string, any> | null)?.firmName;
+    if (preset) setOrgName(String(preset));
+    orgNameSeeded.current = true;
+  }, [link]);
 
   // ─── Loading state ──────────────────────────────────────────────────────────
   if (authLoading || linkLoading) {
@@ -53,38 +68,6 @@ export default function JoinPage() {
           <Loader2 className="w-8 h-8 animate-spin text-[#f5b731]" />
           <p className="text-slate-400 text-sm">Loading invite...</p>
         </div>
-      </div>
-    );
-  }
-
-  // ─── Not authenticated — show login prompt ──────────────────────────────────
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-[#0a0e1a] flex items-center justify-center p-4">
-        <Card className="w-full max-w-md bg-[#141926] border-white/10">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-12 h-12 rounded-full bg-[#f5b731]/10 flex items-center justify-center mb-3">
-              <ShieldCheck className="w-6 h-6 text-[#f5b731]" />
-            </div>
-            <CardTitle className="text-white text-xl">Sign in to continue</CardTitle>
-            <CardDescription className="text-slate-400">
-              You need to sign in before you can accept this invite.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              className="w-full bg-gradient-to-r from-[#f5b731] to-[#e67e22] text-[#0a0e1a] font-semibold hover:opacity-90"
-              onClick={() => {
-                // Store the join path so we return here after login
-                sessionStorage.setItem("join_return", `/join/${token}`);
-                window.location.href = getLoginUrl();
-              }}
-            >
-              Sign In
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     );
   }
@@ -151,7 +134,7 @@ export default function JoinPage() {
                 : "Your account has been created successfully."}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-2">
             <Button
               className="w-full bg-gradient-to-r from-[#f5b731] to-[#e67e22] text-[#0a0e1a] font-semibold hover:opacity-90"
               onClick={() => (window.location.href = "/studio")}
@@ -159,6 +142,18 @@ export default function JoinPage() {
               Go to Print Studio
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
+            {link?.type === "firm" && (
+              // New firm owners land with an empty team — send them straight to
+              // the admin invite surface so they can bring their members in.
+              <Button
+                variant="outline"
+                className="w-full border-white/15 bg-transparent text-slate-200 hover:bg-white/5"
+                onClick={() => (window.location.href = "/studio/admin")}
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Invite your team
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -228,12 +223,29 @@ export default function JoinPage() {
             </div>
           )}
 
+          {/* Org naming (firm links only) — let the new owner name their org. */}
+          {isAuthenticated && link.type === "firm" && (
+            <div className="space-y-1.5">
+              <Label htmlFor="orgName" className="text-xs text-slate-400">Organization name</Label>
+              <Input
+                id="orgName"
+                value={orgName}
+                onChange={(e) => setOrgName(e.target.value)}
+                placeholder={metadata.firmName || "Your organization name"}
+                maxLength={255}
+                className="bg-[#0a0e1a] border-white/10 text-white placeholder:text-slate-500"
+              />
+            </div>
+          )}
+
           {/* Signed in as */}
-          <div className="rounded-lg bg-white/5 border border-white/10 p-3">
-            <p className="text-xs text-slate-500 mb-1">Signed in as</p>
-            <p className="text-sm text-white font-medium">{user?.name || user?.email || "User"}</p>
-            {user?.email && <p className="text-xs text-slate-400">{user.email}</p>}
-          </div>
+          {isAuthenticated && (
+            <div className="rounded-lg bg-white/5 border border-white/10 p-3">
+              <p className="text-xs text-slate-500 mb-1">Signed in as</p>
+              <p className="text-sm text-white font-medium">{user?.name || user?.email || "User"}</p>
+              {user?.email && <p className="text-xs text-slate-400">{user.email}</p>}
+            </div>
+          )}
 
           {/* Error */}
           {redeemError && (
@@ -242,27 +254,45 @@ export default function JoinPage() {
             </div>
           )}
 
-          {/* Accept button */}
-          <Button
-            className="w-full bg-gradient-to-r from-[#f5b731] to-[#e67e22] text-[#0a0e1a] font-semibold hover:opacity-90"
-            disabled={redeemMutation.isPending}
-            onClick={() => {
-              setRedeemError(null);
-              redeemMutation.mutate({ token });
-            }}
-          >
-            {redeemMutation.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                {config.buttonText}
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </>
-            )}
-          </Button>
+          {/* Accept button (authed) or sign-in CTA (anonymous preview) */}
+          {isAuthenticated ? (
+            <Button
+              className="w-full bg-gradient-to-r from-[#f5b731] to-[#e67e22] text-[#0a0e1a] font-semibold hover:opacity-90"
+              disabled={redeemMutation.isPending}
+              onClick={() => {
+                setRedeemError(null);
+                const trimmed = orgName.trim();
+                redeemMutation.mutate({
+                  token,
+                  ...(link.type === "firm" && trimmed ? { orgName: trimmed } : {}),
+                });
+              }}
+            >
+              {redeemMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  {config.buttonText}
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </>
+              )}
+            </Button>
+          ) : (
+            <Button
+              className="w-full bg-gradient-to-r from-[#f5b731] to-[#e67e22] text-[#0a0e1a] font-semibold hover:opacity-90"
+              onClick={() => {
+                // Return here after OAuth to complete the redemption.
+                sessionStorage.setItem("join_return", `/join/${token}`);
+                window.location.href = getLoginUrl();
+              }}
+            >
+              Sign in to accept
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          )}
 
           {/* Expiry info */}
           {link.expiresAt && (

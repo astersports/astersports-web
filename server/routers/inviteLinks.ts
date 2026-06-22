@@ -5,9 +5,9 @@
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { eq, and, desc, sql, lt } from "drizzle-orm";
+import { eq, and, or, desc, isNull, lt, gt, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
-import { router, protectedProcedure } from "../_core/trpc";
+import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import {
   inviteLinks,
@@ -17,7 +17,7 @@ import {
   users,
   platformAdmins,
 } from "../../drizzle/schema";
-import { createTenant, createMembership, grantCredits, ensureCategory } from "../studioDb";
+import { createTenant, createMembership, grantCredits, ensureCategory, countActiveMembers } from "../studioDb";
 import { emailAllowedForDomain } from "../../shared/domain";
 import { TRIAL_CREDITS } from "../../shared/billing";
 
@@ -175,9 +175,12 @@ export const inviteLinksRouter = router({
     }),
 
   /**
-   * Get invite link details by token (public — used by the /join page).
+   * Get invite link details by token. Public on purpose: the /join page shows a
+   * preview of what's being accepted BEFORE forcing OAuth, so a recipient knows
+   * what they're signing into. The token is the bearer secret (32 random chars);
+   * this returns only invite metadata + the target org name, never user data.
    */
-  getByToken: protectedProcedure
+  getByToken: publicProcedure
     .input(z.object({ token: z.string().min(1) }))
     .query(async ({ input }) => {
       const db = await getDb();
@@ -193,15 +196,25 @@ export const inviteLinksRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Invite link not found" });
       }
 
-      // Check if expired
-      if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
-        return { ...link, status: "expired" as const, tenantName: null };
-      }
+      // Whitelisted public shape — only what the /join preview needs. Never echo
+      // the bearer token, createdBy (user data), id, or lastRedeemedAt back to an
+      // unauthenticated caller (avoids leaking the token into client logs/caches).
+      const preview = (
+        status: "active" | "expired" | "redeemed" | "revoked",
+        tenantName: string | null
+      ) => ({
+        type: link.type,
+        status,
+        expiresAt: link.expiresAt,
+        maxUses: link.maxUses,
+        useCount: link.useCount,
+        metadata: link.metadata,
+        tenantName,
+      });
 
-      // Check if max uses reached
-      if (link.maxUses && link.useCount >= link.maxUses) {
-        return { ...link, status: "redeemed" as const, tenantName: null };
-      }
+      if (link.status === "revoked") return preview("revoked", null);
+      if (link.expiresAt && new Date(link.expiresAt) < new Date()) return preview("expired", null);
+      if (link.maxUses && link.useCount >= link.maxUses) return preview("redeemed", null);
 
       // Get tenant name for join links
       let tenantName: string | null = null;
@@ -214,7 +227,7 @@ export const inviteLinksRouter = router({
         tenantName = tenant?.name ?? null;
       }
 
-      return { ...link, tenantName };
+      return preview(link.status, tenantName);
     }),
 
   /**
@@ -222,7 +235,14 @@ export const inviteLinksRouter = router({
    * Creates the appropriate account/membership.
    */
   redeem: protectedProcedure
-    .input(z.object({ token: z.string().min(1) }))
+    .input(
+      z.object({
+        token: z.string().min(1),
+        /** Firm links only: lets the new owner name their org at redemption.
+         *  Falls back to the link's preset firmName, then the user's name. */
+        orgName: z.string().trim().min(1).max(255).optional(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -237,18 +257,8 @@ export const inviteLinksRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Invite link not found" });
       }
 
-      // Validate link is still active
-      if (link.status === "revoked") {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "This invite link has been revoked" });
-      }
-      if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "This invite link has expired" });
-      }
-      if (link.maxUses && link.useCount >= link.maxUses) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "This invite link has reached its usage limit" });
-      }
-
-      // Check if user already redeemed this link
+      // Friendly pre-check for the common double-click / repeat-visit case. The
+      // atomic claim below is the real backstop against concurrent redemptions.
       const [existingRedemption] = await db
         .select()
         .from(inviteLinkRedemptions)
@@ -264,193 +274,231 @@ export const inviteLinksRouter = router({
         throw new TRPCError({ code: "CONFLICT", message: "You have already used this invite link" });
       }
 
-      // Atomically CLAIM a usage slot BEFORE creating any tenant/credits. The old
-      // code incremented useCount only at the end, so two concurrent redemptions
-      // of a near-limit / single-use link both passed the check above and both
-      // minted a tenant + credits (free-credit mint). This conditional update
-      // increments useCount only while a slot remains and aborts if it didn't
-      // claim one. maxUses falsy (0/null) = unlimited.
-      const claim = await db
+      // ── Atomically claim one redemption slot ──────────────────────────────
+      // A single conditional UPDATE: increment useCount only while the link is
+      // active, unexpired, and under maxUses. MySQL row-locks the matched row and
+      // evaluates `useCount < maxUses` under that lock, so two people clicking a
+      // single-use (or capped) link can never both pass. Mirrors the atomic-debit
+      // pattern in deductCredits. Replaces the old read-then-write check that let
+      // concurrent redeemers race past the cap.
+      const now = new Date();
+      const claimRes = await db
         .update(inviteLinks)
         .set({
           useCount: sql`${inviteLinks.useCount} + 1`,
-          lastRedeemedAt: new Date(),
-          ...(link.maxUses === 1 ? { status: "redeemed" } : {}),
+          lastRedeemedAt: now,
+          // Single-use links flip to "redeemed" the moment they're claimed.
+          status: sql`CASE WHEN ${inviteLinks.maxUses} = 1 THEN 'redeemed' ELSE ${inviteLinks.status} END`,
         })
         .where(
           and(
             eq(inviteLinks.id, link.id),
-            link.maxUses ? lt(inviteLinks.useCount, link.maxUses) : undefined
+            eq(inviteLinks.status, "active"),
+            or(isNull(inviteLinks.maxUses), lt(inviteLinks.useCount, inviteLinks.maxUses)),
+            or(isNull(inviteLinks.expiresAt), gt(inviteLinks.expiresAt, now))
           )
         );
-      if (((claim as any)?.[0]?.affectedRows ?? 0) === 0) {
+
+      const claimed = (claimRes as any)?.[0]?.affectedRows ?? 0;
+      if (claimed === 0) {
+        // The claim failed its predicate — re-read to report an accurate reason.
+        const [fresh] = await db
+          .select()
+          .from(inviteLinks)
+          .where(eq(inviteLinks.id, link.id))
+          .limit(1);
+        if (!fresh || fresh.status === "revoked") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "This invite link has been revoked" });
+        }
+        // `<= now` mirrors the claim predicate's `gt(expiresAt, now)`: a link
+        // expiring exactly at `now` fails the claim and must read as "expired",
+        // not "usage limit".
+        if (fresh.expiresAt && new Date(fresh.expiresAt) <= now) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "This invite link has expired" });
+        }
         throw new TRPCError({ code: "BAD_REQUEST", message: "This invite link has reached its usage limit" });
       }
+
+      // Undo the claim if downstream provisioning fails, so a failed redemption
+      // never burns a use slot or strands a single-use link as "redeemed".
+      const refundClaim = async () => {
+        await db
+          .update(inviteLinks)
+          .set({
+            useCount: sql`GREATEST(${inviteLinks.useCount} - 1, 0)`,
+            status: sql`CASE WHEN ${inviteLinks.maxUses} = 1 THEN 'active' ELSE ${inviteLinks.status} END`,
+          })
+          .where(eq(inviteLinks.id, link.id));
+      };
 
       const metadata = (link.metadata ?? {}) as Record<string, any>;
       let resultTenantId: number;
 
-      if (link.type === "firm") {
-        // Create a new firm for this user
-        const firmName = metadata.firmName || ctx.user.name || "My Organization";
-        const slug = firmName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      try {
+        if (link.type === "firm") {
+          // Create a new firm for this user. The redeemer may name their own org
+          // (input.orgName); otherwise fall back to the link preset, then their name.
+          const firmName = input.orgName || metadata.firmName || ctx.user.name || "My Organization";
+          const slug = firmName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-        const category = await ensureCategory("Default", "default");
-        if (!category) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create category" });
+          const category = await ensureCategory("Default", "default");
+          if (!category) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create category" });
 
-        const tenant = await createTenant({
-          name: firmName,
-          slug: `${slug}-${Date.now().toString(36)}`, // Ensure uniqueness
-          categoryId: category.id,
-          type: "firm",
-          plan: metadata.plan || "none",
-          seats: metadata.seats || 5,
-          creditBalance: 0,
-          allowedEmailDomain: metadata.domainLock || null,
-          trialStartedAt: new Date(),
-          trialCredits: metadata.initialCredits || TRIAL_CREDITS,
-        });
+          const tenant = await createTenant({
+            name: firmName,
+            slug: `${slug}-${Date.now().toString(36)}`, // Ensure uniqueness
+            categoryId: category.id,
+            type: "firm",
+            plan: metadata.plan || "none",
+            seats: metadata.seats || 5,
+            creditBalance: 0,
+            allowedEmailDomain: metadata.domainLock || null,
+            trialStartedAt: new Date(),
+            trialCredits: metadata.initialCredits || TRIAL_CREDITS,
+          });
 
-        if (!tenant) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create organization" });
+          if (!tenant) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create organization" });
 
-        await createMembership({
-          tenantId: tenant.id,
-          userId: ctx.user.id,
-          role: "owner",
-          status: "active",
-        });
+          await createMembership({
+            tenantId: tenant.id,
+            userId: ctx.user.id,
+            role: "owner",
+            status: "active",
+          });
 
-        // Grant initial credits
-        const credits = metadata.initialCredits || TRIAL_CREDITS;
-        if (credits > 0) {
-          await grantCredits(tenant.id, credits, "grant", undefined, ctx.user.id);
-        }
+          // Grant initial credits
+          const credits = metadata.initialCredits || TRIAL_CREDITS;
+          if (credits > 0) {
+            await grantCredits(tenant.id, credits, "grant", undefined, ctx.user.id);
+          }
 
-        resultTenantId = tenant.id;
+          resultTenantId = tenant.id;
 
-      } else if (link.type === "individual") {
-        // Create a single-seat individual account
-        const name = ctx.user.name || ctx.user.email?.split("@")[0] || "User";
-        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+        } else if (link.type === "individual") {
+          // Create a single-seat individual account
+          const name = ctx.user.name || ctx.user.email?.split("@")[0] || "User";
+          const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-        const category = await ensureCategory("Default", "default");
-        if (!category) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create category" });
+          const category = await ensureCategory("Default", "default");
+          if (!category) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create category" });
 
-        const tenant = await createTenant({
-          name,
-          slug: `${slug}-${Date.now().toString(36)}`,
-          categoryId: category.id,
-          type: "individual",
-          plan: "none",
-          seats: 1,
-          creditBalance: 0,
-          trialStartedAt: new Date(),
-          trialCredits: metadata.initialCredits || 50,
-        });
+          const tenant = await createTenant({
+            name,
+            slug: `${slug}-${Date.now().toString(36)}`,
+            categoryId: category.id,
+            type: "individual",
+            plan: "none",
+            seats: 1,
+            creditBalance: 0,
+            trialStartedAt: new Date(),
+            trialCredits: metadata.initialCredits || 50,
+          });
 
-        if (!tenant) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create account" });
+          if (!tenant) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create account" });
 
-        await createMembership({
-          tenantId: tenant.id,
-          userId: ctx.user.id,
-          role: "owner",
-          status: "active",
-        });
+          await createMembership({
+            tenantId: tenant.id,
+            userId: ctx.user.id,
+            role: "owner",
+            status: "active",
+          });
 
-        const credits = metadata.initialCredits || 50;
-        if (credits > 0) {
-          await grantCredits(tenant.id, credits, "grant", undefined, ctx.user.id);
-        }
+          const credits = metadata.initialCredits || 50;
+          if (credits > 0) {
+            await grantCredits(tenant.id, credits, "grant", undefined, ctx.user.id);
+          }
 
-        resultTenantId = tenant.id;
+          resultTenantId = tenant.id;
 
-      } else {
-        // Join an existing tenant
-        if (!link.tenantId) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid join link — no tenant specified" });
-        }
+        } else {
+          // Join an existing tenant
+          if (!link.tenantId) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid join link — no tenant specified" });
+          }
 
-        // Check if already a member
-        const [existingMem] = await db
-          .select()
-          .from(memberships)
-          .where(
-            and(
-              eq(memberships.tenantId, link.tenantId),
-              eq(memberships.userId, ctx.user.id)
+          // Check if already a member
+          const [existingMem] = await db
+            .select()
+            .from(memberships)
+            .where(
+              and(
+                eq(memberships.tenantId, link.tenantId),
+                eq(memberships.userId, ctx.user.id)
+              )
             )
-          )
-          .limit(1);
+            .limit(1);
 
-        if (existingMem) {
-          throw new TRPCError({ code: "CONFLICT", message: "You are already a member of this organization" });
-        }
+          if (existingMem) {
+            throw new TRPCError({ code: "CONFLICT", message: "You are already a member of this organization" });
+          }
 
-        // Check domain lock
-        const [tenant] = await db
-          .select()
-          .from(tenants)
-          .where(eq(tenants.id, link.tenantId))
-          .limit(1);
+          // Check domain lock
+          const [tenant] = await db
+            .select()
+            .from(tenants)
+            .where(eq(tenants.id, link.tenantId))
+            .limit(1);
 
-        if (!tenant) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
-        }
+          if (!tenant) {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+          }
 
-        if (tenant.allowedEmailDomain && ctx.user.email) {
-          if (!emailAllowedForDomain(ctx.user.email, tenant.allowedEmailDomain)) {
+          if (tenant.allowedEmailDomain && ctx.user.email) {
+            if (!emailAllowedForDomain(ctx.user.email, tenant.allowedEmailDomain)) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: `This organization requires a @${tenant.allowedEmailDomain} email address`,
+              });
+            }
+          }
+
+          // Seat limit (single authoritative count; replaces the old dead
+          // double-query). Pre-insert check — adequate for the link-capped flow,
+          // since the atomic claim above already serializes redemptions of a
+          // seat-bounded join link.
+          const activeMembers = await countActiveMembers(link.tenantId);
+          if (activeMembers >= tenant.seats) {
             throw new TRPCError({
               code: "BAD_REQUEST",
-              message: `This organization requires a @${tenant.allowedEmailDomain} email address`,
+              message: `This organization has reached its seat limit (${tenant.seats})`,
             });
           }
-        }
 
-        // Check seat limit
-        const [seatCount] = await db
-          .select({ count: memberships.id })
-          .from(memberships)
-          .where(
-            and(
-              eq(memberships.tenantId, link.tenantId),
-              eq(memberships.status, "active")
-            )
-          );
-
-        // Simple count approach
-        const activeMembers = await db
-          .select()
-          .from(memberships)
-          .where(
-            and(
-              eq(memberships.tenantId, link.tenantId),
-              eq(memberships.status, "active")
-            )
-          );
-
-        if (activeMembers.length >= tenant.seats) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `This organization has reached its seat limit (${tenant.seats})`,
+          await createMembership({
+            tenantId: link.tenantId,
+            userId: ctx.user.id,
+            role: metadata.role || "member",
+            status: "active",
           });
+
+          resultTenantId = link.tenantId;
         }
-
-        await createMembership({
-          tenantId: link.tenantId,
-          userId: ctx.user.id,
-          role: metadata.role || "member",
-          status: "active",
-        });
-
-        resultTenantId = link.tenantId;
+      } catch (err) {
+        await refundClaim();
+        throw err;
       }
 
-      // Record redemption (the usage slot was already claimed atomically above).
-      await db.insert(inviteLinkRedemptions).values({
-        inviteLinkId: link.id,
-        userId: ctx.user.id,
-        tenantId: resultTenantId,
-      });
+      // Record the redemption audit row. Provisioning already succeeded and the
+      // claim is committed, so the user IS in — if only this audit write fails
+      // (a DB blip), don't hand the user an error for an account they actually
+      // have. Log loudly for reconciliation instead. Re-use is still bounded: the
+      // atomic claim already spent useCount (a single-use link is "redeemed"), and
+      // the join path's membership check blocks a duplicate join. True one-shot
+      // atomicity across provisioning would require the money-path helpers
+      // (grantCredits) to share a single tx handle — an Architect-scoped refactor,
+      // out of scope for this change.
+      try {
+        await db.insert(inviteLinkRedemptions).values({
+          inviteLinkId: link.id,
+          userId: ctx.user.id,
+          tenantId: resultTenantId,
+        });
+      } catch (err) {
+        console.error(
+          `[invite-redeem] provisioned tenant ${resultTenantId} for user ${ctx.user.id} but failed ` +
+          `to write the redemption audit row for link ${link.id}: ${(err as Error)?.message}`
+        );
+      }
 
       return { success: true, tenantId: resultTenantId };
     }),
