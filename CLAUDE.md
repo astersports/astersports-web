@@ -1,128 +1,212 @@
-# CLAUDE.md — Working agreement for AI builders on astersports-web
+# CLAUDE.md — Operating agreement (astersports-web)
 
-This file governs how AI agents (CC, Manus, any lane) work in this repo. The
-**Flip Authority** section is a hard rule ratified after the 2026-06-20
-live-flag incident; treat it as non-negotiable. The rest documents standing
-conventions so any lane can pick up work without re-deriving them.
-
-> Draft for Architect sign-off — the Flip Authority clause is transcribed from
-> the Architect's incident ruling. If wording needs to change, the Architect
-> amends here and that version wins.
+Phase-aware. **§0 sets the phase and how strictly the rest binds.** §1–§2 are how CC
+works and how the lanes collaborate (both phases). §3–§4 (Flip Authority + Launch
+Gates) are the LIVE-phase hard rules; §0 scopes when they bind. §5–§7 are standing
+conventions, airtight-build standards, and the onboarding gate.
 
 ---
 
-## 1. Flip Authority (single authority, env-verified) — HARD RULE
+## 0. Operating Phase (read first)
 
-> Verbatim from the Architect's 2026-06-20 incident ruling. The Architect amends
-> this clause; that version wins.
+**Current phase: PRE-ONBOARDING BUILD/TEST.** Zero clients onboarded; one signed, not
+yet live. Until onboarding, **production is our test bed, not a customer surface.**
 
-A "flip" is any change that moves a feature from dark to live: setting,
-changing, or deploying a `*_LIVE` flag, `STUDIO_MASK_PROVIDER`, or any
-production secret that moves the **money/credit path**, the **mask provider**,
-or a **sub-processor**.
+Pre-onboarding (lean):
+- Prod is a test bed; deploys are routine; routine PRs auto-merge on green CI (§2.4).
+- `*_LIVE` flags MAY be flipped on in prod **to test** — expected, not an incident.
+  The §3 ritual and §4 gate sequence do NOT gate testing now. CC prepares the flip;
+  **Frank sets it** (§1). (Scale/density still require `STUDIO_MASK_PROVIDER=sam2` +
+  Replicate creds or the app won't boot — `validateEnv` fail-fast.)
 
-1. No lane (CC, Manus, any agent) sets, changes, or deploys any `*_LIVE` flag,
-   `STUDIO_MASK_PROVIDER`, or any prod secret that moves the money/credit path,
-   the mask provider, or a sub-processor. Sole exception: Frank's explicit flip
-   on an Architect-verified SHA after all gates clear.
-2. The flip is a deliberate env change Frank makes or names by hand. It is never
-   a side effect of a builder checkpoint, deploy, or PR merge.
-3. Builders may PREPARE a flip (document the exact secret, value, and target
-   SHA). Builders never SET it.
-4. Every flip is logged: flag, old to new, SHA, who, gate-clearance ref. One
-   flip per change, smoke-tested after. Never batch flips.
-5. Default posture: every `*_LIVE` flag ships dark and stays dark until the flip
-   ritual. No lane assumes another lane has flipped or will. "Dark" is true only
-   when verified against the live deployment env (G0), never inferred.
-6. Gate order before any flip: G0 prod env verified dark (Vercel evidence) →
-   G1 Architect verifies live-candidate SHA → G2 credentialed SAM2 privacy
-   re-confirm → G3 real-garment per-route eval on fixed runners → G4
-   live-surface hardening merged and verified. Re-flip sequence: recolor
-   (classical) → SAM2 provider (own flip, gated on G2) → scale → density.
+Always-on, even now (these survive to the live client): the §1 invariants (ledger
+integrity, no-op billing, secrets) and the two human confirms.
+
+**Transition to LIVE phase:** the moment the first client onboards, §3 (Flip
+Authority) and §4 (Launch Gates) re-bind in full — gated flips, dark-by-default. §7
+is the one-time readiness gate before that client goes live.
+
+> **Harness note:** this doc is *team policy*. The Claude Code auto-mode safety
+> classifier is a **separate** control: it will still prompt or block money-path
+> merges, prod deploys, and flag flips even when §1/§2.4 grant CC that authority. To
+> get hands-off automation, add the matching permission/Bash rules in **CC settings** —
+> editing this doc alone won't change the classifier. (In spirit they align: routine
+> PRs the classifier lets through; Architect-scoped/money-path it gates.)
 
 ---
 
-## 2. Launch Gates (in order)
+## 1. Operating model — Claude-led, Frank oversight
 
-Nothing re-flips to live until ALL of these clear, in sequence:
+CC runs autonomously (no per-action approval):
+- Build end-to-end; open PRs ready; **auto-merge routine PRs on green CI** (§2.4);
+  auto-deploy (Manus from `main`); run the toolchain without per-step prompts.
+- **Architect-scoped PRs (§2.4) hold for Architect approval, relayed by Frank — never
+  auto-merged.**
+- **Prepare** every flip with evidence: flag, old→new value, target SHA, what it
+  turns on, a one-line smoke plan.
+- **Post-deploy smoke + rollback.** After each deploy, run a smoke check (app boots
+  green; the `/api/studio/posture` read succeeds and matches the intended flag state).
+  If a merged PR breaks `main` or fails the smoke, **immediately `git revert` the
+  offending PR and push** to restore green — never fix-forward on a broken `main`;
+  diagnose after.
+- Keep a running log in chat of what merged / deployed / is queued / awaits a confirm.
 
-- **G0 — prod env verified dark.** A production env read (Vercel) showing the
-  relevant `*_LIVE` unset/false and `STUDIO_MASK_PROVIDER` unset/`classical`.
-  Owned by Frank, read by the Architect. Env state is a verified claim, not an
-  inference. (Added after the incident, where the gate model verified code and
-  *assumed* env.)
-- **G1 — Architect verifies the live-candidate SHA.** The Architect reads the
-  actual commit/diff, not the description.
-- **G2 — credentialed SAM2 privacy re-confirmation** (only for the mask-provider
-  flip): crop-to-fabric minimization, `org_id` stamped on every outbound call,
-  sub-processor disclosure published, fail-safe verified.
-- **G3 — real-garment per-route eval on FIXED runners.** Audit H10 found the
-  synthetic gate wasn't actually executing (manifest field-name mismatch), so a
-  prior "pass" was false. G3 does not count until the runners are fixed AND a
-  real-garment eval passes per route.
-- **G4 — live-surface hardening merged** (PR #5 cluster, C1 extended to
-  `generated/*`), implementation-verified by the Architect at the final head SHA.
+Frank's oversight — two confirms:
+1. **Production flip of the money / mask-provider / sub-processor path** — CC prepares
+     + proposes; **Frank executes/confirms.** (Live phase adds §3/§4 on top.)
+2. **Irreversible data ops** — `DROP`/`TRUNCATE`, prod-data wipe, history rewrite,
+     force-push to a shared branch: explicit human OK first.
 
-### Re-flip order
+Always-on invariants (automated; never relax):
+- **CI green before merge.**
+- **Ledger integrity** — `deduct`/`grant` idempotent on `(refId, reason)`; no direct
+  `creditBalance` writes; never force the `credit_ledger` unique index over duplicates.
+- **Never bill for a no-op** — effect fields reflect the EFFECT, not intent.
+- **Secrets** never printed, committed, or echoed.
 
-`recolor` is classical and SAM2-independent → flips first and cleanly. `scale`
-and `density` both REQUIRE the SAM2 provider live (they need rasters), so they
-are entangled with the provider flip and its privacy gate:
+---
+
+## 2. Collaboration model — CC ↔ Architect ↔ Frank
+
+### 2.1 Three lanes, clear roles
+- **CC (Claude Code)** — implements, tests, **verifies against ground truth**
+  (file:line, query results, CI, deployed state), ships. Surfaces evidence + a
+  labeled lean; never settles an architectural fork alone.
+- **Architect (Claude.ai)** — designs, reviews CC's artifacts, **approves
+  Architect-scoped PRs (§2.4)**, ratifies forks, owns safety-doc wording. Reads only
+  the artifact, not CC's working chat.
+- **Frank** — oversight + relay between lanes; the human confirm in §1.
+
+### 2.2 Doc-to-doc round-trip
+Every cross-lane artifact (gap findings, build specs, decision requests, close-outs)
+is a plain-text doc pasted **in full** in chat for Frank to relay, AND committed to
+`docs/*.txt`. No summaries, no deferral. A decision request carries, per fork: the
+request, the evidence (file:line / query), the options + what each entails, a labeled
+lean.
+
+### 2.3 Fact-grounding — no inference where verification is possible
+Source hierarchy: 1) live system state (query/CI/runtime/file), 2) Frank's empirical
+report (authoritative — reframe, don't defend), 3) installed source/types/migrations,
+4) vendor docs, 5) inference (labeled). Tag shared-doc claims `[GROUNDED]` vs
+`[VERIFY]`. Stop-and-verify before writing "the system always/only does X."
+
+### 2.4 Architect-scoped vs. routine (what auto-merges)
+- **Architect-scoped** — design reviewed before code; PR **holds for Architect
+  approval (Frank relays), no auto-merge** (in BOTH phases): money/credit/Stripe/webhook
+  logic; DB schema + migrations; auth / permissions / tenant-isolation; mask-provider /
+  sub-processor; any architectural fork.
+- **Routine** — **auto-merges on green CI**: UI/cosmetic, refactors, tests, docs,
+  dependency bumps, bug fixes not touching the above.
+- **Money-path boundary:** the guard is **backend** credit/ledger/Stripe logic +
+  credentials/flips. **Cosmetic billing UI** (pricing copy, layout) is routine.
+
+---
+
+## 3. Flip Authority (LIVE phase) — HARD RULE
+> Scope: binds in the LIVE phase (≥1 onboarded client). Pre-onboarding (§0) relaxes
+> the gate ceremony — but the **human-on-flip** below holds in BOTH phases: no agent
+> (CC, Manus, any lane) flips a flag itself, ever. Detection: `/api/studio/posture` is
+> the source of truth for the live flag state; an unauthorized flip is reverted on
+> sight and logged.
+
+A "flip" is any change that moves a feature dark→live: setting, changing, or
+deploying a `*_LIVE` flag, `STUDIO_MASK_PROVIDER`, or any prod secret that moves the
+money/credit path, the mask provider, or a sub-processor.
+1. No lane (CC, Manus, any agent) sets, changes, or deploys any such flag/secret.
+     Sole exception: Frank's explicit flip on an Architect-verified SHA after gates clear.
+2. The flip is a deliberate env change Frank makes or names by hand — never a side
+     effect of a builder checkpoint, deploy, or PR merge.
+3. Builders may PREPARE a flip (exact secret, value, target SHA). Builders never SET it.
+4. Every flip is logged: flag, old→new, SHA, who, gate-clearance ref. One flip per  
+     change, smoke-tested after. Never batch flips.
+5. Default posture (live): every `*_LIVE` ships dark and stays dark until the ritual.
+     "Dark" is true only when verified against the live deploy env (G0), never inferred.
+6. Gate order before any flip: G0→G4 (§4).
+
+---
+
+## 4. Launch Gates G0–G4 (LIVE phase)
+> Scope: LIVE phase. Pre-onboarding, these are the one-time onboarding-readiness gate
+> (§7), not a per-flip ritual.
+
+Nothing re-flips to live until ALL clear, in sequence:
+- **G0 — prod env verified dark.** Authoritative check: `GET /api/studio/posture`
+  (cron-secret auth) → `"dark": true` with the relevant `*_LIVE` unset/false. The app
+  reports its own running posture, so no deploy-platform access is needed. (Deploy/env
+  is on **Manus's platform — there is no Vercel project for the org**; don't look for
+  a Vercel env panel.) Owned by Frank.
+- **G1 — Architect verifies the live-candidate SHA** (reads the actual commit/diff).
+- **G2 — credentialed SAM2 privacy re-confirmation** (mask-provider flip only):
+  crop-to-fabric minimization, `org_id` stamped on every outbound call, sub-processor
+  disclosure published, fail-safe verified.
+- **G3 — real-garment per-route eval on fixed runners** (a synthetic-only "pass"
+  doesn't count). Note: the scale detector currently rejection-safe but
+  under-calibrated (false-rejects ~⅓ of genuine repeats) — calibrate here.
+- **G4 — live-surface hardening merged** and verified at the head SHA.
+
+Re-flip order: recolor (classical) → SAM2 provider (own flip, gated on G2) → scale
+(after its eval) → density (after its eval; the credit no-op surface, last).
+
+---
+
+## 5. Standing technical conventions
+- **Branch / commit.** Develop on your assigned branch; PRs target `main`. Trailers:
 
 ```
-recolor (classical)
-  → SAM2 provider live (own flip, gated on G2)
-    → scale (after its per-route eval)
-      → density (after its per-route eval; the credit no-op surface, last)
+
 ```
+Never put the model identifier (e.g. a version number) in commits, PR text, code, or
+any pushed artifact — sign as "Claude Code".
+- **Money path (`generate`/`rerun`).** Backend credit logic, idempotency,
+webhook/Stripe semantics are Architect-scoped (§2.4); the §1 ledger invariants hold.
+- **Deterministic image ops & mask provider.** All raster ops decode through
+`server/_core/image/decodeUpright.ts` (single orientation boundary).
+`STUDIO_MASK_PROVIDER` is `classical` (default) or `sam2` (hard-requires Replicate
+creds, enforced at boot by `validateEnv`). Keep new fetch/decode paths behind the
+resource guards (`server/_core/image/guards.ts`) and SSRF guard
+(`server/_core/net/ssrfGuard.ts`).
+- **Build / test / CI.** `pnpm run check` (tsc) + `pnpm run test` (vitest;
+credential-dependent tests self-skip). CI runs both on every PR and blocks merge on
+red. A gate must actually gate. **Never add an env-coupled assertion to the unit
+suite** (asserting `process.env.*` values) — it red-lines CI for every lane; assert
+posture in a boot check or the `/api/studio/posture` endpoint instead.
 
 ---
 
-## 3. Branch & commit conventions
-
-- Develop on the branch you were assigned; never push to `main` directly and
-  never to another lane's branch without explicit permission.
-- `git push -u origin <branch>`; on network failure retry up to 4× with
-  exponential backoff (2s, 4s, 8s, 16s).
-- After pushing, open a **draft** PR if none exists.
-- Commit-message trailers (every commit):
-  ```
-  Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
-  Claude-Session: <session url>
-  ```
-- Do **not** put the model identifier in commit messages, PR titles/bodies, code
-  comments, or any pushed artifact.
-
----
-
-## 4. Money path (`generate` / `rerun`)
-
-- The credit/money path is GO-gated. Build dark / flag-off; Frank flips it live.
-- Never bill for a no-op: `removed`/effect fields must reflect the EFFECT of an
-  op, not the intent. A byte-identical result is a fail+refund, not a charge.
-- Money-path changes (credit logic, idempotency, webhook/Stripe semantics) are
-  Architect-scoped — coordinate, don't patch reactively.
+## 6. Airtight-build standards (keep true continuously)
+- **Dependency security.** Keep Dependabot criticals/highs at 0; triage and resolve
+all outstanding vulnerabilities before onboarding. (Live counts: handoff doc.)
+- **Ledger reconciliation.** Per tenant, `SUM(credit_ledger.delta) ==
+tenants.creditBalance`. Cover with a test and/or periodic check.
+- **Multi-tenant isolation.** One firm can never read or spend another's data/credits.
+Cover with cross-tenant isolation tests + an impersonation audit.
+- **Sub-processor privacy (sam2 / Replicate).** Before any real customer image flows:
+crop-to-fabric minimization, `org_id` stamped on outbound calls, sub-processor
+disclosure published, fail-safe verified.
+- **Stranded-job safety.** The reaper (`/api/scheduled/reap-stuck-jobs`) must be
+scheduled in prod and `CRON_SECRET` set, so a killed/strand job is refunded, not
+silently charged. 
+- **Secrets.** Env-based with `validateEnv` boot fail-fast; rotation plan for
+JWT / Stripe / Replicate / CRON; none ever in repo or logs.
 
 ---
 
-## 5. Deterministic image ops & mask provider
+## 7. Onboarding readiness gate (run once before the signed client goes live)
+- [ ] Billing tested end-to-end (Stripe dry run + refund path)
+- [ ] Privacy / sub-processor disclosure published (§6)
+- [ ] Scale/density calibrated + verified on real garments (G3)
+- [ ] Multi-tenant isolation verified (§6)
+- [ ] Ledger reconciled (§6)
+- [ ] Dependabot criticals/highs = 0 (§6)
+- [ ] G0 dark-posture read verified via `/api/studio/posture` (§4)
+- [ ] `CRON_SECRET` set + stranded-job reaper cron scheduled (§6)
+- [ ] Backups + a tested restore confirmed  *(verify — don't assume)*
+- [ ] Error tracking + money-path/auth alerting confirmed  *(verify)*
+- [ ] Unit economics: credit price > per-op Replicate/compute cost *(verify)*
+- [ ] Legal: privacy policy, sub-processor list, DPA, terms  *(verify with counsel)*
 
-- All raster ops decode through `server/_core/image/decodeUpright.ts` — the
-  single orientation/coordinate boundary. Add new raster consumers there.
-- Mask provider is `STUDIO_MASK_PROVIDER`: `classical` (default, ship-now floor)
-  or `sam2` (hosted, gated). Opting into `sam2` hard-requires its Replicate
-  creds (enforced at boot by `validateEnv`).
-- Resource guards (`server/_core/image/guards.ts`) bound megapixels and decode
-  concurrency; the SSRF guard (`server/_core/net/ssrfGuard.ts`) gates outbound
-  image fetches. Keep new fetch/decode paths behind them.
+Items marked *(verify)* are **not** confirmed to exist — confirm or build them; never
+record them as done on assumption.
+record them as done on assumption.
 
----
-
-## 6. Build / test / CI
-
-- `pnpm run check` — TypeScript (`tsc --noEmit`).
-- `pnpm run test` — vitest. Credential-dependent tests self-skip when their
-  secret is absent (`it.skipIf`), so the suite is green in a clean environment.
-- CI (`.github/workflows/ci.yml`) runs both on every PR and blocks merge on red.
-- A gate must actually gate: don't add a check that's green for the wrong reason
-  (the G3 lesson) or red for reasons orthogonal to the change.
+```

@@ -33,7 +33,7 @@ describe("validateEnv — live scale/density flags require sam2 (B5)", () => {
   });
 
   it("does NOT error when the live flags are dark (classical default)", async () => {
-    const errors = await errorsFor({ STUDIO_SCALE_LIVE: "false", STUDIO_DENSITY_LIVE: "false", STUDIO_MASK_PROVIDER: "classical" });
+    const errors = await errorsFor({ STUDIO_SCALE_LIVE: "false", STUDIO_DENSITY_LIVE: "false", STUDIO_DENSITY_REDISTRIBUTE: "false", STUDIO_MASK_PROVIDER: "classical" });
     expect(errors.some((e) => SAM2_REQUIRED.test(e))).toBe(false);
   });
 

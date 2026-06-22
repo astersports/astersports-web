@@ -133,15 +133,6 @@ export async function createTenant(data: InsertTenant) {
   return getTenantBySlug(data.slug);
 }
 
-export async function updateTenantCredits(tenantId: number, newBalance: number) {
-  const db = await getDb();
-  if (!db) throw new Error("DB unavailable");
-  await db
-    .update(tenants)
-    .set({ creditBalance: newBalance })
-    .where(eq(tenants.id, tenantId));
-}
-
 export async function updateTenantStripe(
   tenantId: number,
   data: { stripeCustomerId?: string; stripeSubscriptionId?: string; plan?: Tenant["plan"] }
