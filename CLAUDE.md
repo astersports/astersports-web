@@ -1,17 +1,71 @@
 # CLAUDE.md — Working agreement for AI builders on astersports-web
 
-This file governs how AI agents (CC, Manus, any lane) work in this repo. The
-**Flip Authority** section is a hard rule ratified after the 2026-06-20
-live-flag incident; treat it as non-negotiable. The rest documents standing
-conventions so any lane can pick up work without re-deriving them.
+This file governs how AI agents (CC, Manus, any lane) work in this repo. **Read
+§0 Operating Phase first** — it scopes how strict everything else is right now.
+The **Flip Authority** (§1) and **Launch Gates** (§2) are the live-phase hard
+rules, ratified after the 2026-06-20 live-flag incident; §0 scopes *when* they
+bind. The rest documents standing conventions so any lane can pick up work
+without re-deriving them.
 
-> Draft for Architect sign-off — the Flip Authority clause is transcribed from
-> the Architect's incident ruling. If wording needs to change, the Architect
-> amends here and that version wins.
+> The Flip Authority clause is transcribed from the Architect's incident ruling;
+> the Architect amends its wording. §0 (operating phase) is Frank's call as owner
+> while there are no onboarded clients, and should be ratified by the Architect at
+> onboarding.
+
+---
+
+## 0. Operating Phase (read first)
+
+**Current phase: PRE-ONBOARDING BUILD/TEST.** Zero clients are onboarded. One
+real client is signed but **not yet onboarded** — onboarding happens only after
+the known issues (scale/density quality, etc.) are worked out. Until then
+**production is our test environment, not a customer surface**, and §0 scopes how
+strict the rest of this doc is right now.
+
+**Lean while pre-onboarding:**
+- **Prod is a test bed.** Deploys are routine; PRs merge on green CI. The §2 gate
+  sequence and per-change Architect SHA sign-off are **not** required to ship test
+  code.
+- **`*_LIVE` flags MAY be ON in prod to test them.** `STUDIO_SCALE_LIVE`,
+  `STUDIO_DENSITY_LIVE`, `STUDIO_DENSITY_REDISTRIBUTE`, `STUDIO_MASK_PROVIDER=sam2`
+  etc. do not have to stay dark now — flipping them on to exercise a feature is
+  **expected, not an incident**. (This is the fix for "prod won't let me test
+  scale/density.") Note: scale/density still need `sam2` + Replicate creds or the
+  app won't boot (`validateEnv` fail-fast).
+
+**Still human-gated, even now** (the part of §1 that does NOT relax):
+- A flip stays **Frank's deliberate action** — he sets it, or names the exact
+  flag/value for a lane to set. **No agent surprise-flips the money/mask/`*_LIVE`
+  path on its own.** That's the 2026-06-20 incident guardrail; it stays. What
+  relaxes pre-onboarding is the *ceremony around* the flip (gate order,
+  Architect-verified SHA), not the human-gated nature of it.
+
+**Always on — these never relax, because the data survives to the onboarded client:**
+- **Billing/ledger integrity.** `deductCredits`/`grantCredits` stay idempotent on
+  `(refId, reason)`; never a direct `creditBalance` write; never force the
+  `credit_ledger` unique index over duplicate rows.
+- **No irreversible data loss** (`DROP`/`TRUNCATE`, prod-data wipes, history
+  rewrites, force-push to shared branches) without an explicit human OK.
+- **Secrets** are never printed, committed, or echoed. Don't red-line CI for other
+  lanes.
+
+**Transition to LIVE phase:** the moment the first real client is **onboarded**,
+§1 (Flip Authority) and §2 (Launch Gates) re-bind in full — human-gated flips with
+the gate order, money-path sign-off, dark-by-default. **Before** that client goes
+live, §2's gates run **once** as the onboarding-readiness checklist (scale/density
+calibrated + verified, privacy re-confirmed) — a one-time gate, not a per-flip
+ritual during testing.
+
+> Agent auto-merge/auto-deploy is governed by the Claude Code harness permissions
+> (auto-mode / settings), configured **separately** — this doc does not grant it.
+> To get lean agent automation, set the matching permission rules in CC settings;
+> wording here won't change what an agent may do unprompted.
 
 ---
 
 ## 1. Flip Authority (single authority, env-verified) — HARD RULE
+
+> **Scope:** LIVE phase only (≥1 onboarded client). Pre-onboarding, §0 governs — see §0.
 
 > Verbatim from the Architect's 2026-06-20 incident ruling. The Architect amends
 > this clause; that version wins.
@@ -43,6 +97,8 @@ or a **sub-processor**.
 ---
 
 ## 2. Launch Gates (in order)
+
+> **Scope:** LIVE phase only (≥1 onboarded client). Pre-onboarding, §0 governs — see §0.
 
 Nothing re-flips to live until ALL of these clear, in sequence:
 
