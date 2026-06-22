@@ -57,6 +57,25 @@ function borderIdentical(out: Buffer, input: Buffer): boolean {
 }
 
 describe("scalePrintRepeat", () => {
+  it("a disconnected mask speck does not change the scaled output (LCC denoise)", async () => {
+    const clean = new Uint8Array(W * H);
+    for (let y = M0; y < M1; y++) for (let x = M0; x < M1; x++) clean[y * W + x] = 255;
+    const noisy = Uint8Array.from(clean);
+    noisy[(H - 1) * W + (W - 1)] = 255; // rogue island far from the fabric block
+
+    const maskOf = (data: Uint8Array): FabricMask => ({
+      bbox: { x: M0 / W, y: M0 / H, w: (M1 - M0) / W, h: (M1 - M0) / H },
+      confidence: 1, provider: "sam2", raster: { width: W, height: H, data },
+    });
+
+    const a = (await scalePrintRepeat({ image: { url: "x" }, fabric: maskOf(clean), targetFraction: 1.2 })).data;
+    const b = await scalePrintRepeat({ image: { url: "x" }, fabric: maskOf(noisy), targetFraction: 1.2 });
+    expect(b.changed).toBe(true);
+    // The speck must not alter geometry: global-scan would inflate the bbox and
+    // resample differently; LCC keeps the main-component bbox -> byte-identical.
+    expect(Buffer.compare(b.data, a)).toBe(0);
+  });
+
   it("shrinks the repeat to ~0.5 (smaller period), palette preserved, garment frozen", async () => {
     const { data: out } = await scalePrintRepeat({ image: { url: "x" }, fabric: fabric(), targetFraction: 0.5 });
     const m = computeScaleMetrics({ source: scene(), out, width: W, height: H, truthMask: maskU1(), targetFraction: 0.5 });

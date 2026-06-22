@@ -29,7 +29,7 @@ Both ops live entirely inside the fabric region: pixels where the feathered fabr
 **Fraction.** `f = (100 + scale.percent) / 100` (e.g. −50 ⇒ 0.5 shrink, +30 ⇒ 1.3 enlarge).
 
 **Algorithm (`scaleRepeat.ts::scalePrintRepeat`):**
-1. **Bbox.** Tight pixel bbox of fabric pixels `> 127`: `bw = xmax−xmin+1`, `bh = ymax−ymin+1`. Empty mask ⇒ passthrough, `changed:false`.
+1. **Bbox.** Pixel bbox of the **largest connected component** of fabric pixels `> 127` (speck-denoise — a disconnected SAM2 island can't inflate the bbox and skew the resample/crop/tile geometry): `bw = xmax−xmin+1`, `bh = ymax−ymin+1`. Empty mask / no component ⇒ passthrough, `changed:false`. On a clean single-component mask this equals the global min/max extent.
 2. **Resample dims.** `rw = max(1, round(bw·f))`, `rh = max(1, round(bh·f))`.
 3. **Resample.** `sharp.resize(rw, rh, { kernel: "lanczos3" })` — pinned 3-lobe Lanczos (windowed sinc), for determinism.
 4. **Refill the original bbox** (dims fixed):

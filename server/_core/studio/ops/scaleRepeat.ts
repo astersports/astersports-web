@@ -15,6 +15,7 @@ import sharp from "sharp";
 import { decodeUpright } from "../../image/decodeUpright";
 import type { MaskImageInput, FabricMask } from "../../masking/types";
 import { mirrorTileToSize } from "./tile";
+import { largestComponentBBox } from "./connectedComponents";
 
 export interface ScaleInput {
   image: MaskImageInput;
@@ -46,16 +47,13 @@ export async function scalePrintRepeat(input: ScaleInput): Promise<ScaleResult> 
     throw new Error(`scalePrintRepeat: raster dims ${raster.width}x${raster.height} != image ${width}x${height}`);
   }
 
-  // Tight pixel bbox of the fabric region.
-  let xmin = width, xmax = -1, ymin = height, ymax = -1;
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      if (raster.data[y * width + x] > 127) {
-        if (x < xmin) xmin = x; if (x > xmax) xmax = x; if (y < ymin) ymin = y; if (y > ymax) ymax = y;
-      }
-    }
-  }
-  if (xmax < 0) return { data: buffer, width, height, changed: false }; // empty mask -> passthrough
+  // Largest-connected-component bbox of the fabric region. Denoises SAM2 specks
+  // so a rogue disconnected pixel can't inflate bw/bh and skew the center-crop /
+  // mirror-tile geometry. On a clean single-component mask this equals the prior
+  // global min/max scan, so contiguous-fixture outputs are byte-unchanged.
+  const bbox = largestComponentBBox(raster.data, width, height);
+  if (!bbox) return { data: buffer, width, height, changed: false }; // empty mask -> passthrough
+  const { xmin, ymin, xmax, ymax } = bbox;
   const bw = xmax - xmin + 1, bh = ymax - ymin + 1;
   const f = input.targetFraction;
 
