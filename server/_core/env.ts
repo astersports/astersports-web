@@ -1,1 +1,176 @@
-ZXhwb3J0IGNvbnN0IEVOViA9IHsKICBhcHBJZDogcHJvY2Vzcy5lbnYuVklURV9BUFBfSUQgPz8gIiIsCiAgY29va2llU2VjcmV0OiBwcm9jZXNzLmVudi5KV1RfU0VDUkVUID8/ICIiLAogIGRhdGFiYXNlVXJsOiBwcm9jZXNzLmVudi5EQVRBQkFTRV9VUkwgPz8gIiIsCiAgb0F1dGhTZXJ2ZXJVcmw6IHByb2Nlc3MuZW52Lk9BVVRIX1NFUlZFUl9VUkwgPz8gIiIsCiAgb3duZXJPcGVuSWQ6IHByb2Nlc3MuZW52Lk9XTkVSX09QRU5fSUQgPz8gcHJvY2Vzcy5lbnYuVklURV9PV05FUl9PUEVOX0lEID8/ICIiLAogIGlzUHJvZHVjdGlvbjogcHJvY2Vzcy5lbnYuTk9ERV9FTlYgPT09ICJwcm9kdWN0aW9uIiwKICBmb3JnZUFwaVVybDogcHJvY2Vzcy5lbnYuQlVJTFRfSU5fRk9SR0VfQVBJX1VSTCA/PyAiIiwKICBmb3JnZUFwaUtleTogcHJvY2Vzcy5lbnYuQlVJTFRfSU5fRk9SR0VfQVBJX0tFWSA/PyAiIiwKICBzdHJpcGVTZWNyZXRLZXk6IHByb2Nlc3MuZW52LlNUUklQRV9TRUNSRVRfS0VZID8/ICIiLAogIHN0cmlwZVdlYmhvb2tTZWNyZXQ6IHByb2Nlc3MuZW52LlNUUklQRV9XRUJIT09LX1NFQ1JFVCA/PyAiIiwKICByZXNlbmRBcGlLZXk6IHByb2Nlc3MuZW52LlJFU0VORF9BUElfS0VZID8/ICIiLAogIC8qKiBNYW51cyBBZ2VudCBBUEkgKGFwaS5tYW51cy5haSkg4oCUIG9wdGlvbmFsIG91dGJvdW5kIGludGVncmF0aW9uLiBTaGlwcyBEQVJLOgogICAqICBhbiBhYnNlbnQga2V5IGRpc2FibGVzIGl0ICh0aGUgY2xpZW50IHRocm93cyBNYW51c1VuYXZhaWxhYmxlRXJyb3IpLiBUaGlzIGlzCiAgICogIE5PVCBhIGAqX0xJVkVgIGZsYWcgYW5kIE5PVCBvbiB0aGUgbW9uZXkvY3JlZGl0IHBhdGgg4oCUIGl0IGdhdGVzIGFuIGluZXJ0CiAgICogIGNsaWVudCBvbmx5LCBzbyBpdCB3YXJucyAoZmVhdHVyZS1kZWdyYWRpbmcpLCBuZXZlciBibG9ja3MgYm9vdC4gKi8KICBtYW51c0FwaUtleTogcHJvY2Vzcy5lbnYuTUFOVVNfQVBJX0tFWSA/PyAiIiwKICBtYW51c0FwaUJhc2VVcmw6IHByb2Nlc3MuZW52Lk1BTlVTX0FQSV9CQVNFX1VSTCA/PyAiaHR0cHM6Ly9hcGkubWFudXMuYWkiLAogIC8qKgogICAqIFN0dWRpbyBuby1vcCBndWFyZDogd2hlbiBlbmFibGVkIChkZWZhdWx0KSwgYW4gZWRpdGVkIGltYWdlIGlzIFFBLWNoZWNrZWQKICAgKiBhZ2FpbnN0IHRoZSBvcmlnaW5hbCBhbmQsIGlmIHRoZSByZXF1ZXN0ZWQgY2hhbmdlIHdhcyBub3QgYXBwbGllZCwgdGhlIGpvYgogICAqIGZhaWxzIChhbmQgY3JlZGl0cyBhcmUgcmVmdW5kZWQpIGluc3RlYWQgb2Ygc2lsZW50bHkgYmlsbGluZyBmb3IgYSBuby1vcC4KICAgKiBTZXQgU1RVRElPX05PT1BfR1VBUkQ9ZmFsc2UgdG8gZGlzYWJsZS4KICAgKi8KICBzdHVkaW9Ob09wR3VhcmQ6IHByb2Nlc3MuZW52LlNUVURJT19OT09QX0dVQVJEICE9PSAiZmFsc2UiLAogIC8qKgogICAqIEFjdGl2ZSBzZWdtZW50YXRpb24vbWFzayBwcm92aWRlciBmb3IgZGV0ZXJtaW5pc3RpYyBQcmludCBTdHVkaW8gZWRpdHMuCiAgICogImNsYXNzaWNhbCIgKGRlZmF1bHQpIGlzIHRoZSBzaGlwLW5vdyBmbG9vciAodmlzaW9uIGJveCArIEdyYWJDdXQsIHJhc3RlcgogICAqIGdhdGVkIG9uIHNwaWtlIFMzKS4gInNhbTIiIGlzIHRoZSBob3N0ZWQgYmVzdC1pbi1jbGFzcyB0aWVyIChnYXRlZCBvbiBEMS9TNSkuCiAgICovCiAgbWFza1Byb3ZpZGVyOiAocHJvY2Vzcy5lbnYuU1RVRElPX01BU0tfUFJPVklERVIgPT09ICJzYW0yIiA/ICJzYW0yIiA6ICJjbGFzc2ljYWwiKSBhcwogICAgfCAiY2xhc3NpY2FsIgogICAgfCAic2FtMiIsCiAgLyoqIEEyOiByb3V0ZSByZWNvbG9yLW9ubHkgam9icyB0aHJvdWdoIHRoZSBkZXRlcm1pbmlzdGljIHNlcGFyYXRpb24tcmVtYXAgb3AgaW4KICAgKiAgdGhlIGxpdmUgbW9uZXkgcGF0aC4gRGVmYXVsdCBvZmY7IGZsaXAgYWZ0ZXIgQXJjaGl0ZWN0IHZlcmlmaWVzIGFmYWMwMGEuICovCiAgc3R1ZGlvUmVjb2xvckxpdmU6IHByb2Nlc3MuZW52LlNUVURJT19SRUNPTE9SX0xJVkUgPT09ICJ0cnVlIiwKICAvKiogU2NhbGUtbGl2ZTogcm91dGUgc2NhbGUtb25seSBqb2JzIHRocm91Z2ggc2NhbGVQcmludFJlcGVhdCBpbiB0aGUgbW9uZXkgcGF0aC4KICAgKiAgRGVmYXVsdCBvZmYg4oCUIGxhbmRzIGRhcms7IGZsaXAgYWZ0ZXIgdGhlIHBlci1yb3V0ZSByZWFsLWdhcm1lbnQgZXZhbCBwYXNzZXMuCiAgICogIChEZWNpc2lvbiA1OiB0aGUgZGVhZCBTVFVESU9fREVURVJNSU5JU1RJQ18qIGV2YWwgZmxhZ3Mgd2VyZSByZW1vdmVkIGhlcmUg4oCUCiAgICogIHRoZSBzY2FsZS9kZW5zaXR5L3JlY29sb3IgZXZhbCBydW5uZXJzIGludm9rZSB0aGUgb3BzIGRpcmVjdGx5LCBuZXZlciBnYXRlZC4pICovCiAgc3R1ZGlvU2NhbGVMaXZlOiBwcm9jZXNzLmVudi5TVFVESU9fU0NBTEVfTElWRSA9PT0gInRydWUiLAogIC8qKiBELUM6IFJvdXRlIGRlbnNpdHktb25seSBqb2JzIHRocm91Z2ggdGhlIGRldGVybWluaXN0aWMgZGVuc2l0eVRoaW4gb3AgaW4gdGhlCiAgICogIGxpdmUgbW9uZXkgcGF0aC4gUmVxdWlyZXMgU0FNMiAocmFzdGVyICsgaW5zdGFuY2VzKS4gRGVmYXVsdCBvZmY7IGZsaXAgYWZ0ZXIKICAgKiAgcmVhbC1nYXJtZW50IGV2YWwgY29uZmlybXMgY291bnRFcnJvciA8PSAwLjEwIG9uIHByb2R1Y3Rpb24gaW1hZ2VyeS4gKi8KICBzdHVkaW9EZW5zaXR5TGl2ZTogcHJvY2Vzcy5lbnYuU1RVRElPX0RFTlNJVFlfTElWRSA9PT0gInRydWUiLAogIC8qKiBEZW5zaXR5IHYyIChwcm9wb3J0aW9uYWwgcmVkaXN0cmlidXRpb24sIE9wdGlvbiBCKTogcm91dGUgZGVuc2l0eSBqb2JzIHRocm91Z2gKICAgKiAgdGhlIGRldGVybWluaXN0aWMtY29tcG9zaXRlIGRlbnNpdHlSZWRpc3RyaWJ1dGUgb3AgKHJlbW92ZSBwJSwgcmVsb2NhdGUKICAgKiAgc3Vydml2b3JzIHRvIGFuIGV2ZW4gYmx1ZS1ub2lzZSBsYXlvdXQpIGluc3RlYWQgb2YgdGhlIHYxIGVyYXNlLW9ubHkKICAgKiAgZGVuc2l0eVRoaW4uIFJlcXVpcmVzIFNBTTIgKHJhc3RlciArIGluc3RhbmNlcykuIERlZmF1bHQgb2ZmIOKAlCBsYW5kcyBEQVJLIGFuZAogICAqICBpcyBOT1Qgcm91dGVyLXdpcmVkOyB3aXJpbmcgKyB0aGUgZmxpcCBhcmUgRnJhbmsncyBhZnRlciB0aGUgcGVyLXJvdXRlIGV2YWwKICAgKiAgZ2F0ZXMgY2xlYXIuIFBhdHRlcm5lZCBvbiBzdHVkaW9EZW5zaXR5TGl2ZS4gKi8KICBzdHVkaW9EZW5zaXR5UmVkaXN0cmlidXRlOiBwcm9jZXNzLmVudi5TVFVESU9fREVOU0lUWV9SRURJU1RSSUJVVEUgPT09ICJ0cnVlIiwKICAvKiogU2VsZi1zZXJ2ZSBvcmcgY3JlYXRpb24gKGB0ZW5hbnRzLmNyZWF0ZWApLiBNaW50cyBUUklBTF9DUkVESVRTIHRocm91Z2ggdGhlCiAgICogIGxlZGdlci1zYWZlIGBncmFudENyZWRpdHNgIHBhdGggYW5kIGlzIHBlci11c2VyIHJhdGUtbGltaXRlZC4gRGVmYXVsdCBvZmYg4oCUCiAgICogIHRoaXMgaXMgdGhlIEZsaXAtQXV0aG9yaXR5LWdvdmVybmVkIG1vbmV5LXBhdGggZmxpcCAoQ0xBVURFLm1kIMKnMSkuIEl0IGdhdGVzCiAgICogIHRoZSBjcmVkaXQtbWludGluZyB0UlBDIHByb2NlZHVyZSBpdHNlbGY7IHRoZSBjbGllbnQgYFZJVEVfQ1JFQVRFX09SR19MSVZFYAogICAqICBvbmx5IHVuLWRpc2FibGVzIHRoZSBkaWFsb2cgYnV0dG9uIChhIGRpcmVjdCBBUEkgY2FsbCBzdGlsbCBoaXRzIHRoaXMgZ2F0ZSkuCiAgICogIFVubGlrZSBzY2FsZS9kZW5zaXR5IGl0IGhhcyBOTyBzYW0yL3Jhc3RlciBjby1yZXF1aXJlbWVudCwgc28gdmFsaWRhdGVFbnYKICAgKiAgYWRkcyBubyBib290IGd1YXJkIGZvciBpdC4gKi8KICBzdHVkaW9DcmVhdGVPcmdMaXZlOiBwcm9jZXNzLmVudi5TVFVESU9fQ1JFQVRFX09SR19MSVZFID09PSAidHJ1ZSIsCiAgLyoqIFJlcGxpY2F0ZSBTQU0yIChEMSA9IE9wdGlvbiAyKS4gVG9rZW4gKyBtb2RlbC12ZXJzaW9uIGlkIGZvciB0aGUgaG9zdGVkIG1hc2sgc291cmNlLiAqLwogIHJlcGxpY2F0ZUFwaVRva2VuOiBwcm9jZXNzLmVudi5SRVBMSUNBVEVfQVBJX1RPS0VOID8/ICIiLAogIHJlcGxpY2F0ZVNhbTJNb2RlbDogcHJvY2Vzcy5lbnYuUkVQTElDQVRFX1NBTTJfTU9ERUwgPz8gIiIsCiAgLyoqIEg2OiB1cHBlciBib3VuZCBvbiBhIHNvdXJjZSBpbWFnZSdzIHRvdGFsIHBpeGVsIGNvdW50IGZvciB0aGUgZGV0ZXJtaW5pc3RpYwogICAqICBvcHMuIEEgZGVjb2RlZCBSR0JBIGZyYW1lIGNvc3RzIHdpZHRoKmhlaWdodCo0IGJ5dGVzLCBzbyBhbiB1bmJvdW5kZWQgdXBsb2FkCiAgICogIGlzIGEgbWVtb3J5LWV4aGF1c3Rpb24gdmVjdG9yLiA0MCBNUCAofjE2MCBNQiBSR0JBKSBjb3ZlcnMgcmVhbCBwcmludCBhcnR3b3JrCiAgICogIHdpdGggaGVhZHJvb207IHJhaXNlIHZpYSBTVFVESU9fTUFYX01FR0FQSVhFTFMgb25seSB3aXRoIHRoZSBtZW1vcnkgYnVkZ2V0IGluIG1pbmQuICovCiAgc3R1ZGlvTWF4TWVnYXBpeGVsczogTnVtYmVyKHByb2Nlc3MuZW52LlNUVURJT19NQVhfTUVHQVBJWEVMUykgPiAwID8gTnVtYmVyKHByb2Nlc3MuZW52LlNUVURJT19NQVhfTUVHQVBJWEVMUykgOiA0MCwKICAvKiogSDY6IG1heCBjb25jdXJyZW50IHNoYXJwIGRlY29kZXMuIEVhY2ggZGVjb2RlIGhvbGRzIGEgZnVsbCBSR0JBIGZyYW1lIGluCiAgICogIG1lbW9yeTsgd2l0aG91dCBhIGNhcCwgTiBzaW11bHRhbmVvdXMgam9icyBtdWx0aXBseSB0aGUgcGVhay4gRGVmYXVsdCA0LiAqLwogIHN0dWRpb01heENvbmN1cnJlbnREZWNvZGVzOiBOdW1iZXIocHJvY2Vzcy5lbnYuU1RVRElPX01BWF9DT05DVVJSRU5UX0RFQ09ERVMpID4gMCA/IE51bWJlcihwcm9jZXNzLmVudi5TVFVESU9fTUFYX0NPTkNVUlJFTlRfREVDT0RFUykgOiA0LAogIC8qKiBTQU0yIGF1dG9tYXRpYy1tYXNrIHNhbXBsaW5nIGRlbnNpdHkg4oCUIHRoZSBET01JTkFOVCBjb3N0IG9mIGEgZGVuc2l0eSBqb2IuCiAgICogIDY0ICh+NDA5NiBwb2ludHMpIHJvdXRpbmVseSBydW5zIDYwLTEyMHM7IDMyICh+MTAyNCBwb2ludHMpIH40eCBmYXN0ZXI7IDE2CiAgICogICh+MjU2IHBvaW50cykgfjE2eCBmYXN0ZXIgdGhhbiA2NCBhbmQgc3VmZmljaWVudCBmb3IgY291bnQtYmFzZWQgdGhpbm5pbmcuCiAgICogIFJlcXVlc3QgdGltZW91dCByYWlzZWQgdG8gMTgwcyAocGxhdGZvcm0gY2FwKTsgZGVmYXVsdCBsb3dlcmVkIHRvIDE2IHRvIGtlZXAKICAgKiAgdHlwaWNhbCBkZW5zaXR5IGpvYnMgd2VsbCB1bmRlciAzMHMuIFR1bmUgdmlhIFNUVURJT19TQU0yX1BPSU5UU19QRVJfU0lERS4gKi8KICBzdHVkaW9TYW0yUG9pbnRzUGVyU2lkZTogTnVtYmVyKHByb2Nlc3MuZW52LlNUVURJT19TQU0yX1BPSU5UU19QRVJfU0lERSkgPiAwID8gTnVtYmVyKHByb2Nlc3MuZW52LlNUVURJT19TQU0yX1BPSU5UU19QRVJfU0lERSkgOiAxNiwKICAvKiogU0FNMiBtYXNrLXRvLW1hc2sgcmVmaW5lbWVudCBwYXNzICh+MnggbGF0ZW5jeSkuIERlbnNpdHkgZmlsbHMgdGhlIHdob2xlIGNyb3AKICAgKiAgYW5kIGFyZWEtZmlsdGVycyBpbnN0YW5jZXMsIHNvIG1vdGlmLWVkZ2UgcHJlY2lzaW9uIGlzbid0IG5lZWRlZCDigJQgZGVmYXVsdCBvZmYKICAgKiAgZm9yIHNwZWVkLiBTZXQgU1RVRElPX1NBTTJfVVNFX00yTT10cnVlIHRvIHJlLWVuYWJsZS4gKi8KICBzdHVkaW9TYW0yVXNlTTJtOiBwcm9jZXNzLmVudi5TVFVESU9fU0FNMl9VU0VfTTJNID09PSAidHJ1ZSIsCiAgLyoqIENhcCBvbiBkZXRlY3RlZCBpbnN0YW5jZXMgaGFuZGVkIHRvIHRoZSBkZW5zaXR5IG9wcy4gRWFjaCBpbnN0YW5jZSBpcyByZW1hcHBlZAogICAqICB0byBhIGZ1bGwtaW1hZ2UgcmFzdGVyLCBzbyBhIHBhdGhvbG9naWNhbCBTQU0yIG92ZXItc2VnbWVudGF0aW9uIGlzIGFuIE9PTQogICAqICB2ZWN0b3I7IGRlbnNpdHkgb25seSBuZWVkcyBhIHJlcHJlc2VudGF0aXZlIG1vdGlmIHNldC4gRGVmYXVsdCAyMDA7IHR1bmUgdmlhCiAgICogIFNUVURJT19NQVhfSU5TVEFOQ0VTLiAqLwogIHN0dWRpb01heEluc3RhbmNlczogTnVtYmVyKHByb2Nlc3MuZW52LlNUVURJT19NQVhfSU5TVEFOQ0VTKSA+IDAgPyBOdW1iZXIocHJvY2Vzcy5lbnYuU1RVRElPX01BWF9JTlNUQU5DRVMpIDogMjAwLAogIC8qKiBIMjogYWxsb3dsaXN0IG9mIGhvc3RbOnBvcnRdIHZhbHVlcyB0aGUgT0F1dGggcmVkaXJlY3QgdGFyZ2V0IG1heSB1c2UuIFdoZW4KICAgKiAgc2V0IChjb21tYS1zZXBhcmF0ZWQpLCBhIGRlY29kZWQgYHN0YXRlYCByZWRpcmVjdCB3aG9zZSBob3N0IGlzIG5vdCBvbiB0aGUKICAgKiAgbGlzdCBpcyByZWplY3RlZCDigJQgdGhlIGFudGktY29kZS1pbnRlcmNlcHRpb24gY29udHJvbC4gRW1wdHkgPSBzY2hlbWUvZm9ybWF0CiAgICogIHZhbGlkYXRpb24gb25seS4gKi8KICBvYXV0aEFsbG93ZWRSZWRpcmVjdEhvc3RzOiAocHJvY2Vzcy5lbnYuT0FVVEhfQUxMT1dFRF9SRURJUkVDVF9IT1NUUyA/PyAiIikKICAgIC5zcGxpdCgiLCIpCiAgICAubWFwKChoKSA9PiBoLnRyaW0oKSkKICAgIC5maWx0ZXIoQm9vbGVhbiksCiAgLyoqIEgzOiBzaGFyZWQgc2VjcmV0IGZvciBzZXJ2ZXItdG8tc2VydmVyIHNjaGVkdWxlZCAoY3JvbikgZW5kcG9pbnRzLiBXaGVuIHNldCwKICAgKiAgL2FwaS9zY2hlZHVsZWQvKiByZXF1aXJlcyBhIG1hdGNoaW5nIGB4LWNyb24tc2VjcmV0YCBoZWFkZXIgSU4gQURESVRJT04gdG8gdGhlCiAgICogIGV4aXN0aW5nIHNlc3Npb24gY2hlY2suIEJhY2t3YXJkLWNvbXBhdGlibGU6IHVuc2V0ID0gbm8gZXh0cmEgZ2F0ZS4gKi8KICBjcm9uU2VjcmV0OiBwcm9jZXNzLmVudi5DUk9OX1NFQ1JFVCA/PyAiIiwKfTsKCi8qKgogKiBNMTUg4oCUIGVudiBmYWlsLWZhc3QuIEEgYD8/ICIiYCBkZWZhdWx0IHR1cm5zIGEgbWlzc2luZyBzZWNyZXQgaW50byBhIHNpbGVudAogKiBtaXMtY29uZmlndXJhdGlvbiB0aGF0IG9ubHkgc3VyZmFjZXMgYXMgYSBjb25mdXNpbmcgcnVudGltZSBlcnJvciAob3IsIHdvcnNlLAogKiBhIGRlZ3JhZGVkLWJ1dC1iaWxsaW5nIGNvZGUgcGF0aCkuIHZhbGlkYXRlRW52IGNsYXNzaWZpZXMgY29uZmlnIGFuZCwgaW4KICogcHJvZHVjdGlvbiwgcmVmdXNlcyB0byBib290IHdoZW4gc29tZXRoaW5nIHJlcXVpcmVkIGlzIGFic2VudC4gTm9uLXByb2R1Y3Rpb24KICogb25seSB3YXJucywgc28gZGV2L3Rlc3Qgc3RheXMgcnVubmFibGUgd2l0aCBhIHBhcnRpYWwgZW52LgogKi8KZXhwb3J0IGZ1bmN0aW9uIHZhbGlkYXRlRW52KCk6IHsgZXJyb3JzOiBzdHJpbmdbXTsgd2FybmluZ3M6IHN0cmluZ1tdIH0gewogIGNvbnN0IGVycm9yczogc3RyaW5nW10gPSBbXTsKICBjb25zdCB3YXJuaW5nczogc3RyaW5nW10gPSBbXTsKCiAgLy8gSGFyZC1yZXF1aXJlZDogdGhlIHNlcnZlciBjYW5ub3Qgc2VydmUgYXV0aGVudGljYXRlZCB0cmFmZmljIHdpdGhvdXQgdGhlc2UuCiAgY29uc3QgcmVxdWlyZWQ6IEFycmF5PFtzdHJpbmcsIHN0cmluZ10+ID0gWwogICAgWyJKV1RfU0VDUkVUIiwgRU5WLmNvb2tpZVNlY3JldF0sCiAgICBbIkRBVEFCQVNFX1VSTCIsIEVOVi5kYXRhYmFzZVVybF0sCiAgICBbIk9BVVRIX1NFUlZFUl9VUkwiLCBFTlYub0F1dGhTZXJ2ZXJVcmxdLAogICAgWyJWSVRFX0FQUF9JRCIsIEVOVi5hcHBJZF0sCiAgICAvLyBSZXF1aXJlZCBzbyBvd25lci1vbmx5IHJvdXRlcyBmYWlsIGNsb3NlZCBhdCBib290IHJhdGhlciB0aGFuIHNpbGVudGx5CiAgICAvLyBkb3duZ3JhZGluZyB0byAiYW55IGFkbWluIiBhdCBydW50aW1lIChzZWUgb3duZXJQcm9jZWR1cmUgaW4gcm91dGVycy50cykuCiAgICBbIk9XTkVSX09QRU5fSUQiLCBFTlYub3duZXJPcGVuSWRdLAogIF07CiAgZm9yIChjb25zdCBbbmFtZSwgdmFsXSBvZiByZXF1aXJlZCkgewogICAgaWYgKCF2YWwpIGVycm9ycy5wdXNoKGAke25hbWV9IGlzIHJlcXVpcmVkIGJ1dCBtaXNzaW5nYCk7CiAgfQoKICAvLyBDb25kaXRpb25hbCBoYXJkLXJlcXVpcmVtZW50OiBvcHRpbmcgaW50byB0aGUgU0FNMiBtYXNrIHByb3ZpZGVyIHdpdGhvdXQgaXRzCiAgLy8gY3JlZGVudGlhbHMgaXMgZXhhY3RseSB0aGUgc2lsZW50IG1pcy1jb25maWcgdGhhdCBtb3RpdmF0ZWQgdGhpcyBndWFyZCDigJQgdGhlCiAgLy8gc2FtMiBwYXRoIHdvdWxkIGZhaWwgcGVyLXJlcXVlc3QgaW5zdGVhZCBvZiByZWZ1c2luZyB0byBib290LgogIGlmIChFTlYubWFza1Byb3ZpZGVyID09PSAic2FtMiIpIHsKICAgIGlmICghRU5WLnJlcGxpY2F0ZUFwaVRva2VuKSBlcnJvcnMucHVzaCgiU1RVRElPX01BU0tfUFJPVklERVI9c2FtMiByZXF1aXJlcyBSRVBMSUNBVEVfQVBJX1RPS0VOIik7CiAgICBpZiAoIUVOVi5yZXBsaWNhdGVTYW0yTW9kZWwpIGVycm9ycy5wdXNoKCJTVFVESU9fTUFTS19QUk9WSURFUj1zYW0yIHJlcXVpcmVzIFJFUExJQ0FURV9TQU0yX01PREVMIik7CiAgfQoKICAvLyBJbnZlcnNlIGd1YXJkOiB0aGUgZGV0ZXJtaW5pc3RpYyBzY2FsZS9kZW5zaXR5IG9wcyBjb25zdW1lIFNBTTIgcmFzdGVycyArCiAgLy8gaW5zdGFuY2VzOyB0aGUgY2xhc3NpY2FsIHByb3ZpZGVyIGNhbid0IHNlcnZlIHRoZW0sIHNvIGEgbGl2ZSBmbGFnIHdpdGhvdXQKICAvLyBzYW0yIHdvdWxkIGRlZHVjdCwgY2FsbCBvdXQsIGFuZCByZWZ1bmQgb24gZXZlcnkgcmVxdWVzdCAoY2hhcmdlLWZvci1ub3RoaW5nKS4KICAvLyBGYWlsIGZhc3QgYXQgYm9vdCBpbnN0ZWFkIG9mIHBlci1yZXF1ZXN0LgogIGlmICgKICAgIChFTlYuc3R1ZGlvU2NhbGVMaXZlIHx8IEVOVi5zdHVkaW9EZW5zaXR5TGl2ZSB8fCBFTlYuc3R1ZGlvRGVuc2l0eVJlZGlzdHJpYnV0ZSkgJiYKICAgIEVOVi5tYXNrUHJvdmlkZXIgIT09ICJzYW0yIgogICkgewogICAgZXJyb3JzLnB1c2goCiAgICAgICJTVFVESU9fU0NBTEVfTElWRSAvIFNUVURJT19ERU5TSVRZX0xJVkUgLyBTVFVESU9fREVOU0lUWV9SRURJU1RSSUJVVEUgcmVxdWlyZSBTVFVESU9fTUFTS19QUk9WSURFUj1zYW0yIChkZXRlcm1pbmlzdGljIG9wcyBuZWVkIFNBTTIgcmFzdGVycyArIGluc3RhbmNlcykiCiAgICApOwogIH0KCiAgLy8gRmVhdHVyZS1kZWdyYWRpbmc6IHByZXNlbnQtYnV0LWVtcHR5IG1lYW5zIHRoYXQgZmVhdHVyZSBpcyBkYXJrLiBXYXJuIG9ubHkuCiAgY29uc3Qgb3B0aW9uYWw6IEFycmF5PFtzdHJpbmcsIHN0cmluZywgc3RyaW5nXT4gPSBbCiAgICBbIlNUUklQRV9TRUNSRVRfS0VZIiwgRU5WLnN0cmlwZVNlY3JldEtleSwgImJpbGxpbmcvY2hlY2tvdXQiXSwKICAgIFsiU1RSSVBFX1dFQkhPT0tfU0VDUkVUIiwgRU5WLnN0cmlwZVdlYmhvb2tTZWNyZXQsICJTdHJpcGUgd2ViaG9vayB2ZXJpZmljYXRpb24iXSwKICAgIFsiUkVTRU5EX0FQSV9LRVkiLCBFTlYucmVzZW5kQXBpS2V5LCAidHJhbnNhY3Rpb25hbCBlbWFpbCJdLAogICAgWyJNQU5VU19BUElfS0VZIiwgRU5WLm1hbnVzQXBpS2V5LCAiTWFudXMgQWdlbnQgQVBJIGludGVncmF0aW9uIl0sCiAgICBbIkJVSUxUX0lOX0ZPUkdFX0FQSV9VUkwiLCBFTlYuZm9yZ2VBcGlVcmwsICJGb3JnZSBMTE0vaW1hZ2UgZ2VuZXJhdGlvbiJdLAogICAgWyJCVUlMVF9JTl9GT1JHRV9BUElfS0VZIiwgRU5WLmZvcmdlQXBpS2V5LCAiRm9yZ2UgTExNL2ltYWdlIGdlbmVyYXRpb24iXSwKICBdOwogIGZvciAoY29uc3QgW25hbWUsIHZhbCwgZmVhdHVyZV0gb2Ygb3B0aW9uYWwpIHsKICAgIGlmICghdmFsKSB3YXJuaW5ncy5wdXNoKGAke25hbWV9IG1pc3Npbmcg4oCUICR7ZmVhdHVyZX0gZGlzYWJsZWRgKTsKICB9CgogIHJldHVybiB7IGVycm9ycywgd2FybmluZ3MgfTsKfQoKLyoqCiAqIENhbGwgb25jZSBhdCBib290LiBJbiBwcm9kdWN0aW9uLCB0aHJvd3MgaWYgYW55IHJlcXVpcmVkIGVudiBpcyBtaXNzaW5nIHNvIHRoZQogKiBwcm9jZXNzIGV4aXRzIGluc3RlYWQgb2Ygc2VydmluZyBhIGhhbGYtY29uZmlndXJlZCBhcHAuIEVsc2V3aGVyZSwgbG9ncy4KICovCmV4cG9ydCBmdW5jdGlvbiBhc3NlcnRFbnZPckV4aXQoKTogdm9pZCB7CiAgY29uc3QgeyBlcnJvcnMsIHdhcm5pbmdzIH0gPSB2YWxpZGF0ZUVudigpOwogIGZvciAoY29uc3QgdyBvZiB3YXJuaW5ncykgY29uc29sZS53YXJuKGBbZW52XSAke3d9YCk7CiAgaWYgKGVycm9ycy5sZW5ndGggPT09IDApIHJldHVybjsKICBmb3IgKGNvbnN0IGUgb2YgZXJyb3JzKSBjb25zb2xlLmVycm9yKGBbZW52XSAke2V9YCk7CiAgaWYgKEVOVi5pc1Byb2R1Y3Rpb24pIHsKICAgIHRocm93IG5ldyBFcnJvcihgTWlzc2luZyByZXF1aXJlZCBlbnZpcm9ubWVudCBjb25maWd1cmF0aW9uOlxuICAtICR7ZXJyb3JzLmpvaW4oIlxuICAtICIpfWApOwogIH0KICBjb25zb2xlLndhcm4oIltlbnZdIGNvbnRpbnVpbmcgZGVzcGl0ZSBtaXNzaW5nIGNvbmZpZyAobm9uLXByb2R1Y3Rpb24pIik7Cn0K
+export const ENV = {
+  appId: process.env.VITE_APP_ID ?? "",
+  cookieSecret: process.env.JWT_SECRET ?? "",
+  databaseUrl: process.env.DATABASE_URL ?? "",
+  oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
+  ownerOpenId: process.env.OWNER_OPEN_ID ?? process.env.VITE_OWNER_OPEN_ID ?? "",
+  isProduction: process.env.NODE_ENV === "production",
+  forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
+  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+  resendApiKey: process.env.RESEND_API_KEY ?? "",
+  /** Manus Agent API (api.manus.ai) — optional outbound integration. Ships DARK:
+   *  an absent key disables it (the client throws ManusUnavailableError). This is
+   *  NOT a `*_LIVE` flag and NOT on the money/credit path — it gates an inert
+   *  client only, so it warns (feature-degrading), never blocks boot. */
+  manusApiKey: process.env.MANUS_API_KEY ?? "",
+  manusApiBaseUrl: process.env.MANUS_API_BASE_URL ?? "https://api.manus.ai",
+  /**
+   * Studio no-op guard: when enabled (default), an edited image is QA-checked
+   * against the original and, if the requested change was not applied, the job
+   * fails (and credits are refunded) instead of silently billing for a no-op.
+   * Set STUDIO_NOOP_GUARD=false to disable.
+   */
+  studioNoOpGuard: process.env.STUDIO_NOOP_GUARD !== "false",
+  /**
+   * Active segmentation/mask provider for deterministic Print Studio edits.
+   * "classical" (default) is the ship-now floor (vision box + GrabCut, raster
+   * gated on spike S3). "sam2" is the hosted best-in-class tier (gated on D1/S5).
+   */
+  maskProvider: (process.env.STUDIO_MASK_PROVIDER === "sam2" ? "sam2" : "classical") as
+    | "classical"
+    | "sam2",
+  /** A2: route recolor-only jobs through the deterministic separation-remap op in
+   *  the live money path. Default off; flip after Architect verifies afac00a. */
+  studioRecolorLive: process.env.STUDIO_RECOLOR_LIVE === "true",
+  /** Scale-live: route scale-only jobs through scalePrintRepeat in the money path.
+   *  Default off — lands dark; flip after the per-route real-garment eval passes.
+   *  (Decision 5: the dead STUDIO_DETERMINISTIC_* eval flags were removed here —
+   *  the scale/density/recolor eval runners invoke the ops directly, never gated.) */
+  studioScaleLive: process.env.STUDIO_SCALE_LIVE === "true",
+  /** D-C: Route density-only jobs through the deterministic densityThin op in the
+   *  live money path. Requires SAM2 (raster + instances). Default off; flip after
+   *  real-garment eval confirms countError <= 0.10 on production imagery. */
+  studioDensityLive: process.env.STUDIO_DENSITY_LIVE === "true",
+  /** Density v2 (proportional redistribution, Option B): route density jobs through
+   *  the deterministic-composite densityRedistribute op (remove p%, relocate
+   *  survivors to an even blue-noise layout) instead of the v1 erase-only
+   *  densityThin. Requires SAM2 (raster + instances). Default off — lands DARK and
+   *  is NOT router-wired; wiring + the flip are Frank's after the per-route eval
+   *  gates clear. Patterned on studioDensityLive. */
+  studioDensityRedistribute: process.env.STUDIO_DENSITY_REDISTRIBUTE === "true",
+  /** Self-serve org creation (`tenants.create`). Mints TRIAL_CREDITS through the
+   *  ledger-safe `grantCredits` path and is per-user rate-limited. Default off —
+   *  this is the Flip-Authority-governed money-path flip (CLAUDE.md §1). It gates
+   *  the credit-minting tRPC procedure itself; the client `VITE_CREATE_ORG_LIVE`
+   *  only un-disables the dialog button (a direct API call still hits this gate).
+   *  Unlike scale/density it has NO sam2/raster co-requirement, so validateEnv
+   *  adds no boot guard for it. */
+  studioCreateOrgLive: process.env.STUDIO_CREATE_ORG_LIVE === "true",
+  /** Replicate SAM2 (D1 = Option 2). Token + model-version id for the hosted mask source. */
+  replicateApiToken: process.env.REPLICATE_API_TOKEN ?? "",
+  replicateSam2Model: process.env.REPLICATE_SAM2_MODEL ?? "",
+  /** H6: upper bound on a source image's total pixel count for the deterministic
+   *  ops. A decoded RGBA frame costs width*height*4 bytes, so an unbounded upload
+   *  is a memory-exhaustion vector. 40 MP (~160 MB RGBA) covers real print artwork
+   *  with headroom; raise via STUDIO_MAX_MEGAPIXELS only with the memory budget in mind. */
+  studioMaxMegapixels: Number(process.env.STUDIO_MAX_MEGAPIXELS) > 0 ? Number(process.env.STUDIO_MAX_MEGAPIXELS) : 40,
+  /** H6: max concurrent sharp decodes. Each decode holds a full RGBA frame in
+   *  memory; without a cap, N simultaneous jobs multiply the peak. Default 4. */
+  studioMaxConcurrentDecodes: Number(process.env.STUDIO_MAX_CONCURRENT_DECODES) > 0 ? Number(process.env.STUDIO_MAX_CONCURRENT_DECODES) : 4,
+  /** SAM2 automatic-mask sampling density — the DOMINANT cost of a density job.
+   *  64 (~4096 points) routinely runs 60-120s; 32 (~1024 points) ~4x faster; 16
+   *  (~256 points) ~16x faster than 64 and sufficient for count-based thinning.
+   *  Request timeout raised to 180s (platform cap); default lowered to 16 to keep
+   *  typical density jobs well under 30s. Tune via STUDIO_SAM2_POINTS_PER_SIDE. */
+  studioSam2PointsPerSide: Number(process.env.STUDIO_SAM2_POINTS_PER_SIDE) > 0 ? Number(process.env.STUDIO_SAM2_POINTS_PER_SIDE) : 16,
+  /** SAM2 mask-to-mask refinement pass (~2x latency). Density fills the whole crop
+   *  and area-filters instances, so motif-edge precision isn't needed — default off
+   *  for speed. Set STUDIO_SAM2_USE_M2M=true to re-enable. */
+  studioSam2UseM2m: process.env.STUDIO_SAM2_USE_M2M === "true",
+  /** Cap on detected instances handed to the density ops. Each instance is remapped
+   *  to a full-image raster, so a pathological SAM2 over-segmentation is an OOM
+   *  vector; density only needs a representative motif set. Default 200; tune via
+   *  STUDIO_MAX_INSTANCES. */
+  studioMaxInstances: Number(process.env.STUDIO_MAX_INSTANCES) > 0 ? Number(process.env.STUDIO_MAX_INSTANCES) : 200,
+  /** H2: allowlist of host[:port] values the OAuth redirect target may use. When
+   *  set (comma-separated), a decoded `state` redirect whose host is not on the
+   *  list is rejected — the anti-code-interception control. Empty = scheme/format
+   *  validation only. */
+  oauthAllowedRedirectHosts: (process.env.OAUTH_ALLOWED_REDIRECT_HOSTS ?? "")
+    .split(",")
+    .map((h) => h.trim())
+    .filter(Boolean),
+  /** H3: shared secret for server-to-server scheduled (cron) endpoints. When set,
+   *  /api/scheduled/* requires a matching `x-cron-secret` header IN ADDITION to the
+   *  existing session check. Backward-compatible: unset = no extra gate. */
+  cronSecret: process.env.CRON_SECRET ?? "",
+};
+
+/**
+ * M15 — env fail-fast. A `?? ""` default turns a missing secret into a silent
+ * mis-configuration that only surfaces as a confusing runtime error (or, worse,
+ * a degraded-but-billing code path). validateEnv classifies config and, in
+ * production, refuses to boot when something required is absent. Non-production
+ * only warns, so dev/test stays runnable with a partial env.
+ */
+export function validateEnv(): { errors: string[]; warnings: string[] } {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  // Hard-required: the server cannot serve authenticated traffic without these.
+  const required: Array<[string, string]> = [
+    ["JWT_SECRET", ENV.cookieSecret],
+    ["DATABASE_URL", ENV.databaseUrl],
+    ["OAUTH_SERVER_URL", ENV.oAuthServerUrl],
+    ["VITE_APP_ID", ENV.appId],
+    // Required so owner-only routes fail closed at boot rather than silently
+    // downgrading to "any admin" at runtime (see ownerProcedure in routers.ts).
+    ["OWNER_OPEN_ID", ENV.ownerOpenId],
+  ];
+  for (const [name, val] of required) {
+    if (!val) errors.push(`${name} is required but missing`);
+  }
+
+  // Conditional hard-requirement: opting into the SAM2 mask provider without its
+  // credentials is exactly the silent mis-config that motivated this guard — the
+  // sam2 path would fail per-request instead of refusing to boot.
+  if (ENV.maskProvider === "sam2") {
+    if (!ENV.replicateApiToken) errors.push("STUDIO_MASK_PROVIDER=sam2 requires REPLICATE_API_TOKEN");
+    if (!ENV.replicateSam2Model) errors.push("STUDIO_MASK_PROVIDER=sam2 requires REPLICATE_SAM2_MODEL");
+  }
+
+  // Inverse guard: the deterministic scale/density ops consume SAM2 rasters +
+  // instances; the classical provider can't serve them, so a live flag without
+  // sam2 would deduct, call out, and refund on every request (charge-for-nothing).
+  // Fail fast at boot instead of per-request.
+  if (
+    (ENV.studioScaleLive || ENV.studioDensityLive || ENV.studioDensityRedistribute) &&
+    ENV.maskProvider !== "sam2"
+  ) {
+    errors.push(
+      "STUDIO_SCALE_LIVE / STUDIO_DENSITY_LIVE / STUDIO_DENSITY_REDISTRIBUTE require STUDIO_MASK_PROVIDER=sam2 (deterministic ops need SAM2 rasters + instances)"
+    );
+  }
+
+  // Feature-degrading: present-but-empty means that feature is dark. Warn only.
+  const optional: Array<[string, string, string]> = [
+    ["STRIPE_SECRET_KEY", ENV.stripeSecretKey, "billing/checkout"],
+    ["STRIPE_WEBHOOK_SECRET", ENV.stripeWebhookSecret, "Stripe webhook verification"],
+    ["RESEND_API_KEY", ENV.resendApiKey, "transactional email"],
+    ["MANUS_API_KEY", ENV.manusApiKey, "Manus Agent API integration"],
+    ["BUILT_IN_FORGE_API_URL", ENV.forgeApiUrl, "Forge LLM/image generation"],
+    ["BUILT_IN_FORGE_API_KEY", ENV.forgeApiKey, "Forge LLM/image generation"],
+  ];
+  for (const [name, val, feature] of optional) {
+    if (!val) warnings.push(`${name} missing — ${feature} disabled`);
+  }
+
+  return { errors, warnings };
+}
+
+/**
+ * Call once at boot. In production, throws if any required env is missing so the
+ * process exits instead of serving a half-configured app. Elsewhere, logs.
+ */
+export function assertEnvOrExit(): void {
+  const { errors, warnings } = validateEnv();
+  for (const w of warnings) console.warn(`[env] ${w}`);
+  if (errors.length === 0) return;
+  for (const e of errors) console.error(`[env] ${e}`);
+  if (ENV.isProduction) {
+    throw new Error(`Missing required environment configuration:\n  - ${errors.join("\n  - ")}`);
+  }
+  console.warn("[env] continuing despite missing config (non-production)");
+}
