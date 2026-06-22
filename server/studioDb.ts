@@ -29,7 +29,7 @@ import { encodeCursor, decodeCursor } from "./cursor";
  * matched literally instead of acting as wildcards (LIKE-injection → full scans).
  * `\` is MySQL's default LIKE escape character.
  */
-function escapeLike(s: string): string {
+export function escapeLike(s: string): string {
   return s.replace(/[\\%_]/g, (ch) => `\\${ch}`);
 }
 

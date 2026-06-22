@@ -4,11 +4,11 @@
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and, like, desc, inArray } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { tenants, memberships, platformAdmins, users, creditLedger } from "../../drizzle/schema";
-import { grantCredits, createTenant, createMembership } from "../studioDb";
+import { grantCredits, createTenant, createMembership, escapeLike } from "../studioDb";
 import { signImpersonationToken, setImpersonationCookie, clearImpersonationCookie, getImpersonationFromRequest } from "../impersonation";
 
 // ─── Super Admin Middleware ──────────────────────────────────────────────────
@@ -33,50 +33,75 @@ const superAdminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
 // ─── Router ──────────────────────────────────────────────────────────────────
 
 export const platformRouter = router({
-  /** List all accounts, optionally filtered by type. */
+  /**
+   * List accounts (firm/individual), optionally filtered by type and a name
+   * search, with a total count and a growing-limit "load more" page. Scales to
+   * many orgs + individuals: enrichment (member counts + owner email) is done in
+   * 3 queries total (tenants page → memberships via inArray → owner users via
+   * inArray), not the previous per-account N+1.
+   */
   listAccounts: superAdminProcedure
-    .input(z.object({ type: z.enum(["firm", "individual", "all"]).default("all") }))
+    .input(
+      z.object({
+        type: z.enum(["firm", "individual", "all"]).default("all"),
+        search: z.string().max(100).optional(),
+        limit: z.number().min(1).max(200).default(30),
+      })
+    )
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) return [];
+      if (!db) return { accounts: [], total: 0 };
 
-      let query = db.select().from(tenants);
-      if (input.type !== "all") {
-        query = query.where(eq(tenants.type, input.type)) as typeof query;
-      }
+      const conds = [];
+      if (input.type !== "all") conds.push(eq(tenants.type, input.type));
+      if (input.search) conds.push(like(tenants.name, `%${escapeLike(input.search)}%`));
+      const where = conds.length ? and(...conds) : undefined;
 
-      const accounts = await query;
+      const [countRow] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(tenants)
+        .where(where);
+      const total = Number(countRow?.count ?? 0);
 
-      // Attach member count and owner info for each account
-      const enriched = await Promise.all(
-        accounts.map(async (account) => {
-          const mems = await db
-            .select()
-            .from(memberships)
-            .where(eq(memberships.tenantId, account.id));
+      const pageRows = await db
+        .select()
+        .from(tenants)
+        .where(where)
+        .orderBy(desc(tenants.id))
+        .limit(input.limit);
 
-          const activeMembers = mems.filter((m) => m.status === "active").length;
-          const ownerMem = mems.find((m) => m.role === "owner");
+      if (pageRows.length === 0) return { accounts: [], total };
 
-          let ownerEmail: string | null = null;
-          if (ownerMem) {
-            const [ownerUser] = await db
-              .select({ email: users.email, name: users.name })
-              .from(users)
-              .where(eq(users.id, ownerMem.userId))
-              .limit(1);
-            ownerEmail = ownerUser?.email ?? null;
-          }
+      // Batch-enrich: one memberships query for the whole page, one users query
+      // for the distinct owners — no per-account round-trips.
+      const tenantIds = pageRows.map((t) => t.id);
+      const mems = await db
+        .select()
+        .from(memberships)
+        .where(inArray(memberships.tenantId, tenantIds));
 
-          return {
-            ...account,
-            activeMembers,
-            ownerEmail,
-          };
-        })
+      const ownerIds = Array.from(
+        new Set(mems.filter((m) => m.role === "owner").map((m) => m.userId))
       );
+      const ownerRows = ownerIds.length
+        ? await db
+            .select({ id: users.id, email: users.email, name: users.name })
+            .from(users)
+            .where(inArray(users.id, ownerIds))
+        : [];
+      const ownerMap = new Map(ownerRows.map((u) => [u.id, u]));
 
-      return enriched;
+      const accounts = pageRows.map((account) => {
+        const tMems = mems.filter((m) => m.tenantId === account.id);
+        const ownerMem = tMems.find((m) => m.role === "owner");
+        return {
+          ...account,
+          activeMembers: tMems.filter((m) => m.status === "active").length,
+          ownerEmail: ownerMem ? ownerMap.get(ownerMem.userId)?.email ?? null : null,
+        };
+      });
+
+      return { accounts, total };
     }),
 
   /** Provision a new firm account. */

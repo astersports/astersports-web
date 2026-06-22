@@ -60,8 +60,12 @@ export const firmAdminRouter = router({
       userMap = Object.fromEntries(userRows.map((u) => [u.id, { name: u.name, email: u.email }]));
     }
 
-    const totalSpent7d = weekSpend.reduce((sum, r) => sum + (r.totalSpent ?? 0), 0);
-    const totalSpentAll = allTimeSpend.reduce((sum, r) => sum + (r.totalSpent ?? 0), 0);
+    // mysql2 returns SQL aggregates (SUM/ABS) as strings, so coerce to Number
+    // before summing — otherwise `0 + "495"` concatenates into "0495" (and gets
+    // worse with multiple members), which surfaced as zero-padded totals on the
+    // Admin "Spent" card and the Credit Ledger member summary.
+    const totalSpent7d = weekSpend.reduce((sum, r) => sum + Number(r.totalSpent ?? 0), 0);
+    const totalSpentAll = allTimeSpend.reduce((sum, r) => sum + Number(r.totalSpent ?? 0), 0);
 
     const members = allTimeSpend
       .filter((r) => r.userId)
@@ -72,8 +76,8 @@ export const firmAdminRouter = router({
           userId: r.userId!,
           name: user?.name ?? "Unknown",
           email: user?.email ?? null,
-          spentAll: r.totalSpent ?? 0,
-          spent7d: weekRow?.totalSpent ?? 0,
+          spentAll: Number(r.totalSpent ?? 0),
+          spent7d: Number(weekRow?.totalSpent ?? 0),
         };
       })
       .sort((a, b) => b.spent7d - a.spent7d);
