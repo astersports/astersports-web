@@ -1,0 +1,101 @@
+CC REVIEW — CLAUDE.md (astersports-web), for Architect review
+Reviewer lane: Claude Code (CC) | 2026-06-22
+Reviewed against: main HEAD ce255c2; CLAUDE.md last revised d73a6ce.
+Method: read the full governing doc; ground-checked each technical claim against
+code (repo-relative path:line). Tags: [GROUNDED] = verified against code this pass;
+[VERIFY] = needs a source citation or a prod/ops check.
+
+VERDICT
+The doc is coherent and the operating + collaboration model is sound. The §0 phase
+scoping (which gates §3 Flip Authority / §4 Launch Gates to the LIVE phase) resolves
+the lean-velocity vs. rigorous-gates tension cleanly, with the human-on-flip held in
+both phases. No substantive policy contradictions. Findings are: (B) two mechanical
+doc-hygiene glitches, (C) one real rule-vs-shipped-code contradiction to resolve, and
+(D) a few verify items. None block operating under the doc today.
+
+----------------------------------------------------------------------
+A. GROUNDED — claims that check out against code
+----------------------------------------------------------------------
+- §1 ledger integrity: `grantCredits`/`deductCredits` are idempotent on
+  `(refId, reason)` and write balance + ledger row in ONE `db.transaction`
+  (no balance write without a ledger row). server/studioDb.ts:231-356. [GROUNDED]
+- §4 G0: `GET /api/studio/posture` is cron-secret-gated (fail-closed on unset
+  secret) and returns `dark:true` only when the `*_LIVE` flags are off.
+  server/routes/studioPosture.ts:17-51. [GROUNDED]
+- §5 mask provider: `STUDIO_MASK_PROVIDER` is classical|sam2; sam2 hard-requires
+  REPLICATE_API_TOKEN + REPLICATE_SAM2_MODEL, enforced at boot.
+  server/_core/env.ts:31-33 + validateEnv server/_core/env.ts:121-137. [GROUNDED]
+- §6 stranded-job reaper: `POST /api/scheduled/reap-stuck-jobs` exists, reaps +
+  refunds. server/routers.ts:395-410 (calls reapStuckJobs, server/studioDb.ts:403);
+  real-MySQL integration test server/creditLedger.integration.test.ts:94. [GROUNDED]
+  (Reaper SCHEDULED in prod + CRON_SECRET set = ops, see D3 [VERIFY].)
+
+----------------------------------------------------------------------
+B. DOC-HYGIENE FIXES (mechanical; Frank/Architect applies — CC cannot edit CLAUDE.md)
+----------------------------------------------------------------------
+- B1. §5 commit-trailer block is EMPTY. CLAUDE.md lines 155-157 are an opening fence,
+  a blank line, and a closing fence — the example trailers were lost in the refactor.
+  The prose at 158-159 ("sign as Claude Code") is correct, but the block has no
+  content. Restore inside the fence:
+      Co-Authored-By: Claude Code <noreply@anthropic.com>
+      Claude-Session: <session url>
+- B2. Tail duplication + orphan fence. CLAUDE.md line 209 and line 210 are the
+  identical sentence ("record them as done on assumption."); line 212 is a stray
+  orphan fence at EOF. Delete the duplicate line and the orphan fence.
+
+----------------------------------------------------------------------
+C. CONTRADICTION TO RESOLVE (rule vs. shipped code) — Architect ruling needed
+----------------------------------------------------------------------
+- C1. §5 says: "Never add an env-coupled assertion to the unit suite (asserting
+  `process.env.*` values) — it red-lines CI for every lane; assert posture in a
+  boot check or the `/api/studio/posture` endpoint instead."
+  But the shipped dark-posture guard does exactly that: server/cronSecret.test.ts:22
+  and :26 assert `process.env.STUDIO_SCALE_LIVE` / `STUDIO_DENSITY_LIVE`
+  `.not.toBe("true")`. [GROUNDED]
+  These are the deliberate Flip-Authority §3.5 dark-default guards.
+  Nuance that matters: the rule's stated rationale is "red-lines CI for every lane,"
+  but the `.not.toBe("true")` pattern PASSES when the var is unset (clean CI) — so it
+  does NOT red-line. The blanket prohibition therefore forbids, on its face, a test
+  that is actually CI-safe AND is the very posture guard §3 depends on.
+  CC lean: scope §5's rule to "don't assert a SPECIFIC value (`toBe(x)`) of
+  process.env" (that pattern fails when unset), and EXEMPT the dark-default
+  `.not.toBe("true")` guard — or relocate that guard to a boot/posture check per the
+  rule's own pointer. As written, the rule and the shipped guard contradict.
+  Bearing: open PR #76 (create-org) adds a STUDIO_CREATE_ORG_LIVE `.not.toBe("true")`
+  guard in the same file, following the existing pattern — its disposition rides on
+  this ruling.
+
+----------------------------------------------------------------------
+D. VERIFY ITEMS (could not fully ground this pass)
+----------------------------------------------------------------------
+- D1. §4 G3: "the scale detector ... false-rejects ~1/3 of genuine repeats."
+  [VERIFY] source. Likely from an eval / server/detectorAccuracy.test.ts run, but I
+  did not locate the run that produced ~1/3 this pass. Recommend citing the eval so
+  the figure is traceable rather than a floating number.
+- D2. §1 "no direct `creditBalance` writes": server/studioDb.ts:136
+  `updateTenantCredits` writes `creditBalance` directly — but a repo-wide grep finds
+  ZERO callers (verified). [GROUNDED] So the invariant HOLDS today; the helper is a
+  latent ledger-bypass footgun (a future caller could quietly reintroduce M2-style
+  balance/ledger drift). CC lean: delete it, or annotate it forbidden/ledger-bypass,
+  so it can't be reached without review.
+- D3. Ops items (§6/§7): reaper scheduled in prod + CRON_SECRET set; backups +
+  tested restore; error/alerting; unit economics; legal. [VERIFY] — not
+  code-checkable; §7 already flags the right ones "(verify)". No change needed; noting
+  for completeness.
+
+----------------------------------------------------------------------
+E. OPEN QUESTIONS FOR THE ARCHITECT
+----------------------------------------------------------------------
+- E1 (from C1): rule scope / exemption for the dark-posture env guards. CC lean:
+  exempt `.not.toBe("true")` dark guards; forbid `toBe(value)` env asserts. Ruling?
+- E2: §2.2 specifies cross-lane artifacts commit to `docs/*.txt`, but an earlier CC
+  artifact shipped as `.md` — docs/CREATE_ORG_REENABLEMENT_SPEC_2026-06-22.md, which
+  lives on the UNMERGED PR #76 branch (not yet on main, so it won't resolve against
+  main). Standardize on `.txt`, or accept `.md` for specs? (Trivial; flagging for
+  consistency since the doc is explicit.)
+- E3 (from D2): delete `updateTenantCredits`, or annotate it forbidden? CC can ship
+  either as a routine PR once you rule.
+
+END — CC stands by for rulings on E1-E3. B1/B2 are mechanical CLAUDE.md edits for
+Frank (CC cannot edit the governing doc). A/D are the evidence base; nothing here
+blocks operating under the doc now.
