@@ -20,6 +20,7 @@ import {
   type InsertJob,
   type InsertJobVariation,
   type InsertCreditLedgerEntry,
+  type PredictionMeta,
 } from "../drizzle/schema";
 import { TRIAL_DURATION_DAYS } from "../shared/billing";
 import { encodeCursor, decodeCursor } from "./cursor";
@@ -452,6 +453,23 @@ export async function listSam2ProcessingJobs(limit: number) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(jobs).where(eq(jobs.status, "sam2_processing")).orderBy(jobs.enqueuedAt).limit(limit);
+}
+
+/** Async enqueue (ASYNC_GENERATION_SPEC §4): stamp the started prediction + crop geometry onto the
+ *  job and move it to sam2_processing so the worker/cron can pick it up. */
+export async function markJobEnqueued(
+  jobId: number,
+  predictionId: string,
+  predictionMeta: PredictionMeta,
+  creditsUsed: number,
+  controls: string
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .update(jobs)
+    .set({ status: "sam2_processing", predictionId, predictionMeta, enqueuedAt: new Date(), creditsUsed, controls })
+    .where(eq(jobs.id, jobId));
 }
 
 /**

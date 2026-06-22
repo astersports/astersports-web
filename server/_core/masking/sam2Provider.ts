@@ -132,12 +132,11 @@ interface CropSegment {
  *  primitive so density gets fabric + instances from a SINGLE SAM2 call. Pass
  *  `known` to skip the vision-LLM locate (e.g. getInstanceMasks with a fabric hint).
  *  `forDensity` selects the density-specific locator (full-garment coverage). */
-async function cropAndSegment(
-  client: Sam2Client,
+async function locateAndCrop(
   image: MaskImageInput,
   known?: BBoxNormalized,
   forDensity?: boolean
-): Promise<CropSegment> {
+): Promise<{ bbox: BBoxNormalized; confidence: number; width: number; height: number; cropWidth: number; cropHeight: number; dataUrl: string }> {
   let bbox: BBoxNormalized;
   let confidence: number;
   if (known) {
@@ -153,9 +152,19 @@ async function cropAndSegment(
   }
   const { buffer, width, height } = await decodeUpright(image.url); // local only
   const { dataUrl, cropWidth, cropHeight } = await cropToFabricRegion(buffer, width, height, bbox); // Req 1
-  logSam2Call("autoSegment", cropWidth, cropHeight, image.audit); // Req 2 (C5: per-request audit)
-  const seg = await client.autoSegment(dataUrl);
-  return { bbox, confidence, width, height, cropWidth, cropHeight, seg };
+  return { bbox, confidence, width, height, cropWidth, cropHeight, dataUrl };
+}
+
+async function cropAndSegment(
+  client: Sam2Client,
+  image: MaskImageInput,
+  known?: BBoxNormalized,
+  forDensity?: boolean
+): Promise<CropSegment> {
+  const c = await locateAndCrop(image, known, forDensity);
+  logSam2Call("autoSegment", c.cropWidth, c.cropHeight, image.audit); // Req 2 (C5: per-request audit)
+  const seg = await client.autoSegment(c.dataUrl);
+  return { bbox: c.bbox, confidence: c.confidence, width: c.width, height: c.height, cropWidth: c.cropWidth, cropHeight: c.cropHeight, seg };
 }
 
 /**
@@ -250,6 +259,25 @@ export async function finishSam2Segmentation(
   };
   const [fabric, instances] = await Promise.all([fabricFromSegment(s), instancesFromSegment(s)]);
   return { fabric, instances };
+}
+
+/**
+ * Async enqueue seam (ASYNC_GENERATION_SPEC §4): the synchronous-at-enqueue work — locate (vision-
+ * LLM) + crop — then START the SAM2 prediction WITHOUT waiting (predictions.create returns at once).
+ * Returns the predictionId + crop geometry (PredictionMeta) to persist on the job, so the worker
+ * finishes later via finishSam2Segmentation WITHOUT re-running the locate. forDensity (default true)
+ * uses the full-garment density locator. Crop-to-fabric minimization (Req 1) + org audit (Req 2)
+ * are preserved — only the fabric crop is sent to Replicate.
+ */
+export async function startSam2Segmentation(
+  image: MaskImageInput,
+  opts?: { client?: Sam2Client; webhookUrl?: string; forDensity?: boolean }
+): Promise<{ predictionId: string; meta: PredictionMeta }> {
+  const client = opts?.client ?? defaultSam2Client();
+  const c = await locateAndCrop(image, undefined, opts?.forDensity ?? true);
+  logSam2Call("startPrediction", c.cropWidth, c.cropHeight, image.audit);
+  const predictionId = await client.startPrediction(c.dataUrl, undefined, opts?.webhookUrl);
+  return { predictionId, meta: { bbox: c.bbox, width: c.width, height: c.height, cropWidth: c.cropWidth, cropHeight: c.cropHeight } };
 }
 
 export function createSam2Provider(client: Sam2Client): MaskProvider {
