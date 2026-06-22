@@ -3,27 +3,23 @@
  * Pooled balance, spend-by-member bars, User/Admin role toggles,
  * invite with domain lock, transfer ownership.
  */
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useTenant } from "@/contexts/TenantContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import {
   Loader2,
   UserPlus,
   Users,
   CreditCard,
   BarChart3,
-  Crown,
   Shield,
   ArrowRightLeft,
   Lock,
   Unlock,
-  Trash2,
   Link2,
   Copy,
   Check,
@@ -31,6 +27,7 @@ import {
   Clock,
 } from "lucide-react";
 import { toast } from "sonner";
+import MembersList from "./MembersList";
 
 export default function StudioAdmin() {
   const { tenant } = useTenant();
@@ -213,180 +210,6 @@ function SpendByMember({ tenantId }: { tenantId: number }) {
   );
 }
 
-/* ─── Members List with Role Toggles ──────────────────────────────────────── */
-
-const MEMBERS_PAGE = 20;
-
-function MembersList({ tenantId, isOwner }: { tenantId: number; isOwner: boolean }) {
-  const utils = trpc.useUtils();
-  const { data: members, isLoading } = trpc.tenants.members.useQuery(
-    { tenantId },
-    { enabled: !!tenantId }
-  );
-  // M4c: reveal the roster in pages. The query stays whole (the transfer-owner
-  // picker needs every member); the table just renders a growing slice.
-  const [visibleCount, setVisibleCount] = useState(MEMBERS_PAGE);
-  // Reset paging when switching firms so the new roster starts at page one.
-  useEffect(() => setVisibleCount(MEMBERS_PAGE), [tenantId]);
-
-  const toggleMutation = trpc.firmAdmin.toggleRole.useMutation({
-    onSuccess: () => {
-      utils.tenants.members.invalidate({ tenantId });
-      toast.success("Role updated");
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const removeMutation = trpc.firmAdmin.removeMember.useMutation({
-    onSuccess: () => {
-      utils.tenants.members.invalidate({ tenantId });
-      toast.success("Member removed");
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const transferMutation = trpc.firmAdmin.transferOwnership.useMutation({
-    onSuccess: () => {
-      utils.tenants.members.invalidate({ tenantId });
-      toast.success("Ownership transferred");
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Users className="h-4 w-4" />
-          Members
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-        ) : !members || members.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No members yet.</p>
-        ) : (
-          <div className="space-y-1">
-            {/* Header row */}
-            <div className="hidden sm:grid grid-cols-[1fr_80px_80px_40px] gap-2 px-2 py-1 text-xs text-muted-foreground font-medium">
-              <span>Member</span>
-              <span className="text-center">Admin</span>
-              <span className="text-center">Role</span>
-              <span />
-            </div>
-            {members.slice(0, visibleCount).map((m) => {
-              const isOwnerRow = m.role === "owner";
-              const isAdminRow = m.role === "admin" || m.role === "owner";
-              const displayName = m.user?.name || m.invitedEmail || "Unknown";
-              const displayEmail = m.user?.email || m.invitedEmail || "";
-
-              return (
-                <div
-                  key={m.id}
-                  className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0 sm:grid sm:grid-cols-[1fr_80px_80px_40px] sm:gap-2"
-                >
-                  {/* Name + email */}
-                  <div className="flex flex-1 items-center gap-2 min-w-0">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-medium truncate">
-                          {displayName}
-                        </span>
-                        {isOwnerRow && (
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] px-1.5 py-0 border-amber-500/50 text-amber-500"
-                          >
-                            <Crown className="h-2.5 w-2.5 mr-0.5" />
-                            Owner
-                          </Badge>
-                        )}
-                        {m.status === "invited" && (
-                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                            Invited
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {displayEmail}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Admin toggle (amber) */}
-                  <div className="flex justify-center">
-                    <Switch
-                      checked={isAdminRow}
-                      disabled={isOwnerRow || toggleMutation.isPending}
-                      onCheckedChange={(checked) => {
-                        if (isOwnerRow) return;
-                        toggleMutation.mutate({
-                          tenantId,
-                          membershipId: m.id,
-                          field: "role",
-                          value: checked ? "admin" : "member",
-                        });
-                      }}
-                      className="data-[state=checked]:bg-amber-500"
-                    />
-                  </div>
-
-                  {/* Role badge */}
-                  <div className="flex justify-center">
-                    <Badge
-                      variant={isAdminRow ? "default" : "secondary"}
-                      className={`text-[10px] capitalize ${
-                        isOwnerRow
-                          ? "bg-amber-500/20 text-amber-500 border-amber-500/30"
-                          : isAdminRow
-                          ? "bg-amber-500/10 text-amber-400"
-                          : "bg-[#4a8fd4]/10 text-[#4a8fd4]"
-                      }`}
-                    >
-                      {m.role}
-                    </Badge>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex justify-end">
-                    {!isOwnerRow && m.status === "active" && (
-                      <div className="flex gap-1">
-                        {isOwner && (
-                          <button
-                            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                            title="Remove member"
-                            onClick={() => {
-                              if (confirm(`Remove ${displayName} from this firm?`)) {
-                                removeMutation.mutate({ tenantId, membershipId: m.id });
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            {members.length > visibleCount && (
-              <div className="flex justify-center pt-2">
-                <button
-                  onClick={() => setVisibleCount((c) => c + MEMBERS_PAGE)}
-                  className="px-4 py-1.5 rounded-lg text-xs border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                >
-                  Load more ({visibleCount} of {members.length})
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
 
 /* ─── Invite Card ──────────────────────────────────────────────────────────── */
 

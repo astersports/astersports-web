@@ -253,12 +253,67 @@ export const firmAdminRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot remove the owner" });
       }
 
-      // Set status to disabled rather than deleting (keep history)
+      // Hard-delete the membership ("Remove from firm"). The member's jobs +
+      // ledger history persist (keyed by user+tenant), so their work record is
+      // retained even though their access + listing are gone. Suspend
+      // (setMemberStatus) is the reversible disable.
       await db
-        .update(memberships)
-        .set({ status: "disabled" })
+        .delete(memberships)
         .where(eq(memberships.id, input.membershipId));
 
       return { success: true };
+    }),
+
+  /**
+   * Suspend (disabled) or reactivate (active) a member. A disabled member keeps
+   * their row + history but is denied access by the tenant auth gate, which
+   * resolves only status='active' memberships. The owner can't be suspended, and
+   * the last active admin can't be suspended (transfer ownership first).
+   */
+  setMemberStatus: tenantAdminProcedure
+    .input(z.object({ membershipId: z.number(), status: z.enum(["active", "disabled"]) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const [target] = await db
+        .select()
+        .from(memberships)
+        .where(and(eq(memberships.id, input.membershipId), eq(memberships.tenantId, ctx.tenant.id)))
+        .limit(1);
+      if (!target) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+      }
+      if (target.role === "owner") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot suspend the owner" });
+      }
+
+      // Don't let the firm suspend its way out of having an admin.
+      if (input.status === "disabled" && target.role === "admin" && target.status === "active") {
+        const [adminCount] = await db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(memberships)
+          .where(
+            and(
+              eq(memberships.tenantId, ctx.tenant.id),
+              sql`${memberships.role} IN ('admin', 'owner')`,
+              sql`${memberships.id} != ${input.membershipId}`,
+              eq(memberships.status, "active")
+            )
+          );
+        if (Number(adminCount?.count ?? 0) === 0) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Cannot suspend the last admin. Transfer ownership first.",
+          });
+        }
+      }
+
+      await db
+        .update(memberships)
+        .set({ status: input.status })
+        .where(eq(memberships.id, input.membershipId));
+
+      return { success: true, status: input.status };
     }),
 });
