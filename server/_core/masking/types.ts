@@ -39,6 +39,14 @@ export interface FabricMask {
   confidence: number;
   /** Present only when produced by a raster-capable provider. */
   raster?: RasterMask;
+  /**
+   * Garment silhouette boundary (SAM2 combined mask). Only present when produced
+   * by a raster-capable provider. Used by densityRedistribute for layout
+   * constraints and compositing clip — keeps motifs strictly on the garment.
+   * The primary `raster` (full-crop fill) remains the sampling mask for base-cloth
+   * color extraction (v1 densityThin compatibility).
+   */
+  boundaryRaster?: RasterMask;
   provider: MaskProviderName;
 }
 

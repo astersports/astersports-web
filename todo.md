@@ -704,6 +704,18 @@
 - [x] Add DB-persisted error logging to reaper and poll-predictions cron endpoints
 - [x] SETTINGS FIX NEEDED: Set STUDIO_ASYNC_JOBS=true in Settings → Secrets
 - [x] SETTINGS FIX NEEDED: Set STUDIO_DENSITY_REDISTRIBUTE=true in Settings → Secrets
+<<<<<<< Updated upstream
 - [x] Investigate why reaper cron is failing silently — ROOT CAUSE: cronSecretOk rejects platform requests (no x-cron-secret header sent)
 - [x] Fix cronAuth.ts to accept x-webdev-schedule-uid header from Manus Heartbeat platform
 - [ ] Investigate redistribute output quality (white space in result instead of proper motif redistribution)
+=======
+- [x] Investigate why reaper cron is failing silently (likely sdk.authenticateRequest rejecting cron session) — FIXED: cronAuth accepts x-webdev-schedule-uid
+
+## Option B Dual-Mask Fix for densityRedistribute (Jun 22)
+- [x] Update FabricMask type to include optional boundaryMask (seg.combined garment silhouette)
+- [x] Update sam2Provider fabricFromSegment to extract seg.combined as boundaryMask
+- [x] Update densityRedistribute to use boundaryMask for blueNoiseLayout constraints
+- [x] Update densityRedistribute compositing clip to use boundaryMask
+- [x] Preserve v1 densityThin behavior (uses full-crop sampling mask unchanged)
+- [x] Run tests and verify no regression
+>>>>>>> Stashed changes

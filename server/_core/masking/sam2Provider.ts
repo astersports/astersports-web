@@ -175,12 +175,30 @@ async function cropAndSegment(
  * combined_mask is sparse (only the motif union) — leaving almost no bare ground
  * for densityThin's base-cloth sampling. Using the full crop as fabric ensures
  * adequate bare-ground pixels between motifs.
+ *
+ * DUAL MASK (Option B): Also extracts the SAM2 combined mask as `boundaryRaster`.
+ * This is the actual garment silhouette used by densityRedistribute for:
+ *   - Layout constraints (blueNoiseLayout only places motifs on garment)
+ *   - Compositing clip (no motif pixels bleed onto background)
+ * The primary `raster` (full-crop fill) remains the sampling mask for base-cloth
+ * color extraction (v1 densityThin compatibility).
  */
 async function fabricFromSegment(s: CropSegment): Promise<FabricMask> {
-  // Fill the entire crop region as "fabric" (all pixels = 255)
+  // Fill the entire crop region as "fabric" (all pixels = 255) — sampling mask
   const cropRaster = new Uint8Array(s.cropWidth * s.cropHeight).fill(255);
   const fullRaster = remapRasterToFullImage(cropRaster, s.cropWidth, s.cropHeight, s.width, s.height, s.bbox);
-  return { bbox: s.bbox, confidence: s.confidence, raster: { width: s.width, height: s.height, data: fullRaster }, provider: "sam2" };
+
+  // Decode the SAM2 combined mask (garment silhouette) as boundary mask
+  const combinedRaster = await decodeMaskToRaster(s.seg.combined, s.cropWidth, s.cropHeight);
+  const fullBoundary = remapRasterToFullImage(combinedRaster.data, s.cropWidth, s.cropHeight, s.width, s.height, s.bbox);
+
+  return {
+    bbox: s.bbox,
+    confidence: s.confidence,
+    raster: { width: s.width, height: s.height, data: fullRaster },
+    boundaryRaster: { width: s.width, height: s.height, data: fullBoundary },
+    provider: "sam2",
+  };
 }
 
 /**
