@@ -1,184 +1,77 @@
-# CLAUDE.md — Working agreement for AI builders on astersports-web
+# CLAUDE.md — Operating agreement (astersports-web)
 
-This file governs how AI agents (CC, Manus, any lane) work in this repo. **Read
-§0 Operating Phase first** — it scopes how strict everything else is right now.
-The **Flip Authority** (§1) and **Launch Gates** (§2) are the live-phase hard
-rules, ratified after the 2026-06-20 live-flag incident; §0 scopes *when* they
-bind. The rest documents standing conventions so any lane can pick up work
-without re-deriving them.
-
-> The Flip Authority clause is transcribed from the Architect's incident ruling;
-> the Architect amends its wording. §0 (operating phase) is Frank's call as owner
-> while there are no onboarded clients, and should be ratified by the Architect at
-> onboarding.
+**Phase: PRE-ONBOARDING, Claude-led.** Zero clients onboarded; one signed, not
+yet live. Claude (CC) does the majority of the work autonomously; Frank is
+oversight on a small set of confirm checkpoints. This replaces the prior
+gate-heavy posture (which assumed live customers). It **re-tightens at
+onboarding** — see §2.
 
 ---
 
-## 0. Operating Phase (read first)
+## 0. Operating model — Claude-led, Frank oversight
 
-**Current phase: PRE-ONBOARDING BUILD/TEST.** Zero clients are onboarded. One
-real client is signed but **not yet onboarded** — onboarding happens only after
-the known issues (scale/density quality, etc.) are worked out. Until then
-**production is our test environment, not a customer surface**, and §0 scopes how
-strict the rest of this doc is right now.
+### Claude runs autonomously (no per-action approval)
+- Build end-to-end: design, implement, test, refactor, fix.
+- Open PRs **ready**, **auto-merge on green CI**, auto-deploy (Manus from `main`).
+- Run the toolchain (git, pnpm, gh/MCP) without per-step prompts.
+- **Prepare** every flag/secret flip with full evidence: exact flag, old→new
+  value, target SHA, what it turns on, and a one-line smoke plan.
+- Keep a running log in chat of what merged / deployed / is queued / is awaiting a
+  confirm.
 
-**Lean while pre-onboarding:**
-- **Prod is a test bed.** Deploys are routine; PRs merge on green CI. The §2 gate
-  sequence and per-change Architect SHA sign-off are **not** required to ship test
-  code.
-- **`*_LIVE` flags MAY be ON in prod to test them.** `STUDIO_SCALE_LIVE`,
-  `STUDIO_DENSITY_LIVE`, `STUDIO_DENSITY_REDISTRIBUTE`, `STUDIO_MASK_PROVIDER=sam2`
-  etc. do not have to stay dark now — flipping them on to exercise a feature is
-  **expected, not an incident**. (This is the fix for "prod won't let me test
-  scale/density.") Note: scale/density still need `sam2` + Replicate creds or the
-  app won't boot (`validateEnv` fail-fast).
+### Frank's oversight — the limited checks (two confirms only)
+1. **Production flip of the money / mask-provider / sub-processor path**
+   (`*_LIVE`, `STUDIO_MASK_PROVIDER`, any prod secret moving credits/billing or a
+   sub-processor). Claude prepares and proposes; **Frank executes/confirms the
+   flip.** It's the only action that can mis-bill a client or expose customer
+   images, so it stays human — rare, and it *is* the oversight. Claude never sets
+   it unilaterally.
+2. **Irreversible data ops** — `DROP`/`TRUNCATE`, prod-data wipe, history rewrite,
+   force-push to a shared branch: explicit human OK first.
 
-**Still human-gated, even now** (the part of §1 that does NOT relax):
-- A flip stays **Frank's deliberate action** — he sets it, or names the exact
-  flag/value for a lane to set. **No agent surprise-flips the money/mask/`*_LIVE`
-  path on its own.** That's the 2026-06-20 incident guardrail; it stays. What
-  relaxes pre-onboarding is the *ceremony around* the flip (gate order,
-  Architect-verified SHA), not the human-gated nature of it.
-
-**Always on — these never relax, because the data survives to the onboarded client:**
-- **Billing/ledger integrity.** `deductCredits`/`grantCredits` stay idempotent on
-  `(refId, reason)`; never a direct `creditBalance` write; never force the
-  `credit_ledger` unique index over duplicate rows.
-- **No irreversible data loss** (`DROP`/`TRUNCATE`, prod-data wipes, history
-  rewrites, force-push to shared branches) without an explicit human OK.
-- **Secrets** are never printed, committed, or echoed. Don't red-line CI for other
-  lanes.
-
-**Transition to LIVE phase:** the moment the first real client is **onboarded**,
-§1 (Flip Authority) and §2 (Launch Gates) re-bind in full — human-gated flips with
-the gate order, money-path sign-off, dark-by-default. **Before** that client goes
-live, §2's gates run **once** as the onboarding-readiness checklist (scale/density
-calibrated + verified, privacy re-confirmed) — a one-time gate, not a per-flip
-ritual during testing.
-
-> Agent auto-merge/auto-deploy is governed by the Claude Code harness permissions
-> (auto-mode / settings), configured **separately** — this doc does not grant it.
-> To get lean agent automation, set the matching permission rules in CC settings;
-> wording here won't change what an agent may do unprompted.
+### Always-on invariants (automated; never relax)
+- **CI green before merge** — the two CI checks gate every PR; red blocks.
+- **Ledger integrity** — `deduct`/`grant` idempotent on `(refId, reason)`; no
+  direct `creditBalance` writes; never force the `credit_ledger` unique index over
+  duplicates. (This data survives to the live client.)
+- **Never bill for a no-op** — effect fields reflect the EFFECT of an op, not the
+  intent; a byte-identical result is fail+refund, not a charge.
+- **Secrets** are never printed, committed, or echoed.
 
 ---
 
-## 1. Flip Authority (single authority, env-verified)
+## 1. Standing technical conventions
 
-> **Scope:** LIVE phase only (≥1 onboarded client). Pre-onboarding, §0 governs — see §0.
-
-> Verbatim from the Architect's 2026-06-20 incident ruling. The Architect amends
-> this clause; that version wins.
-
-A "flip" is any change that moves a feature from dark to live: setting,
-changing, or deploying a `*_LIVE` flag, `STUDIO_MASK_PROVIDER`, or any
-production secret that moves the **money/credit path**, the **mask provider**,
-or a **sub-processor**.
-
-1. No lane (CC, Manus, any agent) sets, changes, or deploys any `*_LIVE` flag,
-   `STUDIO_MASK_PROVIDER`, or any prod secret that moves the money/credit path,
-   the mask provider, or a sub-processor. Sole exception: Frank's explicit flip
-   on an Architect-verified SHA after all gates clear.
-2. The flip is a deliberate env change Frank makes or names by hand. It is never
-   a side effect of a builder checkpoint, deploy, or PR merge.
-3. Builders may PREPARE a flip (document the exact secret, value, and target
-   SHA). Builders never SET it.
-4. Every flip is logged: flag, old to new, SHA, who, gate-clearance ref. One
-   flip per change, smoke-tested after. Never batch flips.
-5. Default posture: every `*_LIVE` flag ships dark and stays dark until the flip
-   ritual. No lane assumes another lane has flipped or will. "Dark" is true only
-   when verified against the live deployment env (G0), never inferred.
-6. Gate order before any flip: G0 prod env verified dark (Vercel evidence) →
-   G1 Architect verifies live-candidate SHA → G2 credentialed SAM2 privacy
-   re-confirm → G3 real-garment per-route eval on fixed runners → G4
-   live-surface hardening merged and verified. Re-flip sequence: recolor
-   (classical) → SAM2 provider (own flip, gated on G2) → scale → density.
-
----
-
-## 2. Launch Gates (in order)
-
-> **Scope:** LIVE phase only (≥1 onboarded client). Pre-onboarding, §0 governs — see §0.
-
-Nothing re-flips to live until ALL of these clear, in sequence:
-
-- **G0 — prod env verified dark.** A production env read (Vercel) showing the
-  relevant `*_LIVE` unset/false and `STUDIO_MASK_PROVIDER` unset/`classical`.
-  Owned by Frank, read by the Architect. Env state is a verified claim, not an
-  inference. (Added after the incident, where the gate model verified code and
-  *assumed* env.)
-- **G1 — Architect verifies the live-candidate SHA.** The Architect reads the
-  actual commit/diff, not the description.
-- **G2 — credentialed SAM2 privacy re-confirmation** (only for the mask-provider
-  flip): crop-to-fabric minimization, `org_id` stamped on every outbound call,
-  sub-processor disclosure published, fail-safe verified.
-- **G3 — real-garment per-route eval on FIXED runners.** Audit H10 found the
-  synthetic gate wasn't actually executing (manifest field-name mismatch), so a
-  prior "pass" was false. G3 does not count until the runners are fixed AND a
-  real-garment eval passes per route.
-- **G4 — live-surface hardening merged** (PR #5 cluster, C1 extended to
-  `generated/*`), implementation-verified by the Architect at the final head SHA.
-
-### Re-flip order
-
-`recolor` is classical and SAM2-independent → flips first and cleanly. `scale`
-and `density` both REQUIRE the SAM2 provider live (they need rasters), so they
-are entangled with the provider flip and its privacy gate:
-
-```
-recolor (classical)
-  → SAM2 provider live (own flip, gated on G2)
-    → scale (after its per-route eval)
-      → density (after its per-route eval; the credit no-op surface, last)
-```
-
----
-
-## 3. Branch & commit conventions
-
-- Develop on the branch you were assigned; never push to `main` directly and
-  never to another lane's branch without explicit permission.
-- `git push -u origin <branch>`; on network failure retry up to 4× with
-  exponential backoff (2s, 4s, 8s, 16s).
-- After pushing, open a **draft** PR if none exists.
-- Commit-message trailers (every commit):
+- **Branch/commit:** develop on your assigned branch; PRs target `main`. Commit
+  trailers on every commit:
   ```
   Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
   Claude-Session: <session url>
   ```
-- Do **not** put the model identifier in commit messages, PR titles/bodies, code
-  comments, or any pushed artifact.
+  Never put the model identifier in commits, PR text, code, or any pushed artifact.
+- **Money path (`generate`/`rerun`):** credit logic, idempotency, webhook/Stripe
+  semantics — change deliberately, not reactively; the always-on ledger invariants
+  (§0) hold.
+- **Deterministic image ops & mask provider:** all raster ops decode through
+  `server/_core/image/decodeUpright.ts` (single orientation boundary).
+  `STUDIO_MASK_PROVIDER` is `classical` (default) or `sam2` (hosted; hard-requires
+  Replicate creds, enforced at boot by `validateEnv`). Keep new fetch/decode paths
+  behind the resource guards (`server/_core/image/guards.ts`) and SSRF guard
+  (`server/_core/net/ssrfGuard.ts`).
+- **Build/test/CI:** `pnpm run check` (tsc) and `pnpm run test` (vitest;
+  credential-dependent tests self-skip). CI runs both on every PR and blocks merge
+  on red. A gate must actually gate — don't add a check that's green for the wrong
+  reason or red for reasons orthogonal to the change.
 
 ---
 
-## 4. Money path (`generate` / `rerun`)
+## 2. Onboarding transition (re-tighten)
 
-- The credit/money path is GO-gated. Build dark / flag-off; Frank flips it live.
-- Never bill for a no-op: `removed`/effect fields must reflect the EFFECT of an
-  op, not the intent. A byte-identical result is a fail+refund, not a charge.
-- Money-path changes (credit logic, idempotency, webhook/Stripe semantics) are
-  Architect-scoped — coordinate, don't patch reactively.
-
----
-
-## 5. Deterministic image ops & mask provider
-
-- All raster ops decode through `server/_core/image/decodeUpright.ts` — the
-  single orientation/coordinate boundary. Add new raster consumers there.
-- Mask provider is `STUDIO_MASK_PROVIDER`: `classical` (default, ship-now floor)
-  or `sam2` (hosted, gated). Opting into `sam2` hard-requires its Replicate
-  creds (enforced at boot by `validateEnv`).
-- Resource guards (`server/_core/image/guards.ts`) bound megapixels and decode
-  concurrency; the SSRF guard (`server/_core/net/ssrfGuard.ts`) gates outbound
-  image fetches. Keep new fetch/decode paths behind them.
-
----
-
-## 6. Build / test / CI
-
-- `pnpm run check` — TypeScript (`tsc --noEmit`).
-- `pnpm run test` — vitest. Credential-dependent tests self-skip when their
-  secret is absent (`it.skipIf`), so the suite is green in a clean environment.
-- CI (`.github/workflows/ci.yml`) runs both on every PR and blocks merge on red.
-- A gate must actually gate: don't add a check that's green for the wrong reason
-  (the G3 lesson) or red for reasons orthogonal to the change.
+The moment the first real client onboards, the posture re-tightens: production
+flips of the money/mask/sub-processor path get a deliberate gate (verify prod
+state → verify the live-candidate SHA → confirm sub-processor privacy for a mask
+flip), and live surfaces ship dark-by-default. Run the readiness checklist **once**
+before that client goes live: scale/density calibrated + verified, sub-processor
+disclosure published, billing/ledger reconciled. The §0 autonomous build model
+continues; what changes is that the flip checkpoint becomes a gated, evidenced
+event rather than a one-tap confirm.
