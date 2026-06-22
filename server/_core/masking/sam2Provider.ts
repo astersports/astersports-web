@@ -31,6 +31,7 @@ import { locateFabricRegion, locateFabricRegionForDensity } from "./locateFabric
 import { decodeMaskToRaster, instancesFromMasks } from "./sam2Mask";
 import { defaultSam2Client, type Sam2Client } from "./replicateSam2";
 import { ENV } from "../env";
+import type { PredictionMeta } from "../../../drizzle/schema";
 
 export type { Sam2AuditContext } from "./types";
 
@@ -226,6 +227,29 @@ async function instancesFromSegment(s: CropSegment): Promise<InstanceMask[]> {
       ? { width: s.width, height: s.height, data: remapRasterToFullImage(inst.raster.data, s.cropWidth, s.cropHeight, s.width, s.height, s.bbox) }
       : undefined,
   }));
+}
+
+/**
+ * Async seam (ASYNC_GENERATION_SPEC §2-§3): rebuild { fabric, instances } from a completed
+ * prediction's mask buffers + the crop geometry persisted at enqueue (studio_jobs.predictionMeta)
+ * — the same construction getSegmentation does synchronously, minus the vision-LLM locate (which
+ * already ran at enqueue). Used by the async worker; the sync getSegmentation is unchanged.
+ */
+export async function finishSam2Segmentation(
+  segmentation: { combined: Buffer; individuals: Buffer[] },
+  meta: PredictionMeta
+): Promise<{ fabric: FabricMask; instances: InstanceMask[] }> {
+  const s: CropSegment = {
+    bbox: meta.bbox,
+    confidence: 1,
+    width: meta.width,
+    height: meta.height,
+    cropWidth: meta.cropWidth,
+    cropHeight: meta.cropHeight,
+    seg: segmentation,
+  };
+  const [fabric, instances] = await Promise.all([fabricFromSegment(s), instancesFromSegment(s)]);
+  return { fabric, instances };
 }
 
 export function createSam2Provider(client: Sam2Client): MaskProvider {

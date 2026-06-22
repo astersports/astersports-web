@@ -18,6 +18,7 @@ vi.mock("../_core/env", () => ({
     studioSam2PointsPerSide: 32,
     studioSam2UseM2m: false,
     studioMaxInstances: 200,
+    studioAsyncJobs: false,
   },
 }));
 vi.mock("../_core/masking", () => ({ getMaskProvider: vi.fn(() => ({ rasterReady: true })) }));
@@ -72,6 +73,7 @@ describe("GET /api/studio/posture", () => {
     expect(body.rasterReady).toBe(true);
     expect(body.replicateConfigured).toBe(true);
     expect(body.effective).toEqual({ scaleLive: false, densityLive: false });
+    expect(body.asyncJobs).toBe(false);
   });
 
   it("reports effective=true only when flag AND rasterReady, and never leaks secret/token values", () => {

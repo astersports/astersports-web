@@ -59,9 +59,18 @@ export const ENV = {
    *  Unlike scale/density it has NO sam2/raster co-requirement, so validateEnv
    *  adds no boot guard for it. */
   studioCreateOrgLive: process.env.STUDIO_CREATE_ORG_LIVE === "true",
+  /** Async generation processor (ASYNC_GENERATION_SPEC). When on, density/scale jobs enqueue +
+   *  run via the Replicate-async worker (webhook + cron poll) instead of the synchronous SSE
+   *  path, so the 45-120s SAM2 run lives off our 60s-capped request. Architecture toggle, NOT a
+   *  money-path *_LIVE flag (billing is unchanged) — kept out of the /posture `dark` calc.
+   *  Default off; lands DARK, parallel to the SSE path, until verified. The flip stays Frank's. */
+  studioAsyncJobs: process.env.STUDIO_ASYNC_JOBS === "true",
   /** Replicate SAM2 (D1 = Option 2). Token + model-version id for the hosted mask source. */
   replicateApiToken: process.env.REPLICATE_API_TOKEN ?? "",
   replicateSam2Model: process.env.REPLICATE_SAM2_MODEL ?? "",
+  /** Replicate webhook signing secret (svix-style HMAC) for /api/webhooks/replicate
+   *  (ASYNC_GENERATION_SPEC §3). Env-based per §6; the webhook is fail-closed when unset. */
+  replicateWebhookSecret: process.env.REPLICATE_WEBHOOK_SECRET ?? "",
   /** H6: upper bound on a source image's total pixel count for the deterministic
    *  ops. A decoded RGBA frame costs width*height*4 bytes, so an unbounded upload
    *  is a memory-exhaustion vector. 40 MP (~160 MB RGBA) covers real print artwork

@@ -17,7 +17,8 @@ import { notifyOwner } from "./_core/notification";
 import { sdk } from "./_core/sdk";
 import { pruneOldLogs } from './logRetention';
 import { processTrialReminders } from './trialReminders';
-import { reapStuckJobs } from './studioDb';
+import { reapStuckJobs, listSam2ProcessingJobs } from './studioDb';
+import { processAsyncJob } from './studioAsyncWorker';
 import { processTrialAutoCharges } from './shadowBilling';
 import type { Game } from "../shared/types";
 
@@ -409,6 +410,34 @@ export function registerScheduledRoutes(app: any) {
     } catch (error) {
       console.error('[reap-stuck-jobs] Error:', (error as Error).message);
       res.status(500).json({ success: false, error: 'reap failed', timestamp: new Date().toISOString() });
+    }
+  });
+
+  // Poll Replicate for jobs awaiting their SAM2 prediction and process completed ones
+  // (ASYNC_GENERATION_SPEC §3 — the cron fallback for dropped webhooks). N=1 per tick: a single
+  // 40MP CPU op must clear the unforgiving Manus 60s execution cap with headroom.
+  app.post('/api/scheduled/poll-predictions', async (req: any, res: any) => {
+    try {
+      if (!cronSecretOk(req)) {
+        return res.status(403).json({ error: 'forbidden' });
+      }
+      const user = await sdk.authenticateRequest(req);
+      if (!user.isCron || !user.taskUid) {
+        return res.status(403).json({ error: 'cron-only' });
+      }
+      if (!ENV.studioAsyncJobs) {
+        return res.json({ success: true, skipped: 'async disabled', timestamp: new Date().toISOString() });
+      }
+      const pending = await listSam2ProcessingJobs(1); // N=1 — stay well under the 60s cap
+      const results: Array<{ jobId: number; status: string }> = [];
+      for (const j of pending) {
+        const r = await processAsyncJob(j.id);
+        results.push({ jobId: j.id, status: r.status });
+      }
+      res.json({ success: true, processed: results.length, results, timestamp: new Date().toISOString() });
+    } catch (error) {
+      console.error('[poll-predictions] Error:', (error as Error).message);
+      res.status(500).json({ success: false, error: 'poll failed', timestamp: new Date().toISOString() });
     }
   });
 }

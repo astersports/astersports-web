@@ -2,7 +2,7 @@
  * Database helpers for the Print Studio module.
  * Separated from the main db.ts to keep files manageable.
  */
-import { eq, and, gte, lte, desc, sql, like } from "drizzle-orm";
+import { eq, and, gte, lte, desc, sql, like, inArray } from "drizzle-orm";
 import { getDb } from "./db";
 import {
   categories,
@@ -407,7 +407,7 @@ export async function createJob(data: InsertJob) {
 
 export async function updateJobStatus(
   jobId: number,
-  status: "pending" | "processing" | "done" | "failed",
+  status: "pending" | "processing" | "sam2_processing" | "cpu_processing" | "done" | "failed",
   extra?: { instruction?: string; creditsUsed?: number; controls?: string; detectedElements?: string; errorMessage?: string; editType?: string }
 ) {
   const db = await getDb();
@@ -423,6 +423,35 @@ export async function getJob(jobId: number) {
   if (!db) return undefined;
   const [j] = await db.select().from(jobs).where(eq(jobs.id, jobId)).limit(1);
   return j;
+}
+
+/** Find a job by its Replicate prediction id (async worker — webhook lookup). */
+export async function getJobByPredictionId(predictionId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [j] = await db.select().from(jobs).where(eq(jobs.predictionId, predictionId)).limit(1);
+  return j;
+}
+
+/** Atomically claim a job for the CPU op phase: sam2_processing -> cpu_processing. Returns true
+ *  ONLY for the worker that won the transition, so concurrent webhook + cron ticks can't both run
+ *  the op / write a duplicate variation (ASYNC_GENERATION_SPEC §4 concurrency). */
+export async function claimJobForCpuProcessing(jobId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const res = await db
+    .update(jobs)
+    .set({ status: "cpu_processing" })
+    .where(and(eq(jobs.id, jobId), eq(jobs.status, "sam2_processing")));
+  return ((res as any)?.[0]?.affectedRows ?? 0) > 0;
+}
+
+/** Jobs awaiting their SAM2 prediction (cron poller). Bounded by `limit` (N=1 in prod to clear
+ *  the Manus 60s execution cap). Oldest first so no job starves. */
+export async function listSam2ProcessingJobs(limit: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(jobs).where(eq(jobs.status, "sam2_processing")).orderBy(jobs.enqueuedAt).limit(limit);
 }
 
 /**
@@ -450,7 +479,7 @@ export async function reapStuckJobs(
   const stuck = await db
     .select({ id: jobs.id, tenantId: jobs.tenantId, creditsUsed: jobs.creditsUsed })
     .from(jobs)
-    .where(and(eq(jobs.status, "processing"), lte(jobs.updatedAt, cutoff)))
+    .where(and(inArray(jobs.status, ["processing", "sam2_processing", "cpu_processing"]), lte(jobs.updatedAt, cutoff)))
     .limit(limit);
 
   let reaped = 0;

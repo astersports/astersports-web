@@ -20,7 +20,7 @@ import { densityRedistribute } from "./_core/studio/ops/densityRedistribute";
 import { scalePrintRepeat } from "./_core/studio/ops/scaleRepeat";
 import { checkRepeatAdvanced } from "./_core/studio/ops/repeatDetector";
 import { decodeUpright } from "./_core/image/decodeUpright";
-import type { RasterMask, Sam2AuditContext } from "./_core/masking/types";
+import type { RasterMask, Sam2AuditContext, FabricMask, InstanceMask } from "./_core/masking/types";
 
 /**
  * Deterministic density (D-C): SAM2 fabric raster + instance masks -> densityThin -> PNG.
@@ -198,6 +198,60 @@ export async function generateScaledImage(
   // scalePrintRepeat ran but didn't change pixels (f===1 or degenerate mask).
   if (!r.changed) {
     console.warn(`[scale-live] scalePrintRepeat ran but changed:false (f=${params.targetFraction}); no-op -> fail + refund.`);
+    throw new Error(NO_OP_SCALE_ERROR);
+  }
+  return sharp(r.data, { raw: { width: r.width, height: r.height, channels: 4 } }).png().toBuffer();
+}
+
+/**
+ * Async worker path (ASYNC_GENERATION_SPEC §4) — run the density op on an ALREADY-COMPUTED
+ * segmentation (the SAM2 prediction already settled; finishSam2Segmentation built fabric +
+ * instances). Same op selection + the EXACT same no-op refund contract as generateDensityImage /
+ * generateDensityRedistributeImage (removed:0 -> null so the caller refunds), minus the SAM2 call.
+ * `redistribute` picks v2 (relocate) over v1 (erase). `srcUrl` must be a fetchable (resolved/signed) URL.
+ */
+export async function runDensityOnSegmentation(
+  srcUrl: string,
+  fabric: FabricMask,
+  instances: InstanceMask[],
+  percent: number,
+  redistribute: boolean
+): Promise<{ png: Buffer; removed: number } | null> {
+  if (!fabric.raster || !hasAnyPixel(fabric.raster) || instances.length === 0) {
+    console.warn(`[density-async] degraded (no/empty raster or 0 instances); fail + refund.`);
+    return null;
+  }
+  const result = redistribute
+    ? await densityRedistribute({ image: { url: srcUrl }, fabric, instances, percent })
+    : await densityThin({ image: { url: srcUrl }, fabric, instances, percent });
+  if (result.removed === 0) {
+    console.warn(`[density-async] ${redistribute ? "densityRedistribute" : "densityThin"} removed 0 motifs; no-op -> fail + refund.`);
+    return null;
+  }
+  const png = await sharp(result.data, { raw: { width: result.width, height: result.height, channels: 4 } }).png().toBuffer();
+  return { png, removed: result.removed };
+}
+
+/**
+ * Async worker path — run the scale op on an ALREADY-COMPUTED fabric mask. Same non-repeat +
+ * no-op guards as generateScaledImage (throws NON_REPEAT_SCALE_ERROR / NO_OP_SCALE_ERROR so the
+ * caller refunds), minus the getFabricMask SAM2 call. Decodes `srcUrl` for the repeat check.
+ */
+export async function runScaleOnSegmentation(
+  srcUrl: string,
+  fabric: FabricMask,
+  targetFraction: number
+): Promise<Buffer> {
+  if (!fabric.raster || !hasAnyPixel(fabric.raster)) throw new Error(NO_OP_SCALE_ERROR);
+  const decoded = await decodeUpright(srcUrl);
+  const repeatCheck = checkRepeatAdvanced(decoded.buffer, decoded.width, decoded.height, fabric.raster.data);
+  if (!repeatCheck.isRepeat) {
+    console.warn(`[scale-async] non-repeat guard fired: confidence=${repeatCheck.confidence.toFixed(3)} class=${repeatCheck.classification}`);
+    throw new Error(NON_REPEAT_SCALE_ERROR);
+  }
+  const r = await scalePrintRepeat({ image: { url: srcUrl }, fabric, targetFraction, confirmedRepeat: repeatCheck.isRepeat });
+  if (!r.changed) {
+    console.warn(`[scale-async] scalePrintRepeat changed:false (f=${targetFraction}); no-op -> fail + refund.`);
     throw new Error(NO_OP_SCALE_ERROR);
   }
   return sharp(r.data, { raw: { width: r.width, height: r.height, channels: 4 } }).png().toBuffer();
