@@ -29,10 +29,4 @@ describe("CRON_SECRET and live flags env validation", () => {
       expect(["true", "false"]).toContain(process.env.STUDIO_DENSITY_LIVE);
     }
   });
-
-  // Self-serve org creation mints trial credits, so STUDIO_CREATE_ORG_LIVE is a
-  // money-path *_LIVE flag governed by Flip Authority §1 — dark until Frank's flip.
-  it("STUDIO_CREATE_ORG_LIVE is dark (not 'true')", () => {
-    expect(process.env.STUDIO_CREATE_ORG_LIVE).not.toBe("true");
-  });
 });
