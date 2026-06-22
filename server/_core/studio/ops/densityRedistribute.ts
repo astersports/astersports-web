@@ -12,8 +12,9 @@
  *      (no resize -> scale preserved; no rotate -> orientation preserved).
  * Pure + deterministic: same inputs -> identical bytes.
  *
- * Ships DARK behind ENV.studioDensityRedistribute (default off), NOT router-wired.
- * Does not touch densityThin / generateDensityImage / the money path.
+ * Default off behind ENV.studioDensityRedistribute. When on, studioEngine.runVariation
+ * selects this op (over the v1 erase-only densityThin) on the LIVE density money path.
+ * The flag flip itself stays Frank's (CLAUDE.md §1 human-on-flip).
  */
 import sharp from "sharp";
 import { decodeUpright } from "../../image/decodeUpright";

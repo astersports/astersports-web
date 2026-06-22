@@ -46,9 +46,10 @@ export const ENV = {
   /** Density v2 (proportional redistribution, Option B): route density jobs through
    *  the deterministic-composite densityRedistribute op (remove p%, relocate
    *  survivors to an even blue-noise layout) instead of the v1 erase-only
-   *  densityThin. Requires SAM2 (raster + instances). Default off — lands DARK and
-   *  is NOT router-wired; wiring + the flip are Frank's after the per-route eval
-   *  gates clear. Patterned on studioDensityLive. */
+   *  densityThin. Requires SAM2 (raster + instances). Default off. When on,
+   *  studioEngine.runVariation routes the live density money path through this op
+   *  (over v1 densityThin); the flag flip itself stays Frank's (§1 human-on-flip).
+   *  Patterned on studioDensityLive. */
   studioDensityRedistribute: process.env.STUDIO_DENSITY_REDISTRIBUTE === "true",
   /** Self-serve org creation (`tenants.create`). Mints TRIAL_CREDITS through the
    *  ledger-safe `grantCredits` path and is per-user rate-limited. Default off —
