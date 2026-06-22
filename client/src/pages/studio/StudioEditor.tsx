@@ -37,6 +37,7 @@ import { computeCredits } from "@shared/controls";
 import { CREDIT_COST } from "@shared/billing";
 import { shouldUseStream } from "@shared/controlHelpers";
 import { useGenerateStream, type StreamCallbacks } from "@/hooks/useGenerateStream";
+import { useAsyncGenerate } from "@/hooks/useAsyncGenerate";
 
 export default function StudioEditor() {
   const { tenant } = useTenant();
@@ -54,6 +55,7 @@ export default function StudioEditor() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingControls, setPendingControls] = useState<ControlSettings | null>(null);
+  const [asyncPolling, setAsyncPolling] = useState(false);
 
   // Processing timer & progress state
   const [processingStartTime, setProcessingStartTime] = useState<number | null>(null);
@@ -100,6 +102,32 @@ export default function StudioEditor() {
   }), [utils]);
 
   const { startStream, abort: abortStream } = useGenerateStream(streamCallbacks);
+
+  // ─── Async polling (STUDIO_ASYNC_JOBS) — poll getJob until done/failed ──────
+  const onAsyncDone = useCallback((resultUrl: string) => {
+    setAsyncPolling(false);
+    setIsGenerating(false);
+    utils.tenants.myTenants.invalidate();
+    if (!resultUrl) {
+      setStep("controls");
+      toast.error("Generation finished but returned no image. Please try again.");
+      return;
+    }
+    setResults([{ url: resultUrl, key: "" }]);
+    setSelectedResult(0);
+    setStep("results");
+    toast.success("Generation complete.");
+  }, [utils]);
+
+  const onAsyncFailed = useCallback((message?: string) => {
+    setAsyncPolling(false);
+    setIsGenerating(false);
+    setStep("controls");
+    utils.tenants.myTenants.invalidate();
+    toast.error(`${message || "That didn't go through."} Your credits have been refunded.`);
+  }, [utils]);
+
+  useAsyncGenerate({ tenantId: tenant?.id ?? null, jobId, enabled: asyncPolling, onDone: onAsyncDone, onFailed: onAsyncFailed });
 
   // Elapsed timer — ticks every second while processing
   useEffect(() => {
@@ -227,11 +255,38 @@ export default function StudioEditor() {
 
     setIsGenerating(true);
 
-    // Determine if this should use the SSE streaming path
-    const useStream = shouldUseStream(controls);
+    // Density/scale are the deterministic ops. When STUDIO_ASYNC_JOBS is on, enqueue + poll
+    // (clears the 60s ingress wall); otherwise keep the existing SSE streaming path.
+    const deterministic = shouldUseStream(controls);
+    const useAsync = deterministic && !!studioConfig?.asyncJobs;
 
-    if (useStream) {
-      // ─── SSE STREAMING PATH (density/scale) ─────────────────────────────
+    if (useAsync) {
+      // ─── ASYNC ENQUEUE + POLL (density/scale) ───────────────────────────
+      try {
+        const result = await generateMutation.mutateAsync({ tenantId: tenant.id, jobId, controls });
+        if (result.async && "status" in result && result.status === "sam2_processing") {
+          // Fast enqueue returned — transition into the polling UI; useAsyncGenerate drives it.
+          setProcessingStartTime(Date.now());
+          setElapsedSeconds(0);
+          setStep("processing");
+          setAsyncPolling(true);
+          toast.info("Processing started — this may take up to a minute.");
+        } else if (!result.async) {
+          // Unexpected sync result for a deterministic op — render it immediately.
+          setResults(result.results);
+          setSelectedResult(0);
+          setStep("results");
+          setIsGenerating(false);
+        } else {
+          // async:true without a status (flag race) — fall back to the SSE stream.
+          startStream({ tenantId: tenant.id, jobId, controls });
+        }
+      } catch (error: any) {
+        setIsGenerating(false);
+        toast.error(error.message || "Generation failed. Please try again.");
+      }
+    } else if (deterministic) {
+      // ─── SSE STREAMING PATH (density/scale, async off) ──────────────────
       // Opens a long-lived connection that keeps the container alive.
       startStream({
         tenantId: tenant.id,
@@ -277,12 +332,14 @@ export default function StudioEditor() {
   }, [pendingControls, jobId, tenant, generateMutation, utils, startStream, studioConfig]);
 
   const handleRegenerate = () => {
+    setAsyncPolling(false);
     setStep("controls");
     setResults([]);
   };
 
   const handleNewUpload = () => {
     abortStream(); // Cancel any in-flight stream
+    setAsyncPolling(false);
     setStep("upload");
     setJobId(null);
     setOriginalUrl("");
