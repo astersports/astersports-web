@@ -11,6 +11,7 @@ import { serveStatic, setupVite } from "./vite";
 import { handleStripeWebhook } from "../webhook";
 import { registerStudioStreamRoutes } from "../routes/studioStream";
 import { registerStudioPostureRoute } from "../routes/studioPosture";
+import { handleReplicateWebhook } from "../routes/replicateWebhook";
 import { assertEnvOrExit, ENV } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -45,6 +46,14 @@ async function startServer() {
     "/api/stripe/webhook",
     express.raw({ type: "application/json" }),
     handleStripeWebhook
+  );
+
+  // Replicate async-generation webhook (ASYNC_GENERATION_SPEC §3) — like Stripe, it needs the
+  // RAW body for svix-style HMAC signature verification, so register it BEFORE express.json().
+  app.post(
+    "/api/webhooks/replicate",
+    express.raw({ type: "*/*" }),
+    handleReplicateWebhook
   );
 
 

@@ -213,6 +213,18 @@ export type InsertCreditLedgerEntry = typeof creditLedger.$inferInsert;
 /**
  * Studio jobs — each upload/edit session.
  */
+/** Pre-computed context the async worker needs to finish a SAM2 prediction WITHOUT re-running
+ *  the (nondeterministic, costly) vision-LLM locate (ASYNC_GENERATION_SPEC §1). The crop geometry
+ *  is produced at enqueue and stored as JSON on studio_jobs.predictionMeta. Structurally matches
+ *  the masking layer's CropSegment geometry (bbox is BBoxNormalized-shaped). */
+export interface PredictionMeta {
+  bbox: { x: number; y: number; w: number; h: number };
+  width: number;
+  height: number;
+  cropWidth: number;
+  cropHeight: number;
+}
+
 export const jobs = mysqlTable("studio_jobs", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenantId").notNull(),
@@ -244,6 +256,10 @@ export const jobs = mysqlTable("studio_jobs", {
   predictionId: varchar("predictionId", { length: 255 }),
   /** When the async prediction was enqueued — drives the reaper's max-prediction-age sweep. */
   enqueuedAt: timestamp("enqueuedAt"),
+  /** Async-worker crop geometry (ASYNC_GENERATION_SPEC §1) — set at enqueue, consumed by
+   *  finishSam2Segmentation in the worker so it never re-runs the vision-LLM locate. JSON for
+   *  forward flexibility (e.g. future upscale context). */
+  predictionMeta: json("predictionMeta").$type<PredictionMeta>(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (t) => ({

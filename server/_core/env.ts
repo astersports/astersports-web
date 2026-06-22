@@ -68,6 +68,9 @@ export const ENV = {
   /** Replicate SAM2 (D1 = Option 2). Token + model-version id for the hosted mask source. */
   replicateApiToken: process.env.REPLICATE_API_TOKEN ?? "",
   replicateSam2Model: process.env.REPLICATE_SAM2_MODEL ?? "",
+  /** Replicate webhook signing secret (svix-style HMAC) for /api/webhooks/replicate
+   *  (ASYNC_GENERATION_SPEC §3). Env-based per §6; the webhook is fail-closed when unset. */
+  replicateWebhookSecret: process.env.REPLICATE_WEBHOOK_SECRET ?? "",
   /** H6: upper bound on a source image's total pixel count for the deterministic
    *  ops. A decoded RGBA frame costs width*height*4 bytes, so an unbounded upload
    *  is a memory-exhaustion vector. 40 MP (~160 MB RGBA) covers real print artwork
