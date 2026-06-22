@@ -3,7 +3,7 @@
  * Pooled balance, spend-by-member bars, User/Admin role toggles,
  * invite with domain lock, transfer ownership.
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useTenant } from "@/contexts/TenantContext";
@@ -102,49 +102,50 @@ function MetricCards({ tenantId, tenant }: { tenantId: number; tenant: any }) {
   );
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      <Card>
-        <CardContent className="p-4 flex items-center gap-3">
-          <div className="rounded-lg bg-amber-500/10 p-2.5">
-            <CreditCard className="h-5 w-5 text-amber-500" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold tabular-nums">
-              {tenant.creditBalance.toLocaleString()}
-            </p>
-            <p className="text-xs text-muted-foreground">Pool balance</p>
-          </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-4 flex items-center gap-3">
-          <div className="rounded-lg bg-amber-500/10 p-2.5">
-            <BarChart3 className="h-5 w-5 text-amber-500" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold tabular-nums">
-              {(spend?.totalSpent7d ?? 0).toLocaleString()}
-            </p>
-            <p className="text-xs text-muted-foreground">Spent (7 days)</p>
-          </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-4 flex items-center gap-3">
-          <div className="rounded-lg bg-primary/10 p-2.5">
-            <Users className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold tabular-nums">
-              {spend?.members.length ?? 0}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Active / {tenant.seats} seats
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+    // M-mobile: compact 3-up on phones (was grid-cols-1 → three tall stacked
+    // cards); icon stacks above the number on mobile, inline on desktop.
+    <div className="grid grid-cols-3 gap-2 sm:gap-4">
+      <StatCard
+        icon={<CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500" />}
+        value={tenant.creditBalance.toLocaleString()}
+        label="Pool balance"
+      />
+      <StatCard
+        icon={<BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500" />}
+        value={(spend?.totalSpent7d ?? 0).toLocaleString()}
+        label="Spent (7 days)"
+      />
+      <StatCard
+        icon={<Users className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />}
+        value={spend?.members.length ?? 0}
+        label={`Active / ${tenant.seats} seats`}
+        iconBg="bg-primary/10"
+      />
     </div>
+  );
+}
+
+function StatCard({
+  icon,
+  value,
+  label,
+  iconBg = "bg-amber-500/10",
+}: {
+  icon: ReactNode;
+  value: string | number;
+  label: string;
+  iconBg?: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3">
+        <div className={`rounded-lg ${iconBg} p-2 sm:p-2.5 w-fit`}>{icon}</div>
+        <div className="min-w-0">
+          <p className="text-lg sm:text-2xl font-bold tabular-nums truncate">{value}</p>
+          <p className="text-[11px] sm:text-xs text-muted-foreground leading-tight">{label}</p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -283,10 +284,10 @@ function MembersList({ tenantId, isOwner }: { tenantId: number; isOwner: boolean
               return (
                 <div
                   key={m.id}
-                  className="grid grid-cols-1 sm:grid-cols-[1fr_80px_80px_40px] gap-2 items-center px-2 py-2.5 rounded-lg hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0"
+                  className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0 sm:grid sm:grid-cols-[1fr_80px_80px_40px] sm:gap-2"
                 >
                   {/* Name + email */}
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex flex-1 items-center gap-2 min-w-0">
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm font-medium truncate">
