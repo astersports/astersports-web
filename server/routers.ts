@@ -20,6 +20,7 @@ import { processTrialReminders } from './trialReminders';
 import { reapStuckJobs, listSam2ProcessingJobs } from './studioDb';
 import { processAsyncJob } from './studioAsyncWorker';
 import { processTrialAutoCharges } from './shadowBilling';
+import { cronSecretOk as cronSecretMatches } from "./_core/cronAuth";
 import type { Game } from "../shared/types";
 
 // Owner-only procedure: restricts access to the site owner (OWNER_OPEN_ID)
@@ -218,13 +219,13 @@ export const appRouter = router({
 });
 
 // H3: optional shared-secret gate for server-to-server scheduled endpoints.
-// When CRON_SECRET is configured, the matching `x-cron-secret` header is required
-// IN ADDITION to the existing cron session check — so privilege no longer derives
-// from a session claim alone. Backward-compatible: unset = no extra gate.
+// When CRON_SECRET is configured, the secret is required IN ADDITION to the existing
+// cron session check — so privilege no longer derives from a session claim alone.
+// The secret is accepted via our `x-cron-secret` header OR the `Authorization: Bearer
+// <secret>` header the Manus scheduler injects natively (see ./_core/cronAuth for the
+// match logic + tests). Backward-compatible: unset CRON_SECRET = no extra gate.
 function cronSecretOk(req: any): boolean {
-  if (!ENV.cronSecret) return true;
-  const provided = req.headers["x-cron-secret"];
-  return typeof provided === "string" && provided === ENV.cronSecret;
+  return cronSecretMatches(req.headers, ENV.cronSecret);
 }
 
 // Register the scheduled endpoints outside tRPC
