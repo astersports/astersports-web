@@ -111,14 +111,9 @@ export const platformRouter = router({
    * A handful of aggregate queries (no per-account fan-out), so it scales.
    */
   stats: superAdminProcedure.query(async () => {
-    const db = await getDb();
-    if (!db) {
-      return {
-        firmCount: 0, individualCount: 0, totalAccounts: 0,
-        totalCreditsOutstanding: 0, paidCount: 0, inTrialCount: 0,
-        trialsExpiringSoon: 0, spent7dTotal: 0, topSpenders: [],
-      };
-    }
+    // superAdminProcedure middleware already throws if DB is unavailable,
+    // so getDb() here is guaranteed non-null.
+    const db = (await getDb())!;
 
     // One pass over the tenant rows for the mix / credits / trial pipeline.
     const allTenants = await db
