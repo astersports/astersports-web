@@ -10,6 +10,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { handleStripeWebhook } from "../webhook";
 import { registerStudioStreamRoutes } from "../routes/studioStream";
+import { registerStudioPostureRoute } from "../routes/studioPosture";
 import { assertEnvOrExit, ENV } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -61,6 +62,8 @@ async function startServer() {
   registerScheduledRoutes(app);
   // SSE streaming endpoint for long-running density/scale generation
   registerStudioStreamRoutes(app);
+  // GET /api/studio/posture — operator G0 verification of the live flag/provider state
+  registerStudioPostureRoute(app);
 
   // tRPC API
   app.use(
