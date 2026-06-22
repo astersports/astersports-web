@@ -7,7 +7,8 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Building2, User, Plus, Coins, Loader2, Shield, Link2 } from "lucide-react";
+import { Building2, User, Plus, Coins, Loader2, Shield, Link2, ArrowLeft } from "lucide-react";
+import { Link } from "wouter";
 import AccountList from "./AccountList";
 import AddAccountDialog from "./AddAccountDialog";
 import GrantCreditsDialog from "./GrantCreditsDialog";
@@ -59,6 +60,13 @@ export default function PlatformConsole() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              href="/studio"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-white/5 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline">Back to Studio</span>
+            </Link>
             <Button
               variant="outline"
               size="sm"

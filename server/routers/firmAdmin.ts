@@ -213,6 +213,14 @@ export const firmAdminRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Only platform super_admin (impersonating) can modify domain lock
+      if (!ctx.isImpersonating) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Domain lock can only be modified by platform administrators",
+        });
+      }
+
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 

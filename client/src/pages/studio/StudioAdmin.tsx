@@ -7,6 +7,7 @@ import { useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useTenant } from "@/contexts/TenantContext";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -414,6 +415,10 @@ function FirmSettings({ tenantId, tenant }: { tenantId: number; tenant: any }) {
   const [domain, setDomain] = useState(tenant.allowedEmailDomain ?? "");
   const [transferEmail, setTransferEmail] = useState("");
   const utils = trpc.useUtils();
+  const { user } = useAuth();
+  const { isImpersonating } = useTenant();
+  // Only platform super_admin (impersonating) can modify domain lock
+  const canEditDomain = isImpersonating;
 
   const domainMutation = trpc.firmAdmin.updateDomainLock.useMutation({
     onSuccess: (data) => {
@@ -464,33 +469,52 @@ function FirmSettings({ tenantId, tenant }: { tenantId: number; tenant: any }) {
             )}
             Domain Lock
           </label>
-          <div className="flex gap-2">
-            <Input
-              placeholder="e.g. jayallc.com"
-              value={domain}
-              onChange={(e) => setDomain(e.target.value)}
-              className="flex-1"
-            />
-            <Button
-              variant="outline"
-              onClick={() =>
-                domainMutation.mutate({
-                  tenantId,
-                  allowedEmailDomain: domain.trim() || null,
-                })
-              }
-              disabled={domainMutation.isPending}
-            >
-              {domainMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                "Save"
-              )}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            When set, only emails from this domain can be invited. Leave empty to allow any email.
-          </p>
+          {canEditDomain ? (
+            /* Super_admin can edit */
+            <>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="e.g. jayallc.com"
+                  value={domain}
+                  onChange={(e) => setDomain(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    domainMutation.mutate({
+                      tenantId,
+                      allowedEmailDomain: domain.trim() || null,
+                    })
+                  }
+                  disabled={domainMutation.isPending}
+                >
+                  {domainMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Save"
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                When set, only emails from this domain can be invited. Leave empty to allow any email.
+              </p>
+            </>
+          ) : (
+            /* Tenant admins see read-only display */
+            <>
+              <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50 border border-border">
+                <span className="text-sm font-mono">
+                  {tenant.allowedEmailDomain
+                    ? `@${tenant.allowedEmailDomain}`
+                    : "No domain restriction"}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Domain lock is managed by the platform administrator and cannot be changed here.
+              </p>
+            </>
+          )}
         </div>
 
         {/* Transfer Ownership */}

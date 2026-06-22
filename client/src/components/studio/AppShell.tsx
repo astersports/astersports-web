@@ -14,6 +14,7 @@ import {
   Sparkles,
   AlertTriangle,
   BookOpen,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LOW_BALANCE_THRESHOLD } from "@shared/billing";
@@ -34,6 +35,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isAdmin = tenant?.role === "owner" || tenant?.role === "admin";
   // Individual (single-seat) accounts have no team to manage — hide the Admin tab.
   const isIndividual = tenant?.type === "individual";
+  // Super_admin: platform owner (role=admin + matching openId)
+  const isSuperAdmin = user?.role === "admin" && user?.openId === import.meta.env.VITE_OWNER_OPEN_ID;
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
@@ -89,6 +92,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
+
+        {/* Platform Console link (super_admin only) */}
+        {isSuperAdmin && (
+          <div className="px-3 pb-1">
+            <Link
+              href="/platform"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-amber-500 hover:bg-amber-500/10"
+            >
+              <Shield className="w-4 h-4" />
+              Platform Console
+            </Link>
+          </div>
+        )}
 
         {/* Credit balance */}
         {tenant && (
@@ -146,10 +162,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 {item.label}
               </Link>
             );
-          })}
+                    })}
+          {isSuperAdmin && (
+            <Link
+              href="/platform"
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
+                location === "/platform"
+                  ? "border-amber-500 text-amber-500"
+                  : "border-transparent text-amber-500/70"
+              }`}
+            >
+              <Shield className="w-3.5 h-3.5" />
+              Platform
+            </Link>
+          )}
         </nav>
       </div>
-
       {/* Main content */}
       <main className="flex-1 min-w-0 md:p-6 p-4 pt-[7.5rem] md:pt-6">
         {tenant && <TrialBanner tenantId={tenant.id} />}

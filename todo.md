@@ -689,6 +689,6 @@
 - [x] Separate density-specific locator (locateFabricRegionForDensity): aggressive full-coverage prompt, stricter threshold
 
 ## Super Admin Navigation + Domain Lock Fix
-- [ ] Add super_admin nav link from studio header to /platform
-- [ ] Add "Back to Studio" link on Platform Console
-- [ ] Make Domain Lock read-only for tenant admins (only platform super_admin can change)
+- [x] Add super_admin nav link from studio header to /platform
+- [x] Add "Back to Studio" link on Platform Console
+- [x] Make Domain Lock read-only for tenant admins (only platform super_admin can change)
