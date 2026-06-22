@@ -687,3 +687,8 @@
 - [x] Instance count sanity check: warn if SAM2 detects < 5 instances in large bbox (> 50% area)
 - [x] Bbox logging: log returned bbox dimensions + area + confidence on every density job
 - [x] Separate density-specific locator (locateFabricRegionForDensity): aggressive full-coverage prompt, stricter threshold
+
+## Super Admin Navigation + Domain Lock Fix
+- [ ] Add super_admin nav link from studio header to /platform
+- [ ] Add "Back to Studio" link on Platform Console
+- [ ] Make Domain Lock read-only for tenant admins (only platform super_admin can change)
