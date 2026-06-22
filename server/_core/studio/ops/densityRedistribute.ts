@@ -12,11 +12,11 @@
  *      (no resize -> scale preserved; no rotate -> orientation preserved).
  * Pure + deterministic: same inputs -> identical bytes.
  *
- * Default off behind ENV.studioDensityRedistribute, which STAYS OFF per Frank's
- * standing instruction — so the authorized live density path is the v1 erase-only
- * densityThin, NOT this op. The wiring exists (studioEngine.runVariation selects this
- * over densityThin when the flag is on), but the flag flip stays Frank's, and only
- * STUDIO_SCALE_LIVE + STUDIO_DENSITY_LIVE are authorized live (CLAUDE.md §1).
+ * Default off behind ENV.studioDensityRedistribute. When the flag is on,
+ * studioEngine.runVariation selects this op over the v1 erase-only densityThin on the
+ * live density money path (remove p%, then relocate survivors to an even blue-noise
+ * layout); when off, density runs v1. The flag flip itself stays Frank's (CLAUDE.md §1
+ * human-on-flip).
  */
 import sharp from "sharp";
 import { decodeUpright } from "../../image/decodeUpright";

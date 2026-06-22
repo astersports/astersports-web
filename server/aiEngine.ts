@@ -88,11 +88,9 @@ export async function generateDensityImage(
  * call). Same single-getSegmentation + null-on-degrade/no-op -> FAIL+REFUND
  * contract as generateDensityImage, and the SAME count-based refund (`removed`).
  *
- * Wired but flag-gated: studioEngine.runVariation selects this (over generateDensityImage)
- * when ENV.studioDensityRedistribute is on. That flag STAYS OFF per Frank's standing
- * instruction (only STUDIO_SCALE_LIVE + STUDIO_DENSITY_LIVE are authorized live), so the
- * authorized live density path is generateDensityImage (v1); this helper does not run in
- * prod until Frank flips the flag (CLAUDE.md §1 human-on-flip).
+ * Wired + flag-gated: studioEngine.runVariation selects this (over generateDensityImage)
+ * on the live density money path when ENV.studioDensityRedistribute is on. The flag flip
+ * itself stays Frank's (CLAUDE.md §1 human-on-flip).
  */
 export async function generateDensityRedistributeImage(
   originalImageUrl: string,
