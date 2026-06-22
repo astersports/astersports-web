@@ -83,3 +83,5 @@ schema additions are inert when the flag is off). Diagnose after.
 ### Summary
 - **Manus:** deploy `main` (with `db:push`), schedule `poll-predictions`, confirm the reaper + secrets.
 - **Frank:** the `STUDIO_ASYNC_JOBS=true` flip + the smoke test (and `=false` to roll back).
+
+<!-- Last deployed: 2026-06-22T20:45Z — OAuth redirect URI re-registration -->
