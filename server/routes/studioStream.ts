@@ -141,9 +141,14 @@ export function registerStudioStreamRoutes(app: Express) {
     }
 
     // ─── 7. Determine deterministic path ───────────────────────────────────────
+    // Both ops need SAM2 rasters/instances; without a raster-capable provider the
+    // op can only deduct -> call out -> refund. Gate density on rasterReady too
+    // (scale already was) so a classical-provider request degrades to the
+    // generative path instead of charging for a guaranteed refund.
+    const rasterReady = getMaskProvider().rasterReady;
     const densityOnly =
       controls.density.enabled && !controls.scale.enabled;
-    const densityDeterministic = ENV.studioDensityLive || ENV.studioDensityRedistribute;
+    const densityDeterministic = (ENV.studioDensityLive || ENV.studioDensityRedistribute) && rasterReady;
     const useDeterministicDensity = densityDeterministic && densityOnly;
 
     if (densityDeterministic && controls.density.enabled && controls.density.percent > 0 && !densityOnly) {
@@ -153,7 +158,7 @@ export function registerStudioStreamRoutes(app: Express) {
 
     const scaleOnly =
       controls.scale.enabled && controls.scale.percent !== 0 && !controls.density.enabled;
-    const scaleRasterReady = getMaskProvider().rasterReady;
+    const scaleRasterReady = rasterReady;
     const useDeterministicScale = ENV.studioScaleLive && scaleOnly && scaleRasterReady;
 
     if (ENV.studioScaleLive && scaleRasterReady && controls.scale.enabled && controls.scale.percent !== 0 && !scaleOnly) {

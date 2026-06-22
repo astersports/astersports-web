@@ -386,6 +386,57 @@ export async function getJob(jobId: number) {
   return j;
 }
 
+/**
+ * Reap jobs stuck in "processing" past a deadline: idempotently refund (only if
+ * no refund already exists for the job) and mark them failed. Backstops strands
+ * where neither the SSE in-process refund (180s timer / req-close) nor the rerun
+ * catch ran — e.g. an infra hard-kill of the container or a detached promise
+ * dying on serverless. `olderThanMs` MUST exceed the max in-process duration
+ * (the generation budget) so this can never race a still-running job.
+ *
+ * Idempotency: every in-process refund refId starts `job-<id>-` (rerun:
+ * `job-<id>-failed`; SSE: `job-<id>-a<n>-failed`). The reaper only refunds when
+ * no `refund` row matches `job-<id>-%`, then writes `job-<id>-reaped` — so it
+ * can neither double-refund a job an in-process catch already handled nor
+ * re-refund on a second sweep (grantCredits is itself idempotent on the key).
+ */
+export async function reapStuckJobs(
+  olderThanMs: number,
+  limit = 500
+): Promise<{ reaped: number; refunded: number }> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const cutoff = new Date(Date.now() - olderThanMs);
+
+  const stuck = await db
+    .select({ id: jobs.id, tenantId: jobs.tenantId, creditsUsed: jobs.creditsUsed })
+    .from(jobs)
+    .where(and(eq(jobs.status, "processing"), lte(jobs.updatedAt, cutoff)))
+    .limit(limit);
+
+  let reaped = 0;
+  let refunded = 0;
+  for (const job of stuck) {
+    const cost = job.creditsUsed ?? 0;
+    if (cost > 0) {
+      const [already] = await db
+        .select({ id: creditLedger.id })
+        .from(creditLedger)
+        .where(and(eq(creditLedger.reason, "refund"), like(creditLedger.refId, `job-${job.id}-%`)))
+        .limit(1);
+      if (!already) {
+        await grantCredits(job.tenantId, cost, "refund", `job-${job.id}-reaped`);
+        refunded++;
+      }
+    }
+    await updateJobStatus(job.id, "failed", {
+      errorMessage: "Timed out — automatically failed and refunded.",
+    }).catch(() => {});
+    reaped++;
+  }
+  return { reaped, refunded };
+}
+
 export async function listTenantJobs(tenantId: number, limit = 50) {
   const db = await getDb();
   if (!db) return [];

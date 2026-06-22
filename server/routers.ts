@@ -17,6 +17,7 @@ import { notifyOwner } from "./_core/notification";
 import { sdk } from "./_core/sdk";
 import { pruneOldLogs } from './logRetention';
 import { processTrialReminders } from './trialReminders';
+import { reapStuckJobs } from './studioDb';
 import { processTrialAutoCharges } from './shadowBilling';
 import type { Game } from "../shared/types";
 
@@ -384,6 +385,30 @@ export function registerScheduledRoutes(app: any) {
         success: false,
         error: (error as Error).message,
       });
+    }
+  });
+
+  // Reap studio jobs stranded in "processing" — idempotently refund + fail any
+  // job stuck past 10 min (well above the 180s in-process generation budget, so
+  // it never races a live job). Backstops infra hard-kills and detached-promise
+  // strands so a customer is never billed for a job that produced nothing.
+  app.post('/api/scheduled/reap-stuck-jobs', async (req: any, res: any) => {
+    try {
+      if (!cronSecretOk(req)) {
+        return res.status(403).json({ error: 'forbidden' });
+      }
+      const user = await sdk.authenticateRequest(req);
+      if (!user.isCron || !user.taskUid) {
+        return res.status(403).json({ error: 'cron-only' });
+      }
+
+      const result = await reapStuckJobs(10 * 60 * 1000);
+      console.log(`[reap-stuck-jobs] reaped ${result.reaped}, refunded ${result.refunded}`);
+
+      res.json({ success: true, ...result, timestamp: new Date().toISOString() });
+    } catch (error) {
+      console.error('[reap-stuck-jobs] Error:', (error as Error).message);
+      res.status(500).json({ success: false, error: 'reap failed', timestamp: new Date().toISOString() });
     }
   });
 }
