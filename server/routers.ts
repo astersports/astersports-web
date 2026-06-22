@@ -423,10 +423,12 @@ export function registerScheduledRoutes(app: any) {
   app.post('/api/scheduled/poll-predictions', async (req: any, res: any) => {
     try {
       if (!cronSecretOk(req)) {
+        log.error('cron', '[poll-predictions] cronSecretOk failed', { metadata: { headers: Object.keys(req.headers).join(',') } });
         return res.status(403).json({ error: 'forbidden' });
       }
       const user = await sdk.authenticateRequest(req);
       if (!user.isCron || !user.taskUid) {
+        log.error('cron', `[poll-predictions] cron-only check failed: isCron=${user.isCron}, taskUid=${user.taskUid}`);
         return res.status(403).json({ error: 'cron-only' });
       }
       if (!ENV.studioAsyncJobs) {
@@ -438,9 +440,10 @@ export function registerScheduledRoutes(app: any) {
         const r = await processAsyncJob(j.id);
         results.push({ jobId: j.id, status: r.status });
       }
+      log.info('cron', `[poll-predictions] processed ${results.length} jobs`);
       res.json({ success: true, processed: results.length, results, timestamp: new Date().toISOString() });
     } catch (error) {
-      console.error('[poll-predictions] Error:', (error as Error).message);
+      log.error('cron', `[poll-predictions] Error: ${(error as Error).message}`);
       res.status(500).json({ success: false, error: 'poll failed', timestamp: new Date().toISOString() });
     }
   });
