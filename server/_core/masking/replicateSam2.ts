@@ -47,9 +47,34 @@ export interface Sam2Segmentation {
   individuals: Buffer[];
 }
 
+/**
+ * Result of handling an async SAM2 prediction (ASYNC_GENERATION_SPEC §2). The worker maps
+ * these: `succeeded` -> build fabric/instances + run the deterministic op; `failed` -> refund;
+ * `processing` (still running) -> leave for the next poll tick. parseAutoSegmentation only
+ * downloads masks on success, so a still-running poll does no network work.
+ */
+export type PredictionResult =
+  | { status: "succeeded"; segmentation: Sam2Segmentation }
+  | { status: "failed"; error: string }
+  | { status: "processing" };
+
 export interface Sam2Client {
   /** One automatic segmentation call on the crop; returns combined + individuals. */
   autoSegment(imageDataUrl: string, options?: Sam2AutoOptions): Promise<Sam2Segmentation>;
+  /**
+   * Async seam (ASYNC_GENERATION_SPEC §2): create the SAM2 prediction and return its id
+   * WITHOUT waiting, so the 45-120s run lives on Replicate, off our 60s-capped request.
+   * Pass `webhookUrl` to have Replicate POST on completion (Phase 3); either way the cron
+   * poller resolves it via processPrediction. Same `input` shaping as autoSegment.
+   */
+  startPrediction(imageDataUrl: string, options?: Sam2AutoOptions, webhookUrl?: string): Promise<string>;
+  /**
+   * Resolve a started prediction by id: on success download the masks (SSRF-guarded) and
+   * return the segmentation; on failure/cancel/abort surface the error; otherwise report it
+   * is still running (no network work). Transport only — does NOT build fabric/instances or
+   * run the deterministic op (those layer on top in the provider + worker).
+   */
+  processPrediction(predictionId: string): Promise<PredictionResult>;
   /**
    * Box-prompted whole-fabric mask (box = [x0,y0,x1,y1] px). The PROVEN fabric
    * source — kept as the validated fallback (Architect ruling): combined_mask is
@@ -134,6 +159,47 @@ function firstMaskUrl(output: unknown): string {
   return "";
 }
 
+/** Shared SAM2 auto-mask input — identical shape for the sync run() and the async create(). */
+function buildAutoInput(imageDataUrl: string, options?: Sam2AutoOptions) {
+  return {
+    image: imageDataUrl,
+    points_per_side: options?.pointsPerSide ?? ENV.studioSam2PointsPerSide,
+    pred_iou_thresh: options?.predIouThresh ?? 0.82,
+    stability_score_thresh: options?.stabilityScoreThresh ?? 0.88,
+    use_m2m: options?.useM2M ?? ENV.studioSam2UseM2m,
+  };
+}
+
+/** Parse a SAM2 auto output into combined + individual mask buffers (SSRF-guarded download).
+ *  Shared by autoSegment (sync run) and processPrediction (async) so both paths parse the
+ *  output identically. Throws when the model returned no usable masks. */
+async function parseAutoSegmentation(output: unknown): Promise<Sam2Segmentation> {
+  const o = (output ?? {}) as Record<string, unknown>;
+  const combinedUrl = asUrl(o.combined_mask);
+  const individualUrls = Array.isArray(o.individual_masks)
+    ? (o.individual_masks as unknown[]).map(asUrl).filter((u) => u.length > 0)
+    : [];
+  if (!combinedUrl && individualUrls.length === 0) {
+    throw new Error("SAM2 returned no masks. The crop may contain no detectable motifs.");
+  }
+  const [combined, individuals] = await Promise.all([
+    combinedUrl ? fetchBuffer(combinedUrl) : Promise.resolve(Buffer.alloc(0)),
+    Promise.all(individualUrls.map(fetchBuffer)),
+  ]);
+  return { combined, individuals };
+}
+
+/** predictions.create() wants { model } OR { version } (not run()'s combined ref).
+ *  "owner/model:version" -> { version }; "owner/model" -> { model }; bare hash -> { version };
+ *  empty -> { model: "meta/sam-2" } (official model, latest version). */
+export function resolvePredictionTarget(configured?: string): { model: string } | { version: string } {
+  const v = (configured ?? "").trim();
+  if (!v) return { model: SAM2_MODEL };
+  if (v.includes(":")) return { version: v.split(":").pop()!.trim() };
+  if (v.includes("/")) return { model: v };
+  return { version: v };
+}
+
 function requireToken(): string {
   const token = ENV.replicateApiToken;
   if (!token) {
@@ -153,31 +219,42 @@ export function defaultSam2Client(): Sam2Client {
       // useFileOutput:false -> outputs come back as plain URL strings (the shape the
       // verified client parsed), not FileOutput wrappers.
       const replicate = new Replicate({ auth: token, useFileOutput: false });
-      const input = {
-        image: imageDataUrl,
-        points_per_side: options?.pointsPerSide ?? ENV.studioSam2PointsPerSide,
-        pred_iou_thresh: options?.predIouThresh ?? 0.82,
-        stability_score_thresh: options?.stabilityScoreThresh ?? 0.88,
-        use_m2m: options?.useM2M ?? ENV.studioSam2UseM2m,
-      };
       const output = (await runWithTimeout(
         "autoSegment",
-        replicate.run(resolveModelRef(ENV.replicateSam2Model), { input })
+        replicate.run(resolveModelRef(ENV.replicateSam2Model), { input: buildAutoInput(imageDataUrl, options) })
       )) as Record<string, unknown>;
+      return parseAutoSegmentation(output);
+    },
 
-      const combinedUrl = asUrl(output?.combined_mask);
-      const individualUrls = Array.isArray(output?.individual_masks)
-        ? (output.individual_masks as unknown[]).map(asUrl).filter((u) => u.length > 0)
-        : [];
-      if (!combinedUrl && individualUrls.length === 0) {
-        throw new Error("SAM2 returned no masks. The crop may contain no detectable motifs.");
+    async startPrediction(imageDataUrl, options, webhookUrl) {
+      const token = requireToken();
+      const replicate = new Replicate({ auth: token, useFileOutput: false });
+      const target = resolvePredictionTarget(ENV.replicateSam2Model);
+      const opts = {
+        input: buildAutoInput(imageDataUrl, options),
+        ...(webhookUrl
+          ? { webhook: webhookUrl, webhook_events_filter: ["completed"] as ("start" | "output" | "logs" | "completed")[] }
+          : {}),
+      };
+      // predictions.create() requires exactly one of { model } | { version }; branch so the
+      // SDK's union type is satisfied concretely. Returns immediately (no long-poll).
+      const prediction = await replicate.predictions.create(
+        "version" in target ? { ...opts, version: target.version } : { ...opts, model: target.model }
+      );
+      return prediction.id;
+    },
+
+    async processPrediction(predictionId) {
+      const token = requireToken();
+      const replicate = new Replicate({ auth: token, useFileOutput: false });
+      const prediction = await replicate.predictions.get(predictionId);
+      if (prediction.status === "succeeded") {
+        return { status: "succeeded", segmentation: await parseAutoSegmentation(prediction.output) };
       }
-
-      const [combined, individuals] = await Promise.all([
-        combinedUrl ? fetchBuffer(combinedUrl) : Promise.resolve(Buffer.alloc(0)),
-        Promise.all(individualUrls.map(fetchBuffer)),
-      ]);
-      return { combined, individuals };
+      if (prediction.status === "failed" || prediction.status === "canceled" || prediction.status === "aborted") {
+        return { status: "failed", error: String(prediction.error ?? `SAM2 prediction ${prediction.status}`) };
+      }
+      return { status: "processing" };
     },
 
     async boxMask(imageDataUrl, box) {
