@@ -1,0 +1,329 @@
+================================================================================
+STUDIO DENSITY TESTING — SESSION HANDOFF
+astersports-web · 2026-06-22 · for the next Claude Code chat
+================================================================================
+
+PURPOSE
+-------
+You are picking up live density testing of the Print Studio in production.
+The async generation architecture is DONE and PROVEN in prod as of this
+session. Your job is to keep exercising density generation, watch the four
+invariants below, and diagnose/fix anything that breaks — in the same fashion
+the prior session did.
+
+Read CLAUDE.md (repo root) first. The rules there OVERRIDE anything here.
+
+
+--------------------------------------------------------------------------------
+0. TL;DR — WHERE THINGS STAND
+--------------------------------------------------------------------------------
+- Density/scale generation runs on an ASYNC enqueue->poll architecture that
+  clears the hard ~60s Manus request cap. The heavy SAM2 run lives on Replicate
+  (off our request); a cron poller finishes the job off-request; the client
+  polls getJob.
+- This was proven end-to-end in prod today: enqueue returns ~4s, the client
+  polls, the job completes with a v2 (even / no-clustering) density result, no
+  60s timeout, and the ledger is clean (one deduct at enqueue, no refund on
+  success).
+- Everything from the async arc is MERGED to main: PRs #82–#88 (see §7).
+- The flag flips are LIVE (Frank set them — see §2). You are in the
+  PRE-ONBOARDING BUILD/TEST phase: prod is a test bed, flips were set to TEST.
+
+NOTHING is awaiting a fix right now. You are in steady-state testing.
+
+
+--------------------------------------------------------------------------------
+1. GOVERNANCE — NON-NEGOTIABLE (CLAUDE.md §1, §2.4, §3, §5)
+--------------------------------------------------------------------------------
+* YOU NEVER FLIP A FLAG. No agent (CC, Manus, any lane) sets/changes/deploys a
+  *_LIVE flag, STUDIO_MASK_PROVIDER, STUDIO_ASYNC_JOBS, or any money/mask/sub-
+  processor secret — EVER. You PREPARE a flip (flag, old->new, target SHA, what
+  it turns on, one-line smoke). FRANK SETS IT. This holds in both phases.
+
+* §1 ALWAYS-ON INVARIANTS (never relax):
+  - CI green before merge.
+  - Ledger idempotent: deduct/grant keyed on (refId, reason); no direct
+    creditBalance writes; never force the credit_ledger unique index.
+  - NEVER bill for a no-op — effect fields reflect the EFFECT, not intent.
+  - Secrets never printed / committed / echoed.
+
+* ARCHITECT-SCOPED PRs hold for Architect approval (relayed by Frank), NEVER
+  auto-merged: money/credit/Stripe/webhook logic, DB schema + migrations,
+  auth/permissions/tenant-isolation, mask-provider/sub-processor, any
+  architectural fork. ROUTINE PRs (UI, refactors, tests, docs, bug fixes not
+  touching the above) auto-merge on green CI.
+  -> When in doubt, surface evidence + a labeled lean; do not settle an
+     architectural fork alone. Frank relays the Architect's call.
+
+* WORKFLOW: branch off origin/main per change -> PR to main -> merge on green CI.
+  Never commit to main directly. Sign commits as "Claude Code". NEVER put the
+  model identifier (version/marketing name) in commits, PR text, code, or any
+  pushed artifact — chat replies only.
+
+* POST-DEPLOY: Manus auto-deploys from main. After a merge that deploys, confirm
+  green boot + run a smoke (the /posture read + a density generation). If a
+  merged PR breaks main or fails smoke, git revert + push immediately — never
+  fix-forward on a broken main.
+
+
+--------------------------------------------------------------------------------
+2. CURRENT PRODUCTION POSTURE (last-known; RE-VERIFY, don't infer)
+--------------------------------------------------------------------------------
+Last posture read this session (after Frank's flips):
+
+  asyncJobs: true
+  flags: { densityRedistribute: true, densityLive: true, scaleLive: true,
+           createOrgLive: false }
+  effective: { densityLive: true, scaleLive: true }
+  maskProvider: "sam2"
+  replicateConfigured: true
+  sam2: { pointsPerSide: 16 }
+  dark: false
+
+VERIFY at the start of your session (source of truth, not memory):
+  GET /api/studio/posture   with header  x-cron-secret: <CRON_SECRET>
+(Frank runs this — you don't have the cron secret or network to the deploy.)
+
+Flag meanings (server/_core/env.ts):
+  STUDIO_MASK_PROVIDER=sam2     hosted SAM2 mask source (hard-required for
+                                density/scale; validateEnv fails boot otherwise).
+  STUDIO_DENSITY_LIVE=true      density-only jobs run the deterministic op.
+  STUDIO_DENSITY_REDISTRIBUTE   v2: remove p% then relocate survivors to an even
+    =true                       blue-noise layout (no clustering). OFF => v1
+                                erase-only (densityThin), which clusters. The
+                                earlier "keep redistribute OFF" restriction was
+                                LIFTED by Frank — v2 is the authorized target.
+  STUDIO_ASYNC_JOBS=true        enqueue+poll instead of synchronous SSE. NOT a
+                                money-path flag (billing unchanged); kept out of
+                                the /posture `dark` calc.
+  STUDIO_SAM2_POINTS_PER_SIDE=16  sampling density; the dominant cost knob. 16 is
+                                tuned to keep typical density jobs fast. If a job
+                                is slow, this is the first dial (16<32<64).
+
+
+--------------------------------------------------------------------------------
+3. THE DENSITY TEST LOOP (what Frank does; what you watch)
+--------------------------------------------------------------------------------
+Path: Studio Editor -> upload a garment (allover print is the stress case) ->
+auto-detect -> Density control (set a reduction %) -> Generate -> confirm cost
+dialog -> generation runs.
+
+Expected with async ON:
+  1. POST /api/trpc/studio.generate returns FAST (~4s) with {async:true,
+     status:"sam2_processing", jobId}. The client transitions to the polling UI.
+  2. The processing UI ("Generating your result..." with an elapsed timer) shows
+     while the client polls GET /api/trpc/studio.getJob every 2s.
+  3. The poll-predictions cron picks up the job, runs the CPU op off-request,
+     writes the variation, marks the job done.
+  4. The client poll sees status=done and renders the before/after. Result is a
+     v2 redistribute image (even spacing, no clustering).
+
+FOUR WATCH ITEMS (the original test charter; how each manifests now):
+  (1) NO 60s TIMEOUT. Async means the request returns in ~4s and the heavy run
+      is off-request, so "Connection closed before the job finished" / "fetch
+      failed at 60s" should NOT recur. If it does, see §6.
+  (2) NO-OP BILLING. If the op removes nothing (removed:0), the job MUST refund,
+      not charge. In the async worker, runDensityOnSegmentation returns null on a
+      no-op -> failAndRefund("density no-op (removed 0)"). Verify a refund row
+      lands (net zero).
+  (3) EVEN THINNING, NO CLUSTERING. With redistribute=true the result must be an
+      even blue-noise relayout, not erase-only gaps. (v1/densityThin clusters;
+      that's why v2 is authorized.)
+  (4) CREDITS DEDUCT + LEDGER ROW. A credit_ledger deduct lands at enqueue
+      (refId job-<id>-a<n>, reason "deduct"); on success NO refund; on
+      failure/no-op a matching refund (refId job-<id>-failed, reason "refund").
+      SUM(ledger.delta) per tenant == creditBalance.
+
+
+--------------------------------------------------------------------------------
+4. §1 LEDGER — EXACT REFS (so you can verify a clean money path)
+--------------------------------------------------------------------------------
+- DEDUCT at enqueue: studio.generate async branch deducts per attempt with
+  refId `job-<jobId>-a<n>`, reason "deduct".
+- REFUND on failure/no-op/strand: refId `job-<jobId>-failed`, reason "refund",
+  idempotent on (refId, reason). The async worker, the (future) webhook, and the
+  reaper all use this same refId -> no double refund.
+- SUCCESS: no refund; the deduct stands.
+- BACKSTOP: /api/scheduled/reap-stuck-jobs refunds any job stranded in
+  sam2_processing/cpu_processing past its window. This is why a stranded job is
+  ALWAYS refunded, never silently charged. (Confirmed live this session: a failed
+  run's -10 came back ~6 min later with the job-<id>-failed ref.)
+
+You CANNOT query the prod MySQL directly (no Supabase MCP for this repo; the DB
+is MySQL on Manus). Ledger verification is Frank's DB check OR the in-app
+balance + a credit_ledger read he runs. Ask him for the row if you need it.
+
+
+--------------------------------------------------------------------------------
+5. ARCHITECTURE MAP (pull these to reason about a failure)
+--------------------------------------------------------------------------------
+ENQUEUE (on our request, must stay fast):
+  server/routers/studio.ts
+    - generate: async branch (when ENV.studioAsyncJobs) -> deduct ->
+      startSam2Segmentation -> markJobEnqueued -> returns {async, jobId,
+      status:"sam2_processing"}. On start-error: refund + fail.
+    - getJob: tenantProcedure; the client polls this ({tenantId, jobId}).
+    - config: returns {scaleLive, densityLive, asyncJobs} to the client.
+  server/_core/masking/sam2Provider.ts
+    - startSam2Segmentation (locate+crop, kicks off the Replicate prediction),
+      finishSam2Segmentation (parses the finished prediction).
+  server/_core/masking/locateFabricRegion.ts
+    - PHASE 5 (PR #87): the vision locate is bounded — fetch+downscale to <=768px
+      inline data-URL, 20s timeout, DEFAULT_REGION fallback. So the enqueue's
+      synchronous locate can never blow the 60s cap.
+  server/_core/masking/replicateSam2.ts
+    - startPrediction (predictions.create — returns immediately),
+      processPrediction (predictions.get -> succeeded/failed/processing).
+
+COMPLETION (off our request):
+  server/studioAsyncWorker.ts
+    - processAsyncJob(jobId): the SINGLE idempotent fn the cron AND webhook call.
+      Atomic claim sam2_processing->cpu_processing (one worker wins), run op,
+      addVariation, mark done; any throw/failure/no-op -> failAndRefund. READ
+      THIS FIRST when a job completes wrong.
+  server/aiEngine.ts
+    - runDensityOnSegmentation (selects v2 densityRedistribute vs v1 densityThin
+      by the redistribute flag; returns null on no-op), runScaleOnSegmentation.
+  server/_core/studio/ops/densityRedistribute.ts  (v2 — remove + blue-noise relayout)
+  server/_core/studio/ops/densityThin.ts          (v1 — erase-only)
+  server/_core/studio/ops/blueNoiseLayout.ts      (the even relocation)
+  server/studioDb.ts
+    - getJob, updateJobStatus, addVariation, grantCredits, claimJobForCpuProcessing,
+      listSam2ProcessingJobs, reapStuckJobs.
+
+CRON / ROUTES:
+  server/routers.ts -> registerScheduledRoutes
+    - /api/scheduled/poll-predictions  (drains sam2_processing, N=1 per tick)
+    - /api/scheduled/reap-stuck-jobs   (refund backstop)
+    - Gate 1: cronSecretOk(req)         -> 403 {error:"forbidden"}
+    - Gate 2: sdk.authenticateRequest   -> 403 {error:"cron-only"} if not isCron
+  server/_core/cronAuth.ts  (PR #88) — cronSecretOk accepts the secret via EITHER
+    `x-cron-secret` OR `Authorization: Bearer <secret>` (Manus's native header).
+    Pure + unit-tested (server/_core/cronAuth.test.ts).
+  server/routes/studioStream.ts  — the SSE path (used when asyncJobs is OFF).
+  server/routes/studioPosture.ts — GET /api/studio/posture (G0 read).
+  server/routes/replicateWebhook.ts — /api/webhooks/replicate (built, fail-closed
+    HMAC, NOT wired yet — needs a public base URL + REPLICATE_WEBHOOK_SECRET).
+
+CLIENT:
+  client/src/hooks/useAsyncGenerate.ts — polls getJob (refetchInterval 2s while
+    status is active), fires onDone(resultUrl)/onFailed once.
+  client/src/pages/studio/StudioEditor.tsx — routes density/scale to async
+    mutation+poll when studioConfig.asyncJobs, else SSE. NOTE: the processing UI
+    only renders AFTER generate returns sam2_processing (async) or after the SSE
+    "started" event — see §6, this is a key diagnostic signal.
+
+SCHEMA / SPEC:
+  drizzle/schema.ts — studio_jobs.status enum
+    {pending,processing,done,failed,sam2_processing,cpu_processing}; predictionId,
+    enqueuedAt, predictionMeta(json). Migrations 0016 + 0017 (already applied).
+  docs/ASYNC_GENERATION_SPEC.md — the design.
+  docs/STUDIO_ASYNC_GOLIVE_RUNBOOK.md — the Manus deploy/flip/smoke/rollback runbook.
+
+
+--------------------------------------------------------------------------------
+6. DIAGNOSTIC PLAYBOOK (the method that worked this session)
+--------------------------------------------------------------------------------
+When a density generation "fails" or "charges with no result," DON'T guess the
+stage. Localize it first — different stages have different fixes:
+
+KEY INSIGHT: the client processing UI (elapsed timer, "Generating your
+result...") only appears AFTER the enqueue request returns sam2_processing
+(async) or after the SSE "started" event. So:
+  - If Frank saw the processing countdown -> the ENQUEUE SUCCEEDED. The failure
+    is DOWNSTREAM (worker/cron completion or polling), NOT the enqueue.
+  - If Frank saw a spinning Generate button on the controls page then an error
+    toast (no countdown) -> the ENQUEUE itself hung/failed (e.g. a synchronous
+    step blew the 60s cap).
+
+ASK FRANK FOR (he has the browser + the deploy; you don't):
+  1. NETWORK TAB: which endpoint, and its timing?
+     - /api/trpc/studio.generate returns ~fast with a jobId -> async engaged,
+       enqueue OK -> look downstream.
+     - /api/trpc/studio.generate hangs ~60s then fails -> enqueue blew the cap
+       (a synchronous step — locate is now bounded by #87, so suspect something
+       else added to the enqueue).
+     - /api/studio/generate-stream is the request -> SSE path (asyncJobs not
+       effective on the client; check studio.config / the flag).
+  2. HISTORY: did a result image ever land (even late)? Late = cron slow/working;
+     never = completion path never ran.
+  3. CRON LOGS: /api/scheduled/poll-predictions returning 200 or 403?
+     - 403 with body "forbidden"  -> Gate 1 (cronSecretOk / secret header).
+     - 403 with body "cron-only"   -> Gate 2 (cron session cookie / isCron).
+     - 200 but job stuck           -> the worker erred; read processAsyncJob +
+                                      ask for the [poll-predictions]/[async]
+                                      server logs.
+  4. studio_jobs row status for the jobId: stuck in sam2_processing (cron not
+     completing) vs failed (worker refunded) vs done-with-no-variation.
+
+THIS SESSION'S CHAIN (worked): processing UI showed -> enqueue OK -> job stuck
+in sam2_processing -> poll-predictions logs were a wall of 403 -> Manus injects
+`Authorization: Bearer <CRON_SECRET>` but our check only read `x-cron-secret`
+-> fix = accept both headers (PR #88). The reaper refunded the stranded job
+throughout, so §1 held.
+
+REFRAME, DON'T DEFEND (CLAUDE.md §2.3): Frank's empirical report is authoritative.
+If he says "it still times out," that's data — re-localize, don't restate theory.
+
+
+--------------------------------------------------------------------------------
+7. WHAT SHIPPED THIS ARC (all merged to main)
+--------------------------------------------------------------------------------
+  #82  schema: studio_jobs async columns + status enum (migrations 0016/0017)
+  #83  Sam2Client split: start/processPrediction (Replicate async predictions API)
+  #84  async worker + webhook handler + cron poll (processAsyncJob)
+  #85  enqueue: studio.generate async branch (deduct per attempt, return jobId)
+  #86  client: useAsyncGenerate polling hook + StudioEditor wiring + studio.config
+  #87  Phase 5: bound locateFabricRegion (downscale + 20s timeout + DEFAULT_REGION)
+  #88  cron auth: cronSecretOk accepts `Authorization: Bearer` (Manus native)
+
+PROVEN in prod today: cron 200 OK, v2 density delivered, no 60s timeout,
+ledger clean. §1 held the entire arc.
+
+
+--------------------------------------------------------------------------------
+8. OPEN ITEMS / FUTURE (not blocking)
+--------------------------------------------------------------------------------
+- REPLICATE WEBHOOK (latency optimization): /api/webhooks/replicate is built and
+  fail-closed (svix HMAC) but UNWIRED. Wiring it gives instant completion instead
+  of poll-interval latency. Needs a PUBLIC BASE URL + REPLICATE_WEBHOOK_SECRET.
+  Blocked on the domain situation below. Cron-poll is fully load-bearing today.
+- DOMAIN/DNS (Frank's, not CC's — no DNS/registrar tools here): Manus
+  disconnected its binding; Vercel currently holds astersports.io DNS. Until a
+  public base URL is settled, the webhook stays unwired.
+- CALIBRATION (when a real-garment eval cycle runs): SAM2 pointsPerSide=16 is
+  tuned for speed; bump toward 32 only if count accuracy needs it. The scale
+  detector is rejection-safe but under-calibrated (false-rejects ~1/3 of genuine
+  repeats) — calibrate before any heavy scale testing.
+- The cron's second gate (isCron/taskUid session cookie) is unchanged and proven
+  via the working reaper; if a NEW scheduled endpoint ever 403s with body
+  "cron-only", that's the gate to look at (not the secret).
+
+
+--------------------------------------------------------------------------------
+9. BUILD / VERIFY / GOTCHAS
+--------------------------------------------------------------------------------
+- Verify locally:  cd /home/user/astersports-web && pnpm run check && pnpm run test
+  (tsc --noEmit + vitest; credential-dependent tests self-skip). CI runs
+  "typecheck + tests" + "money-path integration (real MySQL)" and blocks merge on red.
+- NEVER add an env-coupled assertion to the unit suite (asserting process.env.*) —
+  it red-lines CI for every lane. Assert posture in /api/studio/posture or a boot
+  check instead (CLAUDE.md §5).
+- BASH cwd DRIFTS to /home/user between calls. Prefix commands with
+  `cd /home/user/astersports-web`. The Read/Grep/Glob tools need repo-rooted
+  paths too (default root is /home/user).
+- LOCAL main is diverged/stale in this container (don't trust it). Branch off
+  origin/main: `git fetch origin main && git checkout -b <type>/<desc> origin/main`.
+  Do NOT force-push or reset shared branches (§1 irreversible-op confirm).
+- PR flow: create -> mark ready (not draft) -> arm auto-merge once the FIRST
+  required check registers (arming in the same burst as create races CI and
+  returns "unstable"); or direct-merge on mergeable_state:clean once all checks
+  are success. Verify the merge with a follow-up pull_request_read.
+- This is a docs/handoff artifact: per CLAUDE.md §2.2 it's committed to docs/
+  AND pasted in full in chat for Frank to relay.
+
+================================================================================
+END — ask Frank for the /posture read + any credit_ledger row you need; he is
+the only one with the deploy env + DB. You verify against ground truth, surface
+evidence + a labeled lean, and never flip a flag.
+================================================================================
