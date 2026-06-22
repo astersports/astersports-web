@@ -692,3 +692,8 @@
 - [x] Add super_admin nav link from studio header to /platform
 - [x] Add "Back to Studio" link on Platform Console
 - [x] Make Domain Lock read-only for tenant admins (only platform super_admin can change)
+
+## Housekeeping (Jun 22)
+- [x] Update cronSecret.test.ts to reflect authorized live posture (STUDIO_DENSITY_REDISTRIBUTE=true)
+- [x] Delete stale GitHub branches (jolly-pascal-k9tw4r, print-studio-build-r8k25e, consolidate-followup, compassionate-ramanujan-7qs8px)
+- [x] Verify async generation smoke test readiness on production
