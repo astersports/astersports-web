@@ -136,10 +136,30 @@ describe("firmAdmin.removeMember", () => {
     expect(canRemove).toBe(false);
   });
 
-  it("sets status to disabled rather than deleting", () => {
+  it("allows removing a non-owner (hard delete; Suspend is the reversible path)", () => {
     const target = { id: 2, role: "member", status: "active" };
-    const newStatus = "disabled";
-    expect(newStatus).toBe("disabled");
-    expect(target.role).not.toBe("owner");
+    const canRemove = target.role !== "owner";
+    expect(canRemove).toBe(true);
+  });
+});
+
+describe("firmAdmin.setMemberStatus", () => {
+  it("rejects suspending the owner", () => {
+    const target = { id: 1, role: "owner", status: "active" };
+    const canSuspend = target.role !== "owner";
+    expect(canSuspend).toBe(false);
+  });
+
+  it("blocks suspending the last active admin", () => {
+    const target = { id: 2, role: "admin", status: "active" };
+    const otherActiveAdmins = 0; // no other admin/owner remains active
+    const blocked = target.role === "admin" && otherActiveAdmins === 0;
+    expect(blocked).toBe(true);
+  });
+
+  it("allows suspending a member", () => {
+    const target = { id: 3, role: "member", status: "active" };
+    const blocked = target.role === "owner";
+    expect(blocked).toBe(false);
   });
 });

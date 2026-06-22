@@ -13,9 +13,9 @@ import {
   countActiveMembers,
 } from "../studioDb";
 import { emailAllowedForDomain } from "../../shared/domain";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { getDb } from "../db";
-import { memberships, users } from "../../drizzle/schema";
+import { memberships, users, jobs, creditLedger } from "../../drizzle/schema";
 
 export const tenantsRouter = router({
   /** List all tenants the current user belongs to. */
@@ -41,21 +41,67 @@ export const tenantsRouter = router({
   // (`platform.provisionFirm` / `inviteIndividual`), all of which grant credits
   // through `grantCredits`, which writes the matching append-only ledger row.
 
-  /** List members of a tenant (admin-only). */
+  /**
+   * List members of a tenant (admin-only), enriched for the member-management
+   * UI: user info, joined date, last in-studio activity (last job, falling back
+   * to last sign-in), job count, and per-member spend (7d + all-time). All
+   * batched — 4 queries total regardless of member count, no per-member N+1.
+   */
   members: tenantAdminProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) return [];
     const mems = await listMemberships(ctx.tenant.id);
     if (mems.length === 0) return [];
-    // M4c: enrich with user info via ONE batched lookup (was an N+1 — a separate
-    // user query per member).
+    const tenantId = ctx.tenant.id;
     const userIds = Array.from(new Set(mems.map((m) => m.userId)));
-    const userRows = await db
-      .select({ id: users.id, name: users.name, email: users.email })
-      .from(users)
-      .where(inArray(users.id, userIds));
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const [userRows, jobAgg, spendAgg] = await Promise.all([
+      db
+        .select({ id: users.id, name: users.name, email: users.email, lastSignedIn: users.lastSignedIn })
+        .from(users)
+        .where(inArray(users.id, userIds)),
+      db
+        .select({
+          userId: jobs.userId,
+          jobsCount: sql<number>`COUNT(*)`,
+          lastJobAt: sql<string | null>`MAX(${jobs.createdAt})`,
+        })
+        .from(jobs)
+        .where(and(eq(jobs.tenantId, tenantId), inArray(jobs.userId, userIds)))
+        .groupBy(jobs.userId),
+      db
+        .select({
+          userId: creditLedger.userId,
+          spentAll: sql<number>`ABS(SUM(CASE WHEN ${creditLedger.delta} < 0 THEN ${creditLedger.delta} ELSE 0 END))`,
+          spent7d: sql<number>`ABS(SUM(CASE WHEN ${creditLedger.delta} < 0 AND ${creditLedger.createdAt} >= ${sevenDaysAgo} THEN ${creditLedger.delta} ELSE 0 END))`,
+        })
+        .from(creditLedger)
+        .where(and(eq(creditLedger.tenantId, tenantId), inArray(creditLedger.userId, userIds)))
+        .groupBy(creditLedger.userId),
+    ]);
+
     const userMap = new Map(userRows.map((u) => [u.id, u]));
-    return mems.map((m) => ({ ...m, user: userMap.get(m.userId) ?? null }));
+    const jobMap = new Map(jobAgg.map((j) => [j.userId, j]));
+    const spendMap = new Map(spendAgg.map((s) => [s.userId, s]));
+
+    return mems.map((m) => {
+      const u = userMap.get(m.userId);
+      const j = jobMap.get(m.userId);
+      const s = spendMap.get(m.userId);
+      const lastJobAt = j?.lastJobAt ? new Date(j.lastJobAt) : null;
+      return {
+        ...m,
+        user: u ? { id: u.id, name: u.name, email: u.email } : null,
+        joinedAt: m.createdAt,
+        lastSignedIn: u?.lastSignedIn ?? null,
+        // True in-studio activity (last generate); fall back to last sign-in.
+        lastActiveAt: lastJobAt ?? u?.lastSignedIn ?? null,
+        jobsCount: Number(j?.jobsCount ?? 0),
+        spent7d: Number(s?.spent7d ?? 0),
+        spentAll: Number(s?.spentAll ?? 0),
+      };
+    });
   }),
 
   /** Invite a member by email (admin-only). Validates domain restriction. */
