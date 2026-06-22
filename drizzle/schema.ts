@@ -230,10 +230,20 @@ export const jobs = mysqlTable("studio_jobs", {
   editType: varchar("editType", { length: 16 }),
   /** Natural-language instruction sent to AI. */
   instruction: text("instruction"),
-  status: mysqlEnum("status", ["pending", "processing", "done", "failed"]).default("pending").notNull(),
+  /** Async-generation lifecycle (ASYNC_GENERATION_SPEC §1). The two async-refactor states
+   *  sam2_processing (awaiting the Replicate prediction) and cpu_processing (running the
+   *  deterministic density/scale ops) are APPENDED to the enum — not inserted mid-list — so
+   *  existing rows' ENUM ordinals are untouched by the ALTER. Terminal states stay done|failed
+   *  (a refund is a failed row + a credit_ledger refund row; no separate `refunded` state). */
+  status: mysqlEnum("status", ["pending", "processing", "done", "failed", "sam2_processing", "cpu_processing"]).default("pending").notNull(),
   creditsUsed: int("creditsUsed").default(0),
   /** Error message when job fails (async density/scale/recolor). */
   errorMessage: text("errorMessage"),
+  /** Replicate prediction id (ASYNC_GENERATION_SPEC §1-§2). Set at enqueue via
+   *  predictions.create(); the webhook + cron poller resolve the job by it. */
+  predictionId: varchar("predictionId", { length: 255 }),
+  /** When the async prediction was enqueued — drives the reaper's max-prediction-age sweep. */
+  enqueuedAt: timestamp("enqueuedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (t) => ({
