@@ -155,10 +155,10 @@ export function defaultSam2Client(): Sam2Client {
       const replicate = new Replicate({ auth: token, useFileOutput: false });
       const input = {
         image: imageDataUrl,
-        points_per_side: options?.pointsPerSide ?? 64,
+        points_per_side: options?.pointsPerSide ?? ENV.studioSam2PointsPerSide,
         pred_iou_thresh: options?.predIouThresh ?? 0.82,
         stability_score_thresh: options?.stabilityScoreThresh ?? 0.88,
-        use_m2m: options?.useM2M ?? true,
+        use_m2m: options?.useM2M ?? ENV.studioSam2UseM2m,
       };
       const output = (await runWithTimeout(
         "autoSegment",

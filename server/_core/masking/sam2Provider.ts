@@ -30,6 +30,7 @@ import { decodeUpright } from "../image/decodeUpright";
 import { locateFabricRegion, locateFabricRegionForDensity } from "./locateFabricRegion";
 import { decodeMaskToRaster, instancesFromMasks } from "./sam2Mask";
 import { defaultSam2Client, type Sam2Client } from "./replicateSam2";
+import { ENV } from "../env";
 
 export type { Sam2AuditContext } from "./types";
 
@@ -187,19 +188,32 @@ async function instancesFromSegment(s: CropSegment): Promise<InstanceMask[]> {
   const cropArea = s.cropWidth * s.cropHeight;
   const maxPx = cropArea * MAX_INSTANCE_FRACTION;
 
-  // Filter: exclude instances larger than 20% of the crop (those are ground, not motifs)
-  const filtered = instances.filter((inst) => {
-    if (!inst.raster) return true;
+  // Filter: exclude instances larger than 20% of the crop (those are ground, not
+  // motifs), keeping each survivor's pixel area for the cap below.
+  const kept: Array<{ inst: InstanceMask; px: number }> = [];
+  for (const inst of instances) {
+    if (!inst.raster) { kept.push({ inst, px: 0 }); continue; }
     let px = 0;
     for (let i = 0; i < inst.raster.data.length; i++) {
       if (inst.raster.data[i] > 127) px++;
     }
     if (px > maxPx) {
       console.log(`[sam2] Filtering out giant instance (${px}px > ${Math.round(maxPx)}px max) — likely ground, not motif`);
-      return false;
+      continue;
     }
-    return true;
-  });
+    kept.push({ inst, px });
+  }
+
+  // Memory/latency cap: each instance is remapped to a FULL-image raster below, so
+  // a pathological SAM2 over-segmentation is an OOM vector. Density only needs a
+  // representative set, so keep the K largest motifs (deterministic: area desc,
+  // index tiebreak). No-op when within the cap.
+  kept.sort((a, b) => (b.px - a.px) || (instances.indexOf(a.inst) - instances.indexOf(b.inst)));
+  const capped = kept.length > ENV.studioMaxInstances ? kept.slice(0, ENV.studioMaxInstances) : kept;
+  if (capped.length < kept.length) {
+    console.log(`[sam2] Capped instances ${kept.length} -> ${capped.length} (STUDIO_MAX_INSTANCES) to bound memory`);
+  }
+  const filtered = capped.map((k) => k.inst);
 
   return filtered.map((inst) => ({
     bbox: {
