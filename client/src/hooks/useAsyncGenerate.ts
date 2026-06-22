@@ -24,6 +24,12 @@ export function useAsyncGenerate(opts: {
   // Fire terminal callbacks at most once per job (guards a late extra poll).
   const firedFor = useRef<number | null>(null);
 
+  // Reset the fire-once guard whenever polling is disabled, so a regenerate on the SAME jobId
+  // fires its terminal callback again instead of being suppressed by the prior run.
+  useEffect(() => {
+    if (!enabled) firedFor.current = null;
+  }, [enabled]);
+
   const query = trpc.studio.getJob.useQuery(
     { tenantId: tenantId ?? 0, jobId: jobId ?? 0 },
     {

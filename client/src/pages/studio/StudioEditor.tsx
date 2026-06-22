@@ -269,6 +269,9 @@ export default function StudioEditor() {
           setProcessingStartTime(Date.now());
           setElapsedSeconds(0);
           setStep("processing");
+          // Drop any stale cached getJob (a prior done result for this reused jobId) so the poll
+          // re-fetches fresh and never fires on an old terminal status.
+          utils.studio.getJob.reset({ tenantId: tenant.id, jobId });
           setAsyncPolling(true);
           toast.info("Processing started — this may take up to a minute.");
         } else if (!result.async) {
