@@ -31,6 +31,12 @@ export const ENV = {
     process.env.SUPABASE_STORAGE_BUCKET && process.env.SUPABASE_STORAGE_BUCKET.trim().length > 0
       ? process.env.SUPABASE_STORAGE_BUCKET.trim()
       : "media",
+  /** Google OAuth 2.0 — the identity provider that replaces the Manus WebDev auth
+   *  server. Sessions stay our own JWT (cookieSecret); Google only verifies who the
+   *  user is. Client secret is server-only (token exchange) — never shipped to the
+   *  client. Absent => the Google login route 503s (no silent insecure fallback). */
+  googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
@@ -222,6 +228,8 @@ export function validateEnv(): { errors: string[]; warnings: string[] } {
     ["ANTHROPIC_API_KEY", ENV.anthropicApiKey, "Claude vision LLM (fabric locate / element detect / no-op judge)"],
     ["SUPABASE_URL", ENV.supabaseUrl, "Supabase Storage (image uploads / signed reads)"],
     ["SUPABASE_SERVICE_ROLE_KEY", ENV.supabaseServiceRoleKey, "Supabase Storage (image uploads / signed reads)"],
+    ["GOOGLE_CLIENT_ID", ENV.googleClientId, "Google sign-in"],
+    ["GOOGLE_CLIENT_SECRET", ENV.googleClientSecret, "Google sign-in"],
   ];
   for (const [name, val, feature] of optional) {
     if (!val) warnings.push(`${name} missing — ${feature} disabled`);
