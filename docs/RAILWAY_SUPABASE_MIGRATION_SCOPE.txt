@@ -1,0 +1,204 @@
+RAILWAY + SUPABASE MIGRATION SCOPE — astersports-web
+=====================================================
+Status: SCOPING (not started). Author: Claude Code. Date: 2026-06-23.
+Target: Railway (compute) + Supabase (Postgres DB + Storage), GitHub-native deploys.
+Window: PRE-ONBOARDING (CLAUDE.md §0) — zero live clients, one signed not-yet-live.
+        This is the cheapest possible time to migrate: a downtime cutover is acceptable,
+        the only data to move is Frank's own test data, and no customer is disrupted.
+
+WHY (validated by 2026-06-23): Manus caps the deployed app at 512 MB on every hosting
+mode, which OOM-kills the 40 MP density raster op mid-run; the platform has no
+observability we can reach, env that doesn't reliably propagate, scale-to-zero that
+breaks the crons, and an agent that re-ran stale code on its own. The workload (long-
+running Express + SSE + CPU/RAM-heavy raster ops) wants a persistent server with real
+RAM and Git-native deploys — exactly Railway. Supabase gives a managed Postgres + object
+storage + auth in one place.
+
+
+-----------------------------------------------------------------------------------------
+1. TARGET ARCHITECTURE
+-----------------------------------------------------------------------------------------
+- Compute:   Railway service — persistent Node container (2 vCPU / 4 GB), `node dist/index.js`,
+             binds $PORT, auto-deploy on push to main (GitHub already connected).
+- Database:  Supabase Postgres (drizzle-orm/postgres-js).
+- Storage:   Supabase Storage (signed URLs; replaces Forge `/manus-storage/`).
+- Crons:     Railway Cron services hitting /api/scheduled/* with the CRON_SECRET header.
+- Vision LLM: direct Anthropic API (Claude) — replaces forge.manus.im in server/_core/llm.ts.
+- AI models: Replicate (SAM2 meta/sam-2, LaMa) — UNCHANGED (already direct).
+- Auth:      Supabase Auth OR own-JWT + a direct OAuth provider (DECISION — see §3.B).
+- Secrets:   Railway env vars + Supabase keys (replaces the Manus Secrets panel).
+
+
+-----------------------------------------------------------------------------------------
+2. DEPENDENCY MIGRATION MAP
+-----------------------------------------------------------------------------------------
+Legend: [S]mall / [M]edium / [L]arge — effort & risk.
+
+A. Compute + deploy ............................................................... [S]
+   FROM: Manus Autoscale/Reserved + "Publish".
+   TO:   Railway service. Add a Dockerfile (or Nixpacks) + start command (`pnpm build`
+         then `node dist/index.js`), bind $PORT, set health check. Auto-deploy from main.
+   Note: kills the entire class of today's pain (cold starts, OOM, flag-propagation,
+         publish flakiness). Git push -> Railway builds + deploys. No "publish" relay.
+
+B. Database (MySQL/TiDB -> Supabase Postgres) ..................................... [L]  *** highest risk ***
+   - Driver: server/db.ts `drizzle-orm/mysql2` -> `drizzle-orm/postgres-js`;
+     drizzle.config.ts `dialect:"mysql"` -> `"postgresql"`.
+   - Schema (drizzle/schema.ts): 18 `mysqlTable` -> `pgTable`; 10 enums `mysqlEnum`/.enum
+     -> `pgEnum`; `int().autoincrement()` -> `serial`/`generatedAlwaysAsIdentity`;
+     `timestamp().onUpdateNow()` -> Postgres has no ON UPDATE — replace with an app-level
+     `updatedAt: new Date()` on writes OR a Postgres trigger (IMPORTANT: the reaper's
+     COALESCE(enqueuedAt, createdAt) and the T1.5 stale-cpu detection read updatedAt —
+     keep semantics identical); `json` -> `jsonb`; review varchar lengths/charset.
+   - *** Money-path CAS rewrite (the critical item) ***: deductCredits / grantCredits /
+     claimJobForCpuProcessing / completeJobIfProcessing / failJobIfClaimable /
+     recoverStrandedCpuJobs / reapStuckJobs / inviteLinks atomic-redeem ALL gate on
+     mysql2's `(res as any)[0].affectedRows`. Postgres (postgres-js) does NOT return
+     affectedRows — use `.returning({...})` and check the returned row count, or the
+     driver rowCount. EVERY guard must be re-ported and proven against the money-path
+     integration suite (creditLedger.integration.test.ts) re-pointed at Postgres. Get
+     this wrong and you silently break "never double-charge / never deliver-and-refund /
+     atomic conditional debit" — the §1 ledger invariants. This is the single most
+     dangerous part of the migration; it is Architect-scoped (§2.4).
+   - The Drizzle "eq() on MySQL enum returns 0 rows in serverless" workaround (inArray)
+     was MySQL/TiDB-specific; on Postgres eq() on a pgEnum is fine, but inArray() also
+     works, so the existing code ports as-is (no behavior change needed).
+   - Migrations: regenerate the whole chain for Postgres (`drizzle-kit generate`), OR
+     baseline a fresh Postgres schema. The 20 existing MySQL .sql files do not apply to
+     Postgres.
+   - CI: the `db-integration` job (mysql:8 service) -> a Postgres service; same tests.
+
+C. Storage (Forge `/manus-storage/` -> Supabase Storage) .......................... [M]
+   - Rewrite server/storage.ts (storagePut / storageGet / storageGetSignedUrl) onto the
+     Supabase Storage SDK (upload + createSignedUrl). Keep the `deterministicKey` option
+     (the LaMa reproducible-cache layer depends on a stable write address).
+   - ~15 call sites resolve `/manus-storage/{key}` via storageGetSignedUrl (aiEngine,
+     studio router, studioStream, studioEngine, studioAsyncWorker, dpiGuard). They funnel
+     through the storage helpers, so the core change is storage.ts + the URL convention
+     (`/manus-storage/` prefix -> a Supabase storage path or signed URL). Update the
+     prefix checks/serving route (server/_core/storageProxy.ts) accordingly.
+
+D. Auth / sessions (Manus OAuth WebDev SDK -> ?) .................................. [L]  *** Architect-scoped ***
+   - server/_core/sdk.ts is the entire login/session/identity layer: Manus OAuth code
+     exchange -> getUserInfo -> `openId`; sessions are jose JWTs {openId, appId, name} in
+     a cookie; authenticateRequest is used in tRPC context + all 6 cron routes + the SSE
+     route; cron callers are detected by the Manus-injected session (isCron/taskUid).
+   - DECISION required (§3.B): (a) Supabase Auth (OAuth providers + JWT verification) —
+     cleanest long-term but remaps the `users.openId` identity (and every FK keyed on it)
+     to Supabase user IDs; (b) keep the own-JWT session layer and swap ONLY the OAuth
+     provider (e.g. Google/Auth0) — smaller, preserves the openId model. Either re-works
+     the cron-auth path (Railway cron sends CRON_SECRET; drop the Manus session check —
+     cronAuth.ts already accepts x-cron-secret, so simplify to that). Auth + tenant
+     isolation is Architect-scoped; design before code.
+
+E. Crons (Manus Heartbeat -> Railway Cron) ........................................ [M]
+   - Endpoints (/api/scheduled/poll-predictions, reap-stuck-jobs, trial-*, log-cleanup,
+     game-check) STAY. Replace the scheduler: Railway Cron services that POST each path on
+     its schedule with `x-cron-secret: $CRON_SECRET`. Remove the Manus Heartbeat SDK
+     (server/_core/heartbeat.ts) and the manus-heartbeat registration. Simplify cron auth
+     to the shared secret (the isCron/taskUid Manus-session check goes away).
+   - On a persistent Railway instance the poll-predictions cold-start 502s and the
+     scale-to-zero strands DISAPPEAR; the T1.5 retry + reaper remain as backstops.
+
+F. Vision LLM (forge.manus.im -> Anthropic) ....................................... [M]
+   - server/_core/llm.ts points at forge.manus.im chat/completions + models; used by the
+     fabric-region locate (vision). Rewire to the direct Anthropic API (Claude vision).
+     Verify all call sites (locateFabricRegion / locateFabricRegionForDensity).
+
+G. Forge Data API (callDataApi) ................................................... [NONE]
+   - GREP CONFIRMS no app callers. Dead code (like the retired Manus Agent API). Delete
+     server/_core/dataApi.ts during the migration. (Verify the AAU scraper, server/
+     scraper.ts, fetches directly — it does not import callDataApi.)
+
+H. AI models (Replicate SAM2 + LaMa) .............................................. [NONE]
+   - Direct Replicate API already. Just carry REPLICATE_API_TOKEN / REPLICATE_SAM2_MODEL
+     into Railway env. Unchanged.
+
+I. Env / secrets .................................................................. [S]
+   - Recreate the env in Railway: JWT_SECRET, DATABASE_URL (Supabase), the Supabase
+     storage keys, REPLICATE_*, STRIPE_*, RESEND_API_KEY, CRON_SECRET, ANTHROPIC_API_KEY
+     (new, for the LLM), the STUDIO_* flags + STUDIO_WORKING_MEGAPIXELS (raise to ~8–10
+     now that you have 4 GB), STUDIO_MASK_PROVIDER=sam2. Drop the Manus/Forge/OAuth vars.
+
+
+-----------------------------------------------------------------------------------------
+3. HIGH-RISK ITEMS (need care + Architect review)
+-----------------------------------------------------------------------------------------
+A. Money-path CAS under Postgres (§2.B). The atomic guards are the spine of the credit
+   ledger + job lifecycle. Port each to `.returning()`/rowCount, and prove with the
+   money-path integration suite on a real Postgres before trusting it. Acceptance: the
+   existing invariants hold — atomic conditional debit never oversells; (refId,reason)
+   idempotency; no deliver-AND-refund; reaper/poison-pill bound + refund exactly once.
+
+B. Auth identity model (§2.D). Decide Supabase Auth vs own-JWT-+-OAuth-provider BEFORE
+   writing code. The `openId` PK/FK web touches users, memberships, tenants, ledger,
+   jobs, impersonation. A wrong remap breaks tenant isolation (Architect-scoped, §2.4 /
+   §6 multi-tenant isolation).
+
+C. Data migration (§5). The ledger must reconcile after the move
+   (SUM(credit_ledger.delta) == tenants.creditBalance per tenant, §6).
+
+
+-----------------------------------------------------------------------------------------
+4. PHASED PLAN (each phase = its own reviewed PR; money/auth/schema HOLD for Architect)
+-----------------------------------------------------------------------------------------
+P0. Railway build/deploy skeleton: Dockerfile/Nixpacks + start cmd + health check; deploy
+    the CURRENT app to Railway pointing still at a throwaway DB to prove it boots. [S]
+P1. Postgres schema port + driver swap + drizzle config; regenerate migrations; stand up
+    the schema on Supabase. [L]
+P2. Money-path CAS re-port to Postgres + re-point creditLedger.integration.test.ts at
+    Postgres; CI db-integration -> Postgres service; prove green. [L]  *** gate ***
+P3. Storage -> Supabase Storage (storage.ts + storageProxy + URL convention). [M]
+P4. Vision LLM -> Anthropic (llm.ts). [M]
+P5. Auth -> chosen provider; cron auth simplified to CRON_SECRET. [L]  *** Architect ***
+P6. Crons -> Railway Cron; remove heartbeat.ts. [M]
+P7. Env wired in Railway; raise STUDIO_WORKING_MEGAPIXELS to ~8–10 (full-res density on
+    4 GB); drop dataApi.ts. [S]
+P8. Data migration (test data) + ledger reconciliation check. [M]
+P9. Cutover: point astersports.io DNS at Railway; decommission Manus. [S]
+
+Suggested order of value: P0 -> P1 -> P2 (the foundation + the risky money path first,
+proven green), then storage/LLM/auth/crons, then cutover.
+
+
+-----------------------------------------------------------------------------------------
+5. DATA MIGRATION
+-----------------------------------------------------------------------------------------
+- Pre-onboarding: the only data is Frank's test tenants/jobs/ledger. Options: (a) start
+  FRESH on Supabase (simplest — no migration, just re-seed; acceptable since there are no
+  customers), or (b) export the Manus MySQL data and transform MySQL->Postgres types
+  (enums, json->jsonb, timestamps) on import.
+- RECOMMENDATION: start fresh on Supabase (re-seed the category/tenant), skip the data
+  export entirely. Validate ledger reconciliation on the fresh DB.
+
+
+-----------------------------------------------------------------------------------------
+6. CUTOVER
+-----------------------------------------------------------------------------------------
+- Pre-onboarding => a simple downtime cutover, no parallel run needed.
+- Deploy fully on Railway+Supabase, smoke-test (login, a density gen end-to-end at full
+  resolution, billing dry-run, /api/studio/posture), then switch astersports.io DNS from
+  Manus to Railway. Keep Manus up briefly as rollback, then decommission.
+
+
+-----------------------------------------------------------------------------------------
+7. WHAT STAYS THE SAME (no migration work)
+-----------------------------------------------------------------------------------------
+- The async generation architecture (enqueue -> SAM2 on Replicate -> poll/worker -> done),
+  the reaper, the poison-pill, the T1.5 stranded-cpu retry, the worker deadline.
+- All deterministic ops (density v1/v2, scale, recolor, blue-noise layout, LaMa cache).
+- Replicate SAM2 + LaMa. The credit/ledger LOGIC (only its DB-driver result-shape changes).
+- The Stripe money path semantics, the eval benches, the resolution-cap knob (just raise it).
+
+
+-----------------------------------------------------------------------------------------
+8. EFFORT / SEQUENCING NOTE
+-----------------------------------------------------------------------------------------
+The bulk is two Large items: the Postgres port incl. the money-path CAS rewrite (P1+P2),
+and Auth (P5). Storage/LLM/crons are Medium; compute/env/cutover are Small. This is a
+multi-day migration done carefully, not a weekend toggle — but the pre-onboarding window
+makes it low-stakes (no live customer, fresh data, downtime cutover OK), and it ends the
+entire class of Manus problems while giving full-resolution density on real RAM.
+
+CC builds it phase-by-phase as reviewed PRs; the schema, money-path CAS, and auth phases
+are Architect-scoped (§2.4) and hold for review before merge.
