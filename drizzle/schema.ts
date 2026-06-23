@@ -223,6 +223,12 @@ export interface PredictionMeta {
   height: number;
   cropWidth: number;
   cropHeight: number;
+  /** The per-attempt deduct refId (`job-<id>-a<N>`) recorded at enqueue so the async
+   *  worker refunds the EXACT attempt that was charged (`<deductRef>-failed`), rather
+   *  than a fixed `job-<id>-failed` that collides across regenerate attempts and leaves
+   *  the 2nd+ attempt un-refunded. Optional: jobs enqueued before this field fall back
+   *  to the legacy `job-<id>-failed` key in the worker. */
+  deductRef?: string;
 }
 
 export const jobs = mysqlTable("studio_jobs", {

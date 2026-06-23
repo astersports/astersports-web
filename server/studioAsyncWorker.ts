@@ -29,9 +29,16 @@ export async function processAsyncJob(jobId: number, client: Sam2Client = defaul
   if (!job.predictionId || !job.predictionMeta) return { status: "skipped", reason: "no predictionId/meta" };
 
   const cost = job.creditsUsed ?? 0;
-  // Per-job fixed refId (one prediction per job in the async model). Idempotent on (refId,reason)
-  // and matched by the reaper's `job-<id>-%` guard, so no double refund across webhook/cron/reaper.
-  const refundRefId = `job-${job.id}-failed`;
+  // Refund the EXACT attempt that was debited: the enqueue mutation records the
+  // per-attempt deduct refId (`job-<id>-a<N>`) on predictionMeta, so we refund
+  // `<deductRef>-failed`. A fixed `job-<id>-failed` collided across regenerate
+  // attempts (attempt 2's refund no-ops against attempt 1's key, leaving attempt 2
+  // un-refunded). Fallback to the legacy key for jobs enqueued before this field.
+  // Either form still starts with `job-<id>-` so the reaper's `job-<id>-%` guard
+  // prevents a double refund across webhook/cron/reaper; idempotent on (refId,reason).
+  const refundRefId = job.predictionMeta?.deductRef
+    ? `${job.predictionMeta.deductRef}-failed`
+    : `job-${job.id}-failed`;
   const failAndRefund = async (reason: string): Promise<AsyncJobOutcome> => {
     try {
       if (cost > 0) await grantCredits(job.tenantId, cost, "refund", refundRefId, job.userId);
@@ -39,6 +46,13 @@ export async function processAsyncJob(jobId: number, client: Sam2Client = defaul
       log.error("studio", "async-worker: refund failed", { jobId: job.id, tenantId: job.tenantId, metadata: { cost, error: (e as any)?.message || String(e) } });
     }
     await updateJobStatus(job.id, "failed", { errorMessage: reason }).catch(() => {});
+    // Telemetry: async failures previously only console.warn'd, so refund/no-op rate
+    // was invisible to server_logs / notifyOwner. Surface every fail+refund explicitly.
+    log.warn("studio", "async-worker: job failed + refunded", {
+      jobId: job.id,
+      tenantId: job.tenantId,
+      metadata: { reason, cost, refundRefId },
+    });
     return { status: "failed", reason };
   };
 
