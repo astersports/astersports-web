@@ -751,13 +751,13 @@
 
 ### Phase 0 — Observability & Eval Gate
 - [x] T0.1: Per-guard refund-reason telemetry (reason enum on every failAndRefund call site) 🟢 AUTO
-- [ ] T0.2: Eval bench as CI gate (fixture set, metrics, pnpm eval, CI red on regression) 🟡 BENCH
+- [x] T0.2: Eval bench as CI gate (fixture set, metrics, pnpm eval, CI red on regression) 🟡 BENCH
 
 ### Tier 1 — Reliability & Money-Path (all 🔴 HUMAN — stop for sign-off)
-- [ ] T1.1: boundaryRaster dimensions guard (assert width/height match, degrade+refund on mismatch)
-- [ ] T1.2: Reaper sweeps on enqueuedAt (change predicate from updatedAt to enqueuedAt)
-- [ ] T1.3: Poison-pill max-attempt cap (schema add poll_attempts, fail at >=5)
-- [ ] T1.4: Worker deadline cancel-safe (AbortController + Promise.race, below P2 cap)
+- [x] T1.1: boundaryRaster dimensions guard (assert width/height match, degrade+refund on mismatch)
+- [x] T1.2: Reaper sweeps on enqueuedAt (change predicate from updatedAt to enqueuedAt)
+- [x] T1.3: Poison-pill max-attempt cap (schema add poll_attempts, fail at >=5)
+- [x] T1.4: Worker deadline cancel-safe (AbortController + Promise.race, below P2 cap)
 
 ### Tier 2 — AI & Quality (all 🟡 BENCH — stop for sign-off with bench evidence)
 - [ ] T2.1: LaMa texture-aware infill with reproducible-by-cache layer
@@ -765,9 +765,9 @@
 - [ ] T2.3: Blue-noise layout → Bridson/Yuksel Poisson-disk
 
 ### Tier 3 — Infrastructure Performance (🟢 AUTO)
-- [ ] T3.1: Segmentation cache per (image, bbox)
-- [ ] T3.2: Lazy crop-sized instance rasters
-- [ ] T3.3: SAM warm-pool / cold-boot + sharp config
+- [x] T3.1: Segmentation cache per (image, bbox)
+- [ ] T3.2: Lazy crop-sized instance rasters — DEFERRED (see docs/T3.2-lazy-crop-rasters-analysis.md)
+- [x] T3.3: SAM warm-pool / cold-boot + sharp config (concurrency=1, bounded cache)
 
 ## Users Table Schema Migration (Jun 23)
 - [x] Add passwordHash, subscriptionType, organizationId, isActive, emailVerified columns to Drizzle schema

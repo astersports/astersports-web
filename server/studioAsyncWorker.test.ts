@@ -18,6 +18,7 @@ vi.mock("./studioDb", () => ({
   addVariation: vi.fn(),
   grantCredits: vi.fn(),
   claimJobForCpuProcessing: vi.fn(),
+  incrementPollAttempts: vi.fn(),
 }));
 vi.mock("./serverLog", () => ({ log: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 
@@ -25,7 +26,7 @@ import { processAsyncJob } from "./studioAsyncWorker";
 import { finishSam2Segmentation } from "./_core/masking/sam2Provider";
 import { runDensityOnSegmentation, runScaleOnSegmentation } from "./aiEngine";
 import { storagePut } from "./storage";
-import { getJob, updateJobStatus, addVariation, grantCredits, claimJobForCpuProcessing } from "./studioDb";
+import { getJob, updateJobStatus, addVariation, grantCredits, claimJobForCpuProcessing, incrementPollAttempts } from "./studioDb";
 
 const m = (fn: unknown) => fn as ReturnType<typeof vi.fn>;
 
@@ -42,6 +43,7 @@ const SEG = { status: "succeeded", segmentation: { combined: Buffer.alloc(0), in
 
 beforeEach(() => {
   vi.clearAllMocks();
+  m(incrementPollAttempts).mockResolvedValue(1); // default: first attempt, well under cap
   m(claimJobForCpuProcessing).mockResolvedValue(true);
   m(finishSam2Segmentation).mockResolvedValue({ fabric: { raster: {} }, instances: [{}] });
   m(storagePut).mockResolvedValue({ key: "k", url: "https://cdn/result.png" });
@@ -135,5 +137,55 @@ describe("processAsyncJob (§6 failure/refund matrix)", () => {
     m(getJob).mockResolvedValue(undefined);
     const r = await processAsyncJob(99, client(SEG));
     expect(r.status).toBe("skipped");
+  });
+
+  // T1.3: Poison-pill max-attempt cap
+  it("T1.3: poison-pill terminates at attempt 5 with refund", async () => {
+    m(getJob).mockResolvedValue(densityJob);
+    m(incrementPollAttempts).mockResolvedValue(5); // at the cap
+    const r = await processAsyncJob(7, client(SEG));
+    expect(r.status).toBe("failed");
+    expect(r.reason).toContain("poison-pill");
+    expect(grantCredits).toHaveBeenCalledWith(3, 10, "refund", "job-7-failed", 9);
+    expect(updateJobStatus).toHaveBeenCalledWith(7, "failed", expect.objectContaining({ errorMessage: expect.stringContaining("Poison-pill") }));
+    // The prediction was never polled (no processPrediction call)
+    expect(claimJobForCpuProcessing).not.toHaveBeenCalled();
+  });
+
+  it("T1.3: attempt 4 (below cap) proceeds normally", async () => {
+    m(getJob).mockResolvedValue(densityJob);
+    m(incrementPollAttempts).mockResolvedValue(4); // below cap
+    m(runDensityOnSegmentation).mockResolvedValue({ png: Buffer.from([1]), removed: 4 });
+    const r = await processAsyncJob(7, client(SEG));
+    expect(r.status).toBe("done");
+  });
+
+  // T1.4: Worker deadline cancel-safe
+  it("T1.4: deadline exceeded -> refund + failed with deadline reason", async () => {
+    m(getJob).mockResolvedValue(densityJob);
+    // Simulate a prediction that hangs forever (never resolves)
+    const hangingClient = {
+      processPrediction: vi.fn(() => new Promise(() => {})), // never resolves
+    } as any;
+    // Use fake timers to trigger the 150s deadline instantly
+    vi.useFakeTimers();
+    const promise = processAsyncJob(7, hangingClient);
+    // Advance past the 150s deadline
+    await vi.advanceTimersByTimeAsync(151_000);
+    const r = await promise;
+    vi.useRealTimers();
+    expect(r.status).toBe("failed");
+    expect(r.reason).toContain("deadline");
+    expect(grantCredits).toHaveBeenCalledWith(3, 10, "refund", "job-7-failed", 9);
+    expect(updateJobStatus).toHaveBeenCalledWith(7, "failed", expect.objectContaining({ errorMessage: expect.stringContaining("deadline") }));
+  });
+
+  it("T1.4: fast job completes well before deadline", async () => {
+    m(getJob).mockResolvedValue(densityJob);
+    m(runDensityOnSegmentation).mockResolvedValue({ png: Buffer.from([1]), removed: 4 });
+    const r = await processAsyncJob(7, client(SEG));
+    expect(r.status).toBe("done");
+    // No deadline refund
+    expect(grantCredits).not.toHaveBeenCalled();
   });
 });

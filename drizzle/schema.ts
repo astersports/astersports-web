@@ -276,6 +276,9 @@ export const jobs = mysqlTable("studio_jobs", {
    *  finishSam2Segmentation in the worker so it never re-runs the vision-LLM locate. JSON for
    *  forward flexibility (e.g. future upscale context). */
   predictionMeta: json("predictionMeta").$type<PredictionMeta>(),
+  /** T1.3: Poison-pill cap — incremented each time the cron poller picks up this job.
+   *  At >= MAX_POLL_ATTEMPTS the worker terminates with failAndRefund(poison_pill). */
+  pollAttempts: int("pollAttempts").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (t) => ({

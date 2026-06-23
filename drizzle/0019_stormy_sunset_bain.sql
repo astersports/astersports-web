@@ -1,0 +1,1 @@
+ALTER TABLE `studio_jobs` ADD `pollAttempts` int DEFAULT 0 NOT NULL;

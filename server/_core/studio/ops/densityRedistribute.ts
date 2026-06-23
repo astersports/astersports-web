@@ -211,6 +211,13 @@ export async function densityRedistribute(input: RedistributeInput): Promise<Red
     console.warn("[density-redistribute] boundaryRaster absent; degrade -> refund (no full-crop boundary fallback).");
     return empty();
   }
+  // T1.1 (GAP-1): boundary dimension guard. A mis-sized boundaryRaster silently corrupts
+  // the composite (motifs placed/clipped against wrong coordinates). This is the ONE
+  // reachable path to a corrupted PAID image that still bills. Degrade -> refund.
+  if (boundary.width !== width || boundary.height !== height) {
+    console.warn(`[density-redistribute] boundaryRaster dimension mismatch: boundary ${boundary.width}x${boundary.height} vs image ${width}x${height}; degrade -> refund.`);
+    return empty();
+  }
   let boundaryArea = 0;
   for (let i = 0; i < boundary.data.length; i++) if (boundary.data[i] > 127) boundaryArea++;
   if (boundaryArea === 0) {

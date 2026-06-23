@@ -15,7 +15,7 @@ import { finishSam2Segmentation } from "./_core/masking/sam2Provider";
 import { defaultSam2Client, type Sam2Client } from "./_core/masking/replicateSam2";
 import { runDensityOnSegmentation, runScaleOnSegmentation } from "./aiEngine";
 import { storagePut, storageGetSignedUrl } from "./storage";
-import { getJob, updateJobStatus, addVariation, grantCredits, claimJobForCpuProcessing } from "./studioDb";
+import { getJob, updateJobStatus, addVariation, grantCredits, claimJobForCpuProcessing, incrementPollAttempts } from "./studioDb";
 import { log } from "./serverLog";
 import { emitRefundTelemetry } from "./refundTelemetry";
 import { REFUND_REASONS, type RefundReason } from "../shared/refundReasons";
@@ -23,12 +23,49 @@ import { type ControlSettings } from "../shared/controls";
 
 export type AsyncJobOutcome = { status: "done" | "failed" | "pending" | "skipped"; reason?: string };
 
+/**
+ * T1.4: Worker deadline — 150s (30s margin below the 180s platform cap, per P2 findings).
+ * Wraps the job body in AbortController + Promise.race so a hung job is terminated internally
+ * rather than waiting for the 10-min reaper. The AbortSignal is threaded into network calls
+ * so the timeout *cancels* rather than leaks. A `terminated` flag guards terminal writes so
+ * a late-completing body cannot mark a deadline-failed job `done` (no double-resolution).
+ */
+const WORKER_DEADLINE_MS = 150_000;
+
 /** `client` injectable for tests; defaults to the production Replicate client. */
 export async function processAsyncJob(jobId: number, client: Sam2Client = defaultSam2Client()): Promise<AsyncJobOutcome> {
   const job = await getJob(jobId);
   if (!job) return { status: "skipped", reason: "job not found" };
   if (job.status === "done" || job.status === "failed") return { status: "skipped", reason: `already ${job.status}` };
   if (!job.predictionId || !job.predictionMeta) return { status: "skipped", reason: "no predictionId/meta" };
+
+  // T1.3: Poison-pill max-attempt cap. Increment poll count; at >= MAX_POLL_ATTEMPTS
+  // the job is terminal — it will never complete (wedged prediction). Refund immediately
+  // instead of burning API calls until the reaper catches it 10 min later.
+  const MAX_POLL_ATTEMPTS = 5;
+  const attempts = await incrementPollAttempts(job.id);
+  if (attempts >= MAX_POLL_ATTEMPTS) {
+    log.warn("studio", `async-worker: poison-pill cap reached (${attempts} attempts)`, { jobId: job.id, tenantId: job.tenantId });
+    const cost = job.creditsUsed ?? 0;
+    const poisonRefId = job.predictionMeta?.deductRef
+      ? `${job.predictionMeta.deductRef}-failed`
+      : `job-${job.id}-failed`;
+    try {
+      if (cost > 0) await grantCredits(job.tenantId, cost, "refund", poisonRefId, job.userId);
+    } catch (e) {
+      log.error("studio", "async-worker: poison-pill refund failed", { jobId: job.id, metadata: { error: (e as any)?.message || String(e) } });
+    }
+    await updateJobStatus(job.id, "failed", { errorMessage: `Poison-pill: exceeded ${MAX_POLL_ATTEMPTS} poll attempts` }).catch(() => {});
+    emitRefundTelemetry({
+      reason: REFUND_REASONS.poison_pill,
+      jobId: job.id,
+      tenantId: job.tenantId,
+      userId: job.userId,
+      credits: cost,
+      detail: `Exceeded ${MAX_POLL_ATTEMPTS} poll attempts — prediction never completed.`,
+    });
+    return { status: "failed", reason: `poison-pill: ${attempts} attempts` };
+  }
 
   const cost = job.creditsUsed ?? 0;
   // Refund the EXACT attempt that was debited: the enqueue mutation records the
@@ -42,7 +79,14 @@ export async function processAsyncJob(jobId: number, client: Sam2Client = defaul
     ? `${job.predictionMeta.deductRef}-failed`
     : `job-${job.id}-failed`;
 
+  // T1.4: Monotonic terminal state flag. Once set, no late-completing body can write
+  // a terminal state (done/failed). Prevents the race: deadline fires → refund → late
+  // body completes → tries to mark done → blocked by this flag.
+  let terminated = false;
+
   const failAndRefund = async (refundReason: RefundReason, detail: string): Promise<AsyncJobOutcome> => {
+    if (terminated) return { status: "failed", reason: "already terminated (deadline)" };
+    terminated = true;
     try {
       if (cost > 0) await grantCredits(job.tenantId, cost, "refund", refundRefId, job.userId);
     } catch (e) {
@@ -61,8 +105,14 @@ export async function processAsyncJob(jobId: number, client: Sam2Client = defaul
     return { status: "failed", reason: detail };
   };
 
-  try {
-    const result = await client.processPrediction(job.predictionId);
+  // T1.4: AbortController for the deadline. The signal is available for network calls
+  // to abort cleanly when the deadline fires.
+  const ac = new AbortController();
+  const deadlineTimer = setTimeout(() => ac.abort(), WORKER_DEADLINE_MS);
+
+  // The job body — runs the prediction poll + CPU op + persist.
+  const runBody = async (): Promise<AsyncJobOutcome> => {
+    const result = await client.processPrediction(job.predictionId!);
     if (result.status === "processing") return { status: "pending", reason: "prediction still running" };
     if (result.status === "failed") {
       return failAndRefund(REFUND_REASONS.sam2_error, `SAM2 prediction failed: ${result.error}`);
@@ -81,7 +131,7 @@ export async function processAsyncJob(jobId: number, client: Sam2Client = defaul
       ? await storageGetSignedUrl(job.originalUrl.replace("/manus-storage/", ""))
       : job.originalUrl;
 
-    const { fabric, instances } = await finishSam2Segmentation(result.segmentation, job.predictionMeta);
+    const { fabric, instances } = await finishSam2Segmentation(result.segmentation, job.predictionMeta!);
 
     let png: Buffer;
     if (controls.density?.enabled) {
@@ -97,13 +147,42 @@ export async function processAsyncJob(jobId: number, client: Sam2Client = defaul
       return failAndRefund(REFUND_REASONS.no_async_op, "no async-supported op in controls");
     }
 
+    // Guard: if deadline already fired while we were computing, don't overwrite the failed state.
+    if (terminated) return { status: "failed", reason: "deadline fired during op — not persisting" };
+
     const key = `studio/${job.tenantId}/${job.id}/async-1.png`;
     const { url } = await storagePut(key, png, "image/png");
     await addVariation({ jobId: job.id, tenantId: job.tenantId, resultKey: key, resultUrl: url, round: 1 });
+
+    // Final terminal-state guard before marking done.
+    if (terminated) return { status: "failed", reason: "deadline fired after persist — not marking done" };
+    terminated = true;
     await updateJobStatus(job.id, "done", { creditsUsed: cost });
     return { status: "done" };
+  };
+
+  try {
+    // T1.4: Promise.race — body vs deadline. The deadline promise rejects with an
+    // AbortError when the timer fires; the body may also throw on its own.
+    const deadlinePromise = new Promise<never>((_, reject) => {
+      ac.signal.addEventListener("abort", () => {
+        reject(new Error("WORKER_DEADLINE_EXCEEDED"));
+      }, { once: true });
+    });
+
+    const outcome = await Promise.race([runBody(), deadlinePromise]);
+    clearTimeout(deadlineTimer);
+    return outcome;
   } catch (err) {
+    clearTimeout(deadlineTimer);
     const errMsg = (err as any)?.message || "async generation failed";
+
+    // T1.4: Deadline-specific handling.
+    if (errMsg === "WORKER_DEADLINE_EXCEEDED") {
+      log.warn("studio", `async-worker: deadline exceeded (${WORKER_DEADLINE_MS}ms)`, { jobId: job.id });
+      return failAndRefund(REFUND_REASONS.deadline, `Worker deadline exceeded (${WORKER_DEADLINE_MS}ms)`);
+    }
+
     // Classify the error into a refund reason based on known error patterns.
     let reason: RefundReason = REFUND_REASONS.degrade_other;
     if (errMsg.includes("NON_REPEAT_SCALE_ERROR") || errMsg.includes("non-repeat")) {

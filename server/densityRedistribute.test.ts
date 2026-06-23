@@ -118,4 +118,29 @@ describe("densityRedistribute (Option B)", () => {
     expect(res.removed).toBe(0);
     expect(Buffer.compare(res.data, scene())).toBe(0);
   });
+
+  // T1.1 (GAP-1): boundaryRaster dimension mismatch -> degrade refund.
+  // This closes the one reachable path to a silently corrupted PAID image that still bills.
+  it("T1.1: boundaryRaster dimension mismatch -> degrade refund, byte-identical (not composite)", async () => {
+    // Boundary is 64x64 but image is 128x128 — a mis-sized remap from the SAM provider.
+    const misSized: FabricMask = {
+      bbox: { x: 0, y: 0, w: 1, h: 1 },
+      confidence: 1,
+      provider: "sam2",
+      raster: fullRaster(),
+      boundaryRaster: { width: 64, height: 64, data: new Uint8Array(64 * 64).fill(255) },
+    };
+    const res = await densityRedistribute({ image: { url: "x" }, fabric: misSized, instances: instances(), percent: 30 });
+    // Must NOT composite — removed === 0 means the caller refunds.
+    expect(res.removed).toBe(0);
+    expect(res.kept).toBe(36); // passthrough keeps all N
+    expect(Buffer.compare(res.data, scene())).toBe(0);
+  });
+
+  it("T1.1: boundaryRaster with correct dims proceeds normally (not a false positive)", async () => {
+    // Correct dims — should actually redistribute.
+    const res = await densityRedistribute({ image: { url: "x" }, fabric, instances: instances(), percent: 30 });
+    expect(res.removed).toBe(11);
+    expect(res.kept).toBe(25);
+  });
 });

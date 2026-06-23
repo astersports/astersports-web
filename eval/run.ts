@@ -5,6 +5,13 @@
  * synthetic fixture manifests. Exits non-zero if ANY verdict fails — this is
  * the CI gate.
  *
+ * Special handling:
+ *  - Cases with id containing "MUST-FAIL" are NEGATIVE TESTS: they MUST fail
+ *    the verdict. If they pass, that's a regression (the gate isn't catching
+ *    the defect). The runner inverts the pass/fail logic for these cases.
+ *  - The density bench enforces a two-sided NNI band [1.0, 1.9] to reject both
+ *    clustered (R<1) and over-regularized (R>1.9) survivor layouts.
+ *
  * Usage:
  *   pnpm eval              (runs all three)
  *   pnpm eval:density      (density only)
@@ -16,11 +23,19 @@
  *   - scale manifest uses rasterUrl/targetFraction → harness expects maskUrl/percent
  *   - redistribute manifest already matches
  */
-import { readFile } from "node:fs/promises";
+import { readFile, access } from "node:fs/promises";
 import path from "node:path";
 import { runDensityCase, type DensityEvalCase } from "../server/_core/studio/eval/densityEval";
 import { runScaleCase, type ScaleEvalCase } from "../server/_core/studio/eval/scaleEval";
 import { runRedistributeCase, type RedistributeEvalCase } from "../server/_core/studio/eval/redistributeEval";
+import { densityVerdict } from "../server/_core/studio/eval/densityMetrics";
+import { ensureRedistributeFixture } from "../server/_core/studio/eval/genRedistributeFixture";
+import { EVAL_OUT_DIR } from "../server/_core/studio/eval/evalMaskIO";
+
+// ─── NNI Band Gate (T0.2 requirement) ─────────────────────────────────────
+// The two-sided NNI band rejects both clustered AND over-regularized layouts.
+// Default: R ∈ [1.0, 1.9]. A perfect hex lattice → R ≈ 2.15, which must FAIL.
+const NNI_BAND = { nniMin: 1.0, nniMax: 1.9 };
 
 // ─── Manifest adapters ──────────────────────────────────────────────────────
 
@@ -70,6 +85,11 @@ function adaptScaleManifest(raw: RawScaleManifestCase[]): ScaleEvalCase[] {
   }));
 }
 
+/** Returns true if a case id indicates it's a negative test (must fail). */
+function isNegativeTest(id: string): boolean {
+  return id.includes("MUST-FAIL") || id.includes("MUST_FAIL");
+}
+
 // ─── Harness runners ────────────────────────────────────────────────────────
 
 async function runDensityBench(): Promise<boolean> {
@@ -82,31 +102,44 @@ async function runDensityBench(): Promise<boolean> {
   console.log("\n╔══════════════════════════════════════════╗");
   console.log("║         DENSITY EVAL BENCH               ║");
   console.log("╚══════════════════════════════════════════╝");
-  console.log("id | inst | removed | countErr | survΔE | evenness | infill | verdict | det");
-  console.log("─".repeat(90));
+  console.log("id | inst | removed | countErr | survΔE | NNI | infill | verdict | det");
+  console.log("─".repeat(95));
 
   for (const c of cases) {
     const r = await runDensityCase(c);
     if (r.error) {
       console.log(`${r.id} | ERROR: ${r.error}`);
-      allPass = false;
+      // Errors on negative tests are acceptable (the op might reject the input)
+      if (!isNegativeTest(c.id)) allPass = false;
       continue;
     }
-    const m = r.metrics!, v = r.verdict!;
-    if (!v.pass) allPass = false;
+    const m = r.metrics!;
+    // Re-compute verdict with the NNI band gate enforced
+    const v = densityVerdict(m, NNI_BAND);
+    const negative = isNegativeTest(c.id);
+
+    // For negative tests: pass means the gate CORRECTLY rejected it
+    const caseOk = negative ? !v.pass : v.pass;
+    if (!caseOk) allPass = false;
+
+    const label = negative
+      ? (v.pass ? "✗ SHOULD-FAIL" : "✓ CAUGHT")
+      : (v.pass ? "✓ PASS" : "✗ FAIL");
+
     console.log([
-      r.id.padEnd(22),
+      r.id.padEnd(35),
       String(r.instances).padStart(4),
       String(r.removed).padStart(7),
       m.countError.toFixed(3).padStart(9),
       m.survivorIntegrity.toFixed(2).padStart(6),
-      m.evenness.toFixed(2).padStart(9),
+      m.nniDispersion.toFixed(2).padStart(5),
       m.infillCleanliness.toFixed(2).padStart(7),
-      (v.pass ? "✓ PASS" : "✗ FAIL").padStart(8),
+      label.padStart(14),
       r.deterministic ? "det" : "NONDET",
     ].join(" | "));
   }
-  console.log(`\n[density] ${allPass ? "ALL PASS ✓" : "REGRESSION DETECTED ✗"}`);
+  console.log(`\n[density] NNI band: R ∈ [${NNI_BAND.nniMin}, ${NNI_BAND.nniMax}]`);
+  console.log(`[density] ${allPass ? "ALL PASS ✓" : "REGRESSION DETECTED ✗"}`);
   return allPass;
 }
 
@@ -127,17 +160,24 @@ async function runScaleBench(): Promise<boolean> {
     const r = await runScaleCase(c);
     if (r.error) {
       console.log(`${r.id} | ERROR: ${r.error}`);
-      allPass = false;
+      if (!isNegativeTest(c.id)) allPass = false;
       continue;
     }
     const m = r.metrics!, v = r.verdict!;
-    if (!v.pass) allPass = false;
+    const negative = isNegativeTest(c.id);
+    const caseOk = negative ? !v.pass : v.pass;
+    if (!caseOk) allPass = false;
+
+    const label = negative
+      ? (v.pass ? "✗ SHOULD-FAIL" : "✓ CAUGHT")
+      : (v.pass ? "✓ PASS" : "✗ FAIL");
+
     console.log([
       r.id.padEnd(22),
       m.measuredFraction.toFixed(3).padStart(8),
       m.scaleRatioError.toFixed(3).padStart(9),
       m.paletteDeltaE.toFixed(2).padStart(10),
-      (v.pass ? "✓ PASS" : "✗ FAIL").padStart(8),
+      label.padStart(14),
       r.deterministic ? "det" : "NONDET",
     ].join(" | "));
   }
@@ -156,6 +196,20 @@ async function runRedistributeBench(): Promise<boolean> {
   }
   if (raw.length === 0) { console.log("[redistribute] No cases. Skipping."); return true; }
 
+  // Auto-generate fixtures if missing (they live in eval/out, gitignored)
+  const needsGen = raw.some((c) => {
+    for (const u of [c.imageUrl, c.maskUrl, c.labelUrl]) {
+      if (!u.startsWith("http")) {
+        try { require("node:fs").accessSync(u); } catch { return true; }
+      }
+    }
+    return false;
+  });
+  if (needsGen) {
+    console.log("[redistribute] Generating synthetic fixtures...");
+    await ensureRedistributeFixture(EVAL_OUT_DIR);
+  }
+
   let allPass = true;
   console.log("\n╔══════════════════════════════════════════╗");
   console.log("║     REDISTRIBUTE EVAL BENCH              ║");
@@ -167,11 +221,18 @@ async function runRedistributeBench(): Promise<boolean> {
     const r = await runRedistributeCase(c);
     if (r.error) {
       console.log(`${r.id} | ERROR: ${r.error}`);
-      allPass = false;
+      if (!isNegativeTest(c.id)) allPass = false;
       continue;
     }
     const m = r.metrics!, v = r.verdict!;
-    if (!v.pass) allPass = false;
+    const negative = isNegativeTest(c.id);
+    const caseOk = negative ? !v.pass : v.pass;
+    if (!caseOk) allPass = false;
+
+    const label = negative
+      ? (v.pass ? "✗ SHOULD-FAIL" : "✓ CAUGHT")
+      : (v.pass ? "✓ PASS" : "✗ FAIL");
+
     console.log([
       r.id.padEnd(28),
       String(r.instances).padStart(4),
@@ -180,7 +241,7 @@ async function runRedistributeBench(): Promise<boolean> {
       m.placementEvenness.toFixed(2).padStart(5),
       m.palette.toFixed(2).padStart(6),
       m.perMotif.toFixed(2).padStart(8),
-      (v.pass ? "✓ PASS" : "✗ FAIL").padStart(8),
+      label.padStart(14),
       r.deterministic ? "det" : "NONDET",
     ].join(" | "));
   }
@@ -195,7 +256,7 @@ async function main() {
   const results: { name: string; pass: boolean }[] = [];
 
   console.log("═══════════════════════════════════════════════════════════════");
-  console.log("  EVAL BENCH — Density & Scale Regression Gate");
+  console.log("  EVAL BENCH — Density & Scale Regression Gate (T0.2)");
   console.log("═══════════════════════════════════════════════════════════════");
 
   if (arg === "all" || arg === "density") {

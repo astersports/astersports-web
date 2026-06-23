@@ -55,7 +55,8 @@ export async function runRedistributeCase(c: RedistributeEvalCase): Promise<Redi
     const { buffer: src, width, height } = await decodeUpright(c.imageUrl);
     const { raster, membership, bbox } = await loadFabricMask(c.maskUrl, width, height);
     const { labels, instances } = await loadInstanceLabelMap(c.labelUrl, width, height);
-    const fabric: FabricMask = { bbox, confidence: 1, raster, provider: "sam2" };
+    // For offline eval, the fabric raster IS the boundary (full-white = full image)
+    const fabric: FabricMask = { bbox, confidence: 1, raster, boundaryRaster: raster, provider: "sam2" };
 
     const r1 = await densityRedistribute({ image: { url: c.imageUrl }, fabric, instances, percent: c.percent });
     const r2 = await densityRedistribute({ image: { url: c.imageUrl }, fabric, instances, percent: c.percent });

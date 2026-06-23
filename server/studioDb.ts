@@ -2,7 +2,7 @@
  * Database helpers for the Print Studio module.
  * Separated from the main db.ts to keep files manageable.
  */
-import { eq, and, gte, lte, desc, sql, like, inArray } from "drizzle-orm";
+import { eq, and, gte, lte, desc, sql, like, inArray, or, isNull } from "drizzle-orm";
 import { getDb } from "./db";
 import { emitRefundTelemetry } from "./refundTelemetry";
 import { REFUND_REASONS } from "../shared/refundReasons";
@@ -428,6 +428,18 @@ export async function getJob(jobId: number) {
   return j;
 }
 
+/** T1.3: Atomically increment pollAttempts and return the new value. */
+export async function incrementPollAttempts(jobId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .update(jobs)
+    .set({ pollAttempts: sql`${jobs.pollAttempts} + 1` })
+    .where(eq(jobs.id, jobId));
+  const [j] = await db.select({ pollAttempts: jobs.pollAttempts }).from(jobs).where(eq(jobs.id, jobId)).limit(1);
+  return j?.pollAttempts ?? 0;
+}
+
 /** Find a job by its Replicate prediction id (async worker — webhook lookup). */
 export async function getJobByPredictionId(predictionId: string) {
   const db = await getDb();
@@ -511,10 +523,25 @@ export async function reapStuckJobs(
   if (!db) throw new Error("DB unavailable");
   const cutoff = new Date(Date.now() - olderThanMs);
 
+  // T1.2: Sweep on enqueuedAt (true-age semantics). A job's updatedAt is bumped
+  // on every poll/status-change, so a wedged prediction that keeps getting polled
+  // would never be reaped under the old updatedAt predicate. enqueuedAt is set
+  // once at enqueue and never touched again — the reaper now catches any job whose
+  // TOTAL lifetime exceeds the deadline, regardless of intermediate activity.
+  // Fallback: if enqueuedAt is NULL (legacy jobs enqueued before the column), fall
+  // back to updatedAt so they're still reapable.
   const stuck = await db
     .select({ id: jobs.id, tenantId: jobs.tenantId, creditsUsed: jobs.creditsUsed })
     .from(jobs)
-    .where(and(inArray(jobs.status, ["processing", "sam2_processing", "cpu_processing"]), lte(jobs.updatedAt, cutoff)))
+    .where(and(
+      inArray(jobs.status, ["processing", "sam2_processing", "cpu_processing"]),
+      or(
+        // Primary: enqueuedAt past the cutoff (true-age)
+        lte(jobs.enqueuedAt, cutoff),
+        // Fallback: legacy jobs without enqueuedAt — use updatedAt
+        and(isNull(jobs.enqueuedAt), lte(jobs.updatedAt, cutoff))
+      )
+    ))
     .limit(limit);
 
   let reaped = 0;

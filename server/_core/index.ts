@@ -1,4 +1,7 @@
 import "dotenv/config";
+// T3.3: Sharp configuration must load before any image processing.
+import "./image/sharpConfig";
+
 import express from "express";
 import { createServer } from "http";
 import net from "net";

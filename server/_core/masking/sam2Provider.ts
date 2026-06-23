@@ -30,6 +30,7 @@ import { decodeUpright } from "../image/decodeUpright";
 import { locateFabricRegion, locateFabricRegionForDensity } from "./locateFabricRegion";
 import { decodeMaskToRaster, instancesFromMasks } from "./sam2Mask";
 import { defaultSam2Client, type Sam2Client } from "./replicateSam2";
+import { cachedSegmentation } from "./segCache";
 import { ENV } from "../env";
 import type { PredictionMeta } from "../../../drizzle/schema";
 
@@ -163,7 +164,13 @@ async function cropAndSegment(
 ): Promise<CropSegment> {
   const c = await locateAndCrop(image, known, forDensity);
   logSam2Call("autoSegment", c.cropWidth, c.cropHeight, image.audit); // Req 2 (C5: per-request audit)
-  const seg = await client.autoSegment(c.dataUrl);
+
+  // T3.1: Segmentation cache — skip the SAM2 call on re-runs of the same garment+bbox.
+  const seg = await cachedSegmentation(
+    image.url,
+    c.bbox,
+    () => client.autoSegment(c.dataUrl),
+  );
   return { bbox: c.bbox, confidence: c.confidence, width: c.width, height: c.height, cropWidth: c.cropWidth, cropHeight: c.cropHeight, seg };
 }
 
