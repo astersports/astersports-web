@@ -513,6 +513,40 @@ export async function listSam2ProcessingJobs(limit: number) {
     .limit(limit);
 }
 
+/**
+ * T1.5: Recover jobs stranded in `cpu_processing` by a mid-op container kill.
+ *
+ * A job goes sam2_processing -> cpu_processing (claimJobForCpuProcessing), then the worker runs
+ * the CPU op under a 45s IN-PROCESS deadline. If the container is hard-killed mid-op (Autoscale
+ * scale-down / cold-start / a deploy restart), the deadline timer dies with the process, so the
+ * job is left stuck in `cpu_processing` — and listSam2ProcessingJobs (sam2_processing only) never
+ * re-picks it, so only the 10-min reaper recovers it, by REFUNDING rather than RETRYING (the
+ * customer sees a charged-then-refunded silent failure instead of a result).
+ *
+ * This atomically resets cpu_processing jobs whose last write (the claim) is older than
+ * `stalenessMs` back to `sam2_processing`, so the normal poll path re-claims (the existing CAS)
+ * and re-runs the op on a fresh container. The op is reproducible (cached SAM2 prediction +
+ * deterministic layout / LaMa cache), and completeJobIfProcessing + addVariation still fire
+ * exactly once via CAS — so a retry can neither deliver twice nor double-charge.
+ *
+ * `stalenessMs` MUST exceed the worker deadline (45s): a still-ALIVE worker always resolves within
+ * its own deadline, so only a job whose `updatedAt` has frozen (no live worker) is recovered.
+ * pollAttempts keeps incrementing across retries, so the poison-pill still bounds a
+ * perpetually-failing op (it fails+refunds rather than retrying forever). inArray() (not eq())
+ * for the enum predicate — the confirmed Drizzle/MySQL-enum serverless bug (see
+ * listSam2ProcessingJobs / reapStuckJobs). Returns the number of jobs reset.
+ */
+export async function recoverStrandedCpuJobs(stalenessMs: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const cutoff = new Date(Date.now() - stalenessMs);
+  const res = await db
+    .update(jobs)
+    .set({ status: "sam2_processing" })
+    .where(and(inArray(jobs.status, ["cpu_processing"]), lte(jobs.updatedAt, cutoff)));
+  return (res as any)?.[0]?.affectedRows ?? 0;
+}
+
 /** Async enqueue (ASYNC_GENERATION_SPEC §4): stamp the started prediction + crop geometry onto the
  *  job and move it to sam2_processing so the worker/cron can pick it up. */
 export async function markJobEnqueued(

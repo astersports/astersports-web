@@ -111,6 +111,13 @@ export const ENV = {
    *  BOTH past the poll cap AND older than this — above the ~120s SAM2 run timeout so a legitimately
    *  slow prediction completes (or Replicate times it out) before we give up. Default 150s. */
   studioMaxPredictionAgeMs: Number(process.env.STUDIO_MAX_PREDICTION_AGE_MS) > 0 ? Number(process.env.STUDIO_MAX_PREDICTION_AGE_MS) : 150_000,
+  /** T1.5: staleness (ms) after which a job stuck in `cpu_processing` is treated as STRANDED
+   *  (its worker container was hard-killed mid-op, so the 45s in-process deadline died with it)
+   *  and reset to `sam2_processing` for a fresh container to RETRY — instead of waiting for the
+   *  10-min reaper to merely refund. MUST exceed studioWorkerDeadlineMs so a still-alive worker
+   *  (which always resolves within its own deadline) is never reset out from under itself.
+   *  Default 60s. Tune via STUDIO_CPU_STALE_MS. */
+  studioCpuStaleMs: Number(process.env.STUDIO_CPU_STALE_MS) > 0 ? Number(process.env.STUDIO_CPU_STALE_MS) : 60_000,
   /** H2: allowlist of host[:port] values the OAuth redirect target may use. When
    *  set (comma-separated), a decoded `state` redirect whose host is not on the
    *  list is rejected — the anti-code-interception control. Empty = scheme/format
