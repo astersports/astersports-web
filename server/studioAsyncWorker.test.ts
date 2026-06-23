@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("./_core/env", () => ({ ENV: { studioDensityRedistribute: false } }));
+vi.mock("./_core/env", () => ({ ENV: { studioDensityRedistribute: false, studioMaxPollAttempts: 5, studioPoisonMinAgeMs: 150_000 } }));
 vi.mock("./_core/masking/sam2Provider", () => ({ finishSam2Segmentation: vi.fn() }));
 vi.mock("./_core/masking/replicateSam2", () => ({ defaultSam2Client: vi.fn(() => ({})) }));
 vi.mock("./aiEngine", () => ({ runDensityOnSegmentation: vi.fn(), runScaleOnSegmentation: vi.fn() }));
@@ -144,9 +144,9 @@ describe("processAsyncJob (§6 failure/refund matrix)", () => {
     expect(r.status).toBe("skipped");
   });
 
-  // T1.3: Poison-pill max-attempt cap
-  it("T1.3: poison-pill terminates at attempt 5 with refund", async () => {
-    m(getJob).mockResolvedValue(densityJob);
+  // T1.3: Poison-pill cap — fires only when BOTH the attempt cap and the age floor are crossed.
+  it("T1.3: poison-pill terminates past the cap once the prediction has aged out, with refund", async () => {
+    m(getJob).mockResolvedValue({ ...densityJob, enqueuedAt: new Date(Date.now() - 200_000) }); // aged past 150s floor
     m(incrementPollAttempts).mockResolvedValue(5); // at the cap
     const r = await processAsyncJob(7, client(SEG));
     expect(r.status).toBe("failed");
@@ -155,6 +155,15 @@ describe("processAsyncJob (§6 failure/refund matrix)", () => {
     expect(updateJobStatus).toHaveBeenCalledWith(7, "failed", expect.objectContaining({ errorMessage: expect.stringContaining("Poison-pill") }));
     // The prediction was never polled (no processPrediction call)
     expect(claimJobForCpuProcessing).not.toHaveBeenCalled();
+  });
+
+  it("T1.3: a slow-but-young prediction (over the cap, under the age floor) is NOT poison-killed", async () => {
+    m(getJob).mockResolvedValue({ ...densityJob, enqueuedAt: new Date(Date.now() - 10_000) }); // only 10s old
+    m(incrementPollAttempts).mockResolvedValue(10); // well over the attempt cap...
+    const r = await processAsyncJob(7, client({ status: "processing" })); // ...but the prediction is still healthy
+    expect(r.status).toBe("pending");
+    expect(grantCredits).not.toHaveBeenCalled(); // no wrongful refund
+    expect(updateJobStatus).not.toHaveBeenCalledWith(7, "failed", expect.anything());
   });
 
   it("T1.3: attempt 4 (below cap) proceeds normally", async () => {

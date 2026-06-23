@@ -37,6 +37,8 @@ export type AsyncJobOutcome = { status: "done" | "failed" | "pending" | "skipped
  * slow job fails+refunds via failJobIfClaimable instead of stranding.
  */
 const WORKER_DEADLINE_MS = 45_000;
+const MAX_POLL_ATTEMPTS = 5;
+const POISON_MIN_AGE_MS = 150_000;
 
 /** Exported for tests to override. */
 export function getDeadlineMs(): number {
@@ -54,13 +56,19 @@ export async function processAsyncJob(
   if (job.status === "done" || job.status === "failed") return { status: "skipped", reason: `already ${job.status}` };
   if (!job.predictionId || !job.predictionMeta) return { status: "skipped", reason: "no predictionId/meta" };
 
-  // T1.3: Poison-pill max-attempt cap. Increment poll count; at >= MAX_POLL_ATTEMPTS
-  // the job is terminal — it will never complete (wedged prediction). Refund immediately
-  // instead of burning API calls until the reaper catches it 10 min later.
-  const MAX_POLL_ATTEMPTS = 5;
+  // T1.3: Poison-pill cap. A prediction is declared wedged ONLY when it has been polled
+  // past the attempt cap AND has aged past the min-age floor. Poll count alone false-fires
+  // on a slow-but-healthy SAM2 (high points_per_side runs longer than a few cron ticks),
+  // refunding a job that would have succeeded — so we require age (anchored on enqueuedAt,
+  // set once at enqueue) to also exceed SAM2's ~120s run timeout. Missing timestamp falls
+  // back to "old enough" so a job with no anchor still terminates on attempts alone.
+  const maxPollAttempts = ENV.studioMaxPollAttempts ?? MAX_POLL_ATTEMPTS;
+  const poisonMinAgeMs = ENV.studioPoisonMinAgeMs ?? POISON_MIN_AGE_MS;
   const attempts = await incrementPollAttempts(job.id);
-  if (attempts >= MAX_POLL_ATTEMPTS) {
-    log.warn("studio", `async-worker: poison-pill cap reached (${attempts} attempts)`, { jobId: job.id, tenantId: job.tenantId });
+  const ageAnchor = job.enqueuedAt ?? job.createdAt ?? null;
+  const ageMs = ageAnchor ? Date.now() - new Date(ageAnchor).getTime() : Infinity;
+  if (attempts >= maxPollAttempts && ageMs >= poisonMinAgeMs) {
+    log.warn("studio", `async-worker: poison-pill cap reached (${attempts} attempts, age ${Math.round(ageMs / 1000)}s)`, { jobId: job.id, tenantId: job.tenantId });
     const cost = job.creditsUsed ?? 0;
     const poisonRefId = job.predictionMeta?.deductRef
       ? `${job.predictionMeta.deductRef}-failed`

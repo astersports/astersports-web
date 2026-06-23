@@ -103,6 +103,13 @@ export const ENV = {
    *  the deadline must be BELOW that so a slow job fails+refunds internally rather than
    *  being hard-killed and stranding the charge. Default 45s (15s margin). */
   studioWorkerDeadlineMs: Number(process.env.STUDIO_WORKER_DEADLINE_MS) > 0 ? Number(process.env.STUDIO_WORKER_DEADLINE_MS) : 45_000,
+  /** T1.3: Poison-pill poll-count cap. A prediction is declared wedged only when it has
+   *  been polled at least this many times AND has aged past `studioPoisonMinAgeMs` — BOTH
+   *  must hold, so a slow-but-healthy prediction is never false-failed/refunded. Default 5. */
+  studioMaxPollAttempts: Number(process.env.STUDIO_MAX_POLL_ATTEMPTS) > 0 ? Number(process.env.STUDIO_MAX_POLL_ATTEMPTS) : 5,
+  /** T1.3: Minimum prediction age (ms) before the poison-pill may fire. Must exceed SAM2's
+   *  ~120s run timeout so a slow-but-healthy prediction settles first. Default 150s. */
+  studioPoisonMinAgeMs: Number(process.env.STUDIO_POISON_MIN_AGE_MS) > 0 ? Number(process.env.STUDIO_POISON_MIN_AGE_MS) : 150_000,
   /** H2: allowlist of host[:port] values the OAuth redirect target may use. When
    *  set (comma-separated), a decoded `state` redirect whose host is not on the
    *  list is rejected — the anti-code-interception control. Empty = scheme/format

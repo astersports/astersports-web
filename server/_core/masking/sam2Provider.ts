@@ -170,6 +170,7 @@ async function cropAndSegment(
     image.url,
     c.bbox,
     () => client.autoSegment(c.dataUrl),
+    ENV.replicateSam2Model, // T3.1 fix: bind the model version into the cache key so a model bump invalidates stale masks
   );
   return { bbox: c.bbox, confidence: c.confidence, width: c.width, height: c.height, cropWidth: c.cropWidth, cropHeight: c.cropHeight, seg };
 }

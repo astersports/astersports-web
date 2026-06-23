@@ -37,13 +37,27 @@ export function isLamaAvailable(): boolean {
  * Build a deterministic cache key from the image pixels + mask pixels + model version.
  * The key is a content-hash, so identical inputs always produce the same key.
  */
-function buildCacheKey(imageRgba: Buffer, mask: RasterMask, modelVersion?: string): string {
+export function buildCacheKey(imageRgba: Buffer, mask: RasterMask, modelVersion?: string): string {
   const h = createHash("sha256");
   h.update(imageRgba);
   h.update(Buffer.from(mask.data.buffer, mask.data.byteOffset, mask.data.byteLength));
   h.update(`|${mask.width}x${mask.height}`);
   h.update(`|model=${modelVersion ?? LAMA_MODEL}`);
   return h.digest("hex").slice(0, 48);
+}
+
+/**
+ * Decode a PNG buffer to raw RGBA at the expected dimensions. Shared by the cache-hit
+ * path and the cache-miss persist path so both return byte-identical pixels for the same
+ * stored PNG (the reproducibility contract).
+ */
+async function pngToRgba(png: Buffer, width: number, height: number): Promise<Buffer> {
+  const { data } = await sharp(png)
+    .resize(width, height, { fit: "fill" })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  return data;
 }
 
 /**
@@ -59,12 +73,7 @@ async function getCachedResult(cacheKey: string, width: number, height: number):
       skipSsrf: true,
     });
     if (!response.ok) return null;
-    // Decode the cached PNG back to raw RGBA at the expected dimensions
-    const { data } = await sharp(buffer)
-      .resize(width, height, { fit: "fill" })
-      .ensureAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
+    const data = await pngToRgba(buffer, width, height);
     console.log(`[lama-cache] HIT key=${cacheKey.slice(0, 12)}…`);
     return data;
   } catch {
@@ -74,19 +83,26 @@ async function getCachedResult(cacheKey: string, width: number, height: number):
 }
 
 /**
- * Persist a LaMa result to S3 for future cache hits.
+ * Persist a LaMa result to S3 for future cache hits, using a DETERMINISTIC storage key
+ * (no random suffix) so the write key equals the key `getCachedResult` later reads.
+ * Returns the bytes a future cache hit would return (the stored PNG re-decoded), so the
+ * miss path can hand back the same pixels — making run-1 and run-N byte-identical.
+ * Returns null on persistence failure (caller falls back to the fresh model bytes).
  */
-async function persistResult(cacheKey: string, rgbaBuffer: Buffer, width: number, height: number): Promise<void> {
+async function persistResult(cacheKey: string, rgbaBuffer: Buffer, width: number, height: number): Promise<Buffer | null> {
   try {
     const png = await sharp(rgbaBuffer, { raw: { width, height, channels: 4 } })
       .png({ compressionLevel: 6 })
       .toBuffer();
     const storageKey = `${LAMA_CACHE_PREFIX}/${cacheKey}.png`;
-    await storagePut(storageKey, png, "image/png");
+    await storagePut(storageKey, png, "image/png", { deterministicKey: true });
     console.log(`[lama-cache] STORED key=${cacheKey.slice(0, 12)}…`);
+    // Re-decode the exact PNG we stored, so this (miss) return matches a future cache hit.
+    return await pngToRgba(png, width, height);
   } catch (err) {
     // Non-fatal: cache persistence failure doesn't block the result
     console.warn(`[lama-cache] Failed to persist: ${(err as Error).message}`);
+    return null;
   }
 }
 
@@ -197,12 +213,15 @@ export async function lamaInfill(input: LamaInfillInput): Promise<LamaInfillResu
     return { data: cached, width, height, fromCache: true };
   }
 
-  // 2. Call LaMa
-  const result = await callLama(imageRgba, width, height, region);
+  // 2. Call LaMa (raw RGBA straight from the model — non-deterministic GPU bytes)
+  const fresh = await callLama(imageRgba, width, height, region);
 
-  // 3. Persist to cache (async, non-blocking)
-  void persistResult(cacheKey, result, width, height);
+  // 3. Persist to cache and return the SAME bytes a later cache hit would return, so
+  //    run-1 (miss) and run-N (hit) are byte-identical. If persistence fails, fall back
+  //    to the fresh bytes — still correct, just not yet cached. Awaited (not fire-and-
+  //    forget) because the returned pixels now depend on the stored PNG round-trip.
+  const persisted = await persistResult(cacheKey, fresh, width, height);
 
-  console.log(`[lama-infill] MISS key=${cacheKey.slice(0, 12)}… (model called, caching)`);
-  return { data: result, width, height, fromCache: false };
+  console.log(`[lama-infill] MISS key=${cacheKey.slice(0, 12)}… (model called, cached)`);
+  return { data: persisted ?? fresh, width, height, fromCache: false };
 }

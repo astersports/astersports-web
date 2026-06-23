@@ -90,4 +90,29 @@ describe("computeRedistributeMetrics", () => {
     expect(redistributeVerdict(m, 0).noopPass).toBe(false);
     expect(redistributeVerdict(m, 0).pass).toBe(false);
   });
+
+  it("NNI cap (placementEvennessMax) rejects an over-regularized lattice only when the cap is set", async () => {
+    const { masks, labels, truthMask } = buildTruth();
+    const res = await densityRedistribute({ image: { url: "x" }, fabric, instances: masks, percent: 30 });
+    const base = computeRedistributeMetrics({
+      source: scene(), out: res.data, width: W, height: H,
+      truthMask, truthInstanceLabels: labels,
+      targets: res.targets, assignments: res.assignments, removed: res.removed,
+      targetRemovalFraction: 0.30,
+    });
+    // Simulate a crystalline hex lattice: NNI ≈ 2.15 (over-regular, above any sane cap).
+    const overRegular = { ...base, placementEvenness: 2.15 };
+
+    // Default cap is Infinity → over-regularization is NOT detected (current shipping behavior).
+    expect(redistributeVerdict(overRegular, res.removed).evennessPass).toBe(true);
+
+    // With the cap engaged, the same over-regular layout is correctly rejected, failing the verdict.
+    const capped = redistributeVerdict(overRegular, res.removed, { placementEvennessMax: 1.9 });
+    expect(capped.evennessPass).toBe(false);
+    expect(capped.pass).toBe(false);
+
+    // A healthy blue-noise layout (NNI inside the band) still passes under the same cap.
+    const healthy = { ...base, placementEvenness: 1.4 };
+    expect(redistributeVerdict(healthy, res.removed, { placementEvennessMax: 1.9 }).evennessPass).toBe(true);
+  });
 });

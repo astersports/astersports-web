@@ -33,7 +33,9 @@ vi.mock("../server/_core/env", () => ({
   },
 }));
 
-import { buildCacheKey } from "./lamaInfillTestHelpers";
+// Import the REAL key builder from the production module (not a hand-copied stand-in),
+// so these determinism tests actually guard the shipping implementation.
+import { buildCacheKey } from "./_core/studio/ops/lamaInfill";
 
 describe("T2.1 — LaMa infill", () => {
   beforeEach(() => {
