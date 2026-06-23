@@ -300,6 +300,9 @@ export function registerStudioStreamRoutes(app: Express) {
       round: 1,
       mode,
       signal: abortController.signal,
+      onProgress: (stage, percent) => {
+        sendSSE(res, { type: "progress", stage, percent }, finished);
+      },
     });
     workPromise.catch(() => {});
     try {

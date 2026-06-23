@@ -299,6 +299,18 @@
   }
 }
 
+/* Pipeline progress shimmer animation */
+@keyframes pipeline-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+.animate-shimmer {
+  animation: pipeline-shimmer 2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-shimmer { animation: none !important; }
+}
+
 /* ═══════════════════════════════════════════════════════════════
    AAU BASKETBALL — INTERACTION PATTERNS
    ═══════════════════════════════════════════════════════════════ */

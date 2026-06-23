@@ -14,6 +14,7 @@ import { useRef, useCallback } from "react";
 export interface StreamCallbacks {
   onStarted: (data: { jobId: number; creditCost: number; newBalance: number }) => void;
   onHeartbeat: () => void;
+  onProgress?: (data: { stage: string; percent: number }) => void;
   onDone: (data: {
     jobId: number;
     results: Array<{ url: string; key: string }>;
@@ -72,12 +73,15 @@ async function consumeSSEStream(
           case "heartbeat":
             callbacks.onHeartbeat();
             break;
+          case "progress":
+            callbacks.onProgress?.(parsed);
+            break;
           case "done":
             callbacks.onDone(parsed);
             return; // Stream complete
           case "error":
             callbacks.onError(parsed);
-            return; // Stream complete (with error)
+            return; // Stream complete
           default:
             console.warn("[useGenerateStream] Unknown event type:", parsed.type);
         }

@@ -28,8 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Upload, Loader2, Sparkles, RefreshCw, AlertTriangle, Clock } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
+import { Upload, Loader2, Sparkles, RefreshCw, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { compressImage } from "@/lib/imageCompress";
 import type { ControlSettings } from "@shared/controls";
@@ -38,6 +37,7 @@ import { CREDIT_COST } from "@shared/billing";
 import { shouldUseStream } from "@shared/controlHelpers";
 import { useGenerateStream, type StreamCallbacks } from "@/hooks/useGenerateStream";
 import { useAsyncGenerate } from "@/hooks/useAsyncGenerate";
+import PipelineProgress from "@/components/studio/PipelineProgress";
 
 export default function StudioEditor() {
   const { tenant } = useTenant();
@@ -62,6 +62,10 @@ export default function StudioEditor() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Real-time pipeline progress (from SSE progress events)
+  const [pipelineStage, setPipelineStage] = useState<string | null>(null);
+  const [pipelinePercent, setPipelinePercent] = useState(0);
+
   const uploadMutation = trpc.studio.upload.useMutation();
   const detectMutation = trpc.studio.detectElements.useMutation();
   const generateMutation = trpc.studio.generate.useMutation();
@@ -73,11 +77,17 @@ export default function StudioEditor() {
     onStarted: (data) => {
       setProcessingStartTime(Date.now());
       setElapsedSeconds(0);
+      setPipelineStage(null);
+      setPipelinePercent(0);
       setStep("processing");
       toast.info("Processing started — this may take up to a minute.");
     },
     onHeartbeat: () => {
       // No-op — the heartbeat keeps the connection alive; the timer handles UI
+    },
+    onProgress: (data) => {
+      setPipelineStage(data.stage);
+      setPipelinePercent(data.percent);
     },
     onDone: (data) => {
       setIsGenerating(false);
@@ -127,7 +137,7 @@ export default function StudioEditor() {
     toast.error(`${message || "That didn't go through."} Your credits have been refunded.`);
   }, [utils]);
 
-  useAsyncGenerate({ tenantId: tenant?.id ?? null, jobId, enabled: asyncPolling, onDone: onAsyncDone, onFailed: onAsyncFailed });
+  const { status: asyncJobStatus } = useAsyncGenerate({ tenantId: tenant?.id ?? null, jobId, enabled: asyncPolling, onDone: onAsyncDone, onFailed: onAsyncFailed });
 
   // Elapsed timer — ticks every second while processing
   useEffect(() => {
@@ -412,27 +422,19 @@ export default function StudioEditor() {
 
   // ─── Processing step (SSE stream in progress) ──────────────────────────────
   if (step === "processing") {
-    // Estimated duration: 50s typical. Progress uses an ease-out curve
-    // so it moves fast at first and slows near the end (never reaches 100% until done).
+    // Determine if we have real pipeline data (from SSE progress events)
+    const hasRealProgress = pipelineStage !== null || asyncPolling;
+
+    // Fallback: time-based progress for when no real events arrive yet
     const ESTIMATED_DURATION = 50;
     const rawProgress = Math.min(elapsedSeconds / ESTIMATED_DURATION, 0.95);
-    // Ease-out curve: fast start, slow finish
     const easedProgress = 1 - Math.pow(1 - rawProgress, 2.5);
-    const progressPercent = Math.round(easedProgress * 95); // cap at 95% until done
+    const fallbackPercent = Math.round(easedProgress * 95);
 
-    const formatTime = (s: number) => {
-      const mins = Math.floor(s / 60);
-      const secs = s % 60;
-      return mins > 0 ? `${mins}:${secs.toString().padStart(2, "0")}` : `${secs}s`;
-    };
-
-    const statusMessage = elapsedSeconds < 10
-      ? "Segmenting print elements..."
-      : elapsedSeconds < 25
-      ? "Analyzing motif instances..."
-      : elapsedSeconds < 40
-      ? "Processing density adjustments..."
-      : "Finalizing result...";
+    // Use real progress when available, otherwise fall back to time-based
+    const displayPercent = hasRealProgress
+      ? (asyncPolling ? undefined : pipelinePercent) // undefined = let PipelineProgress compute from asyncStatus
+      : fallbackPercent;
 
     return (
       <div className="max-w-2xl mx-auto space-y-6">
@@ -444,27 +446,23 @@ export default function StudioEditor() {
         </div>
 
         <Card>
-          <CardContent className="flex flex-col items-center justify-center gap-6 py-12">
+          <CardContent className="flex flex-col items-center justify-center gap-6 py-10">
             <div className="relative">
-              <Loader2 className="w-14 h-14 text-primary animate-spin" />
+              <Loader2 className="w-12 h-12 text-primary animate-spin" />
               <Sparkles className="w-5 h-5 text-primary/60 absolute -top-1 -right-1 animate-pulse" />
             </div>
 
-            <div className="text-center space-y-1">
-              <p className="text-lg font-medium">Generating your result...</p>
-              <p className="text-sm text-muted-foreground">{statusMessage}</p>
-            </div>
+            <p className="text-lg font-medium">Generating your result...</p>
 
-            {/* Progress bar */}
-            <div className="w-full max-w-sm space-y-2">
-              <Progress value={progressPercent} className="h-2.5" />
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  {formatTime(elapsedSeconds)} elapsed
-                </span>
-                <span>~{formatTime(Math.max(0, ESTIMATED_DURATION - elapsedSeconds))} remaining</span>
-              </div>
+            {/* Pipeline progress bar */}
+            <div className="w-full max-w-md">
+              <PipelineProgress
+                currentStage={pipelineStage as any}
+                percent={displayPercent ?? pipelinePercent}
+                elapsedSeconds={elapsedSeconds}
+                isAsync={asyncPolling}
+                asyncStatus={asyncJobStatus}
+              />
             </div>
 
             {originalUrl && (

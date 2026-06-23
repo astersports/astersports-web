@@ -722,3 +722,13 @@
 - [x] Fix: Replace eq(jobs.status, "sam2_processing") with inArray(jobs.status, ["sam2_processing"]) — mirrors working reaper pattern
 - [x] Add diagnostic logging to poll-predictions handler (log found job IDs and processAsyncJob outcomes)
 - [x] TypeScript compiles cleanly, all tests pass
+
+## Real-Time Pipeline Progress Bar (Jun 22)
+- [x] Server: Add `progress` SSE event type with stage info (segmenting → analyzing → processing → compositing → finalizing)
+- [x] Server: Emit progress events at key points in runVariation (before SAM2, after SAM2, during CPU work, before persist)
+- [x] Client: Extend useGenerateStream to handle `progress` event type with stage + percent data
+- [x] Client: Build multi-stage pipeline progress bar component with labeled steps and animated transitions
+- [x] Client: Replace time-based fake progress with real pipeline stage tracking in StudioEditor processing view
+- [x] Client: Show current stage label, elapsed time, and stage-aware progress percentage
+- [x] Mobile: Ensure progress bar renders well on small screens
+- [x] Tests: Verify TypeScript compiles cleanly and existing tests pass (514 passed)
