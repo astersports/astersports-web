@@ -81,6 +81,15 @@ export const ENV = {
    *  is a memory-exhaustion vector. 40 MP (~160 MB RGBA) covers real print artwork
    *  with headroom; raise via STUDIO_MAX_MEGAPIXELS only with the memory budget in mind. */
   studioMaxMegapixels: Number(process.env.STUDIO_MAX_MEGAPIXELS) > 0 ? Number(process.env.STUDIO_MAX_MEGAPIXELS) : 40,
+  /** T1.6: WORKING-resolution cap (megapixels) for the deterministic ops. Distinct from the
+   *  REJECT cap above: this DOWNSCALES (preserves aspect) rather than rejecting. The density op
+   *  holds the image RGBA + up to STUDIO_MAX_INSTANCES full-frame motif masks at once, so at full
+   *  print resolution it OOM-kills the process mid-op on a small instance (the job strands → the
+   *  reaper refunds → no result). Applied at the single decodeUpright boundary, so the image AND
+   *  every SAM2-derived mask (remapped to these dims) stay aligned. Default 2 MP fits a ~512 MB
+   *  box for typical motif counts; RAISE via STUDIO_WORKING_MEGAPIXELS (e.g. 8–10) on a larger
+   *  instance for full-resolution output. 0 disables the cap. */
+  studioWorkingMegapixels: Number(process.env.STUDIO_WORKING_MEGAPIXELS) > 0 ? Number(process.env.STUDIO_WORKING_MEGAPIXELS) : 2,
   /** H6: max concurrent sharp decodes. Each decode holds a full RGBA frame in
    *  memory; without a cap, N simultaneous jobs multiply the peak. Default 4. */
   studioMaxConcurrentDecodes: Number(process.env.STUDIO_MAX_CONCURRENT_DECODES) > 0 ? Number(process.env.STUDIO_MAX_CONCURRENT_DECODES) : 4,
