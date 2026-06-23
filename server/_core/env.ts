@@ -19,6 +19,18 @@ export const ENV = {
     process.env.ANTHROPIC_MODEL && process.env.ANTHROPIC_MODEL.trim().length > 0
       ? process.env.ANTHROPIC_MODEL.trim()
       : "claude-opus-4-8",
+  /** Supabase Storage — customer image uploads + signed reads (server/storage.ts,
+   *  server/_core/storageProxy.ts). Replaces the Manus Forge presigned-URL/S3 path.
+   *  The bucket is PRIVATE; the browser never talks to Supabase directly — it goes
+   *  through /manus-storage/{key}, which auth-checks (tenant isolation) then 307s to
+   *  a short-lived server-signed URL. SUPABASE_URL is the project URL; the
+   *  service-role key is server-only (bypasses RLS) — never ships to the client. */
+  supabaseUrl: process.env.SUPABASE_URL ?? "",
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+  supabaseStorageBucket:
+    process.env.SUPABASE_STORAGE_BUCKET && process.env.SUPABASE_STORAGE_BUCKET.trim().length > 0
+      ? process.env.SUPABASE_STORAGE_BUCKET.trim()
+      : "media",
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
@@ -208,6 +220,8 @@ export function validateEnv(): { errors: string[]; warnings: string[] } {
     ["BUILT_IN_FORGE_API_URL", ENV.forgeApiUrl, "Forge LLM/image generation"],
     ["BUILT_IN_FORGE_API_KEY", ENV.forgeApiKey, "Forge LLM/image generation"],
     ["ANTHROPIC_API_KEY", ENV.anthropicApiKey, "Claude vision LLM (fabric locate / element detect / no-op judge)"],
+    ["SUPABASE_URL", ENV.supabaseUrl, "Supabase Storage (image uploads / signed reads)"],
+    ["SUPABASE_SERVICE_ROLE_KEY", ENV.supabaseServiceRoleKey, "Supabase Storage (image uploads / signed reads)"],
   ];
   for (const [name, val, feature] of optional) {
     if (!val) warnings.push(`${name} missing — ${feature} disabled`);

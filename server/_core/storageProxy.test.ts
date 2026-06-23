@@ -1,9 +1,9 @@
 /**
  * C1 storage-proxy authorization tests. Exercises the access decision in
  * isolation: capture the route handler, drive it with mock req/res, and mock the
- * auth + ownership lookups. ENV is mocked with forgeApiUrl/forgeApiKey unset so
+ * auth + ownership lookups. ENV is mocked with the Supabase storage creds unset so
  * an AUTHORIZED request stops at the "not configured" 500 — that proves it
- * passed the authz gate without needing to mock the Forge presign round-trip.
+ * passed the authz gate without needing to mock the signed-URL round-trip.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Express } from "express";
@@ -11,7 +11,7 @@ import type { Express } from "express";
 vi.mock("./sdk", () => ({ sdk: { authenticateRequest: vi.fn() } }));
 vi.mock("../studioDb", () => ({ getMembership: vi.fn(), getVariationByResultKey: vi.fn() }));
 vi.mock("./env", () => ({
-  ENV: { forgeApiUrl: "", forgeApiKey: "" },
+  ENV: { supabaseUrl: "", supabaseServiceRoleKey: "", supabaseStorageBucket: "media" },
 }));
 
 import { sdk } from "./sdk";
