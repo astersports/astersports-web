@@ -448,11 +448,21 @@ export async function claimJobForCpuProcessing(jobId: number): Promise<boolean> 
 }
 
 /** Jobs awaiting their SAM2 prediction (cron poller). Bounded by `limit` (N=1 in prod to clear
- *  the Manus 60s execution cap). Oldest first so no job starves. */
+ *  the Manus 60s execution cap). Oldest first so no job starves.
+ *
+ *  Uses inArray() instead of eq() to work around a confirmed issue where
+ *  Drizzle's eq() on MySQL enums silently returns empty results in serverless
+ *  containers (TiDB + Autoscale). The reaper uses inArray() which works reliably,
+ *  so we mirror that pattern here. */
 export async function listSam2ProcessingJobs(limit: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(jobs).where(eq(jobs.status, "sam2_processing")).orderBy(jobs.enqueuedAt).limit(limit);
+  return db
+    .select()
+    .from(jobs)
+    .where(inArray(jobs.status, ["sam2_processing"]))
+    .orderBy(jobs.enqueuedAt)
+    .limit(limit);
 }
 
 /** Async enqueue (ASYNC_GENERATION_SPEC §4): stamp the started prediction + crop geometry onto the
