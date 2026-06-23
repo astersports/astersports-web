@@ -54,13 +54,16 @@ export async function processAsyncJob(
   if (job.status === "done" || job.status === "failed") return { status: "skipped", reason: `already ${job.status}` };
   if (!job.predictionId || !job.predictionMeta) return { status: "skipped", reason: "no predictionId/meta" };
 
-  // T1.3: Poison-pill max-attempt cap. Increment poll count; at >= MAX_POLL_ATTEMPTS
-  // the job is terminal — it will never complete (wedged prediction). Refund immediately
-  // instead of burning API calls until the reaper catches it 10 min later.
-  const MAX_POLL_ATTEMPTS = 5;
+  // T1.3: Poison-pill cap. A wedged prediction would re-poll until the 10-min reaper, burning
+  // API calls. Fire only once the job is BOTH past the poll cap AND aged past the max expected
+  // prediction lifetime (> the ~120s SAM2 run timeout) — so a slow-but-healthy prediction at the
+  // ~10s poll cadence isn't false-failed + refunded while still validly running. enqueuedAt is
+  // immutable; poll count alone at a 10s cadence would trip at ~50s.
+  const MAX_POLL_ATTEMPTS = ENV.studioMaxPollAttempts;
   const attempts = await incrementPollAttempts(job.id);
-  if (attempts >= MAX_POLL_ATTEMPTS) {
-    log.warn("studio", `async-worker: poison-pill cap reached (${attempts} attempts)`, { jobId: job.id, tenantId: job.tenantId });
+  const ageMs = job.enqueuedAt ? Date.now() - new Date(job.enqueuedAt).getTime() : 0;
+  if (attempts >= MAX_POLL_ATTEMPTS && ageMs >= ENV.studioMaxPredictionAgeMs) {
+    log.warn("studio", `async-worker: poison-pill (${attempts} polls, age ${Math.round(ageMs / 1000)}s)`, { jobId: job.id, tenantId: job.tenantId });
     const cost = job.creditsUsed ?? 0;
     const poisonRefId = job.predictionMeta?.deductRef
       ? `${job.predictionMeta.deductRef}-failed`
@@ -70,16 +73,16 @@ export async function processAsyncJob(
     } catch (e) {
       log.error("studio", "async-worker: poison-pill refund failed", { jobId: job.id, metadata: { error: (e as any)?.message || String(e) } });
     }
-    await updateJobStatus(job.id, "failed", { errorMessage: `Poison-pill: exceeded ${MAX_POLL_ATTEMPTS} poll attempts` }).catch(() => {});
+    await updateJobStatus(job.id, "failed", { errorMessage: `Poison-pill: ${attempts} polls over ${Math.round(ageMs / 1000)}s — prediction never completed` }).catch(() => {});
     emitRefundTelemetry({
       reason: REFUND_REASONS.poison_pill,
       jobId: job.id,
       tenantId: job.tenantId,
       userId: job.userId,
       credits: cost,
-      detail: `Exceeded ${MAX_POLL_ATTEMPTS} poll attempts — prediction never completed.`,
+      detail: `${attempts} polls over ${Math.round(ageMs / 1000)}s — prediction never completed.`,
     });
-    return { status: "failed", reason: `poison-pill: ${attempts} attempts` };
+    return { status: "failed", reason: `poison-pill: ${attempts} polls, ${Math.round(ageMs / 1000)}s` };
   }
 
   const cost = job.creditsUsed ?? 0;

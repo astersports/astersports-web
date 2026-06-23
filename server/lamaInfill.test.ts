@@ -33,7 +33,9 @@ vi.mock("../server/_core/env", () => ({
   },
 }));
 
-import { buildCacheKey } from "./lamaInfillTestHelpers";
+// Import the REAL buildCacheKey from the production module (previously a hand-copied
+// stand-in in lamaInfillTestHelpers, which meant the cache key was never actually tested).
+import { buildCacheKey } from "../server/_core/studio/ops/lamaInfill";
 
 describe("T2.1 — LaMa infill", () => {
   beforeEach(() => {
@@ -72,6 +74,13 @@ describe("T2.1 — LaMa infill", () => {
       const key2 = buildCacheKey(imageRgba, mask2);
 
       expect(key1).not.toBe(key2);
+    });
+
+    it("different model version produces different cache keys (no stale-model serve)", () => {
+      const imageRgba = Buffer.alloc(100 * 100 * 4, 128);
+      const mask = { width: 100, height: 100, data: new Uint8Array(100 * 100).fill(255) };
+
+      expect(buildCacheKey(imageRgba, mask, "model-v1")).not.toBe(buildCacheKey(imageRgba, mask, "model-v2"));
     });
   });
 

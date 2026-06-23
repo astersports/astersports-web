@@ -166,10 +166,12 @@ async function cropAndSegment(
   logSam2Call("autoSegment", c.cropWidth, c.cropHeight, image.audit); // Req 2 (C5: per-request audit)
 
   // T3.1: Segmentation cache — skip the SAM2 call on re-runs of the same garment+bbox.
+  // Include the model version in the key so a model-pin change can't serve a stale mask.
   const seg = await cachedSegmentation(
     image.url,
     c.bbox,
     () => client.autoSegment(c.dataUrl),
+    ENV.replicateSam2Model,
   );
   return { bbox: c.bbox, confidence: c.confidence, width: c.width, height: c.height, cropWidth: c.cropWidth, cropHeight: c.cropHeight, seg };
 }
