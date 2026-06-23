@@ -15,7 +15,13 @@ import { getDb } from "./db";
 import { jobs } from "../drizzle/schema";
 import { eq, inArray, and, isNotNull } from "drizzle-orm";
 
-describe("P3: Drizzle eq() vs inArray() on MySQL ENUM (TiDB)", () => {
+// Gated on RUN_DB_TESTS=1 (+ a DATABASE_URL pointing at a throwaway MySQL), mirroring
+// creditLedger.integration.test.ts. Without a DB, getDb() is null and beforeAll's
+// db.insert() throws — a DB-coupled assertion in the unit suite red-lines CI for every
+// lane (CLAUDE.md §5). The db-integration CI job sets RUN_DB_TESTS=1, so P3 still runs there.
+const RUN = process.env.RUN_DB_TESTS === "1";
+
+describe.skipIf(!RUN)("P3: Drizzle eq() vs inArray() on MySQL ENUM (TiDB)", () => {
   let db: NonNullable<Awaited<ReturnType<typeof getDb>>>;
   let seededJobId: number | null = null;
 
