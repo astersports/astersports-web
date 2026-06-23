@@ -19,7 +19,7 @@ vi.mock("./studioDb", () => ({
   grantCredits: vi.fn(),
   claimJobForCpuProcessing: vi.fn(),
 }));
-vi.mock("./serverLog", () => ({ log: { error: vi.fn(), info: vi.fn() } }));
+vi.mock("./serverLog", () => ({ log: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 
 import { processAsyncJob } from "./studioAsyncWorker";
 import { finishSam2Segmentation } from "./_core/masking/sam2Provider";
@@ -70,6 +70,16 @@ describe("processAsyncJob (§6 failure/refund matrix)", () => {
     expect(grantCredits).toHaveBeenCalledWith(3, 10, "refund", "job-7-failed", 9);
     expect(updateJobStatus).toHaveBeenCalledWith(7, "failed", expect.objectContaining({ errorMessage: expect.stringContaining("no-op") }));
     expect(addVariation).not.toHaveBeenCalled();
+  });
+
+  it("Fix 1: refunds the per-attempt deductRef key when predictionMeta carries it", async () => {
+    m(getJob).mockResolvedValue({ ...densityJob, predictionMeta: { ...densityJob.predictionMeta, deductRef: "job-7-a2" } });
+    m(runDensityOnSegmentation).mockResolvedValue(null);
+    const r = await processAsyncJob(7, client(SEG));
+    expect(r.status).toBe("failed");
+    // refunds <deductRef>-failed (attempt-scoped), NOT the fixed job-7-failed that
+    // would collide across regenerate attempts and strand attempt 2's credits.
+    expect(grantCredits).toHaveBeenCalledWith(3, 10, "refund", "job-7-a2-failed", 9);
   });
 
   it("prediction failed -> refund + failed, no claim/op", async () => {

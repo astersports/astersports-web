@@ -269,6 +269,9 @@ export const studioRouter = router({
               { url: job.originalUrl, audit: { orgId: String(ctx.tenant.id), jobId: String(job.id) } },
               { forDensity: useDeterministicDensity }
             );
+            // Record the exact per-attempt deduct refId so the worker refunds THIS
+            // attempt (`<deductRef>-failed`), not a fixed key that collides on regenerate.
+            meta.deductRef = deductRef;
             await markJobEnqueued(job.id, predictionId, meta, creditCost, JSON.stringify(controls));
           } catch {
             // locate/crop/startPrediction failed BEFORE the job was enqueued -> refund + fail, so a
