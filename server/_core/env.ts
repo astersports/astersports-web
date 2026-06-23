@@ -103,6 +103,14 @@ export const ENV = {
    *  the deadline must be BELOW that so a slow job fails+refunds internally rather than
    *  being hard-killed and stranding the charge. Default 45s (15s margin). */
   studioWorkerDeadlineMs: Number(process.env.STUDIO_WORKER_DEADLINE_MS) > 0 ? Number(process.env.STUDIO_WORKER_DEADLINE_MS) : 45_000,
+  /** T1.3: poison-pill poll-count cap. A wedged prediction re-polls until the reaper, burning
+   *  API calls; cap the polls. Paired with studioMaxPredictionAgeMs so a slow-but-healthy
+   *  prediction isn't false-failed at the ~10s cron cadence. Default 5; tune via STUDIO_MAX_POLL_ATTEMPTS. */
+  studioMaxPollAttempts: Number(process.env.STUDIO_MAX_POLL_ATTEMPTS) > 0 ? Number(process.env.STUDIO_MAX_POLL_ATTEMPTS) : 5,
+  /** T1.3: max expected async-prediction lifetime (ms). The poison-pill fires only once a job is
+   *  BOTH past the poll cap AND older than this — above the ~120s SAM2 run timeout so a legitimately
+   *  slow prediction completes (or Replicate times it out) before we give up. Default 150s. */
+  studioMaxPredictionAgeMs: Number(process.env.STUDIO_MAX_PREDICTION_AGE_MS) > 0 ? Number(process.env.STUDIO_MAX_PREDICTION_AGE_MS) : 150_000,
   /** H2: allowlist of host[:port] values the OAuth redirect target may use. When
    *  set (comma-separated), a decoded `state` redirect whose host is not on the
    *  list is rejected — the anti-code-interception control. Empty = scheme/format

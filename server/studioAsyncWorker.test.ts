@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("./_core/env", () => ({ ENV: { studioDensityRedistribute: false } }));
+vi.mock("./_core/env", () => ({ ENV: { studioDensityRedistribute: false, studioMaxPollAttempts: 5, studioMaxPredictionAgeMs: 150_000, studioWorkerDeadlineMs: 45_000 } }));
 vi.mock("./_core/masking/sam2Provider", () => ({ finishSam2Segmentation: vi.fn() }));
 vi.mock("./_core/masking/replicateSam2", () => ({ defaultSam2Client: vi.fn(() => ({})) }));
 vi.mock("./aiEngine", () => ({ runDensityOnSegmentation: vi.fn(), runScaleOnSegmentation: vi.fn() }));
@@ -144,9 +144,10 @@ describe("processAsyncJob (§6 failure/refund matrix)", () => {
     expect(r.status).toBe("skipped");
   });
 
-  // T1.3: Poison-pill max-attempt cap
-  it("T1.3: poison-pill terminates at attempt 5 with refund", async () => {
-    m(getJob).mockResolvedValue(densityJob);
+  // T1.3: Poison-pill cap — now gated on poll count AND prediction age
+  it("T1.3: poison-pill terminates when past the poll cap AND aged out", async () => {
+    // Old enqueue (200s > the 150s age threshold) so the age gate also trips.
+    m(getJob).mockResolvedValue({ ...densityJob, enqueuedAt: new Date(Date.now() - 200_000) });
     m(incrementPollAttempts).mockResolvedValue(5); // at the cap
     const r = await processAsyncJob(7, client(SEG));
     expect(r.status).toBe("failed");
@@ -157,7 +158,16 @@ describe("processAsyncJob (§6 failure/refund matrix)", () => {
     expect(claimJobForCpuProcessing).not.toHaveBeenCalled();
   });
 
-  it("T1.3: attempt 4 (below cap) proceeds normally", async () => {
+  it("T1.3: slow-but-young prediction past the poll cap is NOT poison-pilled (age gate)", async () => {
+    // Many polls but still young (10s < 150s) — a legitimately slow SAM2 run must keep waiting, not be refunded.
+    m(getJob).mockResolvedValue({ ...densityJob, enqueuedAt: new Date(Date.now() - 10_000) });
+    m(incrementPollAttempts).mockResolvedValue(6); // over the poll cap
+    const r = await processAsyncJob(7, client({ status: "processing" }));
+    expect(r.status).toBe("pending");
+    expect(grantCredits).not.toHaveBeenCalled();
+  });
+
+  it("T1.3: attempt below cap proceeds normally", async () => {
     m(getJob).mockResolvedValue(densityJob);
     m(incrementPollAttempts).mockResolvedValue(4); // below cap
     m(runDensityOnSegmentation).mockResolvedValue({ png: Buffer.from([1]), removed: 4 });
