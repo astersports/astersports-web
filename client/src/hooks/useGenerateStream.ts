@@ -14,7 +14,7 @@ import { useRef, useCallback } from "react";
 export interface StreamCallbacks {
   onStarted: (data: { jobId: number; creditCost: number; newBalance: number }) => void;
   onHeartbeat: () => void;
-  onProgress?: (data: { stage: string; percent: number }) => void;
+  onProgress?: (data: { stage: string; percent: number; previewUrl?: string }) => void;
   onDone: (data: {
     jobId: number;
     results: Array<{ url: string; key: string }>;

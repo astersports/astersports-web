@@ -13,6 +13,7 @@ import {
 import { ENV } from "./_core/env";
 import { addVariation } from "./studioDb";
 import { type ControlSettings } from "../shared/controls";
+import { thumbnailFromPng } from "./previewThumbnail";
 
 /**
  * The single per-variation generator shared by `generate` and `rerun`.
@@ -35,11 +36,12 @@ export async function runVariation(opts: {
   /** Aborted when the SSE client disconnects — checked before persisting so an
    *  abandoned (and refunded) job never delivers a free asset to history. */
   signal?: AbortSignal;
-  /** Optional callback to report pipeline progress to the SSE stream. */
-  onProgress?: (stage: PipelineStage, percent: number) => void;
+  /** Optional callback to report pipeline progress to the SSE stream.
+   *  previewUrl is an optional base64 data URL of a small thumbnail. */
+  onProgress?: (stage: PipelineStage, percent: number, previewUrl?: string) => void;
 }): Promise<{ url: string; key: string }> {
   const { controls, originalUrl, tenantId, jobId, instruction, expectation, round, mode, signal, onProgress } = opts;
-  const progress = onProgress ?? (() => {});
+  const progress: (stage: PipelineStage, percent: number, previewUrl?: string) => void = onProgress ?? (() => {});
   // C5: per-request audit context stamped on every outbound SAM2 call.
   const audit = { orgId: String(tenantId), jobId: String(jobId) };
   // If the caller aborted (client disconnect/timeout) while the work was running,
@@ -57,7 +59,9 @@ export async function runVariation(opts: {
     if (!densityResult) {
       throw new Error("Density processing is temporarily unavailable. Please try again in a moment.");
     }
-    progress("compositing", 80);
+    // Generate a preview thumbnail of the composited result
+    const densityPreview = await thumbnailFromPng(densityResult.png);
+    progress("compositing", 80, densityPreview);
     assertNotAborted();
     progress("finalizing", 90);
     const key = `studio/${tenantId}/${jobId}/density-${round}.png`;
@@ -72,7 +76,9 @@ export async function runVariation(opts: {
     const png = await generateScaledImage(originalUrl, {
       targetFraction: (100 + controls.scale.percent) / 100,
     }, audit);
-    progress("compositing", 80);
+    // Generate a preview thumbnail of the scaled result
+    const scalePreview = await thumbnailFromPng(png);
+    progress("compositing", 80, scalePreview);
     assertNotAborted();
     progress("finalizing", 90);
     const key = `studio/${tenantId}/${jobId}/scale-${round}.png`;

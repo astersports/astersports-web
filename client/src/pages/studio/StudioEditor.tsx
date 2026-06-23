@@ -65,6 +65,8 @@ export default function StudioEditor() {
   // Real-time pipeline progress (from SSE progress events)
   const [pipelineStage, setPipelineStage] = useState<string | null>(null);
   const [pipelinePercent, setPipelinePercent] = useState(0);
+  // Intermediate preview thumbnails (base64 data URLs keyed by stage)
+  const [previewThumbnails, setPreviewThumbnails] = useState<Record<string, string>>({});
 
   const uploadMutation = trpc.studio.upload.useMutation();
   const detectMutation = trpc.studio.detectElements.useMutation();
@@ -79,6 +81,7 @@ export default function StudioEditor() {
       setElapsedSeconds(0);
       setPipelineStage(null);
       setPipelinePercent(0);
+      setPreviewThumbnails({});
       setStep("processing");
       toast.info("Processing started — this may take up to a minute.");
     },
@@ -88,6 +91,9 @@ export default function StudioEditor() {
     onProgress: (data) => {
       setPipelineStage(data.stage);
       setPipelinePercent(data.percent);
+      if (data.previewUrl) {
+        setPreviewThumbnails(prev => ({ ...prev, [data.stage]: data.previewUrl! }));
+      }
     },
     onDone: (data) => {
       setIsGenerating(false);
@@ -462,19 +468,12 @@ export default function StudioEditor() {
                 elapsedSeconds={elapsedSeconds}
                 isAsync={asyncPolling}
                 asyncStatus={asyncJobStatus}
+                previewThumbnails={previewThumbnails}
+                originalImageUrl={originalUrl || undefined}
               />
             </div>
 
-            {originalUrl && (
-              <div className="mt-2 w-full max-w-xs">
-                <img
-                  src={originalUrl}
-                  alt="Original"
-                  className="w-full rounded-lg object-contain max-h-40 opacity-50"
-                />
-                <p className="text-xs text-center text-muted-foreground mt-2">Original image</p>
-              </div>
-            )}
+            {/* Original image is now shown in the PipelineProgress filmstrip */}
           </CardContent>
         </Card>
       </div>

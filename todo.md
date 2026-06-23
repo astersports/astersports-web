@@ -732,3 +732,12 @@
 - [x] Client: Show current stage label, elapsed time, and stage-aware progress percentage
 - [x] Mobile: Ensure progress bar renders well on small screens
 - [x] Tests: Verify TypeScript compiles cleanly and existing tests pass (514 passed)
+
+## Intermediate Preview Thumbnails in Progress View (Jun 22)
+- [x] Server: Extend onProgress callback to accept optional previewUrl (base64 data URL for small thumbnails)
+- [x] Server: Generate compositing preview (low-res thumbnail of result before final S3 persist)
+- [x] Client: Extend SSE progress event to carry optional previewUrl field
+- [x] Client: Update PipelineProgress to display filmstrip with original + stage previews
+- [x] Client: Animate thumbnail appearance with fade-in/zoom-in transitions + click-to-zoom modal
+- [x] Mobile: Thumbnails scale 16x16→20x20 with responsive layout and overflow scroll
+- [x] Tests: TypeScript compiles cleanly, all 514 tests pass
