@@ -37,7 +37,7 @@ export function isLamaAvailable(): boolean {
  * Build a deterministic cache key from the image pixels + mask pixels + model version.
  * The key is a content-hash, so identical inputs always produce the same key.
  */
-function buildCacheKey(imageRgba: Buffer, mask: RasterMask, modelVersion?: string): string {
+export function buildCacheKey(imageRgba: Buffer, mask: RasterMask, modelVersion?: string): string {
   const h = createHash("sha256");
   h.update(imageRgba);
   h.update(Buffer.from(mask.data.buffer, mask.data.byteOffset, mask.data.byteLength));
@@ -82,7 +82,9 @@ async function persistResult(cacheKey: string, rgbaBuffer: Buffer, width: number
       .png({ compressionLevel: 6 })
       .toBuffer();
     const storageKey = `${LAMA_CACHE_PREFIX}/${cacheKey}.png`;
-    await storagePut(storageKey, png, "image/png");
+    // deterministicKey: the cache key IS the content hash, so the write address must be
+    // stable and equal to what getCachedResult reads (no random suffix) or the cache never hits.
+    await storagePut(storageKey, png, "image/png", { deterministicKey: true });
     console.log(`[lama-cache] STORED key=${cacheKey.slice(0, 12)}…`);
   } catch (err) {
     // Non-fatal: cache persistence failure doesn't block the result
@@ -200,9 +202,13 @@ export async function lamaInfill(input: LamaInfillInput): Promise<LamaInfillResu
   // 2. Call LaMa
   const result = await callLama(imageRgba, width, height, region);
 
-  // 3. Persist to cache (async, non-blocking)
-  void persistResult(cacheKey, result, width, height);
+  // 3. Persist to cache, then return the PERSISTED-and-re-read bytes (not the fresh GPU
+  // output) so run 1 is byte-identical to every later cache hit (NFR-1 — the model is not
+  // byte-reproducible across GPU/driver, the persisted PNG is). Fall back to the fresh
+  // result only if persist/re-read fails (degraded determinism, but still delivers).
+  await persistResult(cacheKey, result, width, height);
+  const canonical = await getCachedResult(cacheKey, width, height);
 
-  console.log(`[lama-infill] MISS key=${cacheKey.slice(0, 12)}… (model called, caching)`);
-  return { data: result, width, height, fromCache: false };
+  console.log(`[lama-infill] MISS key=${cacheKey.slice(0, 12)}… (model called, cached)`);
+  return { data: canonical ?? result, width, height, fromCache: false };
 }

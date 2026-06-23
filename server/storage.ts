@@ -33,9 +33,13 @@ export async function storagePut(
   relKey: string,
   data: Buffer | Uint8Array | string,
   contentType = "application/octet-stream",
+  opts?: { deterministicKey?: boolean },
 ): Promise<{ key: string; url: string }> {
   const { forgeUrl, forgeKey } = getForgeConfig();
-  const key = appendHashSuffix(normalizeKey(relKey));
+  // Default appends a random suffix so distinct user assets sharing a path don't clobber.
+  // Content-addressed callers (the LaMa reproducible-by-cache layer) pass deterministicKey
+  // so the write address equals the later read address — otherwise the cache never hits.
+  const key = opts?.deterministicKey ? normalizeKey(relKey) : appendHashSuffix(normalizeKey(relKey));
 
   // 1. Get presigned PUT URL from Forge
   const presignUrl = new URL("v1/storage/presign/put", forgeUrl + "/");
