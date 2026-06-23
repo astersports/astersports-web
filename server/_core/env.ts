@@ -94,6 +94,14 @@ export const ENV = {
    *  vector; density only needs a representative motif set. Default 200; tune via
    *  STUDIO_MAX_INSTANCES. */
   studioMaxInstances: Number(process.env.STUDIO_MAX_INSTANCES) > 0 ? Number(process.env.STUDIO_MAX_INSTANCES) : 200,
+  /** In-worker wall-clock deadline (ms) for the async CPU op. The poll-predictions
+   *  cron processes N=1 to clear the Manus ~60s execution-cap (studioDb.listSam2ProcessingJobs);
+   *  a CPU op that outruns that cap is hard-killed mid-run and stranded (the client reads
+   *  it as a "timeout"). This deadline races the op and routes to the worker's
+   *  failAndRefund BEFORE the container is killed, so a slow job fails+refunds cleanly
+   *  instead of stranding the charge. Sits BELOW the execution cap (default 45s); raise
+   *  via STUDIO_WORKER_DEADLINE_MS only if the platform execution cap is raised too. */
+  studioWorkerDeadlineMs: Number(process.env.STUDIO_WORKER_DEADLINE_MS) > 0 ? Number(process.env.STUDIO_WORKER_DEADLINE_MS) : 45_000,
   /** H2: allowlist of host[:port] values the OAuth redirect target may use. When
    *  set (comma-separated), a decoded `state` redirect whose host is not on the
    *  list is rejected — the anti-code-interception control. Empty = scheme/format

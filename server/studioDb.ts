@@ -452,6 +452,35 @@ export async function claimJobForCpuProcessing(jobId: number): Promise<boolean> 
   return ((res as any)?.[0]?.affectedRows ?? 0) > 0;
 }
 
+/** Atomically finalize a successful op: cpu_processing -> done (+ creditsUsed). Returns true
+ *  ONLY if this worker still owns the cpu_processing claim. If the in-worker deadline (or a
+ *  peer) already moved the job to `failed`+refunded, this loses (affectedRows=0) and the late
+ *  result is discarded — the cancel-safe guard that prevents a deliver-AND-refund double-resolve. */
+export async function completeJobIfProcessing(jobId: number, creditsUsed: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const res = await db
+    .update(jobs)
+    .set({ status: "done", creditsUsed })
+    .where(and(eq(jobs.id, jobId), inArray(jobs.status, ["cpu_processing"])));
+  return ((res as any)?.[0]?.affectedRows ?? 0) > 0;
+}
+
+/** Atomically fail a still-claimable job: {sam2_processing|cpu_processing} -> failed (+ errorMessage).
+ *  Returns true ONLY if the job was still in flight. Used to GATE the worker refund: if this loses
+ *  (the success path already flipped the job to `done`, or a peer/reaper already failed it), the
+ *  refund is skipped so a delivered+billed job is never refunded and no double-refund is issued.
+ *  inArray() (not eq()) for the enum predicate, mirroring claimJobForCpuProcessing. */
+export async function failJobIfClaimable(jobId: number, errorMessage: string): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const res = await db
+    .update(jobs)
+    .set({ status: "failed", errorMessage })
+    .where(and(eq(jobs.id, jobId), inArray(jobs.status, ["sam2_processing", "cpu_processing"])));
+  return ((res as any)?.[0]?.affectedRows ?? 0) > 0;
+}
+
 /** Jobs awaiting their SAM2 prediction (cron poller). Bounded by `limit` (N=1 in prod to clear
  *  the Manus 60s execution cap). Oldest first so no job starves.
  *
@@ -509,10 +538,19 @@ export async function reapStuckJobs(
   if (!db) throw new Error("DB unavailable");
   const cutoff = new Date(Date.now() - olderThanMs);
 
+  // Age off an IMMUTABLE timestamp, not `updatedAt`. `updatedAt` is onUpdateNow(), so
+  // every status write — including the sam2_processing -> cpu_processing claim — resets
+  // it, which would reset this backstop's clock and let a repeatedly-touched strand
+  // evade the sweep (defeating the "never bill for a no-op" guarantee). `enqueuedAt`
+  // (set once at enqueue) is what the schema comments say drives this sweep; fall back
+  // to `createdAt` (also immutable) for sync `processing` jobs that have no enqueuedAt.
   const stuck = await db
     .select({ id: jobs.id, tenantId: jobs.tenantId, creditsUsed: jobs.creditsUsed })
     .from(jobs)
-    .where(and(inArray(jobs.status, ["processing", "sam2_processing", "cpu_processing"]), lte(jobs.updatedAt, cutoff)))
+    .where(and(
+      inArray(jobs.status, ["processing", "sam2_processing", "cpu_processing"]),
+      lte(sql`COALESCE(${jobs.enqueuedAt}, ${jobs.createdAt})`, cutoff),
+    ))
     .limit(limit);
 
   let reaped = 0;
