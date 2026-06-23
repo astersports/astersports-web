@@ -74,7 +74,7 @@ export async function runRedistributeCase(c: RedistributeEvalCase): Promise<Redi
       removed: r1.removed,
       targetRemovalFraction: c.percent / 100,
     });
-    const verdict = redistributeVerdict(metrics, r1.removed);
+    const verdict = redistributeVerdict(metrics, r1.removed, { placementEvennessMax: 1.9 });
 
     const outPng = await sharp(r1.data, { raw: { width, height, channels: 4 } }).png().toBuffer();
     const artifact = await saveSideBySide(src, width, height, outPng, `redistribute-${c.id}`);

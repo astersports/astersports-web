@@ -29,6 +29,7 @@ import { runDensityCase, type DensityEvalCase } from "../server/_core/studio/eva
 import { runScaleCase, type ScaleEvalCase } from "../server/_core/studio/eval/scaleEval";
 import { runRedistributeCase, type RedistributeEvalCase } from "../server/_core/studio/eval/redistributeEval";
 import { densityVerdict } from "../server/_core/studio/eval/densityMetrics";
+import { redistributeVerdict, type RedistributeMetrics } from "../server/_core/studio/eval/redistributeMetrics";
 import { ensureRedistributeFixture } from "../server/_core/studio/eval/genRedistributeFixture";
 import { EVAL_OUT_DIR } from "../server/_core/studio/eval/evalMaskIO";
 
@@ -185,6 +186,36 @@ async function runScaleBench(): Promise<boolean> {
   return allPass;
 }
 
+/**
+ * MUST-FAIL gate assertion: a perfect hex lattice (NNI ≈ 2.15) must be rejected
+ * by the placementEvennessMax cap (1.9). This tests the GATE, not the OP — the
+ * Bridson layout will never produce NNI > 1.9 in practice, but if someone swaps
+ * the layout to Lloyd-relaxation or a naive grid, this catches it.
+ */
+const NNI_CAP_REDISTRIBUTE = 1.9;
+
+function assertNniCapRejectsLattice(): boolean {
+  const fakeMetrics: RedistributeMetrics = {
+    measuredRemoval: 0.30,
+    countError: 0.0,
+    placementEvenness: 2.15, // perfect hex lattice
+    palette: 0,
+    perMotif: 0,
+    scaleFidelity: 0,
+    infillCleanliness: 0,
+    bgDeltaE: 0,
+    totalInstances: 36,
+    presentTargets: 25,
+  };
+  const v = redistributeVerdict(fakeMetrics, 11, { placementEvennessMax: NNI_CAP_REDISTRIBUTE });
+  if (v.pass) {
+    console.log("  ✗ MUST-FAIL: NNI cap did NOT reject hex lattice (NNI=2.15, cap=1.9)");
+    return false;
+  }
+  console.log("  ✓ MUST-FAIL: NNI cap correctly rejects hex lattice (NNI=2.15 > cap=1.9)");
+  return true;
+}
+
 async function runRedistributeBench(): Promise<boolean> {
   const manifestPath = "eval/samples/redistribute.manifest.json";
   let raw: RedistributeEvalCase[];
@@ -211,6 +242,10 @@ async function runRedistributeBench(): Promise<boolean> {
   }
 
   let allPass = true;
+
+  // Gate assertion: NNI cap rejects hex lattice (MUST-FAIL)
+  if (!assertNniCapRejectsLattice()) allPass = false;
+
   console.log("\n╔══════════════════════════════════════════╗");
   console.log("║     REDISTRIBUTE EVAL BENCH              ║");
   console.log("╚══════════════════════════════════════════╝");

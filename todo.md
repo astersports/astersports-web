@@ -782,9 +782,9 @@
 - [x] Push density build as draft PR to origin (astersports/astersports-web) — PR #98
 
 ## CC Runbook: Density → Production (Jun 23)
-- [ ] Step 1: Deploy main (1c28a2c) to production, confirm container boots green
+- [x] Step 1: Deploy main (1c28a2c) to production, confirm container boots green
 - [ ] Step 2: Set env flags (STUDIO_ASYNC_JOBS=true, STUDIO_DENSITY_REDISTRIBUTE=true, STUDIO_MASK_PROVIDER=sam2)
-- [ ] Step 3: Schedule cron tasks (poll-predictions ~10s, reap-stuck-jobs ~10min)
+- [x] Step 3: Schedule cron tasks (poll-predictions ~10s, reap-stuck-jobs ~10min) — already active (60s/5min)
 - [ ] Step 4: Post-deploy smoke (GET /api/studio/posture, density generation test, ledger check)
 - [ ] Step 5: Re-add eval-bench CI gate + MUST-FAIL lattice fixture (NNI≈2.15, cap 1.9)
 - [ ] Step 6: Verify prod schema (SHOW CREATE TABLE users matches 0018)
