@@ -435,12 +435,15 @@ export function registerScheduledRoutes(app: any) {
         return res.json({ success: true, skipped: 'async disabled', timestamp: new Date().toISOString() });
       }
       const pending = await listSam2ProcessingJobs(1); // N=1 — stay well under the 60s cap
-      const results: Array<{ jobId: number; status: string }> = [];
+      if (pending.length > 0) {
+        log.info('cron', `[poll-predictions] found ${pending.length} pending job(s): ${pending.map((j: any) => `id=${j.id}`).join(',')}`);
+      }
+      const results: Array<{ jobId: number; status: string; reason?: string }> = [];
       for (const j of pending) {
         const r = await processAsyncJob(j.id);
-        results.push({ jobId: j.id, status: r.status });
+        results.push({ jobId: j.id, status: r.status, reason: r.reason });
       }
-      log.info('cron', `[poll-predictions] processed ${results.length} jobs`);
+      log.info('cron', `[poll-predictions] processed ${results.length} jobs${results.length > 0 ? ': ' + JSON.stringify(results) : ''}`);
       res.json({ success: true, processed: results.length, results, timestamp: new Date().toISOString() });
     } catch (error) {
       log.error('cron', `[poll-predictions] Error: ${(error as Error).message}`);
