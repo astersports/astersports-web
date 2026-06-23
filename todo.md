@@ -779,4 +779,12 @@
 ## LaMa Activation & Draft PR (Jun 23)
 - [x] Add STUDIO_LAMA_LIVE env var to ENV config (default off)
 - [x] Wire ENV.studioLamaLive into all 3 aiEngine.ts density call sites
-- [ ] Push density build as draft PR to origin (astersports/astersports-web)
+- [x] Push density build as draft PR to origin (astersports/astersports-web) — PR #98
+
+## CC Runbook: Density → Production (Jun 23)
+- [x] Step 1: Deploy main (1c28a2c) to production, confirm container boots green
+- [ ] Step 2: Set env flags (STUDIO_ASYNC_JOBS=true, STUDIO_DENSITY_REDISTRIBUTE=true, STUDIO_MASK_PROVIDER=sam2)
+- [x] Step 3: Schedule cron tasks (poll-predictions ~10s, reap-stuck-jobs ~10min) — already active (60s/5min)
+- [ ] Step 4: Post-deploy smoke (GET /api/studio/posture, density generation test, ledger check)
+- [x] Step 5: Re-add eval-bench CI gate + MUST-FAIL lattice fixture (NNI≈2.15, cap 1.9) — pushed to origin (ci.yml needs manual push for workflows permission)
+- [x] Step 6: Verify prod schema — users has 0018 columns, studio_jobs has pollAttempts
