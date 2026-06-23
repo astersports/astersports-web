@@ -31,7 +31,9 @@ function scene(): Buffer {
 }
 
 const fullRaster = (): RasterMask => ({ width: W, height: H, data: new Uint8Array(W * H).fill(255) });
-const fabric: FabricMask = { bbox: { x: 0, y: 0, w: 1, h: 1 }, confidence: 1, provider: "sam2", raster: fullRaster() };
+// SAM2 always emits a boundaryRaster; supply it (full raster = whole image is garment),
+// reproducing the prior `?? raster` semantics now that the silent fallback is removed.
+const fabric: FabricMask = { bbox: { x: 0, y: 0, w: 1, h: 1 }, confidence: 1, provider: "sam2", raster: fullRaster(), boundaryRaster: fullRaster() };
 
 function buildTruth(): { masks: InstanceMask[]; labels: Int32Array; truthMask: Uint8Array } {
   const masks: InstanceMask[] = [];
