@@ -7,6 +7,18 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  /** Anthropic (Claude) vision LLM — fabric-region locate, element detection, and
+   *  the no-op QA judge (server/_core/llm.ts). Replaces the Manus forge LLM gateway.
+   *  Absent key => invokeLLM throws at call time; the locate path degrades to
+   *  DEFAULT_REGION rather than crashing, so it warns at boot, never blocks. */
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
+  /** Vision model id. Default Claude Opus 4.8 (best vision). Set ANTHROPIC_MODEL
+   *  to e.g. claude-haiku-4-5 to trade some accuracy for ~5x lower per-call cost
+   *  on the locate/detect/judge calls — an env flip, no code change. */
+  anthropicModel:
+    process.env.ANTHROPIC_MODEL && process.env.ANTHROPIC_MODEL.trim().length > 0
+      ? process.env.ANTHROPIC_MODEL.trim()
+      : "claude-opus-4-8",
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
@@ -195,6 +207,7 @@ export function validateEnv(): { errors: string[]; warnings: string[] } {
     ["MANUS_API_KEY", ENV.manusApiKey, "Manus Agent API integration"],
     ["BUILT_IN_FORGE_API_URL", ENV.forgeApiUrl, "Forge LLM/image generation"],
     ["BUILT_IN_FORGE_API_KEY", ENV.forgeApiKey, "Forge LLM/image generation"],
+    ["ANTHROPIC_API_KEY", ENV.anthropicApiKey, "Claude vision LLM (fabric locate / element detect / no-op judge)"],
   ];
   for (const [name, val, feature] of optional) {
     if (!val) warnings.push(`${name} missing — ${feature} disabled`);
