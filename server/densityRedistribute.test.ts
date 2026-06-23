@@ -28,7 +28,10 @@ function scene(): Buffer {
 }
 
 const fullRaster = (): RasterMask => ({ width: W, height: H, data: new Uint8Array(W * H).fill(255) });
-const fabric: FabricMask = { bbox: { x: 0, y: 0, w: 1, h: 1 }, confidence: 1, provider: "sam2", raster: fullRaster() };
+// SAM2 always emits a boundaryRaster (garment silhouette); mirror that here. The
+// full raster as boundary reproduces the prior `?? raster` semantics so the count /
+// relocation assertions are unchanged. (Fix 3 removed the silent full-crop fallback.)
+const fabric: FabricMask = { bbox: { x: 0, y: 0, w: 1, h: 1 }, confidence: 1, provider: "sam2", raster: fullRaster(), boundaryRaster: fullRaster() };
 
 function instances(): InstanceMask[] {
   const masks: InstanceMask[] = [];
@@ -92,9 +95,26 @@ describe("densityRedistribute (Option B)", () => {
   it("no bare ground to sample (fully covered fabric) -> removed 0, byte-identical (F2 refund)", async () => {
     const d = new Uint8Array(W * H);
     for (let y = 40; y < 60; y++) for (let x = 40; x < 60; x++) d[y * W + x] = 255;
-    const fab: FabricMask = { bbox: { x: 40 / W, y: 40 / H, w: 20 / W, h: 20 / H }, confidence: 1, provider: "sam2", raster: { width: W, height: H, data: Uint8Array.from(d) } };
+    const fab: FabricMask = { bbox: { x: 40 / W, y: 40 / H, w: 20 / W, h: 20 / H }, confidence: 1, provider: "sam2", raster: { width: W, height: H, data: Uint8Array.from(d) }, boundaryRaster: { width: W, height: H, data: Uint8Array.from(d) } };
     const inst: InstanceMask = { bbox: fab.bbox, raster: { width: W, height: H, data: Uint8Array.from(d) } };
     const res = await densityRedistribute({ image: { url: "x" }, fabric: fab, instances: [inst, inst], percent: 50 });
+    expect(res.removed).toBe(0);
+    expect(Buffer.compare(res.data, scene())).toBe(0);
+  });
+
+  // Fix 3 (Pillar 1): a sam2 fabric missing its boundaryRaster, or with an all-zero
+  // (degenerate) one, must DEGRADE -> refund rather than silently using the full-crop
+  // raster as the garment boundary (which would composite motifs onto background).
+  it("Fix 3: boundaryRaster absent (sam2, raster present) -> degrade refund, byte-identical", async () => {
+    const noBoundary: FabricMask = { bbox: { x: 0, y: 0, w: 1, h: 1 }, confidence: 1, provider: "sam2", raster: fullRaster() };
+    const res = await densityRedistribute({ image: { url: "x" }, fabric: noBoundary, instances: instances(), percent: 30 });
+    expect(res.removed).toBe(0);
+    expect(Buffer.compare(res.data, scene())).toBe(0);
+  });
+
+  it("Fix 3: all-zero boundaryRaster (degenerate silhouette) -> degrade refund, byte-identical", async () => {
+    const zeroBoundary: FabricMask = { bbox: { x: 0, y: 0, w: 1, h: 1 }, confidence: 1, provider: "sam2", raster: fullRaster(), boundaryRaster: { width: W, height: H, data: new Uint8Array(W * H) } };
+    const res = await densityRedistribute({ image: { url: "x" }, fabric: zeroBoundary, instances: instances(), percent: 30 });
     expect(res.removed).toBe(0);
     expect(Buffer.compare(res.data, scene())).toBe(0);
   });

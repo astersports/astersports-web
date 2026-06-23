@@ -174,9 +174,8 @@ export async function densityRedistribute(input: RedistributeInput): Promise<Red
     throw new Error(`densityRedistribute: raster dims ${raster.width}x${raster.height} != image ${width}x${height}`);
   }
 
-  // DUAL MASK (Option B): Use the garment silhouette boundary for layout + clip.
-  // Falls back to the full-crop sampling raster if boundaryRaster is absent (classical provider).
-  const boundary = input.fabric.boundaryRaster ?? raster;
+  // DUAL MASK (Option B): the garment silhouette boundary drives layout + clip.
+  // Validated and bound below (Fix 3) — no silent full-crop fallback.
 
   // No-op/passthrough: image returned unchanged, so all N motifs are still present
   // (kept = N, removed = 0). Keeps removed + kept === instances.length. removed === 0
@@ -198,6 +197,24 @@ export async function densityRedistribute(input: RedistributeInput): Promise<Red
   const dimDrift = input.instances.filter((m) => !m.raster || m.raster.width !== width || m.raster.height !== height).length;
   if (dimDrift > 0) {
     console.warn(`[density-redistribute] ${dimDrift}/${n} instance rasters not at ${width}x${height}; degrade -> refund (no bbox over-paint).`);
+    return empty();
+  }
+
+  // Fix 3 (Pillar 1): require a real garment silhouette. Do NOT silently fall back to
+  // the full-crop sampling raster as the boundary — that lets blueNoiseLayout place and
+  // the compositing clip paint motifs onto off-garment background (the clip degrades to
+  // "the entire bbox"). A missing or all-zero boundaryRaster is a DEGRADE -> refund
+  // (parity with the !raster guard above). The all-zero case already refunded via the F2
+  // / blueNoise empty-mask paths; this makes it explicit and avoids the silent fallback.
+  const boundary = input.fabric.boundaryRaster;
+  if (!boundary) {
+    console.warn("[density-redistribute] boundaryRaster absent; degrade -> refund (no full-crop boundary fallback).");
+    return empty();
+  }
+  let boundaryArea = 0;
+  for (let i = 0; i < boundary.data.length; i++) if (boundary.data[i] > 127) boundaryArea++;
+  if (boundaryArea === 0) {
+    console.warn("[density-redistribute] boundaryRaster all-zero (degenerate silhouette); degrade -> refund.");
     return empty();
   }
 
