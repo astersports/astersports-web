@@ -1,0 +1,212 @@
+ARCHITECT DECISION REQUEST — Print Studio Density Module
+Three source-verified fixes + one blocked mask fork
+========================================================
+
+Date:    2026-06-22
+Lane:    CC -> Architect (relayed by Frank), per §2.2
+Repo:    astersports/astersports-web @ main (HEAD 08b8914)
+Scope:   Architect-scoped per §2.4 — touches the credit/ledger money path,
+         a DB job-state predicate, and the mask provider. Holds for Architect
+         approval; no auto-merge; no code generated for the blocked fork.
+Status:  3 fixes READY for review/approval. 1 mask fork BLOCKED pending live data.
+
+
+0. GROUNDING BASIS (read first)
+-------------------------------
+Every claim below is tagged:
+  [GROUNDED-SRC] = verified by static source read at the cited file:line.
+  [VERIFY-RUNTIME] = NOT verified; requires a production query/credential this
+                     session did not have. Listed as blocked, never assumed.
+
+No production DATABASE_URL, CRON_SECRET, or REPLICATE_API_TOKEN was available to
+CC this session, so no runtime fact was confirmed. The Step-A checks specified to
+Frank were not returned. They are carried forward in §5 as open, not closed.
+
+Provenance note: the "Option A / B1 (Instance Hull) / B2 (second SAM2 call)"
+framing discussed in chat did NOT originate from CC's analysis and is not a CC
+recommendation. It was raised chat-side and is recorded here only as a discarded
+proposal (§4). The convex-hull idea is evaluated and rejected on its geometry.
+
+
+1. READY FIX 1 — Async refund-key collision (Pillar 3)   [GROUNDED-SRC]
+-----------------------------------------------------------------------
+SYMPTOM: A user can be charged for a density generation that fails, and never
+refunded, on the 2nd+ attempt of the same job id.
+
+EVIDENCE:
+  - Debit uses a unique PER-ATTEMPT refId:
+      attemptN = countJobGenerationAttempts(job.id) + 1   (studioDb.ts:332)
+      deductRef = `job-<id>-a<N>`                          (studio.ts:254-255)
+  - The async worker's refund uses a FIXED, non-attempt refId:
+      refundRefId = `job-<id>-failed`                      (studioAsyncWorker.ts:34)
+  - grantCredits is idempotent on (refId, reason) and SELECT-first
+    (studioDb.ts:363-373): a duplicate refId is a silent no-op.
+  => Re-invoking `generate` on the same job id: attempt 1 fails -> refunds
+     `job-<id>-failed`. Attempt 2 debits `job-<id>-a2`, fails, tries to refund
+     `job-<id>-failed` again -> grantCredits no-ops -> attempt 2's credits are
+     NOT returned. Reachable; violates §1 "never bill a no-op / ledger integrity".
+
+SCOPE LIMIT (verified): the `rerun` button is NOT affected — it creates a NEW job
+id specifically to avoid refId collisions, with a comment describing the exact
+`rerun-<id>` dup it already fixed (studio.ts:613-619). Only same-id re-`generate`
+triggers this.
+
+FIX (low-risk, no schema change):
+  - At enqueue, persist the exact deductRef into the existing typed JSON column
+    studio_jobs.predictionMeta (schema.ts:262; written by markJobEnqueued,
+    studio.ts:272).
+  - The worker reads predictionMeta.deductRef and refunds `<deductRef>-failed`
+    (attempt-scoped), mirroring the SSE path which already keys per-attempt
+    (Pillar-3 finding, studioStream.ts:345).
+  - No attempt-number reconstruction in the worker (avoids any race on the
+    attempt counter).
+
+RESIDUAL EDGE (disclosed, not blocking): re-generating while attempt 1's Replicate
+prediction is still in flight overwrites predictionMeta; a late attempt-1 webhook
+would then refund attempt-2's key. Current code has the same class of exposure;
+both attempts are charged and each has a distinct refund key, so no double-refund —
+worst case mis-attributes one refund. Acceptable; note for the implementing PR.
+
+TESTS THAT GUARD THIS: studioAsyncWorker.test.ts (no-op->refund wiring);
+creditLedger.integration.test.ts (atomic deduct/grant idempotency, RUN_DB_TESTS=1).
+
+
+2. READY FIX 2 — eq()-on-enum claim UPDATE (Pillar 2b)   [GROUNDED-SRC / VERIFY-RUNTIME]
+---------------------------------------------------------------------------------------
+SOURCE FACT [GROUNDED-SRC]: claimJobForCpuProcessing issues
+  UPDATE studio_jobs SET status='cpu_processing'
+  WHERE id=? AND status='sam2_processing'                 (studioDb.ts:446)
+using a sole enum predicate eq(jobs.status, 'sam2_processing'). The repo documents
+a confirmed bug — Drizzle eq() on a MySQL ENUM "silently returns empty results in
+serverless containers (TiDB + Autoscale)" — and every READ poller already works
+around it with inArray (studioDb.ts:451-463 SELECT; :510 reaper). The HEAD commit
+fixed the SELECT poller; the claim UPDATE at :446 was not converted.
+
+OPEN [VERIFY-RUNTIME]: whether the silent-empty behavior manifests for an
+UPDATE...WHERE (vs a SELECT) is NOT confirmed. If it does, claims always match 0
+rows -> no job ever reaches cpu_processing -> every async density job is stranded
+then reaped+refunded (i.e. density silently broken). If it does not, this is a pure
+consistency cleanup.
+
+DECISION: convert :446 to inArray(jobs.status, ['sam2_processing']), mirroring the
+documented, already-deployed workaround. This is CORRECT AND SAFE in BOTH branches
+of the open question; the runtime check only tells us whether we fixed a live
+outage or tidied a latent risk. The §5 poll-predictions probe should run to label
+it, but the change does not depend on the result.
+
+
+3. READY FIX 3 — Degenerate boundary mask -> explicit refund (Pillar 1)   [GROUNDED-SRC]
+---------------------------------------------------------------------------------------
+SOURCE FACT: densityRedistribute (v2) derives its spatial authority from
+  boundary = input.fabric.boundaryRaster ?? raster        (densityRedistribute.ts:179)
+and uses `boundary` for base-cloth sampling (:207) and the compositing clip (:263).
+If boundaryRaster is absent or all-zero, the `?? raster` fallback silently swaps in
+the FULL-CROP fill, so the background-bleed clip at :263 degrades to "the entire
+bbox" — motifs may composite onto off-garment background. blueNoiseLayout already
+returns [] on an empty mask (blueNoiseLayout.ts:82,88), so the failure is silent
+(a degenerate/clustered or no-op result), not a crash.
+
+FIX: treat a missing or all-zero boundaryRaster as an explicit degrade -> route to
+failAndRefund (parity with the existing `!raster` throw at densityRedistribute.ts:170),
+instead of falling back to the full-crop raster. A blank-wall image SHOULD refund as
+a no-op; this makes that refund explicit and telemetered rather than relying on
+removed===0. Folds the chat-side "degenerate mask guard" idea, reframed: it is NOT
+an infinite-loop guard (no unbounded loop exists — see §4 rejected items).
+
+
+4. THE FORK (BLOCKED) — what is seg.combined?
+---------------------------------------------
+The codebase CONTRADICTS ITSELF on what the SAM2 combined mask contains, and the
+whole "should v2 use a different boundary derivation" question depends on it:
+
+  (a) boundaryRaster is decoded from s.seg.combined and documented as
+      "the actual garment silhouette" (sam2Provider.ts:188-201; types.ts:43).
+  (b) The ADJACENT comment explaining why `raster` was switched OFF combined_mask
+      says: "for dense print patterns SAM2's combined_mask is sparse (only the
+      motif union)" (sam2Provider.ts:170-176).
+
+Both cannot be true for an all-over print. Consequence:
+  - If (a) holds (true silhouette): current boundaryRaster is correct; any
+    hull/union refactor would REGRESS it.
+  - If (b) holds (sparse motif union): v2's blueNoiseLayout is already restricted
+    to where motifs exist, so redistribution cannot spread into inter-motif bare
+    ground on all-over prints — a real defect in CURRENT main, warranting a fix.
+
+ALSO NOTE: seg.combined comes from the SAME single autoSegment call
+(sam2Provider.ts:166) — the silhouette is already a free byproduct. There is no
+"second SAM2 call" cost to trade against; that alternative was a false framing.
+
+BLOCKED PREMISE: No layout / dual-mask / boundary-derivation refactor proceeds
+until s.seg.combined is empirically characterized — decode an actual combined mask
+from a real ALL-OVER-PRINT production job and measure its coverage fraction within
+the garment vs the full crop. Tooling that may already do this:
+scripts/test-density-diag.ts, scripts/test-density-live.ts (require REPLICATE creds
++ a garment fixture). This is a measurement step, not a build step.
+
+DISCARDED PROPOSAL — convex hull of instances (chat-side, REJECTED): a convex hull
+over motif instances paves over garment concavities (armholes, necklines, between
+legs), placing/compositing motifs onto background and defeating the very clip guard
+at densityRedistribute.ts:263. A dilated union is also fragile (too small leaves
+inter-motif gaps closed; too large bleeds past the true garment edge). Neither is
+adopted; the fork stays open pending the measurement above.
+
+UTILITIES (answer to "do we already have hull/dilation?"):
+  - Dilation EXISTS but as a private helper DUPLICATED in densityThin.ts:48 and
+    densityRedistribute.ts:69; reuse would require extracting to _core/masking.
+  - Convex hull does NOT exist anywhere in _core (and is geometrically wrong here).
+
+
+5. RUNTIME VERIFICATIONS STILL OPEN (Step A) — blocked on credentials
+---------------------------------------------------------------------
+These remain [VERIFY-RUNTIME]; Frank/Architect to run when able. Exact checks:
+
+  V1 (does eq-on-enum strand jobs — behavioral, NOT a raw-SQL predicate test,
+      because the bug is in Drizzle's serverless rendering):
+      a. SELECT status, COUNT(*) FROM studio_jobs GROUP BY status;
+      b. SELECT id,status,enqueuedAt,updatedAt,(predictionId IS NOT NULL) hasPred,
+           creditsUsed FROM studio_jobs
+           WHERE status IN ('sam2_processing','cpu_processing')
+             AND updatedAt < NOW() - INTERVAL 30 MINUTE ORDER BY updatedAt LIMIT 20;
+      c. curl -i -X POST -H "x-cron-secret: $CRON_SECRET" \
+           https://<PROD>/api/scheduled/poll-predictions   then re-run (a);
+           a succeeded-prediction job that does NOT advance to cpu_processing/done
+           = the UPDATE claim is silently empty.
+      d. SELECT id,level,source,message,jobId FROM server_logs WHERE source='cron'
+           AND (message LIKE '%poll-predictions%' OR message LIKE '%reap-stuck-jobs%')
+           ORDER BY id DESC LIMIT 20;
+
+  V2 (is unique index 0010 live + table clean):
+      a. SHOW INDEX FROM credit_ledger WHERE Key_name='uniq_credit_ledger_ref_reason';
+         (expect 2 rows, Non_unique=0)
+      b. SELECT refId,reason,COUNT(*) c FROM credit_ledger WHERE refId IS NOT NULL
+           GROUP BY refId,reason HAVING c>1 LIMIT 20;   (expect 0 — §1: never force
+           the index over duplicates)
+
+  V3 (CRON_SECRET set + reaper scheduled):
+      a. curl -i https://<PROD>/api/studio/posture                  (expect 401/403)
+         curl -i -H "x-cron-secret: $CRON_SECRET" https://<PROD>/api/studio/posture
+                                                                     (expect 200+JSON)
+      b. Manus scheduler shows a cron POSTing /api/scheduled/reap-stuck-jobs;
+         corroborate via recurring "[reap-stuck-jobs] reaped" lines in V1d.
+
+  V4 (mask fork): decode a real all-over-print seg.combined; measure garment
+      coverage vs full crop (see §4).
+
+
+6. RECOMMENDATION / NEXT STEPS
+------------------------------
+- Approve fixes 1-3 for implementation as THREE separate Architect-scoped PRs
+  (one concern each; smallest blast radius). Each runs `pnpm run check` +
+  `pnpm run test`; any ledger/refId change additionally runs
+  RUN_DB_TESTS=1 creditLedger.integration.test.ts.
+- Fix 2 ships regardless of V1 (correct in both branches); V1 only labels severity.
+- PARK the mask fork (§4) until V4 data exists. No PR 3.
+- §1 invariants honored throughout: idempotency on (refId,reason), no direct
+  creditBalance writes, never bill a no-op, never force the unique index over dups.
+
+CC LEAN: ship 1-3 (1 and 3 are clear correctness/ledger fixes; 2 is a safe
+consistency cleanup that may also be a latent-outage fix). Hold the mask fork — it
+is the one place where acting before measuring could cause the exact background
+bleed we are trying to prevent.
+
+-- Claude Code
