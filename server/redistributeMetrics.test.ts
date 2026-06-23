@@ -11,8 +11,35 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("./_core/image/decodeUpright", () => ({ decodeUpright: vi.fn() }));
 import { decodeUpright } from "./_core/image/decodeUpright";
 import { densityRedistribute } from "./_core/studio/ops/densityRedistribute";
-import { computeRedistributeMetrics, redistributeVerdict } from "./_core/studio/eval/redistributeMetrics";
+import { computeRedistributeMetrics, redistributeVerdict, type RedistributeMetrics } from "./_core/studio/eval/redistributeMetrics";
 import type { FabricMask, InstanceMask, RasterMask } from "./_core/masking/types";
+
+// H1: the SHIPPING verdict must reject over-regularization (a crystalline hex lattice,
+// NNI ≈ 2.1491), not just clustering — parity with v1 densityVerdict's nniMin/nniMax band.
+describe("redistributeVerdict placementEvenness band (H1)", () => {
+  const base: RedistributeMetrics = {
+    measuredRemoval: 0.3, countError: 0, placementEvenness: 1.4, palette: 0, perMotif: 0,
+    scaleFidelity: 0, infillCleanliness: 0, bgDeltaE: 0, totalInstances: 36, presentTargets: 25,
+  };
+  const withNNI = (nni: number): RedistributeMetrics => ({ ...base, placementEvenness: nni });
+
+  it("no upper cap by default (back-compat): a high NNI still passes evenness", () => {
+    expect(redistributeVerdict(withNNI(2.1), 11).evennessPass).toBe(true);
+    expect(redistributeVerdict(withNNI(5.0), 11).evennessPass).toBe(true);
+  });
+
+  it("placementEvennessMax caps over-regularization (hex lattice R≈2.1 fails once capped)", () => {
+    expect(redistributeVerdict(withNNI(2.1), 11, { placementEvennessMax: 1.9 }).evennessPass).toBe(false);
+    expect(redistributeVerdict(withNNI(2.1), 11, { placementEvennessMax: 1.9 }).pass).toBe(false);
+  });
+
+  it("band gate: even passes, clustered and crystalline both fail", () => {
+    const band = { placementEvenness: 1.0, placementEvennessMax: 1.9 };
+    expect(redistributeVerdict(withNNI(1.4), 11, band).evennessPass).toBe(true);  // even
+    expect(redistributeVerdict(withNNI(0.8), 11, band).evennessPass).toBe(false); // clustered
+    expect(redistributeVerdict(withNNI(2.1), 11, band).evennessPass).toBe(false); // lattice
+  });
+});
 
 const mockDecode = decodeUpright as unknown as ReturnType<typeof vi.fn>;
 const W = 128, H = 128, P = 20, OFF = 14, N = 6, R = 8;

@@ -118,4 +118,15 @@ describe("densityRedistribute (Option B)", () => {
     expect(res.removed).toBe(0);
     expect(Buffer.compare(res.data, scene())).toBe(0);
   });
+
+  // GAP-1: a boundaryRaster whose dims drift from the image would mis-index the layout
+  // walk + the composite clip (`boundary.data[dY*width+dX]`), composing a CORRUPTED result
+  // the caller would still BILL. The dim guard (parity with the raster/instance checks)
+  // degrades -> refund instead.
+  it("GAP-1: boundaryRaster dims != image -> degrade refund (no mis-indexed clip), byte-identical", async () => {
+    const wrongDims: FabricMask = { bbox: { x: 0, y: 0, w: 1, h: 1 }, confidence: 1, provider: "sam2", raster: fullRaster(), boundaryRaster: { width: W / 2, height: H, data: new Uint8Array((W / 2) * H).fill(255) } };
+    const res = await densityRedistribute({ image: { url: "x" }, fabric: wrongDims, instances: instances(), percent: 30 });
+    expect(res.removed).toBe(0);
+    expect(Buffer.compare(res.data, scene())).toBe(0);
+  });
 });

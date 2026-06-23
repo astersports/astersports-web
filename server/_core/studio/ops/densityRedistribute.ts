@@ -211,6 +211,17 @@ export async function densityRedistribute(input: RedistributeInput): Promise<Red
     console.warn("[density-redistribute] boundaryRaster absent; degrade -> refund (no full-crop boundary fallback).");
     return empty();
   }
+  // GAP-1: the boundary is consumed at IMAGE-space indices — blueNoiseLayout walks it
+  // as w*h and the composite clip reads `boundary.data[dY*width+dX]` (below). If its
+  // dims drift from the image, those indices address the wrong pixels (or out of bounds
+  // -> undefined <= 127 -> motif pixels silently dropped / painted off-garment),
+  // producing a CORRUPTED result the caller would still BILL (removed > 0). Every other
+  // failure here degrades to a refund; this was the one path to a corrupted paid image.
+  // Mirror the raster (l.173) and instance-raster (l.197) dim guards: degrade -> refund.
+  if (boundary.width !== width || boundary.height !== height) {
+    console.warn(`[density-redistribute] boundaryRaster dims ${boundary.width}x${boundary.height} != image ${width}x${height}; degrade -> refund.`);
+    return empty();
+  }
   let boundaryArea = 0;
   for (let i = 0; i < boundary.data.length; i++) if (boundary.data[i] > 127) boundaryArea++;
   if (boundaryArea === 0) {

@@ -42,7 +42,8 @@ export interface RedistributeMetrics {
 
 export interface RedistributeThresholds {
   countError?: number;       // default 0.10
-  placementEvenness?: number; // default 1.0 (R >= 1 = dispersed)
+  placementEvenness?: number; // default 1.0 (R >= 1 = dispersed) — NNI floor
+  placementEvennessMax?: number; // default Infinity — NNI cap (rejects over-regularization → hex lattice R≈2.1491)
   palette?: number;          // default 5
   perMotif?: number;         // default 3
   scaleFidelity?: number;    // default 0.05
@@ -262,7 +263,14 @@ export function computeRedistributeMetrics(input: RedistributeMetricInput): Redi
  */
 export function redistributeVerdict(m: RedistributeMetrics, removed: number, thresholds: RedistributeThresholds = {}) {
   const countPass = m.countError <= (thresholds.countError ?? 0.10);
-  const evennessPass = m.placementEvenness >= (thresholds.placementEvenness ?? 1.0);
+  // Two-sided NNI band (parity with v1 densityVerdict's nniMin/nniMax): a FLOOR
+  // rejects clustering, a CAP rejects over-regularization. blueNoiseLayout deliberately
+  // stops Lloyd short of convergence to avoid drifting into a crystalline hex lattice
+  // (NNI → 2.1491); with only a floor, the SHIPPING verdict cannot detect that failure.
+  // Default cap is Infinity (no behaviour change) until the G3 real-garment eval calibrates it.
+  const evennessLo = thresholds.placementEvenness ?? 1.0;
+  const evennessHi = thresholds.placementEvennessMax ?? Infinity;
+  const evennessPass = m.placementEvenness >= evennessLo && m.placementEvenness <= evennessHi;
   const palettePass = m.palette <= (thresholds.palette ?? 5);
   const perMotifPass = m.perMotif <= (thresholds.perMotif ?? 3);
   const scalePass = m.scaleFidelity <= (thresholds.scaleFidelity ?? 0.05);
