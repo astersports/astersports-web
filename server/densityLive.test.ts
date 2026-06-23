@@ -76,6 +76,7 @@ describe("generateDensityImage (single-call getSegmentation)", () => {
       fabric: fabricWithRaster,
       instances,
       percent: 30,
+      useLama: false,
     });
   });
 

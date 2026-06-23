@@ -51,6 +51,11 @@ export const ENV = {
    *  money path; when off, density runs v1. The flag flip stays Frank's (§1
    *  human-on-flip). Patterned on studioDensityLive. */
   studioDensityRedistribute: process.env.STUDIO_DENSITY_REDISTRIBUTE === "true",
+  /** T2.1: LaMa texture-aware infill. When true, density ops use Replicate's LaMa
+   *  inpainting model instead of flat LAB fill. Requires sub-processor disclosure
+   *  (Replicate DPA + privacy policy update) before activation in production.
+   *  Default off — Flip-Authority-governed (CLAUDE.md §1). */
+  studioLamaLive: process.env.STUDIO_LAMA_LIVE === "true",
   /** Self-serve org creation (`tenants.create`). Mints TRIAL_CREDITS through the
    *  ledger-safe `grantCredits` path and is per-user rate-limited. Default off —
    *  this is the Flip-Authority-governed money-path flip (CLAUDE.md §1). It gates
@@ -94,6 +99,10 @@ export const ENV = {
    *  vector; density only needs a representative motif set. Default 200; tune via
    *  STUDIO_MAX_INSTANCES. */
   studioMaxInstances: Number(process.env.STUDIO_MAX_INSTANCES) > 0 ? Number(process.env.STUDIO_MAX_INSTANCES) : 200,
+  /** T1.4: In-worker wall-clock deadline (ms). The cron poller has a ~60s execution cap;
+   *  the deadline must be BELOW that so a slow job fails+refunds internally rather than
+   *  being hard-killed and stranding the charge. Default 45s (15s margin). */
+  studioWorkerDeadlineMs: Number(process.env.STUDIO_WORKER_DEADLINE_MS) > 0 ? Number(process.env.STUDIO_WORKER_DEADLINE_MS) : 45_000,
   /** H2: allowlist of host[:port] values the OAuth redirect target may use. When
    *  set (comma-separated), a decoded `state` redirect whose host is not on the
    *  list is rejected — the anti-code-interception control. Empty = scheme/format

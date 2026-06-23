@@ -9,13 +9,19 @@
  * (sam2_processing -> cpu_processing) lets only one worker run the op + write the variation; the
  * other no-ops. grantCredits is idempotent on (refId, reason) as a second backstop against a
  * double refund, and the reaper backstops a worker/container death mid-op.
+ *
+ * Cancel-safety (T1.4): Two atomic CAS helpers (`completeJobIfProcessing`, `failJobIfClaimable`)
+ * gate all terminal writes. The deadline path calls failJobIfClaimable — if the op already
+ * completed and flipped to `done`, the CAS loses (affectedRows=0) and the refund is skipped.
+ * Conversely, if the deadline fires first, completeJobIfProcessing loses and the late result is
+ * discarded. This prevents the deliver-AND-refund double-resolve hazard.
  */
 import { ENV } from "./_core/env";
 import { finishSam2Segmentation } from "./_core/masking/sam2Provider";
 import { defaultSam2Client, type Sam2Client } from "./_core/masking/replicateSam2";
 import { runDensityOnSegmentation, runScaleOnSegmentation } from "./aiEngine";
 import { storagePut, storageGetSignedUrl } from "./storage";
-import { getJob, updateJobStatus, addVariation, grantCredits, claimJobForCpuProcessing, incrementPollAttempts } from "./studioDb";
+import { getJob, updateJobStatus, addVariation, grantCredits, claimJobForCpuProcessing, completeJobIfProcessing, failJobIfClaimable, incrementPollAttempts } from "./studioDb";
 import { log } from "./serverLog";
 import { emitRefundTelemetry } from "./refundTelemetry";
 import { REFUND_REASONS, type RefundReason } from "../shared/refundReasons";
@@ -25,19 +31,24 @@ export type AsyncJobOutcome = { status: "done" | "failed" | "pending" | "skipped
 
 /**
  * T1.4: Worker deadline — 45s (safe below the 60s cron execution cap).
- * Wraps the job body in AbortController + Promise.race so a hung job is terminated internally
- * rather than waiting for the 10-min reaper. The AbortSignal is threaded into network calls
- * so the timeout *cancels* rather than leaks. A `terminated` flag guards terminal writes so
- * a late-completing body cannot mark a deadline-failed job `done` (no double-resolution).
- *
- * Note: The platform HTTP cap is 180s, but the cron poller path (poll-predictions) has a
- * tighter 60s execution window. Since processAsyncJob is called from the cron handler,
- * the deadline must fit within that window with margin for cleanup.
+ * The poll-predictions cron runs the op inside the Manus ~60s execution cap
+ * (listSam2ProcessingJobs processes N=1 to fit it); a CPU op that outruns the cap is
+ * hard-killed mid-run and stranded. Race the op against a deadline BELOW the cap so a
+ * slow job fails+refunds via failJobIfClaimable instead of stranding.
  */
 const WORKER_DEADLINE_MS = 45_000;
 
+/** Exported for tests to override. */
+export function getDeadlineMs(): number {
+  return ENV.studioWorkerDeadlineMs ?? WORKER_DEADLINE_MS;
+}
+
 /** `client` injectable for tests; defaults to the production Replicate client. */
-export async function processAsyncJob(jobId: number, client: Sam2Client = defaultSam2Client()): Promise<AsyncJobOutcome> {
+export async function processAsyncJob(
+  jobId: number,
+  client: Sam2Client = defaultSam2Client(),
+  deadlineMs: number = getDeadlineMs()
+): Promise<AsyncJobOutcome> {
   const job = await getJob(jobId);
   if (!job) return { status: "skipped", reason: "job not found" };
   if (job.status === "done" || job.status === "failed") return { status: "skipped", reason: `already ${job.status}` };
@@ -72,31 +83,27 @@ export async function processAsyncJob(jobId: number, client: Sam2Client = defaul
   }
 
   const cost = job.creditsUsed ?? 0;
-  // Refund the EXACT attempt that was debited: the enqueue mutation records the
-  // per-attempt deduct refId (`job-<id>-a<N>`) on predictionMeta, so we refund
-  // `<deductRef>-failed`. A fixed `job-<id>-failed` collided across regenerate
-  // attempts (attempt 2's refund no-ops against attempt 1's key, leaving attempt 2
-  // un-refunded). Fallback to the legacy key for jobs enqueued before this field.
-  // Either form still starts with `job-<id>-` so the reaper's `job-<id>-%` guard
-  // prevents a double refund across webhook/cron/reaper; idempotent on (refId,reason).
   const refundRefId = job.predictionMeta?.deductRef
     ? `${job.predictionMeta.deductRef}-failed`
     : `job-${job.id}-failed`;
 
-  // T1.4: Monotonic terminal state flag. Once set, no late-completing body can write
-  // a terminal state (done/failed). Prevents the race: deadline fires → refund → late
-  // body completes → tries to mark done → blocked by this flag.
-  let terminated = false;
-
+  /**
+   * Cancel-safe fail+refund. Uses `failJobIfClaimable` CAS: only refunds if the job is
+   * still in-flight (sam2_processing or cpu_processing). If the success path already
+   * flipped to `done`, the CAS loses and no refund is issued — preventing deliver-AND-refund.
+   */
   const failAndRefund = async (refundReason: RefundReason, detail: string): Promise<AsyncJobOutcome> => {
-    if (terminated) return { status: "failed", reason: "already terminated (deadline)" };
-    terminated = true;
+    const claimed = await failJobIfClaimable(job.id, detail);
+    if (!claimed) {
+      // Job already finalized (done by success path, or failed by peer/reaper) — skip refund.
+      log.warn("studio", "async-worker: failAndRefund CAS lost — job already finalized", { jobId: job.id, metadata: { refundRefId } });
+      return { status: "skipped", reason: "job already finalized before fail" };
+    }
     try {
       if (cost > 0) await grantCredits(job.tenantId, cost, "refund", refundRefId, job.userId);
     } catch (e) {
       log.error("studio", "async-worker: refund failed", { jobId: job.id, tenantId: job.tenantId, metadata: { cost, error: (e as any)?.message || String(e) } });
     }
-    await updateJobStatus(job.id, "failed", { errorMessage: detail }).catch(() => {});
     // T0.1: Emit per-guard refund telemetry — exactly one reason per refund event.
     emitRefundTelemetry({
       reason: refundReason,
@@ -109,99 +116,93 @@ export async function processAsyncJob(jobId: number, client: Sam2Client = defaul
     return { status: "failed", reason: detail };
   };
 
-  // T1.4: AbortController for the deadline. The signal is available for network calls
-  // to abort cleanly when the deadline fires.
-  const ac = new AbortController();
-  const deadlineTimer = setTimeout(() => ac.abort(), WORKER_DEADLINE_MS);
-
-  // The job body — runs the prediction poll + CPU op + persist.
-  const runBody = async (): Promise<AsyncJobOutcome> => {
-    const result = await client.processPrediction(job.predictionId!);
-    if (result.status === "processing") return { status: "pending", reason: "prediction still running" };
-    if (result.status === "failed") {
-      return failAndRefund(REFUND_REASONS.sam2_error, `SAM2 prediction failed: ${result.error}`);
-    }
-
-    // succeeded — atomically claim so only ONE worker runs the op + writes the variation.
-    const claimed = await claimJobForCpuProcessing(job.id);
-    if (!claimed) return { status: "skipped", reason: "claimed by another worker" };
-
-    const controls = job.controls ? (JSON.parse(job.controls) as ControlSettings) : null;
-    if (!controls) {
-      return failAndRefund(REFUND_REASONS.missing_controls, "missing controls");
-    }
-
-    const srcUrl = job.originalUrl.startsWith("/manus-storage/")
-      ? await storageGetSignedUrl(job.originalUrl.replace("/manus-storage/", ""))
-      : job.originalUrl;
-
-    const { fabric, instances } = await finishSam2Segmentation(result.segmentation, job.predictionMeta!);
-
-    let png: Buffer;
-    if (controls.density?.enabled) {
-      const out = await runDensityOnSegmentation(srcUrl, fabric, instances, controls.density.percent, ENV.studioDensityRedistribute);
-      if (!out) {
-        return failAndRefund(REFUND_REASONS.round0_noop, "density no-op (removed 0)");
+  // The op body. Always RESOLVES (never rejects): internal degrades/errors route to
+  // failAndRefund. Raced against the deadline below.
+  const runJob = async (): Promise<AsyncJobOutcome> => {
+    try {
+      const result = await client.processPrediction(job.predictionId!);
+      if (result.status === "processing") return { status: "pending", reason: "prediction still running" };
+      if (result.status === "failed") {
+        return failAndRefund(REFUND_REASONS.sam2_error, `SAM2 prediction failed: ${result.error}`);
       }
-      png = out.png;
-    } else if (controls.scale?.enabled && controls.scale.percent !== 0) {
-      // runScaleOnSegmentation throws NO_OP_SCALE_ERROR / NON_REPEAT_SCALE_ERROR -> caught below -> refund.
-      png = await runScaleOnSegmentation(srcUrl, fabric, (100 + controls.scale.percent) / 100);
-    } else {
-      return failAndRefund(REFUND_REASONS.no_async_op, "no async-supported op in controls");
+
+      // succeeded — atomically claim so only ONE worker runs the op + writes the variation.
+      const claimed = await claimJobForCpuProcessing(job.id);
+      if (!claimed) return { status: "skipped", reason: "claimed by another worker" };
+
+      const controls = job.controls ? (JSON.parse(job.controls) as ControlSettings) : null;
+      if (!controls) {
+        return failAndRefund(REFUND_REASONS.missing_controls, "missing controls");
+      }
+
+      const srcUrl = job.originalUrl.startsWith("/manus-storage/")
+        ? await storageGetSignedUrl(job.originalUrl.replace("/manus-storage/", ""))
+        : job.originalUrl;
+
+      const { fabric, instances } = await finishSam2Segmentation(result.segmentation, job.predictionMeta!);
+
+      let png: Buffer;
+      if (controls.density?.enabled) {
+        const out = await runDensityOnSegmentation(srcUrl, fabric, instances, controls.density.percent, ENV.studioDensityRedistribute);
+        if (!out) {
+          return failAndRefund(REFUND_REASONS.round0_noop, "density no-op (removed 0)");
+        }
+        png = out.png;
+      } else if (controls.scale?.enabled && controls.scale.percent !== 0) {
+        png = await runScaleOnSegmentation(srcUrl, fabric, (100 + controls.scale.percent) / 100);
+      } else {
+        return failAndRefund(REFUND_REASONS.no_async_op, "no async-supported op in controls");
+      }
+
+      const key = `studio/${job.tenantId}/${job.id}/async-1.png`;
+      const { url } = await storagePut(key, png, "image/png");
+
+      // Cancel-safe finalize: atomically flip cpu_processing -> done. If the deadline (or a
+      // peer) already finalized this job as failed+refunded, we LOSE the CAS — discard the
+      // late result rather than deliver-and-refund. (storagePut above may leave an orphan
+      // blob in that rare tie; harmless — no variation references it, no ledger effect.)
+      const finalized = await completeJobIfProcessing(job.id, cost);
+      if (!finalized) {
+        log.warn("studio", "async-worker: result discarded — job finalized (deadline/peer) before op completed", { jobId: job.id, metadata: { refundRefId } });
+        return { status: "skipped", reason: "finalized before op completed" };
+      }
+      await addVariation({ jobId: job.id, tenantId: job.tenantId, resultKey: key, resultUrl: url, round: 1 });
+      return { status: "done" };
+    } catch (err) {
+      return failAndRefund(
+        classifyError((err as any)?.message || ""),
+        (err as any)?.message || "async generation failed"
+      );
     }
-
-    // Guard: if deadline already fired while we were computing, don't overwrite the failed state.
-    if (terminated) return { status: "failed", reason: "deadline fired during op — not persisting" };
-
-    const key = `studio/${job.tenantId}/${job.id}/async-1.png`;
-    const { url } = await storagePut(key, png, "image/png");
-    await addVariation({ jobId: job.id, tenantId: job.tenantId, resultKey: key, resultUrl: url, round: 1 });
-
-    // Final terminal-state guard before marking done.
-    if (terminated) return { status: "failed", reason: "deadline fired after persist — not marking done" };
-    terminated = true;
-    await updateJobStatus(job.id, "done", { creditsUsed: cost });
-    return { status: "done" };
   };
 
+  // T1.4: In-worker wall-clock deadline via Promise.race.
+  if (!(deadlineMs > 0)) return runJob();
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    deadlineTimer = setTimeout(() => reject(new Error(`WORKER_DEADLINE_EXCEEDED`)), deadlineMs);
+  });
   try {
-    // T1.4: Promise.race — body vs deadline. The deadline promise rejects with an
-    // AbortError when the timer fires; the body may also throw on its own.
-    const deadlinePromise = new Promise<never>((_, reject) => {
-      ac.signal.addEventListener("abort", () => {
-        reject(new Error("WORKER_DEADLINE_EXCEEDED"));
-      }, { once: true });
-    });
-
-    const outcome = await Promise.race([runBody(), deadlinePromise]);
-    clearTimeout(deadlineTimer);
-    return outcome;
+    return await Promise.race([runJob(), deadline]);
   } catch (err) {
-    clearTimeout(deadlineTimer);
     const errMsg = (err as any)?.message || "async generation failed";
-
-    // T1.4: Deadline-specific handling.
     if (errMsg === "WORKER_DEADLINE_EXCEEDED") {
-      log.warn("studio", `async-worker: deadline exceeded (${WORKER_DEADLINE_MS}ms)`, { jobId: job.id });
-      return failAndRefund(REFUND_REASONS.deadline, `Worker deadline exceeded (${WORKER_DEADLINE_MS}ms)`);
+      log.warn("studio", `async-worker: deadline exceeded (${deadlineMs}ms)`, { jobId: job.id });
+      return failAndRefund(REFUND_REASONS.deadline, `Worker deadline exceeded (${deadlineMs}ms)`);
     }
-
-    // Classify the error into a refund reason based on known error patterns.
-    let reason: RefundReason = REFUND_REASONS.degrade_other;
-    if (errMsg.includes("NON_REPEAT_SCALE_ERROR") || errMsg.includes("non-repeat")) {
-      reason = REFUND_REASONS.non_repeat;
-    } else if (errMsg.includes("NO_OP_SCALE_ERROR") || errMsg.includes("no-op")) {
-      reason = REFUND_REASONS.round0_noop;
-    } else if (errMsg.includes("boundary") && errMsg.includes("dimension")) {
-      reason = REFUND_REASONS.boundary_dims;
-    } else if (errMsg.includes("raster") && errMsg.includes("dimension")) {
-      reason = REFUND_REASONS.raster_dims;
-    } else if (errMsg.includes("instance") && errMsg.includes("dimension")) {
-      reason = REFUND_REASONS.instance_dims;
-    } else if (errMsg.includes("under-segmented") || errMsg.includes("too few")) {
-      reason = REFUND_REASONS.under_seg;
-    }
-    return failAndRefund(reason, errMsg);
+    return failAndRefund(classifyError(errMsg), errMsg);
+  } finally {
+    if (deadlineTimer) clearTimeout(deadlineTimer);
   }
+}
+
+/** Classify error messages into refund reasons for telemetry. */
+function classifyError(msg: string): RefundReason {
+  if (msg.includes("NON_REPEAT_SCALE_ERROR") || msg.includes("non-repeat")) return REFUND_REASONS.non_repeat;
+  if (msg.includes("NO_OP_SCALE_ERROR") || msg.includes("no-op")) return REFUND_REASONS.round0_noop;
+  if (msg.includes("boundary") && msg.includes("dimension")) return REFUND_REASONS.boundary_dims;
+  if (msg.includes("raster") && msg.includes("dimension")) return REFUND_REASONS.raster_dims;
+  if (msg.includes("instance") && msg.includes("dimension")) return REFUND_REASONS.instance_dims;
+  if (msg.includes("under-segmented") || msg.includes("too few")) return REFUND_REASONS.under_seg;
+  return REFUND_REASONS.degrade_other;
 }

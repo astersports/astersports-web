@@ -92,6 +92,7 @@ describe("generateDensityRedistributeImage (single-call getSegmentation, v2 live
       fabric: fabricWithRaster,
       instances,
       percent: 30,
+      useLama: false,
     });
   });
 

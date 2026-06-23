@@ -775,3 +775,8 @@
 - [x] Mark migration as applied (columns already existed from manual ALTER TABLE)
 - [x] Verify DB has all 14 columns
 - [x] TypeScript compiles cleanly, all 518 tests pass
+
+## LaMa Activation & Draft PR (Jun 23)
+- [x] Add STUDIO_LAMA_LIVE env var to ENV config (default off)
+- [x] Wire ENV.studioLamaLive into all 3 aiEngine.ts density call sites
+- [ ] Push density build as draft PR to origin (astersports/astersports-web)

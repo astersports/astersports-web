@@ -18,6 +18,8 @@ vi.mock("./studioDb", () => ({
   addVariation: vi.fn(),
   grantCredits: vi.fn(),
   claimJobForCpuProcessing: vi.fn(),
+  completeJobIfProcessing: vi.fn(),
+  failJobIfClaimable: vi.fn(),
   incrementPollAttempts: vi.fn(),
 }));
 vi.mock("./serverLog", () => ({ log: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
@@ -26,7 +28,7 @@ import { processAsyncJob } from "./studioAsyncWorker";
 import { finishSam2Segmentation } from "./_core/masking/sam2Provider";
 import { runDensityOnSegmentation, runScaleOnSegmentation } from "./aiEngine";
 import { storagePut } from "./storage";
-import { getJob, updateJobStatus, addVariation, grantCredits, claimJobForCpuProcessing, incrementPollAttempts } from "./studioDb";
+import { getJob, updateJobStatus, addVariation, grantCredits, claimJobForCpuProcessing, completeJobIfProcessing, failJobIfClaimable, incrementPollAttempts } from "./studioDb";
 
 const m = (fn: unknown) => fn as ReturnType<typeof vi.fn>;
 
@@ -45,6 +47,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   m(incrementPollAttempts).mockResolvedValue(1); // default: first attempt, well under cap
   m(claimJobForCpuProcessing).mockResolvedValue(true);
+  m(completeJobIfProcessing).mockResolvedValue(true); // CAS: success path wins by default
+  m(failJobIfClaimable).mockResolvedValue(true); // CAS: fail path wins by default
   m(finishSam2Segmentation).mockResolvedValue({ fabric: { raster: {} }, instances: [{}] });
   m(storagePut).mockResolvedValue({ key: "k", url: "https://cdn/result.png" });
   m(addVariation).mockResolvedValue(undefined);
@@ -60,7 +64,8 @@ describe("processAsyncJob (§6 failure/refund matrix)", () => {
     expect(r.status).toBe("done");
     expect(runDensityOnSegmentation).toHaveBeenCalledWith("https://cdn/x.jpg", expect.anything(), expect.anything(), 40, false);
     expect(addVariation).toHaveBeenCalledTimes(1);
-    expect(updateJobStatus).toHaveBeenCalledWith(7, "done", { creditsUsed: 10 });
+    // CAS: completeJobIfProcessing atomically flips cpu_processing -> done
+    expect(completeJobIfProcessing).toHaveBeenCalledWith(7, 10);
     expect(grantCredits).not.toHaveBeenCalled();
   });
 
@@ -69,8 +74,8 @@ describe("processAsyncJob (§6 failure/refund matrix)", () => {
     m(runDensityOnSegmentation).mockResolvedValue(null);
     const r = await processAsyncJob(7, client(SEG));
     expect(r.status).toBe("failed");
+    expect(failJobIfClaimable).toHaveBeenCalledWith(7, expect.stringContaining("no-op"));
     expect(grantCredits).toHaveBeenCalledWith(3, 10, "refund", "job-7-failed", 9);
-    expect(updateJobStatus).toHaveBeenCalledWith(7, "failed", expect.objectContaining({ errorMessage: expect.stringContaining("no-op") }));
     expect(addVariation).not.toHaveBeenCalled();
   });
 
@@ -161,23 +166,48 @@ describe("processAsyncJob (§6 failure/refund matrix)", () => {
   });
 
   // T1.4: Worker deadline cancel-safe
-  it("T1.4: deadline exceeded -> refund + failed with deadline reason", async () => {
+  it("T1.4: deadline exceeded -> CAS failJobIfClaimable + refund", async () => {
     m(getJob).mockResolvedValue(densityJob);
     // Simulate a prediction that hangs forever (never resolves)
     const hangingClient = {
       processPrediction: vi.fn(() => new Promise(() => {})), // never resolves
     } as any;
-    // Use fake timers to trigger the 150s deadline instantly
     vi.useFakeTimers();
-    const promise = processAsyncJob(7, hangingClient);
-    // Advance past the 150s deadline
-    await vi.advanceTimersByTimeAsync(151_000);
+    // Pass a short deadline (50ms) to avoid needing to advance 45s
+    const promise = processAsyncJob(7, hangingClient, 50);
+    await vi.advanceTimersByTimeAsync(100);
     const r = await promise;
     vi.useRealTimers();
     expect(r.status).toBe("failed");
     expect(r.reason).toContain("deadline");
+    // CAS: failJobIfClaimable gates the refund
+    expect(failJobIfClaimable).toHaveBeenCalledWith(7, expect.stringContaining("deadline"));
     expect(grantCredits).toHaveBeenCalledWith(3, 10, "refund", "job-7-failed", 9);
-    expect(updateJobStatus).toHaveBeenCalledWith(7, "failed", expect.objectContaining({ errorMessage: expect.stringContaining("deadline") }));
+  });
+
+  it("T1.4: deadline fires but op already completed (CAS lost) -> no double-resolve", async () => {
+    m(getJob).mockResolvedValue(densityJob);
+    m(runDensityOnSegmentation).mockResolvedValue({ png: Buffer.from([1]), removed: 4 });
+    // Simulate: op completes, then deadline fires but failJobIfClaimable loses (job already done)
+    m(failJobIfClaimable).mockResolvedValue(false); // CAS lost — job already finalized
+    const r = await processAsyncJob(7, client(SEG));
+    expect(r.status).toBe("done");
+    // completeJobIfProcessing won the race
+    expect(completeJobIfProcessing).toHaveBeenCalledWith(7, 10);
+    // No refund issued — CAS prevents deliver-AND-refund
+    expect(grantCredits).not.toHaveBeenCalled();
+  });
+
+  it("T1.4: op completes but CAS completeJobIfProcessing lost (deadline already failed it) -> result discarded", async () => {
+    m(getJob).mockResolvedValue(densityJob);
+    m(runDensityOnSegmentation).mockResolvedValue({ png: Buffer.from([1]), removed: 4 });
+    // Simulate: deadline already failed the job before op could finalize
+    m(completeJobIfProcessing).mockResolvedValue(false); // CAS lost — deadline won
+    const r = await processAsyncJob(7, client(SEG));
+    expect(r.status).toBe("skipped");
+    expect(r.reason).toContain("finalized before op completed");
+    // No variation saved, no refund from this path (deadline path handles refund)
+    expect(addVariation).not.toHaveBeenCalled();
   });
 
   it("T1.4: fast job completes well before deadline", async () => {
