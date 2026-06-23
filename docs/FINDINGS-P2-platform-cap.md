@@ -37,7 +37,7 @@ The original 60s timeout that killed SSE streams was the platform's previous def
 
 ## Implications for T1.4 (Worker Deadline)
 
-The worker deadline (AbortController + Promise.race) should be set to **150 seconds** — leaving a 30s margin below the 180s platform cap for cleanup, logging, and response serialization.
+The worker deadline (AbortController + Promise.race) is set to **45 seconds** — safe below the 60s cron execution window. While the platform HTTP cap is 180s, the `poll-predictions` cron handler that calls `processAsyncJob` has a tighter 60s execution limit. The 45s deadline leaves a 15s margin for cleanup, logging, and response serialization within that window.
 
 The actual expected execution time for a density/scale job:
 - SAM2 prediction: 15-45s (runs on Replicate, polled by cron — NOT within the worker deadline)

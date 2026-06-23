@@ -24,13 +24,17 @@ import { type ControlSettings } from "../shared/controls";
 export type AsyncJobOutcome = { status: "done" | "failed" | "pending" | "skipped"; reason?: string };
 
 /**
- * T1.4: Worker deadline — 150s (30s margin below the 180s platform cap, per P2 findings).
+ * T1.4: Worker deadline — 45s (safe below the 60s cron execution cap).
  * Wraps the job body in AbortController + Promise.race so a hung job is terminated internally
  * rather than waiting for the 10-min reaper. The AbortSignal is threaded into network calls
  * so the timeout *cancels* rather than leaks. A `terminated` flag guards terminal writes so
  * a late-completing body cannot mark a deadline-failed job `done` (no double-resolution).
+ *
+ * Note: The platform HTTP cap is 180s, but the cron poller path (poll-predictions) has a
+ * tighter 60s execution window. Since processAsyncJob is called from the cron handler,
+ * the deadline must fit within that window with margin for cleanup.
  */
-const WORKER_DEADLINE_MS = 150_000;
+const WORKER_DEADLINE_MS = 45_000;
 
 /** `client` injectable for tests; defaults to the production Replicate client. */
 export async function processAsyncJob(jobId: number, client: Sam2Client = defaultSam2Client()): Promise<AsyncJobOutcome> {
