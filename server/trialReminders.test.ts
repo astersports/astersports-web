@@ -92,15 +92,17 @@ describe("trialReminders", () => {
         creditBalance: 30,
       };
 
-      const mockExecute = vi.fn()
-        .mockResolvedValueOnce([]) // checkReminderSent returns empty
-        .mockResolvedValueOnce([]); // markReminderSent
-
       const mockDb = {
         select: vi.fn().mockReturnThis(),
         from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue([mockTenant]),
-        execute: mockExecute,
+        // trialTenants awaits where(); checkReminderSent calls where().limit().
+        where: vi.fn(() => ({
+          then: (resolve: (v: unknown) => unknown) => resolve([mockTenant]),
+          limit: vi.fn().mockResolvedValue([]), // checkReminderSent: not yet sent
+        })),
+        insert: vi.fn().mockReturnThis(),
+        values: vi.fn().mockReturnThis(),
+        onConflictDoNothing: vi.fn().mockResolvedValue(undefined), // markReminderSent
       };
 
       const { getDb } = await import("./db");
@@ -133,14 +135,16 @@ describe("trialReminders", () => {
         creditBalance: 30,
       };
 
-      const mockExecute = vi.fn()
-        .mockResolvedValueOnce([{ 1: 1 }]); // already sent
-
       const mockDb = {
         select: vi.fn().mockReturnThis(),
         from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue([mockTenant]),
-        execute: mockExecute,
+        where: vi.fn(() => ({
+          then: (resolve: (v: unknown) => unknown) => resolve([mockTenant]),
+          limit: vi.fn().mockResolvedValue([{ tenantId: 1 }]), // already sent
+        })),
+        insert: vi.fn().mockReturnThis(),
+        values: vi.fn().mockReturnThis(),
+        onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
       };
 
       const { getDb } = await import("./db");
@@ -166,14 +170,16 @@ describe("trialReminders", () => {
         creditBalance: 10,
       };
 
-      const mockExecute = vi.fn()
-        .mockResolvedValueOnce([]); // not sent yet
-
       const mockDb = {
         select: vi.fn().mockReturnThis(),
         from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue([mockTenant]),
-        execute: mockExecute,
+        where: vi.fn(() => ({
+          then: (resolve: (v: unknown) => unknown) => resolve([mockTenant]),
+          limit: vi.fn().mockResolvedValue([]), // not sent yet
+        })),
+        insert: vi.fn().mockReturnThis(),
+        values: vi.fn().mockReturnThis(),
+        onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
       };
 
       const { getDb } = await import("./db");

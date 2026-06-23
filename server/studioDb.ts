@@ -37,34 +37,24 @@ export function escapeLike(s: string): string {
 }
 
 /**
- * M5d: FULLTEXT search capability. The `ft_studio_jobs_search` index is applied
- * out-of-band (custom migration 0015) via db:push; until then History search
- * falls back to substring LIKE. A definitive probe result is cached once per
- * process (the index can't appear mid-process — it lands on a deploy/restart
- * after db:push). A transient probe FAILURE is NOT cached, so a connection blip
- * during the first probe doesn't pin LIKE for the process lifetime.
+ * History search runs as case-insensitive substring ILIKE (see listStudioJobs).
+ * The MySQL FULLTEXT path (MATCH … AGAINST plus an information_schema/DATABASE()
+ * index probe) was removed in the Postgres migration. A future Postgres full-text
+ * upgrade would add a tsvector column + GIN index and a probe here;
+ * `toJobsBooleanQuery` (below, unit-tested) is retained for that.
  */
-let jobsFulltextAvailable: boolean | null = null;
-async function hasJobsFulltextIndex(
-  db: NonNullable<Awaited<ReturnType<typeof getDb>>>
-): Promise<boolean> {
-  if (jobsFulltextAvailable !== null) return jobsFulltextAvailable;
-  try {
-    const res = await db.execute(sql`
-      SELECT 1 AS present FROM information_schema.statistics
-      WHERE table_schema = DATABASE()
-        AND table_name = 'studio_jobs'
-        AND index_type = 'FULLTEXT'
-      LIMIT 1
-    `);
-    const rows = (Array.isArray(res) ? res[0] : (res as { rows?: unknown[] })?.rows) ?? [];
-    jobsFulltextAvailable = Array.isArray(rows) && rows.length > 0;
-    return jobsFulltextAvailable;
-  } catch {
-    // Transient failure — leave the cache unset so a later call re-probes;
-    // use LIKE for this request only.
-    return false;
-  }
+
+/**
+ * Serialize a JS Date for interpolation INSIDE a raw `sql` template. postgres-js
+ * cannot bind a raw Date there — drizzle only maps Dates on typed-column helpers
+ * (gte/lte(col, date)), not in raw SQL, so an un-mapped Date throws
+ * `TypeError: ... Received an instance of Date`. Emit the naive-UTC string drizzle
+ * uses for pg `timestamp` columns and cast it, so the value crosses as text.
+ * Prefer gte/lte(col, date) for simple comparisons; use this only where the
+ * comparison must live in raw SQL (COALESCE / keyset tuples).
+ */
+function tsParam(d: Date) {
+  return sql`${d.toISOString().replace("T", " ").replace("Z", "")}::timestamp`;
 }
 
 /** Minimum token length InnoDB FULLTEXT indexes by default (innodb_ft_min_token_size). */
@@ -601,7 +591,7 @@ export async function reapStuckJobs(
     .from(jobs)
     .where(and(
       inArray(jobs.status, ["processing", "sam2_processing", "cpu_processing"]),
-      lte(sql`COALESCE(${jobs.enqueuedAt}, ${jobs.createdAt})`, cutoff),
+      sql`COALESCE(${jobs.enqueuedAt}, ${jobs.createdAt}) <= ${tsParam(cutoff)}`,
     ))
     .limit(limit);
 
@@ -679,21 +669,13 @@ export async function listTenantJobsEnhanced(
     conditions.push(sql`${jobs.status} = ${opts.status}`);
   }
   if (opts.search) {
-    // M5d: FULLTEXT MATCH when the query is FULLTEXT-suitable AND the
-    // ft_studio_jobs_search index is present; substring LIKE otherwise
-    // (pre-migration, or short/punctuation-only queries the index can't serve).
-    // Tokenize first so non-suitable queries skip the information_schema probe.
-    const boolQuery = toJobsBooleanQuery(opts.search);
-    if (boolQuery && (await hasJobsFulltextIndex(db))) {
-      conditions.push(
-        sql`MATCH(${jobs.title}, ${jobs.detectedElements}, ${jobs.instruction}) AGAINST(${boolQuery} IN BOOLEAN MODE)`
-      );
-    } else {
-      const term = `%${escapeLike(opts.search)}%`;
-      conditions.push(
-        sql`(${jobs.title} LIKE ${term} OR ${jobs.detectedElements} LIKE ${term} OR ${jobs.instruction} LIKE ${term})`
-      );
-    }
+    // Case-insensitive substring search. MySQL LIKE was case-insensitive by
+    // default; Postgres LIKE is case-sensitive, so use ILIKE for parity.
+    // escapeLike neutralizes %/_ so user input can't act as a wildcard.
+    const term = `%${escapeLike(opts.search)}%`;
+    conditions.push(
+      sql`(${jobs.title} ILIKE ${term} OR ${jobs.detectedElements} ILIKE ${term} OR ${jobs.instruction} ILIKE ${term})`
+    );
   }
   if (opts.favoritesOnly) {
     conditions.push(
@@ -701,10 +683,10 @@ export async function listTenantJobsEnhanced(
     );
   }
   if (opts.startDate) {
-    conditions.push(sql`${jobs.createdAt} >= ${new Date(opts.startDate)}`);
+    conditions.push(gte(jobs.createdAt, new Date(opts.startDate)));
   }
   if (opts.endDate) {
-    conditions.push(sql`${jobs.createdAt} <= ${new Date(opts.endDate)}`);
+    conditions.push(lte(jobs.createdAt, new Date(opts.endDate)));
   }
   if (opts.userId) {
     conditions.push(eq(jobs.userId, opts.userId));
@@ -738,11 +720,13 @@ export async function listTenantJobsEnhanced(
   const decoded = rawDecoded && typeof rawDecoded.k === expectKey ? rawDecoded : null;
   let rowCondition = condition;
   if (decoded) {
-    const kVal = sortBy === "date" ? new Date(Number(decoded.k)) : decoded.k;
+    // Date keys must be cast (tsParam) because the keyset lives in raw SQL where a
+    // raw Date can't bind; string (title) / number (credits) keys bind directly.
+    const kBind = sortBy === "date" ? tsParam(new Date(Number(decoded.k))) : sql`${decoded.k}`;
     const keyset =
       dir === "asc"
-        ? sql`(${sortCol} > ${kVal} OR (${sortCol} = ${kVal} AND ${jobs.id} > ${decoded.id}))`
-        : sql`(${sortCol} < ${kVal} OR (${sortCol} = ${kVal} AND ${jobs.id} < ${decoded.id}))`;
+        ? sql`(${sortCol} > ${kBind} OR (${sortCol} = ${kBind} AND ${jobs.id} > ${decoded.id}))`
+        : sql`(${sortCol} < ${kBind} OR (${sortCol} = ${kBind} AND ${jobs.id} < ${decoded.id}))`;
     rowCondition = and(condition, keyset);
   }
   const effectiveOffset = decoded ? 0 : offset;
@@ -857,7 +841,7 @@ async function computeTopEditType(
         const [r] = await db
           .select({ count: sql<number>`count(*)` })
           .from(jobs)
-          .where(and(eq(jobs.tenantId, tenantId), sql`${jobs.controls} LIKE ${`%"${t}":%"enabled":true%`}`));
+          .where(and(eq(jobs.tenantId, tenantId), sql`${jobs.controls} ILIKE ${`%"${t}":%"enabled":true%`}`));
         return { type: cap(t), count: r?.count ?? 0 };
       })
     );
@@ -1040,12 +1024,12 @@ export async function listCreditLedger(
     conditions.push(gte(creditLedger.createdAt, new Date(opts.from)));
   }
   if (opts.to) {
-    conditions.push(sql`${creditLedger.createdAt} <= ${new Date(opts.to)}`);
+    conditions.push(lte(creditLedger.createdAt, new Date(opts.to)));
   }
   if (opts.search) {
     const searchTerm = `%${escapeLike(opts.search)}%`;
     conditions.push(
-      sql`(${creditLedger.refId} LIKE ${searchTerm} OR ${creditLedger.note} LIKE ${searchTerm})`
+      sql`(${creditLedger.refId} ILIKE ${searchTerm} OR ${creditLedger.note} ILIKE ${searchTerm})`
     );
   }
   if (opts.userId) {
@@ -1062,10 +1046,10 @@ export async function listCreditLedger(
   const decoded = rawDecoded && typeof rawDecoded.k === "number" ? rawDecoded : null;
   let rowCondition = condition;
   if (decoded) {
-    const kVal = new Date(decoded.k);
+    const kBind = tsParam(new Date(decoded.k));
     rowCondition = and(
       condition,
-      sql`(${creditLedger.createdAt} < ${kVal} OR (${creditLedger.createdAt} = ${kVal} AND ${creditLedger.id} < ${decoded.id}))`
+      sql`(${creditLedger.createdAt} < ${kBind} OR (${creditLedger.createdAt} = ${kBind} AND ${creditLedger.id} < ${decoded.id}))`
     );
   }
   const effectiveOffset = decoded ? 0 : offset;
@@ -1093,7 +1077,11 @@ export async function listCreditLedger(
         jobs,
         // M1: tenant-scope the join — without jobs.tenantId = ledger.tenantId a
         // numeric refId collision could surface another tenant's job metadata.
-        sql`${creditLedger.refId} IS NOT NULL AND ${jobs.tenantId} = ${creditLedger.tenantId} AND ${jobs.id} = CAST(REPLACE(REPLACE(${creditLedger.refId}, 'job-', ''), '-failed', '') AS UNSIGNED)`
+        // Extract the numeric job id from refId ('job-<id>', 'job-<id>-a<n>',
+        // 'job-<id>-...-failed', …). MySQL CAST(... AS UNSIGNED) leniently took the
+        // leading digits; Postgres CAST rejects '123-a1', so pull the digits after
+        // 'job-' with a regex (NULL when refId isn't a job ref, e.g. 'grant-…' → no join).
+        sql`${creditLedger.refId} IS NOT NULL AND ${jobs.tenantId} = ${creditLedger.tenantId} AND ${jobs.id} = CAST(substring(${creditLedger.refId} from 'job-([0-9]+)') AS INTEGER)`
       )
       .where(rowCondition)
       .orderBy(desc(creditLedger.createdAt), desc(creditLedger.id))

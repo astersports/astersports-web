@@ -1,4 +1,4 @@
-import { pgTable, pgEnum, serial, integer, text, timestamp, varchar, boolean, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, serial, integer, text, timestamp, varchar, boolean, jsonb, index, uniqueIndex, primaryKey } from "drizzle-orm/pg-core";
 
 /**
  * MIGRATION (Railway + Supabase): this schema was ported from MySQL (drizzle-orm/mysql-core)
@@ -289,6 +289,23 @@ export const tenantStats = pgTable("studio_tenant_stats", {
 
 export type TenantStats = typeof tenantStats.$inferSelect;
 export type InsertTenantStats = typeof tenantStats.$inferInsert;
+
+/**
+ * Idempotency ledger for trial-day reminder emails (processTrialReminders cron).
+ * Composite PK (tenantId, trialDay) is both the "send each reminder at most once"
+ * guarantee and the ON CONFLICT DO NOTHING target. (On MySQL this was an
+ * unmanaged out-of-band table; the Postgres migration brings it into the schema.)
+ */
+export const trialRemindersSent = pgTable("trial_reminders_sent", {
+  tenantId: integer("tenantId").notNull(),
+  trialDay: integer("trialDay").notNull(),
+  sentAt: timestamp("sentAt").defaultNow().notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.tenantId, t.trialDay] }),
+]);
+
+export type TrialReminderSent = typeof trialRemindersSent.$inferSelect;
+export type InsertTrialReminderSent = typeof trialRemindersSent.$inferInsert;
 
 /** Server-side structured logs for production debugging. */
 export const serverLogs = pgTable("server_logs", {

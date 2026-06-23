@@ -7,7 +7,7 @@ import { router } from "../_core/trpc";
 import { adminProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { serverLogs } from "../../drizzle/schema";
-import { desc, eq, and, gte, lte, like, sql, count } from "drizzle-orm";
+import { desc, eq, and, gte, lte, ilike, sql, count } from "drizzle-orm";
 
 export const adminLogsRouter = router({
   /** Paginated log query with filters */
@@ -36,9 +36,10 @@ export const adminLogsRouter = router({
       if (input.tenantId) conditions.push(eq(serverLogs.tenantId, input.tenantId));
       if (input.search) {
         // M6: escape LIKE metacharacters so a user-supplied `%`/`_` can't turn the
-        // search into a wildcard scan. `\` is the default MySQL LIKE escape char.
+        // search into a wildcard scan (`\` is the default escape char). ILIKE for
+        // case-insensitive parity with MySQL (Postgres LIKE is case-sensitive).
         const escaped = input.search.replace(/[\\%_]/g, (ch) => `\\${ch}`);
-        conditions.push(like(serverLogs.message, `%${escaped}%`));
+        conditions.push(ilike(serverLogs.message, `%${escaped}%`));
       }
       if (input.from) conditions.push(gte(serverLogs.createdAt, new Date(input.from)));
       if (input.to) conditions.push(lte(serverLogs.createdAt, new Date(input.to)));

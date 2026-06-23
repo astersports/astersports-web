@@ -4,7 +4,7 @@
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { eq, sql, and, like, desc, inArray, gte } from "drizzle-orm";
+import { eq, sql, and, ilike, desc, inArray, gte } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { tenants, memberships, platformAdmins, users, creditLedger } from "../../drizzle/schema";
@@ -55,7 +55,7 @@ export const platformRouter = router({
 
       const conds = [];
       if (input.type !== "all") conds.push(eq(tenants.type, input.type));
-      if (input.search) conds.push(like(tenants.name, `%${escapeLike(input.search)}%`));
+      if (input.search) conds.push(ilike(tenants.name, `%${escapeLike(input.search)}%`));
       const where = conds.length ? and(...conds) : undefined;
 
       const [countRow] = await db
