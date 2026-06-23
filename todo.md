@@ -760,9 +760,9 @@
 - [x] T1.4: Worker deadline cancel-safe (AbortController + Promise.race, below P2 cap)
 
 ### Tier 2 — AI & Quality (all 🟡 BENCH — stop for sign-off with bench evidence)
-- [ ] T2.1: LaMa texture-aware infill with reproducible-by-cache layer
-- [ ] T2.2: SAM3 PCS evaluation (benchmark protocol, labeled test set, decision rule)
-- [ ] T2.3: Blue-noise layout → Bridson/Yuksel Poisson-disk
+- [x] T2.1: LaMa texture-aware infill with reproducible-by-cache layer
+- [x] T2.2: SAM3 PCS evaluation (benchmark protocol, labeled test set, decision rule)
+- [x] T2.3: Blue-noise layout → Bridson/Yuksel Poisson-disk
 
 ### Tier 3 — Infrastructure Performance (🟢 AUTO)
 - [x] T3.1: Segmentation cache per (image, bbox)

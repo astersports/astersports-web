@@ -12,6 +12,7 @@ import { invokeLLM } from "./_core/llm";
 import { decodeUpright } from "./_core/image/decodeUpright";
 import { decodeMaskToRaster, rasterBBox, instancesFromMasks } from "./_core/masking/sam2Mask";
 import { createSam2Provider } from "./_core/masking/sam2Provider";
+import { clearSegCache } from "./_core/masking/segCache";
 import type { Sam2Client } from "./_core/masking/replicateSam2";
 import { resolveModelRef } from "./_core/masking/replicateSam2";
 
@@ -69,6 +70,7 @@ describe("sam2Mask utilities", () => {
 describe("createSam2Provider (mocked client)", () => {
   const W = 48, H = 48;
   beforeEach(() => {
+    clearSegCache(); // T3.1: clear segmentation cache between tests to prevent interference
     mockDecode.mockImplementation(async () => ({ buffer: Buffer.alloc(W * H * 4, 200), width: W, height: H }));
   });
 

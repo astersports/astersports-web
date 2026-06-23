@@ -18,6 +18,7 @@ import { decodeUpright } from "../../image/decodeUpright";
 import { rgb255ToLab } from "./color";
 import { kmeans, type Vec3 } from "./kmeans";
 import { infillBaseCloth, type InfillResult } from "./infill";
+import { lamaInfill, isLamaAvailable } from "./lamaInfill";
 import { stratifiedSelect } from "./stratifiedSelect";
 import type { MaskImageInput, FabricMask, InstanceMask, RasterMask } from "../../masking/types";
 
@@ -26,6 +27,9 @@ export interface DensityInput {
   fabric: FabricMask; // MUST carry .raster; bounds the op + base-cloth sampling
   instances: InstanceMask[];
   percent: number; // 0..90 (DENSITY_MAX). X% of instances to remove.
+  /** T2.1: When true, use LaMa texture-aware infill instead of flat LAB.
+   *  Falls back to LAB on error or when LaMa is unavailable. */
+  useLama?: boolean;
 }
 export interface DensityResult extends InfillResult {
   removed: number;
@@ -138,12 +142,29 @@ export async function densityThin(input: DensityInput): Promise<DensityResult> {
   // instead of billing for a byte-identical image.
   if (regionCount === 0) return { data: buffer, width, height, removed: 0 };
 
-  const erased = await infillBaseCloth({ image: input.image, region, baseClothLab, featherPx: 1, flatten: true });
+  // T2.1: LaMa texture-aware infill (with flat LAB fallback).
+  // LaMa produces texture-continuous results on gradient/textured grounds;
+  // flat LAB is the deterministic fallback (cache-miss + LaMa unavailable).
+  let out: Buffer;
+  if (input.useLama && isLamaAvailable()) {
+    try {
+      const lamaResult = await lamaInfill({ imageRgba: buffer, width, height, region });
+      out = lamaResult.data;
+      console.log(`[density] LaMa infill ${lamaResult.fromCache ? "(cached)" : "(fresh)"} for ${selected.length} motifs`);
+    } catch (err) {
+      // Fallback to flat LAB on any LaMa error
+      console.warn(`[density] LaMa failed, falling back to flat LAB: ${(err as Error).message}`);
+      const erased = await infillBaseCloth({ image: input.image, region, baseClothLab, featherPx: 1, flatten: true });
+      out = erased.data;
+    }
+  } else {
+    const erased = await infillBaseCloth({ image: input.image, region, baseClothLab, featherPx: 1, flatten: true });
+    out = erased.data;
+  }
 
   // The infill feather can graze survivor-motif pixels at a shared boundary;
   // restore them to the original so survivors stay byte-identical (the feather is
   // for clean edges against GROUND, not against survivors).
-  const out = erased.data;
   for (let i = 0; i < width * height; i++) {
     if (!survivors[i]) continue;
     const p = i * 4;

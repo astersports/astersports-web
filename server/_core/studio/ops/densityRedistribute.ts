@@ -23,6 +23,7 @@ import { decodeUpright } from "../../image/decodeUpright";
 import { rgb255ToLab } from "./color";
 import { kmeans, type Vec3 } from "./kmeans";
 import { infillBaseCloth, type InfillResult } from "./infill";
+import { lamaInfill, isLamaAvailable } from "./lamaInfill";
 import { blueNoiseLayout, type Point } from "./blueNoiseLayout";
 import { assignTargets, type Assignment } from "./assignTargets";
 import type { MaskImageInput, FabricMask, InstanceMask, RasterMask } from "../../masking/types";
@@ -34,6 +35,9 @@ export interface RedistributeInput {
   percent: number; // 0..90. X% of instances to remove before redistributing.
   /** Blue-noise relaxation seed (matches kmeans({seed})). Default 1. */
   seed?: number;
+  /** T2.1: When true, use LaMa texture-aware infill instead of flat LAB.
+   *  Falls back to LAB on error or when LaMa is unavailable. */
+  useLama?: boolean;
 }
 
 export interface RedistributeResult extends InfillResult {
@@ -258,8 +262,22 @@ export async function densityRedistribute(input: RedistributeInput): Promise<Red
   // F1: nothing erased (degenerate raster / instances outside fabric) -> refund.
   if (regionCount === 0) return empty();
 
-  const erased = await infillBaseCloth({ image: input.image, region, baseClothLab, featherPx: 1, flatten: true });
-  const out = erased.data;
+  // T2.1: LaMa texture-aware infill (with flat LAB fallback).
+  let out: Buffer;
+  if (input.useLama && isLamaAvailable()) {
+    try {
+      const lamaResult = await lamaInfill({ imageRgba: buffer, width, height, region });
+      out = lamaResult.data;
+      console.log(`[redistribute] LaMa infill ${lamaResult.fromCache ? "(cached)" : "(fresh)"}`);
+    } catch (err) {
+      console.warn(`[redistribute] LaMa failed, falling back to flat LAB: ${(err as Error).message}`);
+      const erased = await infillBaseCloth({ image: input.image, region, baseClothLab, featherPx: 1, flatten: true });
+      out = erased.data;
+    }
+  } else {
+    const erased = await infillBaseCloth({ image: input.image, region, baseClothLab, featherPx: 1, flatten: true });
+    out = erased.data;
+  }
 
   // 4.4 step 2 — composite the M survivors at their targets. No resize (scale
   // preserved), no rotate (orientation preserved). Translate each motif crop from
