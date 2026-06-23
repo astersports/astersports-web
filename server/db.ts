@@ -1,22 +1,23 @@
 import { eq } from "drizzle-orm";
-import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
+import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
-let _db: MySql2Database | null = null;
+let _db: PostgresJsDatabase | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      const pool = mysql.createPool({
-        uri: process.env.DATABASE_URL,
-        connectionLimit: 10,
-        idleTimeout: 60_000,
-        enableKeepAlive: true,
+      // postgres-js (Supabase). `prepare:false` is the Supabase-recommended setting when
+      // routing through the transaction pooler (pgBouncer). max=10 mirrors the old pool.
+      const client = postgres(process.env.DATABASE_URL, {
+        max: 10,
+        idle_timeout: 60,
+        prepare: false,
       });
-      _db = drizzle(pool);
+      _db = drizzle(client);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -75,7 +76,9 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
+    // Postgres upsert: ON CONFLICT (openId) DO UPDATE (was MySQL onDuplicateKeyUpdate).
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
       set: updateSet,
     });
   } catch (error) {
