@@ -27,10 +27,9 @@ export async function pruneOldLogs(): Promise<number> {
 
   const result = await db
     .delete(serverLogs)
-    .where(lt(serverLogs.createdAt, cutoff));
+    .where(lt(serverLogs.createdAt, cutoff))
+    .returning({ id: serverLogs.id });
 
-  // drizzle mysql delete returns [ResultSetHeader, ...]
-  // ResultSetHeader has affectedRows
-  const affectedRows = (result as any)?.[0]?.affectedRows ?? 0;
-  return affectedRows;
+  // Postgres: .returning() yields one row per deleted record; length = rows deleted.
+  return result.length;
 }

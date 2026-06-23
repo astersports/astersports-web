@@ -304,10 +304,12 @@ export async function deductCredits(
     const res = await tx
       .update(tenants)
       .set({ creditBalance: sql`${tenants.creditBalance} - ${amount}` })
-      .where(and(eq(tenants.id, tenantId), gte(tenants.creditBalance, amount)));
+      .where(and(eq(tenants.id, tenantId), gte(tenants.creditBalance, amount)))
+      .returning({ id: tenants.id });
 
-    const affected = (res as any)?.[0]?.affectedRows ?? 0;
-    if (affected === 0) throw new Error("Insufficient credits");
+    // Postgres: .returning() yields the affected rows; empty => the conditional debit did not
+    // apply (balance < amount). The atomic guard holds exactly as the mysql2 affectedRows did.
+    if (res.length === 0) throw new Error("Insufficient credits");
 
     const [tenant] = await tx.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
     const newBalance = tenant!.creditBalance;
@@ -377,10 +379,10 @@ export async function grantCredits(
     const res = await tx
       .update(tenants)
       .set({ creditBalance: sql`${tenants.creditBalance} + ${amount}` })
-      .where(eq(tenants.id, tenantId));
+      .where(eq(tenants.id, tenantId))
+      .returning({ id: tenants.id });
 
-    const affected = (res as any)?.[0]?.affectedRows ?? 0;
-    if (affected === 0) throw new Error("Tenant not found");
+    if (res.length === 0) throw new Error("Tenant not found");
 
     const [tenant] = await tx.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
     const newBalance = tenant!.creditBalance;
@@ -402,9 +404,8 @@ export async function grantCredits(
 export async function createJob(data: InsertJob) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const result = await db.insert(jobs).values(data);
-  const insertId = result[0].insertId;
-  const [job] = await db.select().from(jobs).where(eq(jobs.id, insertId)).limit(1);
+  // Postgres: RETURNING gives the inserted row directly (no separate insertId round-trip).
+  const [job] = await db.insert(jobs).values(data).returning();
   return job!;
 }
 
@@ -454,16 +455,16 @@ export async function getJobByPredictionId(predictionId: string) {
 export async function claimJobForCpuProcessing(jobId: number): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
-  // Use inArray() for the status enum predicate, mirroring listSam2ProcessingJobs /
-  // reapStuckJobs: Drizzle eq() on a MySQL enum can silently match zero rows in
-  // serverless containers (TiDB + Autoscale), which here would make every claim
-  // return affectedRows=0 and strand async jobs in sam2_processing. The id predicate
-  // stays eq() (int PK, unaffected); correctness still comes from affectedRows.
+  // Atomic claim: only the worker that flips sam2_processing -> cpu_processing wins. On Postgres
+  // the affected count comes from .returning() (mysql2's affectedRows doesn't exist) — res.length>0
+  // means this worker won the transition. inArray() is a clean equality set (the old MySQL/TiDB
+  // eq()-on-enum-matches-zero workaround is moot on Postgres; the id predicate stays eq(), int PK).
   const res = await db
     .update(jobs)
     .set({ status: "cpu_processing" })
-    .where(and(eq(jobs.id, jobId), inArray(jobs.status, ["sam2_processing"])));
-  return ((res as any)?.[0]?.affectedRows ?? 0) > 0;
+    .where(and(eq(jobs.id, jobId), inArray(jobs.status, ["sam2_processing"])))
+    .returning({ id: jobs.id });
+  return res.length > 0;
 }
 
 /** Atomically finalize a successful op: cpu_processing -> done (+ creditsUsed). Returns true
@@ -476,8 +477,9 @@ export async function completeJobIfProcessing(jobId: number, creditsUsed: number
   const res = await db
     .update(jobs)
     .set({ status: "done", creditsUsed })
-    .where(and(eq(jobs.id, jobId), inArray(jobs.status, ["cpu_processing"])));
-  return ((res as any)?.[0]?.affectedRows ?? 0) > 0;
+    .where(and(eq(jobs.id, jobId), inArray(jobs.status, ["cpu_processing"])))
+    .returning({ id: jobs.id });
+  return res.length > 0;
 }
 
 /** Atomically fail a still-claimable job: {sam2_processing|cpu_processing} -> failed (+ errorMessage).
@@ -491,8 +493,9 @@ export async function failJobIfClaimable(jobId: number, errorMessage: string): P
   const res = await db
     .update(jobs)
     .set({ status: "failed", errorMessage })
-    .where(and(eq(jobs.id, jobId), inArray(jobs.status, ["sam2_processing", "cpu_processing"])));
-  return ((res as any)?.[0]?.affectedRows ?? 0) > 0;
+    .where(and(eq(jobs.id, jobId), inArray(jobs.status, ["sam2_processing", "cpu_processing"])))
+    .returning({ id: jobs.id });
+  return res.length > 0;
 }
 
 /** Jobs awaiting their SAM2 prediction (cron poller). Bounded by `limit` (N=1 in prod to clear
@@ -543,8 +546,9 @@ export async function recoverStrandedCpuJobs(stalenessMs: number): Promise<numbe
   const res = await db
     .update(jobs)
     .set({ status: "sam2_processing" })
-    .where(and(inArray(jobs.status, ["cpu_processing"]), lte(jobs.updatedAt, cutoff)));
-  return (res as any)?.[0]?.affectedRows ?? 0;
+    .where(and(inArray(jobs.status, ["cpu_processing"]), lte(jobs.updatedAt, cutoff)))
+    .returning({ id: jobs.id });
+  return res.length;
 }
 
 /** Async enqueue (ASYNC_GENERATION_SPEC §4): stamp the started prediction + crop geometry onto the
@@ -930,7 +934,7 @@ async function getHistoryAggregates(
     await db
       .insert(tenantStats)
       .values({ tenantId, ...agg, computedAt: new Date() })
-      .onDuplicateKeyUpdate({ set: { ...agg, computedAt: new Date() } });
+      .onConflictDoUpdate({ target: tenantStats.tenantId, set: { ...agg, computedAt: new Date() } });
     return agg;
   } catch (err) {
     // Tolerate the rollup table not being present yet (pre-db:push); surface

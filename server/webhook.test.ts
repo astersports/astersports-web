@@ -70,6 +70,8 @@ function makeWebhookDb({
   limit.mockResolvedValue(clientRow ? [clientRow] : []); // subsequent client lookups
   const whereResult: any = {
     limit,
+    // Postgres UPDATE path: .returning() yields one row per affected record (length = affectedRows).
+    returning: vi.fn(() => Promise.resolve(Array.from({ length: affectedRows }, () => ({ id: 1 })))),
     then: (resolve: any, reject?: any) => Promise.resolve([{ affectedRows }]).then(resolve, reject),
   };
   return {

@@ -34,7 +34,7 @@ function thenable(getVal: () => any): any {
 function makeDb(): any {
   const db: any = {
     select: () => thenable(() => (queues.select.length ? queues.select.shift() : [])),
-    update: () => thenable(() => (queues.update.length ? queues.update.shift() : [{ affectedRows: 1 }])),
+    update: () => thenable(() => (queues.update.length ? queues.update.shift() : [{ id: 1 }])),
     insert: () =>
       thenable(() => {
         const v = queues.insert.length ? queues.insert.shift() : undefined;
@@ -122,7 +122,7 @@ describe("inviteLinks.redeem — provisioning", () => {
       [{ id: 10, type: "firm", status: "active", maxUses: 1, useCount: 0, tenantId: null, metadata: { plan: "pro", seats: 5, initialCredits: 100 }, expiresAt: null }],
       [], // no prior redemption
     ];
-    queues.update = [[{ affectedRows: 1 }]]; // claim succeeds
+    queues.update = [[{ id: 1 }]]; // claim succeeds
     const res = await caller({ user }).redeem({ token: "t", orgName: "Casey Design Co" });
     expect(res).toEqual({ success: true, tenantId: 99 });
     expect(studioDb.createTenant).toHaveBeenCalledWith(expect.objectContaining({ name: "Casey Design Co", type: "firm" }));
@@ -137,7 +137,7 @@ describe("inviteLinks.redeem — provisioning", () => {
       [], // not already a member
       [{ id: 7, seats: 5, allowedEmailDomain: null }], // tenant
     ];
-    queues.update = [[{ affectedRows: 1 }]];
+    queues.update = [[{ id: 1 }]];
     (studioDb.countActiveMembers as any).mockResolvedValue(2);
     const res = await caller({ user }).redeem({ token: "t" });
     expect(res).toEqual({ success: true, tenantId: 7 });
@@ -162,7 +162,7 @@ describe("inviteLinks.redeem — rejections", () => {
       [], // no prior redemption
       [{ id: 13, status: "active", maxUses: 1, useCount: 1, expiresAt: null }], // fresh re-read
     ];
-    queues.update = [[{ affectedRows: 0 }]]; // claim lost the race
+    queues.update = [[]]; // claim lost the race (Postgres: 0 returned rows)
     await expect(caller({ user }).redeem({ token: "t" })).rejects.toThrow(/usage limit/i);
   });
 
@@ -172,7 +172,7 @@ describe("inviteLinks.redeem — rejections", () => {
       [],
       [{ id: 14, status: "revoked", maxUses: 1, useCount: 0, expiresAt: null }],
     ];
-    queues.update = [[{ affectedRows: 0 }]];
+    queues.update = [[]];
     await expect(caller({ user }).redeem({ token: "t" })).rejects.toThrow(/revoked/i);
   });
 
@@ -182,7 +182,7 @@ describe("inviteLinks.redeem — rejections", () => {
       [],
       [{ id: 15, status: "active", maxUses: 1, useCount: 0, expiresAt: new Date(Date.now() - 1000) }],
     ];
-    queues.update = [[{ affectedRows: 0 }]];
+    queues.update = [[]];
     await expect(caller({ user }).redeem({ token: "t" })).rejects.toThrow(/expired/i);
   });
 
@@ -193,7 +193,7 @@ describe("inviteLinks.redeem — rejections", () => {
       [], // not already a member
       [{ id: 7, seats: 5, allowedEmailDomain: "other.com" }],
     ];
-    queues.update = [[{ affectedRows: 1 }] /* claim */, [{ affectedRows: 1 }] /* refund */];
+    queues.update = [[{ id: 1 }] /* claim */, [{ id: 1 }] /* refund */];
     await expect(caller({ user }).redeem({ token: "t" })).rejects.toThrow(/other\.com/);
     expect(studioDb.createMembership).not.toHaveBeenCalled();
     expect(queues.update).toHaveLength(0); // both claim + refund updates consumed
@@ -206,7 +206,7 @@ describe("inviteLinks.redeem — rejections", () => {
       [],
       [{ id: 7, seats: 2, allowedEmailDomain: null }],
     ];
-    queues.update = [[{ affectedRows: 1 }], [{ affectedRows: 1 }]];
+    queues.update = [[{ id: 1 }], [{ id: 1 }]];
     (studioDb.countActiveMembers as any).mockResolvedValue(2); // full
     await expect(caller({ user }).redeem({ token: "t" })).rejects.toThrow(/seat limit/i);
     expect(queues.update).toHaveLength(0); // claim refunded
@@ -217,7 +217,7 @@ describe("inviteLinks.redeem — rejections", () => {
       [{ id: 18, type: "firm", status: "active", maxUses: 1, useCount: 0, metadata: {}, expiresAt: null }],
       [],
     ];
-    queues.update = [[{ affectedRows: 1 }], [{ affectedRows: 1 }]];
+    queues.update = [[{ id: 1 }], [{ id: 1 }]];
     (studioDb.createTenant as any).mockResolvedValue(null); // provisioning failure
     await expect(caller({ user }).redeem({ token: "t" })).rejects.toThrow(/create organization/i);
     expect(queues.update).toHaveLength(0); // claim refunded
@@ -229,7 +229,7 @@ describe("inviteLinks.redeem — rejections", () => {
       [{ id: 19, type: "firm", status: "active", maxUses: 1, useCount: 0, metadata: {}, expiresAt: null }],
       [],
     ];
-    queues.update = [[{ affectedRows: 1 }]]; // claim succeeds, no refund
+    queues.update = [[{ id: 1 }]]; // claim succeeds, no refund
     queues.insert = [new Error("audit write failed")];
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await caller({ user }).redeem({ token: "t" });
