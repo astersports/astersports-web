@@ -20,6 +20,8 @@ import { getMaskProvider } from "../_core/masking";
 import { checkUpscaleDpi } from "../_core/studio/guards/dpiGuard";
 import { storageGetSignedUrl } from "../storage";
 import { log } from "../serverLog";
+import { emitRefundTelemetry } from "../refundTelemetry";
+import { REFUND_REASONS } from "../../shared/refundReasons";
 import { runVariation } from "../studioEngine";
 import {
   getTenantById,
@@ -233,6 +235,15 @@ export function registerStudioStreamRoutes(app: Express) {
       // Refund the just-made deduct so a status-write failure can't leave the
       // customer charged for a job that never started.
       await grantCredits(tenant.id, creditCost, "refund", `${deductRef}-failed`, user.id).catch(() => {});
+      // T0.1: Emit refund telemetry for status-write failure.
+      emitRefundTelemetry({
+        reason: REFUND_REASONS.status_write_failure,
+        jobId: job.id,
+        tenantId: tenant.id,
+        userId: user.id,
+        credits: creditCost,
+        detail: "Status-write failure before generation started.",
+      });
       res.status(500).json({ error: "Failed to start generation. Please try again." });
       return;
     }
@@ -348,6 +359,15 @@ export function registerStudioStreamRoutes(app: Express) {
       // Refund credits on failure — keyed to THIS attempt's deduct so it only
       // ever offsets a debit that actually happened (idempotent on the refId).
       await grantCredits(tenant.id, creditCost, "refund", `${deductRef}-failed`, user.id);
+      // T0.1: Emit refund telemetry for SSE stream errors.
+      emitRefundTelemetry({
+        reason: REFUND_REASONS.stream_error,
+        jobId: job.id,
+        tenantId: tenant.id,
+        userId: user.id,
+        credits: creditCost,
+        detail: errMsg,
+      });
       await updateJobStatus(job.id, "failed", { errorMessage: errMsg });
 
       // Send error event

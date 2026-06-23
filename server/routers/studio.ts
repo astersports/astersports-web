@@ -14,6 +14,8 @@ import { getMaskProvider } from "../_core/masking";
 import { startSam2Segmentation } from "../_core/masking/sam2Provider";
 import { checkUpscaleDpi } from "../_core/studio/guards/dpiGuard";
 import { log } from "../serverLog";
+import { emitRefundTelemetry } from "../refundTelemetry";
+import { REFUND_REASONS } from "../../shared/refundReasons";
 import {
   createJob,
   updateJobStatus,
@@ -277,6 +279,15 @@ export const studioRouter = router({
             // locate/crop/startPrediction failed BEFORE the job was enqueued -> refund + fail, so a
             // start error never leaves the customer charged for a job the worker will never see.
             await grantCredits(ctx.tenant.id, creditCost, "refund", `${deductRef}-failed`, ctx.user.id).catch(() => {});
+            // T0.1: Emit refund telemetry for enqueue failure.
+            emitRefundTelemetry({
+              reason: REFUND_REASONS.enqueue_failure,
+              jobId: job.id,
+              tenantId: ctx.tenant.id,
+              userId: ctx.user.id,
+              credits: creditCost,
+              detail: "Failed to start generation (locate/crop/startPrediction).",
+            });
             await updateJobStatus(job.id, "failed", { errorMessage: "Failed to start generation." }).catch(() => {});
             throw new TRPCError({
               code: "INTERNAL_SERVER_ERROR",
@@ -398,6 +409,20 @@ export const studioRouter = router({
           `job-${job.id}-failed`,
           ctx.user.id
         );
+        // T0.1: Emit refund telemetry for all-failed batch.
+        {
+          const nonRepeatFailCheck = settled.find(
+            (r) => r.status === "rejected" && r.reason?.message === NON_REPEAT_SCALE_ERROR
+          );
+          emitRefundTelemetry({
+            reason: nonRepeatFailCheck ? REFUND_REASONS.non_repeat : REFUND_REASONS.all_failed,
+            jobId: job.id,
+            tenantId: ctx.tenant.id,
+            userId: ctx.user.id,
+            credits: creditCost,
+            detail: nonRepeatFailCheck ? "Non-repeat pattern detected" : "All variations failed",
+          });
+        }
         await updateJobStatus(job.id, "failed");
 
         // Non-repeat guard: surface an honest, actionable message instead of
@@ -435,6 +460,15 @@ export const studioRouter = router({
             `job-${job.id}-partial`,
             ctx.user.id
           );
+          // T0.1: Emit refund telemetry for partial-failed batch.
+          emitRefundTelemetry({
+            reason: REFUND_REASONS.partial_failed,
+            jobId: job.id,
+            tenantId: ctx.tenant.id,
+            userId: ctx.user.id,
+            credits: refund,
+            detail: `${failedCount} of ${controls.variations} variations failed`,
+          });
           creditsUsed = creditCost - refund;
         }
       }
@@ -680,6 +714,15 @@ export const studioRouter = router({
           try {
             // Refund credits on failure (deterministic no-op or provider error).
             await grantCredits(ctx.tenant.id, cost, "refund", `job-${newJob.id}-failed`, ctx.user?.id);
+            // T0.1: Emit refund telemetry for rerun failure.
+            emitRefundTelemetry({
+              reason: REFUND_REASONS.degrade_other,
+              jobId: newJob.id,
+              tenantId: ctx.tenant.id,
+              userId: ctx.user?.id,
+              credits: cost,
+              detail: (err as any)?.message || "rerun background task failed",
+            });
           } catch (refundErr) {
             log.error("studio", `rerun: failed to refund credits`, { jobId: newJob.id, tenantId: ctx.tenant.id, userId: ctx.user?.id, metadata: { cost, error: (refundErr as any)?.message || String(refundErr) } });
           }

@@ -741,3 +741,37 @@
 - [x] Client: Animate thumbnail appearance with fade-in/zoom-in transitions + click-to-zoom modal
 - [x] Mobile: Thumbnails scale 16x16→20x20 with responsive layout and overflow scroll
 - [x] Tests: TypeScript compiles cleanly, all 514 tests pass
+
+## Density & Scale Execution Spec (Jun 23, 2026)
+
+### Preconditions
+- [x] P1: Determine seg.combined semantics (motif union vs silhouette) — FINDINGS-P1-seg-combined.md committed
+- [x] P2: Confirm platform execution cap — 180s (FINDINGS-P2-platform-cap.md committed)
+- [x] P3: Reproduce or dismiss TiDB/Drizzle eq()-on-enum bug — NOT REPRODUCED, inArray fix retained (FINDINGS-P3-drizzle-enum-bug.md committed)
+
+### Phase 0 — Observability & Eval Gate
+- [x] T0.1: Per-guard refund-reason telemetry (reason enum on every failAndRefund call site) 🟢 AUTO
+- [ ] T0.2: Eval bench as CI gate (fixture set, metrics, pnpm eval, CI red on regression) 🟡 BENCH
+
+### Tier 1 — Reliability & Money-Path (all 🔴 HUMAN — stop for sign-off)
+- [ ] T1.1: boundaryRaster dimensions guard (assert width/height match, degrade+refund on mismatch)
+- [ ] T1.2: Reaper sweeps on enqueuedAt (change predicate from updatedAt to enqueuedAt)
+- [ ] T1.3: Poison-pill max-attempt cap (schema add poll_attempts, fail at >=5)
+- [ ] T1.4: Worker deadline cancel-safe (AbortController + Promise.race, below P2 cap)
+
+### Tier 2 — AI & Quality (all 🟡 BENCH — stop for sign-off with bench evidence)
+- [ ] T2.1: LaMa texture-aware infill with reproducible-by-cache layer
+- [ ] T2.2: SAM3 PCS evaluation (benchmark protocol, labeled test set, decision rule)
+- [ ] T2.3: Blue-noise layout → Bridson/Yuksel Poisson-disk
+
+### Tier 3 — Infrastructure Performance (🟢 AUTO)
+- [ ] T3.1: Segmentation cache per (image, bbox)
+- [ ] T3.2: Lazy crop-sized instance rasters
+- [ ] T3.3: SAM warm-pool / cold-boot + sharp config
+
+## Users Table Schema Migration (Jun 23)
+- [x] Add passwordHash, subscriptionType, organizationId, isActive, emailVerified columns to Drizzle schema
+- [x] Generate migration (0018_lovely_jane_foster.sql)
+- [x] Mark migration as applied (columns already existed from manual ALTER TABLE)
+- [x] Verify DB has all 14 columns
+- [x] TypeScript compiles cleanly, all 518 tests pass

@@ -4,6 +4,8 @@
  */
 import { eq, and, gte, lte, desc, sql, like, inArray } from "drizzle-orm";
 import { getDb } from "./db";
+import { emitRefundTelemetry } from "./refundTelemetry";
+import { REFUND_REASONS } from "../shared/refundReasons";
 import {
   categories,
   tenants,
@@ -527,6 +529,14 @@ export async function reapStuckJobs(
         .limit(1);
       if (!already) {
         await grantCredits(job.tenantId, cost, "refund", `job-${job.id}-reaped`);
+        // T0.1: Emit per-guard refund telemetry for reaper timeouts.
+        emitRefundTelemetry({
+          reason: REFUND_REASONS.reaper_timeout,
+          jobId: job.id,
+          tenantId: job.tenantId,
+          credits: cost,
+          detail: "Timed out — automatically failed and refunded by reaper.",
+        });
         refunded++;
       }
     }

@@ -17,6 +17,8 @@ import { runDensityOnSegmentation, runScaleOnSegmentation } from "./aiEngine";
 import { storagePut, storageGetSignedUrl } from "./storage";
 import { getJob, updateJobStatus, addVariation, grantCredits, claimJobForCpuProcessing } from "./studioDb";
 import { log } from "./serverLog";
+import { emitRefundTelemetry } from "./refundTelemetry";
+import { REFUND_REASONS, type RefundReason } from "../shared/refundReasons";
 import { type ControlSettings } from "../shared/controls";
 
 export type AsyncJobOutcome = { status: "done" | "failed" | "pending" | "skipped"; reason?: string };
@@ -39,34 +41,41 @@ export async function processAsyncJob(jobId: number, client: Sam2Client = defaul
   const refundRefId = job.predictionMeta?.deductRef
     ? `${job.predictionMeta.deductRef}-failed`
     : `job-${job.id}-failed`;
-  const failAndRefund = async (reason: string): Promise<AsyncJobOutcome> => {
+
+  const failAndRefund = async (refundReason: RefundReason, detail: string): Promise<AsyncJobOutcome> => {
     try {
       if (cost > 0) await grantCredits(job.tenantId, cost, "refund", refundRefId, job.userId);
     } catch (e) {
       log.error("studio", "async-worker: refund failed", { jobId: job.id, tenantId: job.tenantId, metadata: { cost, error: (e as any)?.message || String(e) } });
     }
-    await updateJobStatus(job.id, "failed", { errorMessage: reason }).catch(() => {});
-    // Telemetry: async failures previously only console.warn'd, so refund/no-op rate
-    // was invisible to server_logs / notifyOwner. Surface every fail+refund explicitly.
-    log.warn("studio", "async-worker: job failed + refunded", {
+    await updateJobStatus(job.id, "failed", { errorMessage: detail }).catch(() => {});
+    // T0.1: Emit per-guard refund telemetry — exactly one reason per refund event.
+    emitRefundTelemetry({
+      reason: refundReason,
       jobId: job.id,
       tenantId: job.tenantId,
-      metadata: { reason, cost, refundRefId },
+      userId: job.userId,
+      credits: cost,
+      detail,
     });
-    return { status: "failed", reason };
+    return { status: "failed", reason: detail };
   };
 
   try {
     const result = await client.processPrediction(job.predictionId);
     if (result.status === "processing") return { status: "pending", reason: "prediction still running" };
-    if (result.status === "failed") return failAndRefund(`SAM2 prediction failed: ${result.error}`);
+    if (result.status === "failed") {
+      return failAndRefund(REFUND_REASONS.sam2_error, `SAM2 prediction failed: ${result.error}`);
+    }
 
     // succeeded — atomically claim so only ONE worker runs the op + writes the variation.
     const claimed = await claimJobForCpuProcessing(job.id);
     if (!claimed) return { status: "skipped", reason: "claimed by another worker" };
 
     const controls = job.controls ? (JSON.parse(job.controls) as ControlSettings) : null;
-    if (!controls) return failAndRefund("missing controls");
+    if (!controls) {
+      return failAndRefund(REFUND_REASONS.missing_controls, "missing controls");
+    }
 
     const srcUrl = job.originalUrl.startsWith("/manus-storage/")
       ? await storageGetSignedUrl(job.originalUrl.replace("/manus-storage/", ""))
@@ -77,13 +86,15 @@ export async function processAsyncJob(jobId: number, client: Sam2Client = defaul
     let png: Buffer;
     if (controls.density?.enabled) {
       const out = await runDensityOnSegmentation(srcUrl, fabric, instances, controls.density.percent, ENV.studioDensityRedistribute);
-      if (!out) return failAndRefund("density no-op (removed 0)");
+      if (!out) {
+        return failAndRefund(REFUND_REASONS.round0_noop, "density no-op (removed 0)");
+      }
       png = out.png;
     } else if (controls.scale?.enabled && controls.scale.percent !== 0) {
       // runScaleOnSegmentation throws NO_OP_SCALE_ERROR / NON_REPEAT_SCALE_ERROR -> caught below -> refund.
       png = await runScaleOnSegmentation(srcUrl, fabric, (100 + controls.scale.percent) / 100);
     } else {
-      return failAndRefund("no async-supported op in controls");
+      return failAndRefund(REFUND_REASONS.no_async_op, "no async-supported op in controls");
     }
 
     const key = `studio/${job.tenantId}/${job.id}/async-1.png`;
@@ -92,6 +103,22 @@ export async function processAsyncJob(jobId: number, client: Sam2Client = defaul
     await updateJobStatus(job.id, "done", { creditsUsed: cost });
     return { status: "done" };
   } catch (err) {
-    return failAndRefund((err as any)?.message || "async generation failed");
+    const errMsg = (err as any)?.message || "async generation failed";
+    // Classify the error into a refund reason based on known error patterns.
+    let reason: RefundReason = REFUND_REASONS.degrade_other;
+    if (errMsg.includes("NON_REPEAT_SCALE_ERROR") || errMsg.includes("non-repeat")) {
+      reason = REFUND_REASONS.non_repeat;
+    } else if (errMsg.includes("NO_OP_SCALE_ERROR") || errMsg.includes("no-op")) {
+      reason = REFUND_REASONS.round0_noop;
+    } else if (errMsg.includes("boundary") && errMsg.includes("dimension")) {
+      reason = REFUND_REASONS.boundary_dims;
+    } else if (errMsg.includes("raster") && errMsg.includes("dimension")) {
+      reason = REFUND_REASONS.raster_dims;
+    } else if (errMsg.includes("instance") && errMsg.includes("dimension")) {
+      reason = REFUND_REASONS.instance_dims;
+    } else if (errMsg.includes("under-segmented") || errMsg.includes("too few")) {
+      reason = REFUND_REASONS.under_seg;
+    }
+    return failAndRefund(reason, errMsg);
   }
 }

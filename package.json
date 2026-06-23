@@ -10,6 +10,10 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
+    "eval": "node eval/generateScaleDensitySynthetic.mjs && npx tsx eval/run.ts all",
+    "eval:density": "node eval/generateScaleDensitySynthetic.mjs && npx tsx eval/run.ts density",
+    "eval:scale": "node eval/generateScaleDensitySynthetic.mjs && npx tsx eval/run.ts scale",
+    "eval:redistribute": "npx tsx eval/run.ts redistribute",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {

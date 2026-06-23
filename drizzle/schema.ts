@@ -15,8 +15,18 @@ export const users = mysqlTable("users", {
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
+  /** Hashed password for email/password auth (null for OAuth-only users). */
+  passwordHash: varchar("passwordHash", { length: 255 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  /** Subscription tier (e.g. "free", "pro", "enterprise"). */
+  subscriptionType: varchar("subscriptionType", { length: 64 }),
+  /** FK to an organization/team table (null for individual users). */
+  organizationId: int("organizationId"),
+  /** Whether the account is active (false = suspended/deactivated). */
+  isActive: boolean("isActive").notNull().default(true),
+  /** Whether the user's email address has been verified. */
+  emailVerified: boolean("emailVerified").notNull().default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
