@@ -440,10 +440,15 @@ export async function getJobByPredictionId(predictionId: string) {
 export async function claimJobForCpuProcessing(jobId: number): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
+  // Use inArray() for the status enum predicate, mirroring listSam2ProcessingJobs /
+  // reapStuckJobs: Drizzle eq() on a MySQL enum can silently match zero rows in
+  // serverless containers (TiDB + Autoscale), which here would make every claim
+  // return affectedRows=0 and strand async jobs in sam2_processing. The id predicate
+  // stays eq() (int PK, unaffected); correctness still comes from affectedRows.
   const res = await db
     .update(jobs)
     .set({ status: "cpu_processing" })
-    .where(and(eq(jobs.id, jobId), eq(jobs.status, "sam2_processing")));
+    .where(and(eq(jobs.id, jobId), inArray(jobs.status, ["sam2_processing"])));
   return ((res as any)?.[0]?.affectedRows ?? 0) > 0;
 }
 
