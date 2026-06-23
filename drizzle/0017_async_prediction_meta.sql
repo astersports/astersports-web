@@ -1,1 +1,0 @@
-ALTER TABLE `studio_jobs` ADD `predictionMeta` json;
