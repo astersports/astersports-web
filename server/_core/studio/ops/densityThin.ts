@@ -19,6 +19,7 @@ import { rgb255ToLab } from "./color";
 import { kmeans, type Vec3 } from "./kmeans";
 import { infillBaseCloth, type InfillResult } from "./infill";
 import { lamaInfill, isLamaAvailable } from "./lamaInfill";
+import { fluxFill, isFluxFillAvailable } from "./fluxFill";
 import { stratifiedSelect } from "./stratifiedSelect";
 import type { MaskImageInput, FabricMask, InstanceMask, RasterMask } from "../../masking/types";
 
@@ -30,6 +31,10 @@ export interface DensityInput {
   /** T2.1: When true, use LaMa texture-aware infill instead of flat LAB.
    *  Falls back to LAB on error or when LaMa is unavailable. */
   useLama?: boolean;
+  /** SPIKE: generative infill provider when useLama is on — "flux" routes through FLUX.1 Fill
+   *  (better on structured cloth) with the pixel-identity composite; default/absent = LaMa. The
+   *  caller passes ENV.studioInfillProvider so the op stays pure. */
+  infillProvider?: "lama" | "flux";
 }
 export interface DensityResult extends InfillResult {
   removed: number;
@@ -145,15 +150,18 @@ export async function densityThin(input: DensityInput): Promise<DensityResult> {
   // T2.1: LaMa texture-aware infill (with flat LAB fallback).
   // LaMa produces texture-continuous results on gradient/textured grounds;
   // flat LAB is the deterministic fallback (cache-miss + LaMa unavailable).
+  const useFlux = input.infillProvider === "flux" && isFluxFillAvailable();
   let out: Buffer;
-  if (input.useLama && isLamaAvailable()) {
+  if (input.useLama && (useFlux || isLamaAvailable())) {
     try {
-      const lamaResult = await lamaInfill({ imageRgba: buffer, width, height, region });
-      out = lamaResult.data;
-      console.log(`[density] LaMa infill ${lamaResult.fromCache ? "(cached)" : "(fresh)"} for ${selected.length} motifs`);
+      const r = useFlux
+        ? await fluxFill({ imageRgba: buffer, width, height, region })
+        : await lamaInfill({ imageRgba: buffer, width, height, region });
+      out = r.data;
+      console.log(`[density] ${useFlux ? "FLUX" : "LaMa"} infill ${r.fromCache ? "(cached)" : "(fresh)"} for ${selected.length} motifs`);
     } catch (err) {
-      // Fallback to flat LAB on any LaMa error
-      console.warn(`[density] LaMa failed, falling back to flat LAB: ${(err as Error).message}`);
+      // Fallback to flat LAB on any provider error
+      console.warn(`[density] ${useFlux ? "FLUX" : "LaMa"} failed, falling back to flat LAB: ${(err as Error).message}`);
       const erased = await infillBaseCloth({ image: input.image, region, baseClothLab, featherPx: 1, flatten: true });
       out = erased.data;
     }

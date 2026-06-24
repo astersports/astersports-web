@@ -93,6 +93,7 @@ describe("generateDensityRedistributeImage (single-call getSegmentation, v2 live
       instances,
       percent: 30,
       useLama: false,
+      infillProvider: "lama",
     });
   });
 

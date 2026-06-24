@@ -77,6 +77,7 @@ describe("generateDensityImage (single-call getSegmentation)", () => {
       instances,
       percent: 30,
       useLama: false,
+      infillProvider: "lama",
     });
   });
 

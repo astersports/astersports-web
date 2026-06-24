@@ -24,6 +24,7 @@ import { rgb255ToLab } from "./color";
 import { kmeans, type Vec3 } from "./kmeans";
 import { infillBaseCloth, type InfillResult } from "./infill";
 import { lamaInfill, isLamaAvailable } from "./lamaInfill";
+import { fluxFill, isFluxFillAvailable } from "./fluxFill";
 import { blueNoiseLayout, type Point } from "./blueNoiseLayout";
 import { assignTargets, type Assignment } from "./assignTargets";
 import { garmentMaskFromImage } from "./garmentSilhouette";
@@ -39,6 +40,9 @@ export interface RedistributeInput {
   /** T2.1: When true, use LaMa texture-aware infill instead of flat LAB.
    *  Falls back to LAB on error or when LaMa is unavailable. */
   useLama?: boolean;
+  /** SPIKE: generative infill provider when useLama is on — "flux" = FLUX.1 Fill (pixel-identity
+   *  composite); default/absent = LaMa. Caller passes ENV.studioInfillProvider (op stays pure). */
+  infillProvider?: "lama" | "flux";
 }
 
 export interface RedistributeResult extends InfillResult {
@@ -351,14 +355,17 @@ export async function densityRedistribute(input: RedistributeInput): Promise<Red
   if (regionCount === 0) return empty();
 
   // T2.1: LaMa texture-aware infill (with flat LAB fallback).
+  const useFlux = input.infillProvider === "flux" && isFluxFillAvailable();
   let out: Buffer;
-  if (input.useLama && isLamaAvailable()) {
+  if (input.useLama && (useFlux || isLamaAvailable())) {
     try {
-      const lamaResult = await lamaInfill({ imageRgba: buffer, width, height, region });
-      out = lamaResult.data;
-      console.log(`[redistribute] LaMa infill ${lamaResult.fromCache ? "(cached)" : "(fresh)"}`);
+      const r = useFlux
+        ? await fluxFill({ imageRgba: buffer, width, height, region })
+        : await lamaInfill({ imageRgba: buffer, width, height, region });
+      out = r.data;
+      console.log(`[redistribute] ${useFlux ? "FLUX" : "LaMa"} infill ${r.fromCache ? "(cached)" : "(fresh)"}`);
     } catch (err) {
-      console.warn(`[redistribute] LaMa failed, falling back to flat LAB: ${(err as Error).message}`);
+      console.warn(`[redistribute] ${useFlux ? "FLUX" : "LaMa"} failed, falling back to flat LAB: ${(err as Error).message}`);
       const erased = await infillBaseCloth({ image: input.image, region, baseClothLab, featherPx: 1, flatten: true });
       out = erased.data;
     }

@@ -14,6 +14,7 @@
     "eval:density": "node eval/generateScaleDensitySynthetic.mjs && npx tsx eval/run.ts density",
     "eval:scale": "node eval/generateScaleDensitySynthetic.mjs && npx tsx eval/run.ts scale",
     "eval:redistribute": "npx tsx eval/run.ts redistribute",
+    "eval:fill": "npx tsx eval/fluxVsLama.ts",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {

@@ -63,7 +63,7 @@ export async function generateDensityImage(
     `fabric bbox area=${(bboxArea * 100).toFixed(1)}%, percent=${percent}%`
   );
 
-  const result = await densityThin({ image: { url: srcUrl }, fabric, instances, percent, useLama: ENV.studioLamaLive });
+  const result = await densityThin({ image: { url: srcUrl }, fabric, instances, percent, useLama: ENV.studioLamaLive, infillProvider: ENV.studioInfillProvider });
 
   // D-C no-op guard: the op ran but removed nothing (e.g. too few motifs for the
   // requested percent) — refund rather than bill for an unchanged image.
@@ -121,7 +121,7 @@ export async function generateDensityRedistributeImage(
     `fabric bbox area=${(bboxArea * 100).toFixed(1)}%, percent=${percent}%`
   );
 
-  const result = await densityRedistribute({ image: { url: srcUrl }, fabric, instances, percent, useLama: ENV.studioLamaLive });
+  const result = await densityRedistribute({ image: { url: srcUrl }, fabric, instances, percent, useLama: ENV.studioLamaLive, infillProvider: ENV.studioInfillProvider });
 
   // No-op guard: the op ran but removed nothing (too few motifs for the requested
   // percent, no bare ground to sample, or instances outside the fabric) — refund
@@ -222,8 +222,8 @@ export async function runDensityOnSegmentation(
     return null;
   }
   const result = redistribute
-    ? await densityRedistribute({ image: { url: srcUrl }, fabric, instances, percent, useLama: ENV.studioLamaLive })
-    : await densityThin({ image: { url: srcUrl }, fabric, instances, percent, useLama: ENV.studioLamaLive });
+    ? await densityRedistribute({ image: { url: srcUrl }, fabric, instances, percent, useLama: ENV.studioLamaLive, infillProvider: ENV.studioInfillProvider })
+    : await densityThin({ image: { url: srcUrl }, fabric, instances, percent, useLama: ENV.studioLamaLive, infillProvider: ENV.studioInfillProvider });
   if (result.removed === 0) {
     console.warn(`[density-async] ${redistribute ? "densityRedistribute" : "densityThin"} removed 0 motifs; no-op -> fail + refund.`);
     return null;

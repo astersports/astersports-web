@@ -56,6 +56,13 @@ export const ENV = {
    *  (Replicate DPA + privacy policy update) before activation in production.
    *  Default off — Flip-Authority-governed (CLAUDE.md §1). */
   studioLamaLive: process.env.STUDIO_LAMA_LIVE === "true",
+  /** SPIKE: density infill provider — "lama" (default) or "flux" (FLUX.1 Fill, generative).
+   *  "flux" routes customer images to BFL via Replicate = a NEW sub-processor; needs §1
+   *  sign-off + disclosure + a BFL commercial licence before any customer image. Dark by default. */
+  studioInfillProvider: (process.env.STUDIO_INFILL_PROVIDER === "flux" ? "flux" : "lama") as "lama" | "flux",
+  /** SPIKE: override the FLUX.1 Fill model ref (e.g. black-forest-labs/flux-fill-dev for strict
+   *  bf16+seed determinism). Empty -> flux-fill-pro default in fluxFill.ts. */
+  studioFluxFillModel: process.env.STUDIO_FLUX_FILL_MODEL ?? "",
   /** Self-serve org creation (`tenants.create`). Mints TRIAL_CREDITS through the
    *  ledger-safe `grantCredits` path and is per-user rate-limited. Default off —
    *  this is the Flip-Authority-governed money-path flip (CLAUDE.md §1). It gates
