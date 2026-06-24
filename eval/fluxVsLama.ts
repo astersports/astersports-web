@@ -10,7 +10,7 @@
  *
  * Output eval/out/<prefix>-compare.png = ORIGINAL | CURRENT | FLUX (labelled).
  */
-import { writeFile } from "node:fs/promises";
+import { writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 import { lamaInfill } from "../server/_core/studio/ops/lamaInfill";
@@ -65,6 +65,7 @@ async function main() {
   const img = await loadRgba(imagePath);
   const region = await loadMask(maskPath, img.width, img.height);
   const outDir = path.join("eval", "out");
+  await mkdir(outDir, { recursive: true }); // gitignored, so absent in a fresh CI checkout
   console.log(`image ${img.width}x${img.height}, mask loaded — running fills…`);
 
   // CURRENT fill: LaMa if it returns, else the flat fall-back the live op uses.
