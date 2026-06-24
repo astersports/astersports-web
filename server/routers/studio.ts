@@ -316,7 +316,9 @@ export const studioRouter = router({
               credits: creditCost,
               detail: "Failed to start generation (locate/crop/startPrediction).",
             });
-            await updateJobStatus(job.id, "failed", { errorMessage: "Failed to start generation." }).catch(() => {});
+            await updateJobStatus(job.id, "failed", {
+              errorMessage: `Failed to start generation: ${detail}${inner ? " | cause: " + (inner instanceof Error ? inner.message : String(inner)) : ""}`.slice(0, 900),
+            }).catch(() => {});
             throw new TRPCError({
               code: "INTERNAL_SERVER_ERROR",
               message: "Couldn't start generation. Your credits have been refunded — please try again in a moment.",
