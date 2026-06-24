@@ -31,20 +31,20 @@ describe("garmentSilhouetteFromInstances", () => {
     expect(garmentSilhouetteFromInstances([motif(50, 50, 4)], 0, H)).toBeNull();
   });
 
-  it("bridges a ring of motifs into one solid region (interior gap filled)", () => {
-    // four motifs around an empty centre — the centre is bare ground, not a motif
-    const insts = [motif(50, 50, 4), motif(70, 50, 4), motif(50, 70, 4), motif(70, 70, 4)];
-    const sil = garmentSilhouetteFromInstances(insts, W, H)!;
+  it("fills the gap BETWEEN motif clusters so redistribution can spread evenly", () => {
+    // two clusters separated by a wide bare gap — the hull must bridge them
+    const left = [motif(25, 60, 4), motif(30, 50, 4), motif(30, 70, 4)];
+    const right = [motif(95, 60, 4), motif(90, 50, 4), motif(90, 70, 4)];
+    const sil = garmentSilhouetteFromInstances([...left, ...right], W, H)!;
     expect(sil).not.toBeNull();
-    expect(on(sil, 60, 60)).toBe(true); // enclosed bare-ground gap is inside the silhouette
-    expect(on(sil, 5, 5)).toBe(false);  // a far corner with no motifs is excluded
+    expect(on(sil, 60, 60)).toBe(true); // the gap between the clusters is inside the silhouette
   });
 
-  it("drops a far-flung stray detection (keeps only the largest component)", () => {
-    const cluster = [motif(55, 55, 4), motif(65, 55, 4), motif(55, 65, 4), motif(65, 65, 4), motif(60, 60, 4)];
-    const stray = motif(8, 8, 2); // far corner, beyond the close bridge
-    const sil = garmentSilhouetteFromInstances([...cluster, stray], W, H)!;
-    expect(on(sil, 60, 60)).toBe(true); // garment cluster kept
-    expect(on(sil, 8, 8)).toBe(false);  // off-garment stray dropped
+  it("excludes regions outside the motif span (e.g. background corners)", () => {
+    const cluster = [motif(55, 55, 4), motif(65, 55, 4), motif(55, 65, 4), motif(65, 65, 4)];
+    const sil = garmentSilhouetteFromInstances(cluster, W, H)!;
+    expect(on(sil, 60, 60)).toBe(true);   // inside the motif span
+    expect(on(sil, 5, 5)).toBe(false);    // far corner, outside the hull
+    expect(on(sil, 115, 10)).toBe(false); // far corner, outside the hull
   });
 });
