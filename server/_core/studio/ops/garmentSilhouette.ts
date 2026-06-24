@@ -10,150 +10,87 @@
  *
  * The motif INSTANCES (individual_masks, after the >20% giant-ground filter) are
  * reliably ON the garment — print motifs don't land on the wall. So derive the
- * silhouette from where the motifs actually are: union the instance bboxes, then
- * morphologically CLOSE with a radius scaled to the motif spacing (bridges the
- * inter-motif gaps into one solid print region without a net outward halo), fill
- * interior holes, and keep the single largest connected component (drops far-flung
- * stray detections). Background-independent (uses motif positions, not backdrop
- * colour), so it holds on busy/on-model backgrounds too.
+ * silhouette from the CONVEX HULL of the instance footprints: the smallest convex
+ * region spanning every motif. This (a) excludes the background (the hull is bounded
+ * by the garment's own outermost motifs), and (b) crucially FILLS the gaps between
+ * motif clusters, so blue-noise redistribution spreads survivors evenly across the
+ * whole print area instead of bunching them back into the original dense sections.
+ * Background-independent (uses motif positions, not backdrop colour).
+ *
+ * A hull slightly over-covers a concave garment outline; for typical apparel panels
+ * (skirts, shirt fronts) that is negligible, and the composite still clips to it.
  *
  * Pure + deterministic: same instances -> identical silhouette. No network, no model.
  */
 import type { InstanceMask, RasterMask } from "../../masking/types";
 
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+interface Pt { x: number; y: number }
 
-/** 1-D binary dilation by radius `r` (set if any neighbour within ±r is set). O(n)
- *  via nearest-set-left then nearest-set-right — no per-pixel window scan. */
-function dilateLine(get: (i: number) => number, set: (i: number, v: number) => void, len: number, r: number): void {
-  const leftOk = new Uint8Array(len);
-  let last = -1 - r; // sentinel: distance > r
-  for (let i = 0; i < len; i++) {
-    if (get(i) > 127) last = i;
-    leftOk[i] = i - last <= r ? 1 : 0;
-  }
-  let next = len + r; // sentinel
-  for (let i = len - 1; i >= 0; i--) {
-    if (get(i) > 127) next = i;
-    set(i, leftOk[i] || next - i <= r ? 255 : 0);
-  }
+/** >0 if o->a->b turns counter-clockwise. */
+function cross(o: Pt, a: Pt, b: Pt): number {
+  return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
 }
 
-/** 1-D binary erosion by radius `r` (set only if ALL neighbours within ±r are set,
- *  i.e. the nearest UNSET pixel is farther than r). O(n), mirror of dilateLine. */
-function erodeLine(get: (i: number) => number, set: (i: number, v: number) => void, len: number, r: number): void {
-  const leftOk = new Uint8Array(len);
-  let lastZero = -1 - r;
-  for (let i = 0; i < len; i++) {
-    if (get(i) <= 127) lastZero = i;
-    leftOk[i] = i - lastZero > r ? 1 : 0;
+/** Andrew's monotone-chain convex hull. Returns CCW hull vertices (no collinear
+ *  interior points), or [] when fewer than 3 distinct points are given. */
+function convexHull(points: Pt[]): Pt[] {
+  const pts = points.slice().sort((a, b) => a.x - b.x || a.y - b.y);
+  const uniq: Pt[] = [];
+  for (const p of pts) {
+    const last = uniq[uniq.length - 1];
+    if (!last || last.x !== p.x || last.y !== p.y) uniq.push(p);
   }
-  let nextZero = len + r;
-  for (let i = len - 1; i >= 0; i--) {
-    if (get(i) <= 127) nextZero = i;
-    set(i, leftOk[i] && nextZero - i > r ? 255 : 0);
+  if (uniq.length < 3) return [];
+  const lower: Pt[] = [];
+  for (const p of uniq) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+    lower.push(p);
   }
+  const upper: Pt[] = [];
+  for (let i = uniq.length - 1; i >= 0; i--) {
+    const p = uniq[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  lower.pop();
+  upper.pop();
+  const hull = lower.concat(upper);
+  return hull.length >= 3 ? hull : [];
 }
 
-/** Separable square morphology pass (horizontal then vertical) using `op` per line. */
-function morphSquare(
-  src: Uint8Array,
-  w: number,
-  h: number,
-  r: number,
-  op: (get: (i: number) => number, set: (i: number, v: number) => void, len: number, r: number) => void
-): Uint8Array {
-  if (r <= 0) return src.slice();
-  const horiz = new Uint8Array(w * h);
-  for (let y = 0; y < h; y++) {
-    const base = y * w;
-    op((x) => src[base + x], (x, v) => { horiz[base + x] = v; }, w, r);
-  }
-  const out = new Uint8Array(w * h);
-  for (let x = 0; x < w; x++) {
-    op((y) => horiz[y * w + x], (y, v) => { out[y * w + x] = v; }, h, r);
-  }
-  return out;
-}
-
-/** Morphological close: dilate by r then erode by r (bridges gaps <= 2r, no net halo). */
-function close(src: Uint8Array, w: number, h: number, r: number): Uint8Array {
-  return morphSquare(morphSquare(src, w, h, r, dilateLine), w, h, r, erodeLine);
-}
-
-/** Fill interior holes: any 0-pixel NOT 4-connected to the border becomes 255. */
-function fillHoles(mask: Uint8Array, w: number, h: number): Uint8Array {
-  const n = w * h;
-  const bgReachable = new Uint8Array(n);
-  const stack = new Uint32Array(n);
-  let sp = 0;
-  const push = (i: number) => { if (mask[i] <= 127 && !bgReachable[i]) { bgReachable[i] = 1; stack[sp++] = i; } };
-  for (let x = 0; x < w; x++) { push(x); push((h - 1) * w + x); }
-  for (let y = 0; y < h; y++) { push(y * w); push(y * w + (w - 1)); }
-  while (sp > 0) {
-    const idx = stack[--sp];
-    const x = idx % w, y = (idx / w) | 0;
-    if (x > 0) push(idx - 1);
-    if (x < w - 1) push(idx + 1);
-    if (y > 0) push(idx - w);
-    if (y < h - 1) push(idx + w);
-  }
-  const out = new Uint8Array(n);
-  for (let i = 0; i < n; i++) out[i] = mask[i] > 127 || !bgReachable[i] ? 255 : 0;
-  return out;
-}
-
-/** Keep only the single largest 4-connected component (drops stray islands). */
-function largestComponentMask(mask: Uint8Array, w: number, h: number): Uint8Array {
-  const n = w * h;
-  const visited = new Uint8Array(n);
-  const frontier = new Uint32Array(n);
-  let best: number[] = [];
-  for (let start = 0; start < n; start++) {
-    if (mask[start] <= 127 || visited[start]) continue;
-    let head = 0, tail = 0;
-    frontier[tail++] = start;
-    visited[start] = 1;
-    const comp: number[] = [];
-    while (head < tail) {
-      const idx = frontier[head++];
-      comp.push(idx);
-      const x = idx % w, y = (idx / w) | 0;
-      if (x > 0)     { const j = idx - 1; if (mask[j] > 127 && !visited[j]) { visited[j] = 1; frontier[tail++] = j; } }
-      if (x < w - 1) { const j = idx + 1; if (mask[j] > 127 && !visited[j]) { visited[j] = 1; frontier[tail++] = j; } }
-      if (y > 0)     { const j = idx - w; if (mask[j] > 127 && !visited[j]) { visited[j] = 1; frontier[tail++] = j; } }
-      if (y < h - 1) { const j = idx + w; if (mask[j] > 127 && !visited[j]) { visited[j] = 1; frontier[tail++] = j; } }
+/** Scanline-fill a convex polygon into a binary raster (255 inside). */
+function fillConvexPolygon(hull: Pt[], width: number, height: number): Uint8Array {
+  const data = new Uint8Array(width * height);
+  let ymin = Infinity, ymax = -Infinity;
+  for (const p of hull) { if (p.y < ymin) ymin = p.y; if (p.y > ymax) ymax = p.y; }
+  const yLo = Math.max(0, Math.floor(ymin));
+  const yHi = Math.min(height - 1, Math.ceil(ymax));
+  for (let y = yLo; y <= yHi; y++) {
+    const yc = y + 0.5;
+    let xL = Infinity, xR = -Infinity;
+    for (let i = 0; i < hull.length; i++) {
+      const a = hull[i], b = hull[(i + 1) % hull.length];
+      // edge crosses the scanline yc?
+      if ((a.y <= yc && b.y > yc) || (b.y <= yc && a.y > yc)) {
+        const x = a.x + ((yc - a.y) / (b.y - a.y)) * (b.x - a.x);
+        if (x < xL) xL = x;
+        if (x > xR) xR = x;
+      }
     }
-    if (comp.length > best.length) best = comp;
+    if (xR < xL) continue;
+    const x0 = Math.max(0, Math.round(xL));
+    const x1 = Math.min(width - 1, Math.round(xR));
+    const base = y * width;
+    for (let x = x0; x <= x1; x++) data[base + x] = 255;
   }
-  const out = new Uint8Array(n);
-  for (const i of best) out[i] = 255;
-  return out;
-}
-
-/** Mark an instance's pixels (raster if dims match, else its bbox rectangle). */
-function markInstance(mask: Uint8Array, inst: InstanceMask, w: number, h: number): boolean {
-  const r = inst.raster;
-  if (r && r.width === w && r.height === h) {
-    let any = false;
-    for (let i = 0; i < w * h; i++) if (r.data[i] > 127) { mask[i] = 255; any = true; }
-    return any;
-  }
-  const x0 = clamp(Math.floor(inst.bbox.x * w), 0, w - 1);
-  const y0 = clamp(Math.floor(inst.bbox.y * h), 0, h - 1);
-  const x1 = clamp(Math.ceil((inst.bbox.x + inst.bbox.w) * w), x0 + 1, w);
-  const y1 = clamp(Math.ceil((inst.bbox.y + inst.bbox.h) * h), y0 + 1, h);
-  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) mask[y * w + x] = 255;
-  return true;
+  return data;
 }
 
 /**
- * Build the garment silhouette from instance masks. Returns null when there are no
- * usable instances — callers then keep the combined_mask boundary.
- *
- * Close radius scales with the estimated motif spacing sqrt(area/N): big enough to
- * bridge neighbouring motifs (2r > spacing), capped at 15% of the short side so a
- * sparse layout can't balloon far past the garment edge.
+ * Build the garment silhouette as the filled convex hull of the instance footprints.
+ * Returns null when there are too few instances to form a hull (caller then keeps the
+ * combined_mask boundary). Each instance contributes its bbox corners so the hull spans
+ * each motif's extent, not just its centre.
  */
 export function garmentSilhouetteFromInstances(
   instances: InstanceMask[],
@@ -161,16 +98,14 @@ export function garmentSilhouetteFromInstances(
   height: number
 ): RasterMask | null {
   if (width <= 0 || height <= 0 || instances.length === 0) return null;
-  const n = width * height;
-  const union = new Uint8Array(n);
-  let count = 0;
-  for (const inst of instances) if (markInstance(union, inst, width, height)) count++;
-  if (count === 0) return null;
-
-  const spacing = Math.sqrt((width * height) / count);
-  const radius = clamp(Math.round(0.75 * spacing), 4, Math.round(0.15 * Math.min(width, height)));
-  const closed = close(union, width, height, radius);
-  const filled = fillHoles(closed, width, height);
-  const largest = largestComponentMask(filled, width, height);
-  return { width, height, data: largest };
+  const pts: Pt[] = [];
+  for (const inst of instances) {
+    const b = inst.bbox;
+    const x0 = b.x * width, y0 = b.y * height;
+    const x1 = (b.x + b.w) * width, y1 = (b.y + b.h) * height;
+    pts.push({ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x0, y: y1 }, { x: x1, y: y1 });
+  }
+  const hull = convexHull(pts);
+  if (hull.length < 3) return null;
+  return { width, height, data: fillConvexPolygon(hull, width, height) };
 }
