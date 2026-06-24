@@ -1,0 +1,123 @@
+RAILWAY ENV CHECKLIST — astersports-web (Railway + Supabase migration)
+=====================================================================
+Prepared by Claude Code (CC) for Frank to set in the Railway service.
+Status: P7 (env consolidation). All values are SET BY FRANK in Railway →
+your service → "Variables". CC never sets these (it has no Railway access).
+
+HOW TO READ THIS
+  [SET]    you already added it this session — just confirm it's saved
+  [TO DO]  add it now
+  [LATER]  needed when we test billing — not required to boot
+  [UNSET]  do NOT add — leaving it out is what keeps the feature dark/safe
+  (secret) never paste the value back to me in chat
+
+Railway exposes these to BOTH the build and the running app. Vars whose name
+starts with VITE_ get BAKED INTO the browser bundle at build time — so if you
+change one later you must REDEPLOY (rebuild), not just restart.
+
+---------------------------------------------------------------------
+A. REQUIRED TO BOOT  (Railway crashes at startup, naming the missing one)
+---------------------------------------------------------------------
+[ ] NODE_ENV               = production
+       (turns on prod mode: static serving, fixed port, fail-fast on bad env)
+
+[ ] JWT_SECRET             = ~40 random letters+numbers   (secret)
+       Generate a NEW one the same way you made CRON_SECRET (type random
+       characters). This signs login sessions. Do not reuse CRON_SECRET.
+
+[ ] DATABASE_URL           = Supabase connection string   (secret)
+       Supabase dashboard → your project → "Connect" (top bar) →
+       "Connection string" → choose the TRANSACTION POOLER (port 6543,
+       host ends in ...pooler.supabase.com). Copy the URI and replace
+       [YOUR-PASSWORD] with your database password.
+       (Forgot the DB password? Settings → Database → "Reset database
+        password", then use the new one here.)
+       Our driver is set up for this pooler (prepare:false), so 6543 is correct.
+
+[ ] GOOGLE_CLIENT_ID       = your OAuth client id (the 212199380924-ur90... one)
+[ ] GOOGLE_CLIENT_SECRET   = your OAuth client secret   (secret)
+       From Google Cloud Console → Credentials → your "astersports-web" client.
+       (These two now gate boot — that's the migration fix in this commit:
+        they replaced the old Manus OAUTH_SERVER_URL as "auth is configured".)
+
+[ ] VITE_APP_ID            = astersports-web
+       Just a stable identifier; this exact text is fine.
+
+[ ] VITE_OWNER_OPEN_ID     = google:PENDING     <-- TEMPORARY placeholder
+       This is the chicken-and-egg one. Your real owner id is "google:<number>"
+       which you only get AFTER your first Google login. So:
+         Step 1 (now): set it to literally  google:PENDING  so the app boots.
+         Step 2 (after you log in once): I'll walk you to Supabase → Table
+           Editor → users → your row → copy "openId", set this var to that,
+           then redeploy. That makes your account the owner/admin.
+       (This one var covers both the owner UI and the server owner-gate.)
+
+---------------------------------------------------------------------
+B. CORE FEATURES  (set these now so login + upload + AI editing all work)
+---------------------------------------------------------------------
+[SET] SUPABASE_URL                = https://eyitivulszubtdfpsbdx.supabase.co
+[SET] SUPABASE_SERVICE_ROLE_KEY   = (the sb... key you added)   (secret)
+[SET] CRON_SECRET                 = (the one you generated)     (secret)
+[SET] ENABLE_SCHEDULER            = true
+
+[ ] ANTHROPIC_API_KEY    = your Anthropic API key   (secret)
+       Powers the vision steps (find the fabric region, detect elements,
+       no-op QA). Without it editing still runs but less accurately.
+       CONFIRM this is set — it's the one we wired up when we moved AI off Manus.
+
+[ ] STUDIO_MASK_PROVIDER = sam2
+[ ] REPLICATE_API_TOKEN  = copy from your current Manus setup   (secret)
+[ ] REPLICATE_SAM2_MODEL = copy from your current Manus setup
+       sam2 is the real mask engine (matches what prod runs today). If you set
+       STUDIO_MASK_PROVIDER=sam2 you MUST also set both Replicate values, or the
+       app refuses to boot (on purpose — no half-configured paid path).
+       (Want a faster first boot? Leave all three UNSET to run the "classical"
+        provider, then add them for the editing test. Your call.)
+
+[ ] STUDIO_WORKING_MEGAPIXELS = 8
+       Railway gives us more memory than Manus, so we can render at higher
+       resolution. 8 is a good default; leave unset to fall back to 2.
+
+---------------------------------------------------------------------
+C. BILLING  (set when we test checkout — NOT needed to boot)
+---------------------------------------------------------------------
+[LATER] STRIPE_SECRET_KEY            = copy from Manus   (secret)
+[LATER] VITE_STRIPE_PUBLISHABLE_KEY  = copy from Manus (pk_...)
+[LATER] VITE_APP_URL                 = your Railway URL (later: astersports.io)
+[LATER] STRIPE_WEBHOOK_SECRET        = NEW value   (secret)
+        The Railway URL differs from Manus, so Stripe needs a new webhook
+        endpoint pointing at it — that generates a fresh signing secret.
+        We'll do this together when we test billing.
+[LATER] RESEND_API_KEY               = copy from Manus   (secret)
+        Trial-reminder / receipt emails. Not needed for the core test.
+
+---------------------------------------------------------------------
+D. LEAVE UNSET  (adding any of these turns on a gated/dark feature — don't)
+---------------------------------------------------------------------
+[UNSET] STUDIO_SCALE_LIVE           [UNSET] STUDIO_DENSITY_LIVE
+[UNSET] STUDIO_DENSITY_REDISTRIBUTE [UNSET] STUDIO_RECOLOR_LIVE
+[UNSET] STUDIO_LAMA_LIVE            [UNSET] STUDIO_CREATE_ORG_LIVE
+[UNSET] STUDIO_ASYNC_JOBS           [UNSET] VITE_CREATE_ORG_LIVE
+        These are the dark feature flags. They default OFF when unset. Turning
+        any on is a deliberate, gated "flip" — that stays your decision, later,
+        one at a time. Don't add them to get the app running.
+
+Legacy / retired (leave unset — they were Manus and are gone now):
+[UNSET] OAUTH_SERVER_URL   [UNSET] MANUS_API_KEY
+[UNSET] BUILT_IN_FORGE_API_URL      [UNSET] BUILT_IN_FORGE_API_KEY
+[UNSET] VITE_FRONTEND_FORGE_API_URL [UNSET] VITE_FRONTEND_FORGE_API_KEY
+
+---------------------------------------------------------------------
+E. DON'T SET  (Railway provides it)
+---------------------------------------------------------------------
+PORT  — Railway injects this automatically. Adding your own can break the
+        health check. Leave it alone.
+
+=====================================================================
+BOOT CONTRACT (what "good" looks like)
+  - With Group A complete (+ Replicate if you set sam2), the app starts.
+  - Missing a required one → Railway logs:  [env] <NAME> is required but missing
+    and the process exits. That's the guard working — add the named var.
+  - First successful boot → open the Railway URL → "Sign in with Google" →
+    then we do the VITE_OWNER_OPEN_ID step-2 swap. Then upload + edit test.
+  - We do NOT point astersports.io at Railway until the full test passes.
