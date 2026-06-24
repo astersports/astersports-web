@@ -26,6 +26,7 @@ import { infillBaseCloth, type InfillResult } from "./infill";
 import { lamaInfill, isLamaAvailable } from "./lamaInfill";
 import { blueNoiseLayout, type Point } from "./blueNoiseLayout";
 import { assignTargets, type Assignment } from "./assignTargets";
+import { garmentMaskFromImage } from "./garmentSilhouette";
 import type { MaskImageInput, FabricMask, InstanceMask, RasterMask, BBoxNormalized } from "../../masking/types";
 
 export interface RedistributeInput {
@@ -283,17 +284,32 @@ export async function densityRedistribute(input: RedistributeInput): Promise<Red
   // "the entire bbox"). A missing or all-zero boundaryRaster is a DEGRADE -> refund
   // (parity with the !raster guard above). The all-zero case already refunded via the F2
   // / blueNoise empty-mask paths; this makes it explicit and avoids the silent fallback.
-  const boundary = input.fabric.boundaryRaster;
-  if (!boundary) {
+  const rawBoundary = input.fabric.boundaryRaster;
+  if (!rawBoundary) {
     console.warn("[density-redistribute] boundaryRaster absent; degrade -> refund (no full-crop boundary fallback).");
     return empty();
   }
   // T1.1 (GAP-1): boundary dimension guard. A mis-sized boundaryRaster silently corrupts
   // the composite (motifs placed/clipped against wrong coordinates). This is the ONE
   // reachable path to a corrupted PAID image that still bills. Degrade -> refund.
-  if (boundary.width !== width || boundary.height !== height) {
-    console.warn(`[density-redistribute] boundaryRaster dimension mismatch: boundary ${boundary.width}x${boundary.height} vs image ${width}x${height}; degrade -> refund.`);
+  if (rawBoundary.width !== width || rawBoundary.height !== height) {
+    console.warn(`[density-redistribute] boundaryRaster dimension mismatch: boundary ${rawBoundary.width}x${rawBoundary.height} vs image ${width}x${height}; degrade -> refund.`);
     return empty();
+  }
+  // Clip the motif silhouette to the ACTUAL garment via border background removal, so a
+  // few stray placements can't land on the backdrop beside/above the garment (observed:
+  // motifs floating off the skirt near the hanger). Fail-safe: a non-plain backdrop ->
+  // garmentMaskFromImage returns null (keep the silhouette); an over-aggressive clip
+  // (<30% of the silhouette retained — e.g. a low-contrast garment/backdrop) is ignored.
+  const garment = garmentMaskFromImage(buffer, width, height);
+  let boundary: RasterMask = rawBoundary;
+  if (garment) {
+    const data = new Uint8Array(width * height);
+    let kept = 0, raw = 0;
+    for (let i = 0; i < data.length; i++) {
+      if (rawBoundary.data[i] > 127) { raw++; if (garment.data[i] > 127) { data[i] = 255; kept++; } }
+    }
+    if (kept > 0.3 * raw) boundary = { width, height, data };
   }
   let boundaryArea = 0;
   for (let i = 0; i < boundary.data.length; i++) if (boundary.data[i] > 127) boundaryArea++;

@@ -173,3 +173,54 @@ export function garmentSilhouetteFromInstances(
   const largest = largestComponentMask(fillHoles(closed, width, height), width, height);
   return { width, height, data: largest };
 }
+
+/**
+ * Garment mask via border flood-fill background removal — for plain-backdrop product
+ * photos. The backdrop is the pixels colour-close to the crop's border ring AND
+ * 4-connected to it; the garment is the largest NON-backdrop region, holes filled.
+ *
+ * Used to CLIP a motif silhouette (densityRedistribute) so a few stray placements can't
+ * land on the backdrop beside or above the garment (e.g. motifs floating off a skirt near
+ * the hanger): a motif-position silhouette alone can't tell garment from hanger/wall.
+ *
+ * Fail-safe: returns null when the backdrop isn't plainly separable — it fills <5% or >95%
+ * of the crop (busy/non-plain backdrop, or garment ≈ backdrop colour) — so the caller keeps
+ * the motif silhouette unchanged. `buffer` is RGBA at width×height.
+ */
+export function garmentMaskFromImage(buffer: Buffer, width: number, height: number): RasterMask | null {
+  const n = width * height;
+  if (n === 0 || buffer.length < n * 4) return null;
+  // Backdrop reference colour = mean of the border ring.
+  let rs = 0, gs = 0, bs = 0, cnt = 0;
+  const sample = (i: number) => { const p = i * 4; rs += buffer[p]; gs += buffer[p + 1]; bs += buffer[p + 2]; cnt++; };
+  for (let x = 0; x < width; x++) { sample(x); sample((height - 1) * width + x); }
+  for (let y = 0; y < height; y++) { sample(y * width); sample(y * width + (width - 1)); }
+  const rr = rs / cnt, rg = gs / cnt, rb = bs / cnt;
+  const TOL2 = 45 * 45; // squared RGB distance from the backdrop reference
+  const nearBackdrop = (i: number): boolean => {
+    const p = i * 4;
+    const dr = buffer[p] - rr, dg = buffer[p + 1] - rg, db = buffer[p + 2] - rb;
+    return dr * dr + dg * dg + db * db <= TOL2;
+  };
+  const bg = new Uint8Array(n);
+  const stack = new Uint32Array(n);
+  let sp = 0;
+  const push = (i: number) => { if (!bg[i] && nearBackdrop(i)) { bg[i] = 1; stack[sp++] = i; } };
+  for (let x = 0; x < width; x++) { push(x); push((height - 1) * width + x); }
+  for (let y = 0; y < height; y++) { push(y * width); push(y * width + (width - 1)); }
+  while (sp > 0) {
+    const idx = stack[--sp];
+    const x = idx % width, y = (idx / width) | 0;
+    if (x > 0) push(idx - 1);
+    if (x < width - 1) push(idx + 1);
+    if (y > 0) push(idx - width);
+    if (y < height - 1) push(idx + width);
+  }
+  let bgCount = 0;
+  for (let i = 0; i < n; i++) if (bg[i]) bgCount++;
+  const frac = bgCount / n;
+  if (frac < 0.05 || frac > 0.95) return null; // not a plainly-separable backdrop -> skip
+  const fg = new Uint8Array(n);
+  for (let i = 0; i < n; i++) fg[i] = bg[i] ? 0 : 255;
+  return { width, height, data: fillHoles(largestComponentMask(fg, width, height), width, height) };
+}
