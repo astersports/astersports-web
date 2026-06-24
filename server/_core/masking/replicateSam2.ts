@@ -85,6 +85,20 @@ export interface Sam2Client {
 }
 
 const SAM2_MODEL = "meta/sam-2";
+/**
+ * Confirmed-working SAM2 version (automatic-mask generation). This is the exact hash the
+ * proven path uses (eval/generateSam2Mask.mjs, scripts/confirmDensityLive.mjs) and the
+ * input/output shape this client builds (`image` + `points_per_side`/`use_m2m` -> `combined_mask`
+ * + `individual_masks`) matches it.
+ *
+ * Why a VERSION and not the `meta/sam-2` slug: predictions.create() with a bare slug hits the
+ * official-model endpoint (POST /v1/models/{owner}/{name}/predictions). SAM2 here is a COMMUNITY
+ * model, so that slug 404s ("requested resource could not be found") — a community model must be
+ * run by version (POST /v1/predictions with a `version` body). Pinning the proven version means an
+ * unset — or a stale `meta/sam-2` — REPLICATE_SAM2_MODEL still resolves to a runnable model.
+ * Overridable via REPLICATE_SAM2_MODEL (an `owner/model:version` ref or a bare version hash).
+ */
+const SAM2_DEFAULT_VERSION = "fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83";
 const DOWNLOAD_TIMEOUT_MS = 30_000;
 /**
  * Caller-side deadline for replicate.run(). The SDK long-polls until the
@@ -117,12 +131,13 @@ async function runWithTimeout<T>(label: string, p: Promise<T>): Promise<T> {
 /**
  * Resolve REPLICATE_SAM2_MODEL into a ref the SDK's `run()` accepts.
  * `run()` wants `owner/model` or `owner/model:version` — NOT a bare version hash.
- * So a configured value WITH a slash is used as-is; a bare version hash (no slash,
- * e.g. the confirmed `fe97b45...`) is pinned to `meta/sam-2:<hash>`; empty -> slug.
+ * A configured `owner/model:version` is used as-is; a bare version hash (no slash,
+ * e.g. the confirmed `fe97b45...`) is pinned to `meta/sam-2:<hash>`. Unset — or the bare
+ * `meta/sam-2` slug, which 404s without a version — pins the confirmed default version.
  */
 export function resolveModelRef(configured?: string): `${string}/${string}` {
   const v = (configured ?? "").trim();
-  if (!v) return SAM2_MODEL;
+  if (!v || v === SAM2_MODEL) return `${SAM2_MODEL}:${SAM2_DEFAULT_VERSION}` as `${string}/${string}`;
   return (v.includes("/") ? v : `${SAM2_MODEL}:${v}`) as `${string}/${string}`;
 }
 
@@ -190,11 +205,13 @@ async function parseAutoSegmentation(output: unknown): Promise<Sam2Segmentation>
 }
 
 /** predictions.create() wants { model } OR { version } (not run()'s combined ref).
- *  "owner/model:version" -> { version }; "owner/model" -> { model }; bare hash -> { version };
- *  empty -> { model: "meta/sam-2" } (official model, latest version). */
+ *  "owner/model:version" -> { version }; bare hash -> { version }; some other "owner/model"
+ *  slug -> { model } (trust an explicit override). Unset — or the bare `meta/sam-2` slug, which
+ *  404s here (this endpoint serves OFFICIAL models only; SAM2 here is a COMMUNITY model that must
+ *  be run by version) -> the confirmed default version. */
 export function resolvePredictionTarget(configured?: string): { model: string } | { version: string } {
   const v = (configured ?? "").trim();
-  if (!v) return { model: SAM2_MODEL };
+  if (!v || v === SAM2_MODEL) return { version: SAM2_DEFAULT_VERSION };
   if (v.includes(":")) return { version: v.split(":").pop()!.trim() };
   if (v.includes("/")) return { model: v };
   return { version: v };

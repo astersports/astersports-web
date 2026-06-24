@@ -31,13 +31,16 @@ describe("resolveModelRef (REPLICATE_SAM2_MODEL -> run() ref)", () => {
     expect(resolveModelRef("fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83"))
       .toBe("meta/sam-2:fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83");
   });
-  it("passes a slug or owner/model:version through unchanged", () => {
-    expect(resolveModelRef("meta/sam-2")).toBe("meta/sam-2");
+  it("passes an owner/model:version through unchanged", () => {
     expect(resolveModelRef("meta/sam-2:abc123")).toBe("meta/sam-2:abc123");
   });
-  it("defaults to the meta/sam-2 slug when unset", () => {
-    expect(resolveModelRef("")).toBe("meta/sam-2");
-    expect(resolveModelRef(undefined)).toBe("meta/sam-2");
+  it("pins the confirmed default version when unset or given the bare meta/sam-2 slug", () => {
+    // The bare `meta/sam-2` slug 404s on run() without a version, so it resolves to the
+    // confirmed default version exactly like an unset value does.
+    const DEFAULT_REF = "meta/sam-2:fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83";
+    expect(resolveModelRef("meta/sam-2")).toBe(DEFAULT_REF);
+    expect(resolveModelRef("")).toBe(DEFAULT_REF);
+    expect(resolveModelRef(undefined)).toBe(DEFAULT_REF);
   });
 });
 
