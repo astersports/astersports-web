@@ -873,18 +873,30 @@ async function computeJobAggregates(
 const TENANT_STATS_FRESH_MS = 5 * 60 * 1000;
 
 /**
- * True only for the MySQL "table doesn't exist" error (errno 1146 /
- * ER_NO_SUCH_TABLE). Lets the rollup reader tolerate `studio_tenant_stats` not
- * being present yet (migration 0013 not applied via db:push) while still
+ * True for the "table doesn't exist" error. Post-migration this is Postgres
+ * `undefined_table` (SQLSTATE 42P01, message `relation "..." does not exist`);
+ * the legacy MySQL form (ER_NO_SUCH_TABLE / errno 1146) is kept for safety. The
+ * driver error is wrapped by drizzle (DrizzleQueryError), so the SQLSTATE lives
+ * on `.cause` — walk the chain. Lets the rollup reader tolerate
+ * `studio_tenant_stats` not being present yet (pre-`db:push`) while still
  * surfacing every other DB error instead of silently swallowing it.
  */
 function isMissingTableError(err: unknown): boolean {
-  const e = err as { code?: string; errno?: number; message?: string } | null;
-  return (
-    e?.code === "ER_NO_SUCH_TABLE" ||
-    e?.errno === 1146 ||
-    (typeof e?.message === "string" && /doesn'?t exist|no such table|ER_NO_SUCH_TABLE/i.test(e.message))
-  );
+  let e: unknown = err;
+  for (let i = 0; e && i < 4; i++) {
+    const x = e as { code?: string; errno?: number; message?: string; cause?: unknown };
+    const message = typeof x.message === "string" ? x.message : "";
+    if (
+      x.code === "42P01" || // Postgres undefined_table
+      x.code === "ER_NO_SUCH_TABLE" ||
+      x.errno === 1146 ||
+      /does ?n'?t exist|no such table|relation .* does not exist|ER_NO_SUCH_TABLE/i.test(message)
+    ) {
+      return true;
+    }
+    e = x.cause;
+  }
+  return false;
 }
 
 /**

@@ -10,8 +10,11 @@ let _db: PostgresJsDatabase | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      // postgres-js (Supabase). `prepare:false` is the Supabase-recommended setting when
-      // routing through the transaction pooler (pgBouncer). max=10 mirrors the old pool.
+      // postgres-js (Supabase). `prepare:false` keeps us compatible with both Supabase
+      // poolers. For a persistent server (Railway) prefer the SESSION pooler (pooler
+      // host, port 5432) over the TRANSACTION pooler (port 6543, meant for serverless);
+      // the transaction pooler was the suspected cause of first-login upsert failures.
+      // max=10 mirrors the old pool.
       const client = postgres(process.env.DATABASE_URL, {
         max: 10,
         idle_timeout: 60,

@@ -100,7 +100,16 @@ export function registerOAuthRoutes(app: Express) {
 
       res.redirect(302, "/");
     } catch (error) {
-      console.error("[OAuth] Google callback failed", error);
+      // Un-swallow the real cause: a bare DrizzleQueryError prints only "Failed
+      // query: ..." and hides the underlying postgres-js/Postgres error, which made
+      // the first-login failure hard to diagnose. Walk the cause chain.
+      const chain: string[] = [];
+      let cur: unknown = error;
+      for (let i = 0; cur && i < 5; i++) {
+        chain.push(cur instanceof Error ? `${cur.name}: ${cur.message}` : String(cur));
+        cur = cur instanceof Error ? (cur as { cause?: unknown }).cause : undefined;
+      }
+      console.error("[OAuth] Google callback failed →", chain.join("  ←caused by←  "));
       res.status(500).json({ error: "OAuth callback failed" });
     }
   });
