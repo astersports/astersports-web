@@ -69,6 +69,9 @@ function validateControls(raw: any): ControlSettings {
     density: {
       enabled: Boolean(density.enabled),
       percent: Math.max(0, Math.min(90, Number(density.percent) || 0)),
+      // Survivor layout. Default "respace" (the prior behaviour); "inplace" is the opt-in
+      // for placed/couture designs. Server still gates respace on the redistribute flag.
+      mode: density.mode === "inplace" ? "inplace" : "respace",
     },
     variations: 1, // clamped to 1
   };
