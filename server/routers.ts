@@ -14,7 +14,6 @@ import { firmAdminRouter } from "./routers/firmAdmin";
 import { inviteLinksRouter } from "./routers/inviteLinks";
 import { fetchAllGames, invalidateAllCaches, getTournamentRegistry } from "./scraper";
 import { notifyOwner } from "./_core/notification";
-import { sdk } from "./_core/sdk";
 import { pruneOldLogs } from './logRetention';
 import { log } from './serverLog';
 import { processTrialReminders } from './trialReminders';
@@ -226,6 +225,11 @@ export const appRouter = router({
 // <secret>` header the Manus scheduler injects natively (see ./_core/cronAuth for the
 // match logic + tests). Backward-compatible: unset CRON_SECRET = no extra gate.
 function cronSecretOk(req: any): boolean {
+  // Fail CLOSED in production when no secret is configured: with the Manus
+  // isCron session check removed (Railway migration), CRON_SECRET is the sole
+  // gate on these endpoints (reaper / poll / billing), so an unset secret in prod
+  // must lock them, not open them. Dev/CI (not production) stays open for tests.
+  if (ENV.isProduction && !ENV.cronSecret) return false;
   return cronSecretMatches(req.headers, ENV.cronSecret);
 }
 
@@ -236,10 +240,6 @@ export function registerScheduledRoutes(app: any) {
     try {
       if (!cronSecretOk(req)) {
         return res.status(403).json({ error: 'forbidden' });
-      }
-      const user = await sdk.authenticateRequest(req);
-      if (!user.isCron || !user.taskUid) {
-        return res.status(403).json({ error: 'cron-only' });
       }
 
       const deleted = await pruneOldLogs();
@@ -266,10 +266,6 @@ export function registerScheduledRoutes(app: any) {
     try {
       if (!cronSecretOk(req)) {
         return res.status(403).json({ error: 'forbidden' });
-      }
-      const user = await sdk.authenticateRequest(req);
-      if (!user.isCron || !user.taskUid) {
-        return res.status(403).json({ error: 'cron-only' });
       }
 
       const result = await processTrialReminders();
@@ -298,10 +294,6 @@ export function registerScheduledRoutes(app: any) {
       if (!cronSecretOk(req)) {
         return res.status(403).json({ error: 'forbidden' });
       }
-      const user = await sdk.authenticateRequest(req);
-      if (!user.isCron || !user.taskUid) {
-        return res.status(403).json({ error: 'cron-only' });
-      }
 
       const result = await processTrialAutoCharges();
       console.log(`[trial-autocharge] Processed ${result.processed}, charged ${result.charged}, failed ${result.failed}`);
@@ -328,11 +320,6 @@ export function registerScheduledRoutes(app: any) {
     try {
       if (!cronSecretOk(req)) {
         return res.status(403).json({ error: 'forbidden' });
-      }
-      // Authenticate cron request
-      const user = await sdk.authenticateRequest(req);
-      if (!user.isCron || !user.taskUid) {
-        return res.status(403).json({ error: 'cron-only' });
       }
 
       const result = await fetchAllGames();
@@ -401,11 +388,6 @@ export function registerScheduledRoutes(app: any) {
         log.error('cron', '[reap-stuck-jobs] cronSecretOk failed', { metadata: { headers: Object.keys(req.headers).join(',') } });
         return res.status(403).json({ error: 'forbidden' });
       }
-      const user = await sdk.authenticateRequest(req);
-      if (!user.isCron || !user.taskUid) {
-        log.error('cron', `[reap-stuck-jobs] cron-only check failed: isCron=${user.isCron}, taskUid=${user.taskUid}`);
-        return res.status(403).json({ error: 'cron-only' });
-      }
 
       const result = await reapStuckJobs(10 * 60 * 1000);
       log.info('cron', `[reap-stuck-jobs] reaped ${result.reaped}, refunded ${result.refunded}`);
@@ -425,11 +407,6 @@ export function registerScheduledRoutes(app: any) {
       if (!cronSecretOk(req)) {
         log.error('cron', '[poll-predictions] cronSecretOk failed', { metadata: { headers: Object.keys(req.headers).join(',') } });
         return res.status(403).json({ error: 'forbidden' });
-      }
-      const user = await sdk.authenticateRequest(req);
-      if (!user.isCron || !user.taskUid) {
-        log.error('cron', `[poll-predictions] cron-only check failed: isCron=${user.isCron}, taskUid=${user.taskUid}`);
-        return res.status(403).json({ error: 'cron-only' });
       }
       if (!ENV.studioAsyncJobs) {
         return res.json({ success: true, skipped: 'async disabled', timestamp: new Date().toISOString() });

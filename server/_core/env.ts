@@ -165,10 +165,15 @@ export const ENV = {
     .split(",")
     .map((h) => h.trim())
     .filter(Boolean),
-  /** H3: shared secret for server-to-server scheduled (cron) endpoints. When set,
-   *  /api/scheduled/* requires a matching `x-cron-secret` header IN ADDITION to the
-   *  existing session check. Backward-compatible: unset = no extra gate. */
+  /** H3: shared secret for server-to-server scheduled (cron) endpoints. Post-Manus
+   *  this is the SOLE gate on /api/scheduled/* (the Manus isCron session check was
+   *  removed) — so in production it must be set or the endpoints fail closed. */
   cronSecret: process.env.CRON_SECRET ?? "",
+  /** In-process scheduler (replaces the Manus Heartbeat). When true, the running
+   *  app triggers its own /api/scheduled/* endpoints on intervals (self-HTTP with
+   *  CRON_SECRET). Off by default so dev/CI/tests never schedule; set
+   *  ENABLE_SCHEDULER=true on exactly one running instance in prod. */
+  schedulerEnabled: process.env.ENABLE_SCHEDULER === "true",
 };
 
 /**
@@ -230,6 +235,7 @@ export function validateEnv(): { errors: string[]; warnings: string[] } {
     ["SUPABASE_SERVICE_ROLE_KEY", ENV.supabaseServiceRoleKey, "Supabase Storage (image uploads / signed reads)"],
     ["GOOGLE_CLIENT_ID", ENV.googleClientId, "Google sign-in"],
     ["GOOGLE_CLIENT_SECRET", ENV.googleClientSecret, "Google sign-in"],
+    ["CRON_SECRET", ENV.cronSecret, "scheduled cron endpoints (reaper/poll/billing) — gate fails closed in prod if unset"],
   ];
   for (const [name, val, feature] of optional) {
     if (!val) warnings.push(`${name} missing — ${feature} disabled`);

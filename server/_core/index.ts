@@ -16,6 +16,7 @@ import { registerStudioStreamRoutes } from "../routes/studioStream";
 import { registerStudioPostureRoute } from "../routes/studioPosture";
 import { handleReplicateWebhook } from "../routes/replicateWebhook";
 import { assertEnvOrExit, ENV } from "./env";
+import { startScheduler } from "./scheduler";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -106,6 +107,9 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
+    // In-process cron scheduler (replaces the Manus Heartbeat). No-op unless
+    // ENABLE_SCHEDULER=true; self-HTTPs /api/scheduled/* with CRON_SECRET.
+    startScheduler(port);
   });
 }
 
