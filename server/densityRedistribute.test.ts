@@ -143,4 +143,26 @@ describe("densityRedistribute (Option B)", () => {
     expect(res.removed).toBe(11);
     expect(res.kept).toBe(25);
   });
+
+  it("size-tiered: emphasises main blooms — secondary bits removed at a higher rate (total unchanged)", async () => {
+    const disk = (cx: number, cy: number, rad: number): InstanceMask => {
+      const data = new Uint8Array(W * H);
+      for (let y = cy - rad; y <= cy + rad; y++)
+        for (let x = cx - rad; x <= cx + rad; x++)
+          if (x >= 0 && x < W && y >= 0 && y < H && (x - cx) ** 2 + (y - cy) ** 2 <= rad * rad) data[y * W + x] = 255;
+      return { bbox: { x: (cx - rad) / W, y: (cy - rad) / H, w: (2 * rad + 1) / W, h: (2 * rad + 1) / H }, raster: { width: W, height: H, data } };
+    };
+    // 4 large blooms (idx 0-3) + 12 small bits (idx 4-15). At 50% (removeN=8) the bits
+    // should be thinned more than the blooms, while total removed stays 8.
+    const big = [disk(24, 24, 10), disk(104, 24, 10), disk(24, 104, 10), disk(104, 104, 10)];
+    const small: InstanceMask[] = [];
+    for (let i = 0; i < 12; i++) small.push(disk(20 + (i % 4) * 30, 50 + Math.floor(i / 4) * 12, 3));
+    const res = await densityRedistribute({ image: { url: "x" }, fabric, instances: [...big, ...small], percent: 50 });
+
+    expect(res.removed).toBe(8); // round(16 * 0.5) — total reduction (billing) unchanged
+    const survBig = res.assignments.filter((a) => a.source < 4).length;
+    const survSmall = res.assignments.filter((a) => a.source >= 4).length;
+    expect(survBig + survSmall).toBe(8); // kept = 16 - 8
+    expect(survBig / 4).toBeGreaterThan(survSmall / 12); // blooms kept at a higher fraction than bits
+  });
 });

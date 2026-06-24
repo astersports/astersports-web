@@ -26,7 +26,7 @@ import { infillBaseCloth, type InfillResult } from "./infill";
 import { lamaInfill, isLamaAvailable } from "./lamaInfill";
 import { blueNoiseLayout, type Point } from "./blueNoiseLayout";
 import { assignTargets, type Assignment } from "./assignTargets";
-import type { MaskImageInput, FabricMask, InstanceMask, RasterMask } from "../../masking/types";
+import type { MaskImageInput, FabricMask, InstanceMask, RasterMask, BBoxNormalized } from "../../masking/types";
 
 export interface RedistributeInput {
   image: MaskImageInput;
@@ -168,6 +168,80 @@ async function cropAlpha(
   return { alpha: data, stride: info.channels };
 }
 
+/** A surviving instance and the even target it relocates to. */
+type Placement = { instIdx: number; target: Point };
+
+/** Pixel area of an instance (raster mass if dims match, else bbox rectangle). */
+function instanceArea(inst: InstanceMask, w: number, h: number): number {
+  const r = inst.raster;
+  if (r && r.width === w && r.height === h) {
+    let a = 0;
+    for (let i = 0; i < w * h; i++) if (r.data[i] > 127) a++;
+    return a;
+  }
+  return Math.max(1, Math.round(inst.bbox.w * w) * Math.round(inst.bbox.h * h));
+}
+
+/**
+ * Plan which motifs survive and where each relocates, EMPHASISING the main blooms.
+ *
+ * Classify instances by pixel area: "main" = at/above the mean motif area (a skewed
+ * floral — many small buds/leaves, few large blooms — puts the blooms above the mean).
+ * Remove the SECONDARY bits at ~2x the rate of the MAIN blooms (so blooms are kept and
+ * dominate), while keeping removeMain + removeSec === removeN so total reduction (and
+ * billing) is unchanged. Lay blooms and bits out on SEPARATE even (blue-noise) layers so
+ * the blooms read as the key even rhythm and the bits evenly fill around them; bits are
+ * listed first so blooms composite on top where they overlap.
+ *
+ * Degenerate split (one class empty — e.g. uniform motifs): fall back to a single even
+ * layout of all M survivors (the prior v2 behaviour; keeps the count tests exact).
+ */
+function planPlacements(
+  instances: InstanceMask[],
+  srcCentroids: Point[],
+  boundary: RasterMask,
+  bbox: BBoxNormalized,
+  removeN: number,
+  width: number,
+  height: number,
+  seed: number
+): Placement[] {
+  const n = instances.length;
+  const M = n - removeN;
+  const areas = instances.map((inst) => instanceArea(inst, width, height));
+  const mean = areas.reduce((a, b) => a + b, 0) / n;
+  const mainIdx: number[] = [];
+  const secIdx: number[] = [];
+  instances.forEach((_, i) => (areas[i] >= mean ? mainIdx : secIdx).push(i));
+
+  // Degenerate split -> single even layout of all survivors (prior behaviour).
+  if (mainIdx.length === 0 || secIdx.length === 0) {
+    const targets = blueNoiseLayout(boundary, bbox, M, { seed });
+    if (targets.length === 0) return [];
+    const { assignments } = assignTargets(srcCentroids, targets);
+    return assignments.map((a) => ({ instIdx: a.source, target: targets[a.target] }));
+  }
+
+  // Tiered removal: secondary bits removed at ~2x the main rate; total === removeN.
+  const r = removeN / (mainIdx.length + 2 * secIdx.length);
+  let removeMain = clamp(Math.round(r * mainIdx.length), 0, mainIdx.length);
+  let removeSec = clamp(removeN - removeMain, 0, secIdx.length);
+  removeMain = clamp(removeN - removeSec, 0, mainIdx.length); // rebalance if bits ran out
+  const Mmain = mainIdx.length - removeMain;
+  const Msec = secIdx.length - removeSec;
+
+  const mainTargets = blueNoiseLayout(boundary, bbox, Mmain, { seed });
+  const secTargets = blueNoiseLayout(boundary, bbox, Msec, { seed: seed + 7 });
+  const am = assignTargets(mainIdx.map((i) => srcCentroids[i]), mainTargets);
+  const as = assignTargets(secIdx.map((i) => srcCentroids[i]), secTargets);
+
+  // Bits first, blooms last (blooms composite on top of any overlap).
+  return [
+    ...as.assignments.map((a) => ({ instIdx: secIdx[a.source], target: secTargets[a.target] })),
+    ...am.assignments.map((a) => ({ instIdx: mainIdx[a.source], target: mainTargets[a.target] })),
+  ];
+}
+
 export async function densityRedistribute(input: RedistributeInput): Promise<RedistributeResult> {
   const { buffer, width, height } = await decodeUpright(input.image.url);
   const raster = input.fabric.raster;
@@ -193,7 +267,6 @@ export async function densityRedistribute(input: RedistributeInput): Promise<Red
   if (n === 0 || percent <= 0) return empty();
   const removeN = clamp(Math.round((n * percent) / 100), 0, n);
   if (removeN === 0) return empty();
-  const M = n - removeN;
 
   // F3: instance-raster dim drift forces a bbox-rectangle fallback in markInstance
   // that produces a grossly-corrupted redistribute. Treat it as a DEGRADE -> refund
@@ -238,15 +311,14 @@ export async function densityRedistribute(input: RedistributeInput): Promise<Red
     return empty();
   }
 
-  // 4.2 even target layout — exactly M blue-noise points inside the GARMENT SILHOUETTE.
-  // Uses boundaryRaster so points are constrained to the actual garment, not the full crop.
-  const targets = blueNoiseLayout(boundary, input.fabric.bbox, M, { seed: input.seed ?? 1 });
-  if (targets.length === 0) return empty();
-
-  // 4.3 assignment + survivor selection (min squared displacement).
+  // 4.2/4.3 size-tiered survivor layout (planPlacements): emphasise the MAIN blooms (own
+  // even rhythm) and thin the SECONDARY bits more (own even layer), inside the GARMENT
+  // SILHOUETTE (boundaryRaster). Total removal === removeN, so billing is unchanged.
   const srcCentroids = input.instances.map((inst) => centroid(inst, width, height));
-  const { assignments } = assignTargets(srcCentroids, targets);
-  if (assignments.length === 0) return empty();
+  const placements = planPlacements(
+    input.instances, srcCentroids, boundary, input.fabric.bbox, removeN, width, height, input.seed ?? 1
+  );
+  if (placements.length === 0) return empty();
 
   // 4.4 step 1 — erase ALL N originals to base cloth (the exact v1 erase).
   const sel = new Uint8Array(width * height);
@@ -279,16 +351,16 @@ export async function densityRedistribute(input: RedistributeInput): Promise<Red
     out = erased.data;
   }
 
-  // 4.4 step 2 — composite the M survivors at their targets. No resize (scale
-  // preserved), no rotate (orientation preserved). Translate each motif crop from
-  // its source centroid to the assigned target centroid, alpha-blended over ground.
-  for (const a of assignments) {
-    const inst = input.instances[a.source];
+  // 4.4 step 2 — composite each surviving motif at its even target. No resize (scale
+  // preserved), no rotate (orientation preserved). Translate each motif crop from its
+  // source centroid to the assigned target centroid, alpha-blended over ground.
+  for (const pl of placements) {
+    const inst = input.instances[pl.instIdx];
     const bb = instanceBBox(inst, width, height);
     const cw = bb.x1 - bb.x0 + 1;
     const ch = bb.y1 - bb.y0 + 1;
-    const [csx, csy] = srcCentroids[a.source];
-    const [tx, ty] = targets[a.target];
+    const [csx, csy] = srcCentroids[pl.instIdx];
+    const [tx, ty] = pl.target;
     const dx = Math.round(tx - csx);
     const dy = Math.round(ty - csy);
 
@@ -313,6 +385,8 @@ export async function densityRedistribute(input: RedistributeInput): Promise<Red
     }
   }
 
-  const kept = assignments.length;
+  const kept = placements.length;
+  const targets = placements.map((p) => p.target);
+  const assignments: Assignment[] = placements.map((p, i) => ({ source: p.instIdx, target: i }));
   return { data: out, width, height, kept, removed: n - kept, targets, assignments };
 }
