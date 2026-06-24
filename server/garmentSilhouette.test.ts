@@ -2,12 +2,16 @@
  * garmentSilhouetteFromInstances — the instance-derived garment outline that
  * densityRedistribute (v2) uses for layout + clip, replacing SAM2's combined_mask
  * (which unions background segments and let motifs land off-garment).
+ *
+ * It morphologically CLOSES the motif union: bridges the gaps BETWEEN clusters (even
+ * spread, not bunched) while leaving the OPEN backdrop beside the garment excluded
+ * (keeps survivors on the garment — the convex-hull failure mode), and drops strays.
  */
 import { describe, it, expect } from "vitest";
 import { garmentSilhouetteFromInstances } from "./_core/studio/ops/garmentSilhouette";
 import type { InstanceMask, RasterMask } from "./_core/masking/types";
 
-const W = 120, H = 120;
+const W = 200, H = 200;
 
 /** A filled square motif of half-size `r` centred at (cx,cy), as a full-dim raster instance. */
 function motif(cx: number, cy: number, r: number): InstanceMask {
@@ -31,20 +35,30 @@ describe("garmentSilhouetteFromInstances", () => {
     expect(garmentSilhouetteFromInstances([motif(50, 50, 4)], 0, H)).toBeNull();
   });
 
-  it("fills the gap BETWEEN motif clusters so redistribution can spread evenly", () => {
-    // two clusters separated by a wide bare gap — the hull must bridge them
-    const left = [motif(25, 60, 4), motif(30, 50, 4), motif(30, 70, 4)];
-    const right = [motif(95, 60, 4), motif(90, 50, 4), motif(90, 70, 4)];
-    const sil = garmentSilhouetteFromInstances([...left, ...right], W, H)!;
+  it("bridges the gap BETWEEN nearby motif clusters so redistribution spreads evenly", () => {
+    // two clusters with a modest bare gap — the close must bridge them into one region
+    const a = [motif(70, 100, 4), motif(80, 90, 4), motif(80, 110, 4)];
+    const b = [motif(130, 100, 4), motif(120, 90, 4), motif(120, 110, 4)];
+    const sil = garmentSilhouetteFromInstances([...a, ...b], W, H)!;
     expect(sil).not.toBeNull();
-    expect(on(sil, 60, 60)).toBe(true); // the gap between the clusters is inside the silhouette
+    expect(on(sil, 100, 100)).toBe(true); // the bridged gap between clusters is inside the silhouette
   });
 
-  it("excludes regions outside the motif span (e.g. background corners)", () => {
-    const cluster = [motif(55, 55, 4), motif(65, 55, 4), motif(55, 65, 4), motif(65, 65, 4)];
+  it("excludes the open backdrop far from any motif", () => {
+    const cluster = [motif(95, 95, 4), motif(105, 95, 4), motif(95, 105, 4), motif(105, 105, 4)];
     const sil = garmentSilhouetteFromInstances(cluster, W, H)!;
-    expect(on(sil, 60, 60)).toBe(true);   // inside the motif span
-    expect(on(sil, 5, 5)).toBe(false);    // far corner, outside the hull
-    expect(on(sil, 115, 10)).toBe(false); // far corner, outside the hull
+    expect(on(sil, 100, 100)).toBe(true); // inside the print region
+    expect(on(sil, 10, 10)).toBe(false);  // far backdrop corner, excluded
+    expect(on(sil, 190, 10)).toBe(false); // far backdrop corner, excluded
+  });
+
+  it("drops a far-flung stray detection (keeps the largest component)", () => {
+    // a solid 3x3 cluster (clearly the largest region) plus one isolated stray
+    const cluster: InstanceMask[] = [];
+    for (const cy of [85, 100, 115]) for (const cx of [85, 100, 115]) cluster.push(motif(cx, cy, 4));
+    const stray = motif(160, 40, 3); // isolated, away from the borders, far beyond the close bridge
+    const sil = garmentSilhouetteFromInstances([...cluster, stray], W, H)!;
+    expect(on(sil, 100, 100)).toBe(true); // garment cluster kept
+    expect(on(sil, 160, 40)).toBe(false); // off-garment stray dropped
   });
 });
