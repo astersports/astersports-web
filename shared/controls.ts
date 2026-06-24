@@ -10,10 +10,37 @@ export interface ScaleControl {
   percent: number;
 }
 
+/**
+ * How surviving motifs are arranged after thinning:
+ *  - "respace": RELOCATE survivors to an even (blue-noise) layout. Best for repeating
+ *    all-over prints (ditsy florals, terrazzo) — evens out the spacing.
+ *  - "inplace": keep every survivor in its ORIGINAL position. Best for placed / couture
+ *    designs — preserves the composition (readable text, deliberate placement) and never
+ *    moves a motif off-garment.
+ */
+export type DensityMode = "respace" | "inplace";
+
 export interface DensityControl {
   enabled: boolean;
   /** Percent of print to thin out evenly. 0..100. */
   percent: number;
+  /** Layout of survivors after thinning. Optional for back-compat (absent -> server
+   *  falls back to the STUDIO_DENSITY_REDISTRIBUTE flag default). */
+  mode?: DensityMode;
+}
+
+/**
+ * Resolve whether density runs v2 (respace/relocate) vs v1 (thin in place), HONOURING
+ * the STUDIO_DENSITY_REDISTRIBUTE flip-authority flag as a ceiling: respace only runs
+ * when the user asked for it AND the flag is live. An absent mode (old jobs) falls back
+ * to the flag's prior env-driven behaviour. v1 (in place) is always a safe result.
+ */
+export function resolveDensityRedistribute(
+  mode: DensityMode | undefined,
+  envRedistributeLive: boolean
+): boolean {
+  const wantRespace = mode != null ? mode === "respace" : envRedistributeLive;
+  return wantRespace && envRedistributeLive;
 }
 
 export interface ControlSettings {
@@ -36,7 +63,7 @@ export const PERCENT_STEPS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 export function defaultControls(): ControlSettings {
   return {
     scale: { enabled: false, percent: 0 },
-    density: { enabled: false, percent: 0 },
+    density: { enabled: false, percent: 0, mode: "respace" },
     variations: 1,
   };
 }
