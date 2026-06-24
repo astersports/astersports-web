@@ -48,6 +48,25 @@ function scaleOnly(c: ControlSettings): boolean {
 }
 
 /**
+ * Replicate completion-webhook URL for async (STUDIO_ASYNC_JOBS) jobs. Returns
+ * undefined unless REPLICATE_WEBHOOK_SECRET is set — the webhook handler is
+ * fail-closed on that secret, so without it Replicate's callback would be rejected
+ * and the cron poller resolves the job anyway (graceful degradation). With it (plus
+ * a public base URL), Replicate POSTs the instant SAM2 settles, so the result lands
+ * in seconds instead of waiting up to a full poll interval. Base URL: an explicit
+ * PUBLIC_BASE_URL / VITE_APP_URL, else Railway's injected RAILWAY_PUBLIC_DOMAIN.
+ */
+function replicateWebhookUrl(): string | undefined {
+  if (!ENV.replicateWebhookSecret) return undefined;
+  const base = (
+    process.env.PUBLIC_BASE_URL ||
+    process.env.VITE_APP_URL ||
+    (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : "")
+  ).replace(/\/+$/, "");
+  return base ? `${base}/api/webhooks/replicate` : undefined;
+}
+
+/**
  * H5: the single per-variation generator shared by `generate` and `rerun`.
  * `mode` selects the deterministic op (density/scale) vs the generative
  * prompt path. The density path returns no image on a degrade/no-op and THROWS
@@ -269,7 +288,7 @@ export const studioRouter = router({
           try {
             const { predictionId, meta } = await startSam2Segmentation(
               { url: job.originalUrl, audit: { orgId: String(ctx.tenant.id), jobId: String(job.id) } },
-              { forDensity: useDeterministicDensity }
+              { forDensity: useDeterministicDensity, webhookUrl: replicateWebhookUrl() }
             );
             // Record the exact per-attempt deduct refId so the worker refunds THIS
             // attempt (`<deductRef>-failed`), not a fixed key that collides on regenerate.
