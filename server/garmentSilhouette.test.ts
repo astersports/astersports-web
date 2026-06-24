@@ -8,7 +8,7 @@
  * (keeps survivors on the garment — the convex-hull failure mode), and drops strays.
  */
 import { describe, it, expect } from "vitest";
-import { garmentSilhouetteFromInstances } from "./_core/studio/ops/garmentSilhouette";
+import { garmentSilhouetteFromInstances, garmentMaskFromImage } from "./_core/studio/ops/garmentSilhouette";
 import type { InstanceMask, RasterMask } from "./_core/masking/types";
 
 const W = 200, H = 200;
@@ -60,5 +60,26 @@ describe("garmentSilhouetteFromInstances", () => {
     const sil = garmentSilhouetteFromInstances([...cluster, stray], W, H)!;
     expect(on(sil, 100, 100)).toBe(true); // garment cluster kept
     expect(on(sil, 160, 40)).toBe(false); // off-garment stray dropped
+  });
+});
+
+describe("garmentMaskFromImage (border background removal)", () => {
+  const rgba = (r: number, g: number, b: number): Buffer => {
+    const buf = Buffer.alloc(W * H * 4);
+    for (let i = 0; i < W * H; i++) { const p = i * 4; buf[p] = r; buf[p + 1] = g; buf[p + 2] = b; buf[p + 3] = 255; }
+    return buf;
+  };
+
+  it("keeps the central garment and excludes the plain backdrop corners", () => {
+    const buf = rgba(220, 220, 220); // light backdrop
+    for (let y = 60; y < 140; y++) for (let x = 60; x < 140; x++) { const p = (y * W + x) * 4; buf[p] = 30; buf[p + 1] = 30; buf[p + 2] = 30; } // dark garment
+    const m = garmentMaskFromImage(buf, W, H)!;
+    expect(m).not.toBeNull();
+    expect(m.data[100 * W + 100] > 127).toBe(true);  // garment centre
+    expect(m.data[10 * W + 10] > 127).toBe(false);   // backdrop corner excluded
+  });
+
+  it("returns null for a uniform image (no separable backdrop -> caller keeps the silhouette)", () => {
+    expect(garmentMaskFromImage(rgba(200, 200, 200), W, H)).toBeNull();
   });
 });
