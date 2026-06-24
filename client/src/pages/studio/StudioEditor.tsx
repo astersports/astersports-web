@@ -628,12 +628,19 @@ export default function StudioEditor() {
 
         {/* Before/After */}
         <div className="lg:col-span-3">
-          {results[selectedResult] && (
+          {results[selectedResult] ? (
             <BeforeAfter
               beforeUrl={originalUrl}
               afterUrl={results[selectedResult].url}
               onDownload={() => handleDownload(results[selectedResult].url)}
             />
+          ) : (
+            <div className="rounded-lg border border-border bg-card p-8 text-center">
+              <p className="text-sm font-medium">No result to display</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                The generation didn't return an image. Try again, or start a new image above.
+              </p>
+            </div>
           )}
         </div>
       </div>
