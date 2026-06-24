@@ -63,7 +63,7 @@ export const PERCENT_STEPS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 export function defaultControls(): ControlSettings {
   return {
     scale: { enabled: false, percent: 0 },
-    density: { enabled: false, percent: 0, mode: "respace" },
+    density: { enabled: false, percent: 0, mode: "inplace" },
     variations: 1,
   };
 }
