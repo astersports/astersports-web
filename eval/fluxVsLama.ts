@@ -25,7 +25,9 @@ import { fluxFill } from "../server/_core/studio/ops/fluxFill";
 import type { RasterMask } from "../server/_core/masking/types";
 
 async function loadRgba(p: string): Promise<{ data: Buffer; width: number; height: number }> {
-  const { data, info } = await sharp(p).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  // .rotate() applies EXIF orientation so a phone photo is uprighted — and matches the mask,
+  // which makeRemovalMask.mjs also builds from the uprighted image.
+  const { data, info } = await sharp(p).rotate().ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   return { data, width: info.width, height: info.height };
 }
 

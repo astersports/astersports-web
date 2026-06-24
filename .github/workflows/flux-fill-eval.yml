@@ -1,0 +1,43 @@
+# SPIKE one-shot eval — FLUX.1 Fill vs LaMa on the test garment's removal mask.
+# Triggered by changing the sentinel file `eval/RUN_EVAL` (so it only runs when we ask),
+# NOT on every push. Needs the REPLICATE_API_TOKEN repo secret (both fills call Replicate).
+# Output original | LaMa | FLUX is committed back to this branch as eval/out/flux-vs-lama-*.png.
+name: FLUX vs LaMa fill eval
+on:
+  push:
+    branches: [claude/flux-fill-hybrid-spike]
+    paths: ["eval/RUN_EVAL"]
+permissions:
+  contents: write
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run FLUX vs LaMa fill eval
+        env:
+          REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
+          STUDIO_FLUX_FILL_MODEL: ${{ vars.STUDIO_FLUX_FILL_MODEL }}
+        run: npx tsx eval/fluxVsLama.ts eval/samples/test-garment.jpeg eval/samples/test-garment.mask.png
+      - name: Upload comparison (backup)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flux-vs-lama-compare
+          path: eval/out/flux-vs-lama-*.png
+          if-no-files-found: ignore
+      - name: Commit result back to the branch
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f eval/out/flux-vs-lama-compare.png eval/out/flux-vs-lama-lama.png eval/out/flux-vs-lama-flux.png 2>/dev/null || true
+          git commit -m "eval: FLUX vs LaMa fill result [skip ci]" || echo "nothing to commit"
+          git push origin HEAD:claude/flux-fill-hybrid-spike || echo "push failed"
