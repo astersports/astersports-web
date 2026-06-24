@@ -191,7 +191,12 @@ export function validateEnv(): { errors: string[]; warnings: string[] } {
   const required: Array<[string, string]> = [
     ["JWT_SECRET", ENV.cookieSecret],
     ["DATABASE_URL", ENV.databaseUrl],
-    ["OAUTH_SERVER_URL", ENV.oAuthServerUrl],
+    // Google OAuth is the sole identity provider since the Railway/Supabase
+    // migration retired the Manus OAuth server (OAUTH_SERVER_URL). Without these
+    // no user can authenticate, so they gate boot exactly as OAUTH_SERVER_URL did
+    // before — failing fast beats booting green with every login 503ing.
+    ["GOOGLE_CLIENT_ID", ENV.googleClientId],
+    ["GOOGLE_CLIENT_SECRET", ENV.googleClientSecret],
     ["VITE_APP_ID", ENV.appId],
     // Required so owner-only routes fail closed at boot rather than silently
     // downgrading to "any admin" at runtime (see ownerProcedure in routers.ts).
@@ -233,8 +238,6 @@ export function validateEnv(): { errors: string[]; warnings: string[] } {
     ["ANTHROPIC_API_KEY", ENV.anthropicApiKey, "Claude vision LLM (fabric locate / element detect / no-op judge)"],
     ["SUPABASE_URL", ENV.supabaseUrl, "Supabase Storage (image uploads / signed reads)"],
     ["SUPABASE_SERVICE_ROLE_KEY", ENV.supabaseServiceRoleKey, "Supabase Storage (image uploads / signed reads)"],
-    ["GOOGLE_CLIENT_ID", ENV.googleClientId, "Google sign-in"],
-    ["GOOGLE_CLIENT_SECRET", ENV.googleClientSecret, "Google sign-in"],
     ["CRON_SECRET", ENV.cronSecret, "scheduled cron endpoints (reaper/poll/billing) — gate fails closed in prod if unset"],
   ];
   for (const [name, val, feature] of optional) {
