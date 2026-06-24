@@ -52,14 +52,26 @@ describe("garmentSilhouetteFromInstances", () => {
     expect(on(sil, 190, 10)).toBe(false); // far backdrop corner, excluded
   });
 
-  it("drops a far-flung stray detection (keeps the largest component)", () => {
-    // a solid 3x3 cluster (clearly the largest region) plus one isolated stray
+  it("drops a far-flung stray detection (below the substantial-region threshold)", () => {
+    // a solid 3x3 cluster (clearly the largest region) plus one isolated stray (~3% of it)
     const cluster: InstanceMask[] = [];
     for (const cy of [85, 100, 115]) for (const cx of [85, 100, 115]) cluster.push(motif(cx, cy, 4));
     const stray = motif(160, 40, 3); // isolated, away from the borders, far beyond the close bridge
     const sil = garmentSilhouetteFromInstances([...cluster, stray], W, H)!;
     expect(on(sil, 100, 100)).toBe(true); // garment cluster kept
     expect(on(sil, 160, 40)).toBe(false); // off-garment stray dropped
+  });
+
+  it("keeps SEPARATE substantial print regions (e.g. a blazer body + sleeve), not just the largest", () => {
+    // big "body" cluster (4x4) + a smaller, well-separated "sleeve" cluster (2x2). The
+    // gap exceeds the close bridge, so they stay separate components; the sleeve is ~20%
+    // of the body, above the 10% keep threshold, so it must NOT be dropped as non-largest.
+    const body: InstanceMask[] = [];
+    for (const cy of [85, 97, 109, 121]) for (const cx of [50, 62, 74, 86]) body.push(motif(cx, cy, 5));
+    const sleeve = [motif(160, 97, 5), motif(172, 97, 5), motif(160, 109, 5), motif(172, 109, 5)];
+    const sil = garmentSilhouetteFromInstances([...body, ...sleeve], W, H)!;
+    expect(on(sil, 68, 103)).toBe(true);  // body region kept
+    expect(on(sil, 166, 103)).toBe(true); // separate sleeve region ALSO kept
   });
 });
 

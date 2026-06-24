@@ -9,7 +9,7 @@
  * base-cloth SAMPLING raster (sam2Provider.fabricFromSegment) but a poor garment OUTLINE.
  *
  * APPROACH: morphological CLOSE of the motif-instance union, then fill enclosed holes,
- * then keep the largest connected component.
+ * then keep every substantial connected component (≥10% of the largest).
  *  - The motif INSTANCES are reliably ON the garment, so the union tracks the print area.
  *  - CLOSE (dilate by r, fill, erode by r) bridges the gaps BETWEEN motif clusters into
  *    one solid region (so blue-noise spreads survivors evenly, not bunched in the
@@ -19,7 +19,8 @@
  *    background beside the garment (a convex hull's failure mode: it bridges straight
  *    across the backdrop at a concave waist, placing motifs off the skirt). This keeps
  *    survivors on the garment.
- *  - largestComponent drops a stray/false detection far from the garment.
+ *  - substantialComponents drops a stray/false detection far from the garment, while
+ *    keeping separate real print regions (e.g. a blazer's sleeves apart from the body).
  * Background-independent (uses motif positions, not backdrop colour).
  *
  * Pure + deterministic: same instances -> identical silhouette. No network, no model.
@@ -129,6 +130,42 @@ function largestComponentMask(mask: Uint8Array, w: number, h: number): Uint8Arra
   return out;
 }
 
+/**
+ * Keep every 4-connected component whose area is ≥ `frac` × the largest component's
+ * area. Drops a small stray island (a far-flung false detection) WHILE preserving
+ * SEPARATE substantial print regions — e.g. a blazer's sleeves, which sit apart from
+ * the body print and would be lost if we kept only the single largest component.
+ */
+function substantialComponentsMask(mask: Uint8Array, w: number, h: number, frac: number): Uint8Array {
+  const n = w * h;
+  const visited = new Uint8Array(n);
+  const frontier = new Uint32Array(n);
+  const comps: number[][] = [];
+  let maxLen = 0;
+  for (let start = 0; start < n; start++) {
+    if (mask[start] <= 127 || visited[start]) continue;
+    let head = 0, tail = 0;
+    frontier[tail++] = start;
+    visited[start] = 1;
+    const comp: number[] = [];
+    while (head < tail) {
+      const idx = frontier[head++];
+      comp.push(idx);
+      const x = idx % w, y = (idx / w) | 0;
+      if (x > 0)     { const j = idx - 1; if (mask[j] > 127 && !visited[j]) { visited[j] = 1; frontier[tail++] = j; } }
+      if (x < w - 1) { const j = idx + 1; if (mask[j] > 127 && !visited[j]) { visited[j] = 1; frontier[tail++] = j; } }
+      if (y > 0)     { const j = idx - w; if (mask[j] > 127 && !visited[j]) { visited[j] = 1; frontier[tail++] = j; } }
+      if (y < h - 1) { const j = idx + w; if (mask[j] > 127 && !visited[j]) { visited[j] = 1; frontier[tail++] = j; } }
+    }
+    comps.push(comp);
+    if (comp.length > maxLen) maxLen = comp.length;
+  }
+  const min = maxLen * frac;
+  const out = new Uint8Array(n);
+  for (const comp of comps) if (comp.length >= min) for (const i of comp) out[i] = 255;
+  return out;
+}
+
 /** Mark an instance's pixels (raster if dims match, else its bbox rectangle). Returns true if any set. */
 function markInstance(mask: Uint8Array, inst: InstanceMask, w: number, h: number): boolean {
   const r = inst.raster;
@@ -170,8 +207,11 @@ export function garmentSilhouetteFromInstances(
   const dilated = morphSquare(union, width, height, radius, dilateLine);
   const filled = fillHoles(dilated, width, height);
   const closed = morphSquare(filled, width, height, radius, erodeLine);
-  const largest = largestComponentMask(fillHoles(closed, width, height), width, height);
-  return { width, height, data: largest };
+  // Keep every substantial print region (≥10% of the largest): drops a far-flung stray
+  // but PRESERVES separate garment parts — e.g. a blazer's sleeve-print apart from the
+  // body — which a single-largest-component pick would silently leave bare.
+  const regions = substantialComponentsMask(fillHoles(closed, width, height), width, height, 0.1);
+  return { width, height, data: regions };
 }
 
 /**
