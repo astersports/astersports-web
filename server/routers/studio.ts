@@ -294,7 +294,16 @@ export const studioRouter = router({
             // attempt (`<deductRef>-failed`), not a fixed key that collides on regenerate.
             meta.deductRef = deductRef;
             await markJobEnqueued(job.id, predictionId, meta, creditCost, JSON.stringify(controls));
-          } catch {
+          } catch (startErr) {
+            // Surface the real cause server-side — it was swallowed here before, which made a
+            // start failure impossible to diagnose. The customer still gets the generic message +
+            // refund below; only the logs get the detail.
+            const detail = startErr instanceof Error ? (startErr.stack || `${startErr.name}: ${startErr.message}`) : String(startErr);
+            const inner = (startErr as { cause?: unknown } | null)?.cause;
+            console.error(
+              `[studio.generate] SAM2 start FAILED (job ${job.id}): ${detail}` +
+                (inner ? ` | caused by: ${inner instanceof Error ? inner.message : String(inner)}` : "")
+            );
             // locate/crop/startPrediction failed BEFORE the job was enqueued -> refund + fail, so a
             // start error never leaves the customer charged for a job the worker will never see.
             await grantCredits(ctx.tenant.id, creditCost, "refund", `${deductRef}-failed`, ctx.user.id).catch(() => {});
