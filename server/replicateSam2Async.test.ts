@@ -41,15 +41,17 @@ beforeEach(() => {
 
 describe("resolvePredictionTarget", () => {
   const DEFAULT_VERSION = "fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83";
-  it("maps configured model refs to predictions.create's { model } | { version }", () => {
-    // Unset or the bare `meta/sam-2` slug (which 404s — community model needs a version)
-    // both pin the confirmed default version.
+  it("always resolves to a { version } — SAM2 is a community model, so the slug path 404s", () => {
+    // An explicit version (owner/model:version or :version) always wins.
+    expect(resolvePredictionTarget("meta/sam-2:abc123")).toEqual({ version: "abc123" });
+    expect(resolvePredictionTarget("zsxkib/segment-anything-2:abc123")).toEqual({ version: "abc123" });
+    // A bare token is a version hash.
+    expect(resolvePredictionTarget("deadbeefcafe")).toEqual({ version: "deadbeefcafe" });
+    // Empty OR any version-less slug pins the confirmed default version (the bare slug 404s on
+    // the official-model endpoint, so we never emit { model } for a community model here).
     expect(resolvePredictionTarget("")).toEqual({ version: DEFAULT_VERSION });
     expect(resolvePredictionTarget("meta/sam-2")).toEqual({ version: DEFAULT_VERSION });
-    expect(resolvePredictionTarget("meta/sam-2:abc123")).toEqual({ version: "abc123" });
-    expect(resolvePredictionTarget("deadbeefcafe")).toEqual({ version: "deadbeefcafe" });
-    // A different explicit slug is still trusted as an official-model { model } ref.
-    expect(resolvePredictionTarget("black-forest-labs/flux-schnell")).toEqual({ model: "black-forest-labs/flux-schnell" });
+    expect(resolvePredictionTarget("zsxkib/segment-anything-2")).toEqual({ version: DEFAULT_VERSION });
   });
 });
 

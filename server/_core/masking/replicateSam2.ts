@@ -95,8 +95,9 @@ const SAM2_MODEL = "meta/sam-2";
  * official-model endpoint (POST /v1/models/{owner}/{name}/predictions). SAM2 here is a COMMUNITY
  * model, so that slug 404s ("requested resource could not be found") — a community model must be
  * run by version (POST /v1/predictions with a `version` body). Pinning the proven version means an
- * unset — or a stale `meta/sam-2` — REPLICATE_SAM2_MODEL still resolves to a runnable model.
- * Overridable via REPLICATE_SAM2_MODEL (an `owner/model:version` ref or a bare version hash).
+ * unset REPLICATE_SAM2_MODEL — OR any version-less slug (`meta/sam-2`, `zsxkib/segment-anything-2`,
+ * …) — still resolves to a runnable model. Override with a version: a bare hash or
+ * `owner/model:version` (a bare slug can't select this community model — see resolvePredictionTarget).
  */
 const SAM2_DEFAULT_VERSION = "fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83";
 const DOWNLOAD_TIMEOUT_MS = 30_000;
@@ -129,16 +130,20 @@ async function runWithTimeout<T>(label: string, p: Promise<T>): Promise<T> {
 }
 
 /**
- * Resolve REPLICATE_SAM2_MODEL into a ref the SDK's `run()` accepts.
- * `run()` wants `owner/model` or `owner/model:version` — NOT a bare version hash.
- * A configured `owner/model:version` is used as-is; a bare version hash (no slash,
- * e.g. the confirmed `fe97b45...`) is pinned to `meta/sam-2:<hash>`. Unset — or the bare
- * `meta/sam-2` slug, which 404s without a version — pins the confirmed default version.
+ * Resolve REPLICATE_SAM2_MODEL into a ref the SDK's `run()` accepts (`owner/model:version`).
+ * SAM2 here is a COMMUNITY model, so a version-LESS slug 404s on run() — always resolve to an
+ * explicit version: the version side of "...:version", a bare hash, else the pinned default
+ * (empty or any version-less slug). To point at another version set REPLICATE_SAM2_MODEL to that
+ * version hash (or owner/model:version).
  */
 export function resolveModelRef(configured?: string): `${string}/${string}` {
   const v = (configured ?? "").trim();
-  if (!v || v === SAM2_MODEL) return `${SAM2_MODEL}:${SAM2_DEFAULT_VERSION}` as `${string}/${string}`;
-  return (v.includes("/") ? v : `${SAM2_MODEL}:${v}`) as `${string}/${string}`;
+  const version = v.includes(":")
+    ? v.split(":").pop()!.trim()
+    : v && !v.includes("/")
+      ? v
+      : SAM2_DEFAULT_VERSION;
+  return `${SAM2_MODEL}:${version}` as `${string}/${string}`;
 }
 
 /** Coerce a Replicate output entry to a URL string (tolerates SDK FileOutput). */
@@ -204,17 +209,17 @@ async function parseAutoSegmentation(output: unknown): Promise<Sam2Segmentation>
   return { combined, individuals };
 }
 
-/** predictions.create() wants { model } OR { version } (not run()'s combined ref).
- *  "owner/model:version" -> { version }; bare hash -> { version }; some other "owner/model"
- *  slug -> { model } (trust an explicit override). Unset — or the bare `meta/sam-2` slug, which
- *  404s here (this endpoint serves OFFICIAL models only; SAM2 here is a COMMUNITY model that must
- *  be run by version) -> the confirmed default version. */
+/** predictions.create() wants { model } OR { version }. SAM2 here is a COMMUNITY model, so the
+ *  { model: slug } path (POST /v1/models/{owner}/{name}/predictions — OFFICIAL models only) 404s
+ *  for it. So ALWAYS resolve to a { version }: the version side of "...:version", a bare hash, or
+ *  (empty / any version-less slug, e.g. `meta/sam-2` or `zsxkib/segment-anything-2`) the pinned
+ *  default. To run another version, set REPLICATE_SAM2_MODEL to that version hash (or
+ *  owner/model:version) — a bare slug can't select a community model here. */
 export function resolvePredictionTarget(configured?: string): { model: string } | { version: string } {
   const v = (configured ?? "").trim();
-  if (!v || v === SAM2_MODEL) return { version: SAM2_DEFAULT_VERSION };
   if (v.includes(":")) return { version: v.split(":").pop()!.trim() };
-  if (v.includes("/")) return { model: v };
-  return { version: v };
+  if (v && !v.includes("/")) return { version: v };
+  return { version: SAM2_DEFAULT_VERSION };
 }
 
 function requireToken(): string {
