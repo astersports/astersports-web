@@ -1,19 +1,12 @@
-import { AXIOS_TIMEOUT_MS, COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { ForbiddenError } from "@shared/_core/errors";
-import axios, { type AxiosInstance } from "axios";
 import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { ENV } from "./env";
-import type {
-  ExchangeTokenRequest,
-  ExchangeTokenResponse,
-  GetUserInfoResponse,
-  GetUserInfoWithJwtRequest,
-  GetUserInfoWithJwtResponse,
-} from "./types/manusTypes";
+
 // Utility function
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
@@ -24,163 +17,16 @@ export type SessionPayload = {
   name: string;
 };
 
-const EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
-const GET_USER_INFO_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfo`;
-const GET_USER_INFO_WITH_JWT_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfoWithJwt`;
-
-class OAuthService {
-  // Dead Manus OAuth login path — superseded by Google in P5 (see
-  // server/_core/googleAuth.ts + oauth.ts). Retained inert pending the dead-code
-  // sweep; the constructor no longer logs a misleading OAUTH_SERVER_URL error now
-  // that the var is intentionally unset post-migration.
-  constructor(private client: ReturnType<typeof axios.create>) {}
-
-  private decodeState(state: string): string {
-    // H2: `state` carries the OAuth redirect target. Without validation an
-    // attacker-crafted `state` could redirect the code exchange to a host they
-    // control (authorization-code interception / open redirect). Enforce that the
-    // decoded value is an absolute http(s) URL and, when an allowlist is
-    // configured, that its host is on it.
-    let redirectUri: string;
-    try {
-      redirectUri = atob(state);
-    } catch {
-      throw new Error("invalid OAuth state encoding");
-    }
-    let parsed: URL;
-    try {
-      parsed = new URL(redirectUri);
-    } catch {
-      throw new Error("invalid OAuth redirect target");
-    }
-    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-      throw new Error(`disallowed OAuth redirect scheme: ${parsed.protocol}`);
-    }
-    const allow = ENV.oauthAllowedRedirectHosts;
-    if (allow.length > 0 && !allow.includes(parsed.host)) {
-      throw new Error(`OAuth redirect host not allowed: ${parsed.host}`);
-    }
-    return redirectUri;
-  }
-
-  async getTokenByCode(
-    code: string,
-    state: string
-  ): Promise<ExchangeTokenResponse> {
-    const payload: ExchangeTokenRequest = {
-      clientId: ENV.appId,
-      grantType: "authorization_code",
-      code,
-      redirectUri: this.decodeState(state),
-    };
-
-    const { data } = await this.client.post<ExchangeTokenResponse>(
-      EXCHANGE_TOKEN_PATH,
-      payload
-    );
-
-    return data;
-  }
-
-  async getUserInfoByToken(
-    token: ExchangeTokenResponse
-  ): Promise<GetUserInfoResponse> {
-    const { data } = await this.client.post<GetUserInfoResponse>(
-      GET_USER_INFO_PATH,
-      {
-        accessToken: token.accessToken,
-      }
-    );
-
-    return data;
-  }
-}
-
-const createOAuthHttpClient = (): AxiosInstance =>
-  axios.create({
-    baseURL: ENV.oAuthServerUrl,
-    timeout: AXIOS_TIMEOUT_MS,
-  });
-
 class SDKServer {
-  private readonly client: AxiosInstance;
-  private readonly oauthService: OAuthService;
-
-  constructor(client: AxiosInstance = createOAuthHttpClient()) {
-    this.client = client;
-    this.oauthService = new OAuthService(this.client);
-  }
-
-  private deriveLoginMethod(
-    platforms: unknown,
-    fallback: string | null | undefined
-  ): string | null {
-    if (fallback && fallback.length > 0) return fallback;
-    if (!Array.isArray(platforms) || platforms.length === 0) return null;
-    const set = new Set<string>(
-      platforms.filter((p): p is string => typeof p === "string")
-    );
-    if (set.has("REGISTERED_PLATFORM_EMAIL")) return "email";
-    if (set.has("REGISTERED_PLATFORM_GOOGLE")) return "google";
-    if (set.has("REGISTERED_PLATFORM_APPLE")) return "apple";
-    if (
-      set.has("REGISTERED_PLATFORM_MICROSOFT") ||
-      set.has("REGISTERED_PLATFORM_AZURE")
-    )
-      return "microsoft";
-    if (set.has("REGISTERED_PLATFORM_GITHUB")) return "github";
-    const first = Array.from(set)[0];
-    return first ? first.toLowerCase() : null;
-  }
-
-  /**
-   * Exchange OAuth authorization code for access token
-   * @example
-   * const tokenResponse = await sdk.exchangeCodeForToken(code, state);
-   */
-  async exchangeCodeForToken(
-    code: string,
-    state: string
-  ): Promise<ExchangeTokenResponse> {
-    return this.oauthService.getTokenByCode(code, state);
-  }
-
-  /**
-   * Get user information using access token
-   * @example
-   * const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
-   */
-  async getUserInfo(accessToken: string): Promise<GetUserInfoResponse> {
-    const data = await this.oauthService.getUserInfoByToken({
-      accessToken,
-    } as ExchangeTokenResponse);
-    const loginMethod = this.deriveLoginMethod(
-      (data as any)?.platforms,
-      (data as any)?.platform ?? data.platform ?? null
-    );
-    return {
-      ...(data as any),
-      platform: loginMethod,
-      loginMethod,
-    } as GetUserInfoResponse;
-  }
-
-  private parseCookies(cookieHeader: string | undefined) {
-    if (!cookieHeader) {
-      return new Map<string, string>();
-    }
-
-    const parsed = parseCookieHeader(cookieHeader);
-    return new Map(Object.entries(parsed));
-  }
-
   private getSessionSecret() {
     const secret = ENV.cookieSecret;
     return new TextEncoder().encode(secret);
   }
 
   /**
-   * Create a session token for a Manus user openId
+   * Create a session token for a user openId. Minted after the Google OAuth code
+   * exchange (server/_core/oauth.ts + googleAuth.ts) — the app session is our own
+   * HS256 JWT, not a provider token.
    * @example
    * const sessionToken = await sdk.createSessionToken(userInfo.openId);
    */
@@ -241,8 +87,8 @@ class SDKServer {
         return null;
       }
 
-      // H3: enforce the token audience. With a JWT secret shared across
-      // Manus-template apps, a session minted for another app would otherwise
+      // H3: enforce the token audience. With a JWT secret potentially shared
+      // across apps, a session minted for another app would otherwise
       // authenticate here. Only enforce when this app's id is configured (env
       // fail-fast guarantees it in prod) so dev without VITE_APP_ID still works.
       if (ENV.appId && appId !== ENV.appId) {
@@ -261,47 +107,22 @@ class SDKServer {
     }
   }
 
-  async getUserInfoWithJwt(
-    jwtToken: string
-  ): Promise<GetUserInfoWithJwtResponse> {
-    const payload: GetUserInfoWithJwtRequest = {
-      jwtToken,
-      projectId: ENV.appId,
-    };
+  private parseCookies(cookieHeader: string | undefined) {
+    if (!cookieHeader) {
+      return new Map<string, string>();
+    }
 
-    const { data } = await this.client.post<GetUserInfoWithJwtResponse>(
-      GET_USER_INFO_WITH_JWT_PATH,
-      payload
-    );
-
-    const loginMethod = this.deriveLoginMethod(
-      (data as any)?.platforms,
-      (data as any)?.platform ?? data.platform ?? null
-    );
-    return {
-      ...(data as any),
-      platform: loginMethod,
-      loginMethod,
-    } as GetUserInfoWithJwtResponse;
+    const parsed = parseCookieHeader(cookieHeader);
+    return new Map(Object.entries(parsed));
   }
 
   async authenticateRequest(req: Request): Promise<AuthenticatedUser> {
-    // Regular authentication flow
     const cookies = this.parseCookies(req.headers.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);
     const session = await this.verifySession(sessionCookie);
 
     if (!session) {
       throw ForbiddenError("Invalid session cookie");
-    }
-
-    if (session.openId.startsWith(CRON_OPEN_ID_PREFIX)) {
-      const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
-      const taskUid = userInfo.taskUid ?? null;
-      if (!taskUid) {
-        throw ForbiddenError("Cron session missing task_uid");
-      }
-      return buildCronUser(userInfo);
     }
 
     const sessionUserId = session.openId;
@@ -311,7 +132,7 @@ class SDKServer {
     // The session JWT is ours (HS256, our secret), so its openId/name are trusted.
     // Google login always upserts the user (server/_core/oauth.ts), so this only
     // fires if the row was deleted mid-session — recreate a minimal user from the
-    // session payload. No identity-provider round-trip (the Manus sync is retired).
+    // session payload. No identity-provider round-trip.
     if (!user) {
       await db.upsertUser({
         openId: sessionUserId,
@@ -334,31 +155,9 @@ class SDKServer {
   }
 }
 
-const CRON_OPEN_ID_PREFIX = "cron_";
-
-/** Result of `sdk.authenticateRequest`. Cron callbacks set `isCron=true` and `taskUid`; see `references/periodic-updates.md`. */
-export type AuthenticatedUser = User & {
-  taskUid?: string;
-  isCron?: boolean;
-};
-
-function buildCronUser(
-  userInfo: GetUserInfoWithJwtResponse
-): AuthenticatedUser {
-  const now = new Date();
-  return {
-    id: -1,
-    openId: userInfo.openId,
-    name: userInfo.name || "Manus Scheduled Task",
-    email: null,
-    loginMethod: null,
-    role: "user",
-    createdAt: now,
-    updatedAt: now,
-    lastSignedIn: now,
-    taskUid: userInfo.taskUid ?? undefined,
-    isCron: true,
-  } as AuthenticatedUser;
-}
+/** Result of `sdk.authenticateRequest`. Cron callbacks authenticate via the
+ *  shared CRON_SECRET (server/_core/cronAuth.ts), not a user session, so the
+ *  authenticated user is always a real User row. */
+export type AuthenticatedUser = User;
 
 export const sdk = new SDKServer();
