@@ -62,6 +62,20 @@ R4 (→Q4, ratified): registration moves OFF LeagueApps ONTO the app's /r/:slug.
    astersports.app. (Sequencing TBD vs the active 2026 season.)
 
 ────────────────────────────────────────────────────────────────────────
+0b. GROUNDED OPS / HOSTING FACTS (Frank, 2026-06-25)
+────────────────────────────────────────────────────────────────────────
+- P1 astersports-web deploys via RAILWAY. Print Studio is being built in a
+  SEPARATE parallel Claude Code lane against this same repo. CC (this lane) must
+  stay clear of the studio surface and rebase PR #107 on main before merge to
+  avoid colliding with that lane (shared files: server/routers.ts, Home.tsx).
+- P3 Legacy Hoopers' LIVE site (legacyhoopers.org) is on SQUARESPACE today, not
+  the legacy-hoopers React repo. Where to manage it is an OPEN Frank decision
+  (Squarespace stays / Railway React build / fold into the app). Interacts with
+  F6 + R3 below.
+- P2 the Sports App will be registered with APPLE (App Store) on a later build
+  pass. Today it is React + Supabase (PWA-wrap or React Native later).
+
+────────────────────────────────────────────────────────────────────────
 1. THE FOUR PROPERTIES — what each IS today  [GROUNDED]
 ────────────────────────────────────────────────────────────────────────
 P1. astersports-web  →  astersports.io  (the platform marketing site)
@@ -257,9 +271,11 @@ CC LEAN: **A.** Unify Aster platform chrome to the documented brand (fix the
   immediate low-risk action (gradient alignment) I can take on request.
 
 ── F6. FATE of the legacy-hoopers repo (P3) ──
-REQUEST: Redesign-in-place, fold into the app's public surface, or retire?
+REQUEST: Redesign-in-place, fold into the app's public surface, or retire? AND
+  where does the legacyhoopers.org DOMAIN point?
 EVIDENCE: P3 is a full standalone site; P2 can already render a public program
-  presence; Frank wants P3 redesigned AND the program piloted on P2.
+  presence; Frank wants P3 redesigned AND the program piloted on P2. legacyhoopers.org
+  is on SQUARESPACE today (§0b); management location is an open Frank decision.
 OPTIONS:
   A) Fold-in: retire P3 as a separate app; the program's public presence becomes
      P2 public pages (Legacy-branded) + optional thin marketing shell. One less
@@ -267,7 +283,12 @@ OPTIONS:
   B) Redesign-in-place: P3 stays a separate marketing site, redesigned, reading
      program data from the app/scraper. (Pairs with F1=B.)
 CC LEAN: **A if F1=A; B if F1=B.** These two forks move together — F1's ruling
-  decides F6. Lean A overall (fewer codebases, app is the home).
+  decides F6. Lean A overall (fewer codebases, app is the home). On the DOMAIN:
+  per R3 (live-data), point legacyhoopers.org at the app's live Legacy-branded
+  public pages (custom domain) once built; keep Squarespace up in the interim.
+  Standing up the legacy-hoopers React repo on Railway is the WEAKER option — it
+  re-creates the duplicate-data problem R3 rules against (CC recommends against it
+  unless Frank wants a distinct marketing-only shell).
 
 ────────────────────────────────────────────────────────────────────────
 4. TARGET IA  [per Frank's §0a rulings; Architect to ratify the shape]
