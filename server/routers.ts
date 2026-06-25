@@ -126,14 +126,15 @@ export const appRouter = router({
     }),
   }),
 
-  // Weather (owner-only — matches the AAU section). Powered by Open-Meteo.
+  // Weather (public — the AAU page is public). Powered by Open-Meteo.
+  // Read-only; coordinate input is bounded by isValidCoord below.
   weather: router({
-    home: ownerProcedure.query(async () => {
+    home: publicProcedure.query(async () => {
       const forecast = await fetchForecast(HOME_VENUE.latitude, HOME_VENUE.longitude);
       return { venue: HOME_VENUE, forecast };
     }),
 
-    get: ownerProcedure
+    get: publicProcedure
       .input(z.object({ latitude: z.number(), longitude: z.number() }))
       .query(async ({ input }) => {
         if (!isValidCoord(input.latitude, input.longitude)) {
