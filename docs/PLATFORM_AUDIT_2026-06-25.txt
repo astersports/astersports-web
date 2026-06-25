@@ -373,30 +373,35 @@ v0.2.0 growth (to let W-a/W-b drop local copies): (1) combined daily-strip compo
   P2/P3 polish + add CI before consumers wire in.
 
 ════════════════════════════════════════════════════════════════════════
-3. DECISION FORKS (labeled leans — §11.8 rule 6; operator/architect decide)
+3. DECISION FORKS — RULED by Frank 2026-06-25 (rulings stamped inline)
 ════════════════════════════════════════════════════════════════════════
-D1 [Architect-scoped] X1/P0-1 repo↔prod reconciliation. The ingest source is stranded
-   on held draft PR #1094 (do-not-auto-merge); prod already ran ahead of it. LEAN: do
-   it next — rebase + merge #1094 after diffing its files vs the deployed bytes, then
-   separately source-control stripe-webhook-handler. A live Stripe webhook + public-
-   records writer with main lacking the source is the platform's biggest risk now.
-D2 [Frank/Architect] @aster/weather canonical source (CC_REBASELINE G1, still open).
-   LEAN: v0.2.0 extracts composer+hook from W-b, animation from W-a; both consumers
-   refactor to import; sequence one at a time; no 4th copy. Decide before any more
-   weather work.
-D3 [Frank] legacy-hoopers disposition. LEAN: RETIRE the repo (unshipped, redundant with
-   the app's LH tenant); salvage the Court Noir design language as a doc ref only.
-D4 [Frank] AAU public-exposure scope. The PR #107 decision covered scoreboard venue/
-   times + first names; the client ALSO hardcodes a minor roster (names+jersey#s) +
-   recurring practice addresses/times. CONFIRM in-scope or gate. Same exposure exists
-   un-recorded in legacy-hoopers.
-D5 [Architect-scoped] DB hygiene sweep (X6) before St Patrick onboards: pin
-   fin_tx_append_only search_path, move pg_net out of public, consolidate the 173
-   multiple-permissive policies, prune the 85 unused indexes, confirm the 7 anon SECDEF
-   RPCs. LEAN: one batched advisor-hygiene pass, Architect-reviewed.
-D6 [Routine] st-patricks-armonk P1-1 (siteSettings.get allowlist) + P2-1 (JWT fail-
-   fast) are self-contained security fixes — LEAN: ship in that repo independent of the
-   weather convergence.
+D1 [RULED: GO] X1/P0-1 repo↔prod reconciliation. Rebase + merge held PR #1094 after
+   diffing its files vs the deployed bytes; separately source-control stripe-webhook-
+   handler; add the out-of-band-deploy guardrail. NOTE: blocked this session — the
+   GitHub integration reaching aster-sports dropped (only astersports-web reachable);
+   the merge needs that restored OR Frank's manual merge (prod already runs the code).
+D2 [RULED: HYBRID v0.2.0] @aster/weather convergence. Extract the combined-forecast
+   composer + React hook from W-b (the app, newest/app-tuned), and the animated icons
+   from W-a (St Patrick, the visual original). Grow v0.2.0; both consumers refactor to
+   import; sequence one at a time; no 4th copy. Build effort — sequence after the deep
+   audit; aster-weather + consumer PRs are PR-gated by the same tooling block.
+D3 [RULED: LEAVE] legacy-hoopers stays — it is a website REBUILD in Frank's queue (not
+   this week), not a retire. Do NOT retire; revisit when Frank picks it up. (Supersedes
+   the earlier "retire" lean.)
+D4 [RULED: KEEP ALL PUBLIC] The public AAU page's minor roster (first names + jersey #s)
+   + recurring practice gym addresses/days/times are an ON-THE-RECORD operator decision,
+   extending PR #107 to cover the roster + practice schedule. It is the recruiting
+   showcase; the exposure is accepted. NOT a finding. (Same applies to the legacy-hoopers
+   equivalent surface.)
+D5 [RULED: FULL SWEEP NOW] DB hygiene before St Patrick onboards: pin fin_tx_append_only
+   search_path, move pg_net out of public, consolidate the 173 multiple-permissive
+   policies, prune the 85 unused indexes + add the 32 FK indexes, confirm the 7 anon
+   SECDEF RPCs. NOTE: Architect-scoped schema. CC will PREPARE the migration(s) + mirror
+   + PR — it will NOT apply to prod out-of-band (that would repeat the X1 P0). Apply via
+   the normal merged-PR → Supabase flow once the aster-sports PR path is restored.
+D6 [RULED: GO] st-patricks-armonk P1-1 (siteSettings.get allowlist) + P2-1 (JWT fail-
+   fast). Self-contained security fixes. NOTE: code can be staged + pushed via git; the
+   PR is blocked by the same GitHub tooling drop (st-patrick unreachable via API).
 
 ════════════════════════════════════════════════════════════════════════
 3b. OPEN-PR INVENTORY (are all PRs merged? — operator question, 2026-06-25)
