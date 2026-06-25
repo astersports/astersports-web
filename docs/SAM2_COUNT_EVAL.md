@@ -1,6 +1,6 @@
 # SAM2 count-accuracy eval — billing-grade density go/no-go
 
-Run: run 28179947555 @ c206014ee137212c35c3d55c35ad93d99b56f3a2. Measures the REAL production count path (autoSegment → finishSam2Segmentation
+Run: run 28195680920 @ 1b57b4535ea075256069af05403fc4943dfbba3b. Measures the REAL production count path (autoSegment → finishSam2Segmentation
 → derived instances) on the hard conditions where the classical offline segmenter hit ~40%.
 This is a MEASUREMENT (truth, not a tuned target). Derived instance count = production
 derivation (specks <0.02% dropped, giants >20% crop dropped as ground, cap 200) — NOT raw
@@ -32,7 +32,7 @@ mask count (raw shown in the last column for transparency). Params tried: pps16,
 | stassie-dots | fuzzy | 34 | ? | 130 | ? | pps64 | pps32:129(raw 139) pps64:130(raw 142) |
 | pindot | fuzzy | 84 | ? | 1 | ? | pps32 | pps32:1(raw 2) pps64:1(raw 2) |
 | ditsy-marullo | fuzzy | 12 | ? | 24 | ? | pps64 | pps32:23(raw 24) pps64:24(raw 25) |
-| tessa-roses | fuzzy | 112 | ? | 211 | ? | pps64 | pps32:209(raw 212) pps64:211(raw 214) |
+| tessa-roses | fuzzy | 112 | ? | 200 | ? | pps32 | pps32:200(raw 212) pps64:200(raw 214) |
 | tossed-floral-walker | fuzzy | 7 | ? | 143 | ? | pps64 | pps32:137(raw 143) pps64:143(raw 149) |
 
 ## VERDICT
