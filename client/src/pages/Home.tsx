@@ -505,7 +505,7 @@ function ProcessSection() {
           {steps.map((step, i) => (
             <div
               key={step.number}
-              className={`relative p-6 rounded-xl border border-white/5 bg-[#0d1220]/70 backdrop-blur-sm hover:border-[#F6CC55]/20 hover:bg-[#0d1220] transition-all duration-300 group ${
+              className={`aster-panel relative p-6 hover:-translate-y-1 group ${
                 isVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-8 scale-95"
               }`}
               style={{
@@ -658,8 +658,8 @@ function FAQSection() {
             {faqs.map((faq, i) => (
               <div
                 key={i}
-                className={`border border-white/5 rounded-xl overflow-hidden transition-all duration-500 ${
-                  openIndex === i ? "bg-[#0d1220]/90 border-[#F6CC55]/15" : "bg-[#0d1220]/50 hover:border-white/10"
+                className={`aster-panel overflow-hidden transition-all duration-500 ${
+                  openIndex === i ? "shadow-[0_0_0_1px_rgba(246,204,85,0.35)]" : ""
                 } ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
                 style={{ transitionDelay: `${200 + i * 60}ms` }}
               >
@@ -768,7 +768,7 @@ function ContactSection() {
               }`}
             >
               {submitted ? (
-                <div className="p-8 rounded-2xl border border-[#F6CC55]/20 bg-[#0a0e1a]/60 backdrop-blur-sm text-center">
+                <div className="aster-panel p-8 text-center shadow-[0_0_0_1px_rgba(246,204,85,0.35)]">
                   <StarAccent className="mx-auto mb-4 w-6 h-6" />
                   <h3 className="text-xl font-semibold text-white mb-2" style={{ fontFamily: "var(--font-display)" }}>
                     Message ready to send
@@ -785,7 +785,7 @@ function ContactSection() {
                   </button>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="p-6 md:p-8 rounded-2xl border border-white/5 bg-[#0a0e1a]/60 backdrop-blur-sm space-y-5">
+                <form onSubmit={handleSubmit} className="aster-panel p-6 md:p-8 space-y-5">
                   <div>
                     <label htmlFor="name" className="block text-sm font-medium text-slate-300 mb-2" style={{ fontFamily: "var(--font-display)" }}>
                       Name
@@ -796,7 +796,7 @@ function ContactSection() {
                       required
                       value={formState.name}
                       onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-                      className="w-full px-4 py-3 rounded-lg bg-[#111827] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all"
+                      className="w-full px-4 py-3 rounded-lg bg-[#0b1020] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all"
                       placeholder="Your name"
                     />
                   </div>
@@ -810,7 +810,7 @@ function ContactSection() {
                       required
                       value={formState.email}
                       onChange={(e) => setFormState({ ...formState, email: e.target.value })}
-                      className="w-full px-4 py-3 rounded-lg bg-[#111827] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all"
+                      className="w-full px-4 py-3 rounded-lg bg-[#0b1020] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all"
                       placeholder="your@email.com"
                     />
                   </div>
@@ -824,7 +824,7 @@ function ContactSection() {
                       rows={4}
                       value={formState.message}
                       onChange={(e) => setFormState({ ...formState, message: e.target.value })}
-                      className="w-full px-4 py-3 rounded-lg bg-[#111827] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all resize-none"
+                      className="w-full px-4 py-3 rounded-lg bg-[#0b1020] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all resize-none"
                       placeholder="Tell us about your project..."
                     />
                   </div>

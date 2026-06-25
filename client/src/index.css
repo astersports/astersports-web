@@ -705,6 +705,16 @@
   box-shadow: 0 0 22px -2px rgba(246,204,85,.65);
 }
 
+/* shared panel surface — unifies every card on the marketing page with the
+   constellation nodes (one celestial system, not two card styles). */
+.aster-panel {
+  background: linear-gradient(180deg, #0f1424, #141a2e);
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 14px;
+  transition: border-color .2s ease, transform .2s ease;
+}
+.aster-panel:hover { border-color: rgba(246,204,85,.28); }
+
 /* faint constellation backdrop behind the registry so all nodes share one sky */
 .aster-constellation { position: relative; }
 .aster-constellation::before {
