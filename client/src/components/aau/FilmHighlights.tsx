@@ -3,16 +3,17 @@ import { Film, Play, Trophy, Clock, Maximize2, X } from "lucide-react";
 import SectionHeading from "./SectionHeading";
 
 // ─── Featured Video ──────────────────────────────────────────────────────────
-// "Birdie Buckets" — Finals highlight reel. The source lives in the owner's
-// Google Drive (video/quicktime, ~331 MB), so it is streamed via the Drive
-// preview player rather than self-hosted. The whole AAU section is owner-gated,
-// so the viewer is authenticated to the Google account that owns the file.
+// "Birdie Buckets" — Finals highlight reel (video/mp4, ~126 MB). Streamed from
+// the owner's Google Drive via the direct-download endpoint and played in a
+// native HTML5 <video> element (matching the rest of the film room). The file is
+// too large to commit to the repo (>100 MB GitHub cap), so it is not self-hosted.
+// The Drive file must be shared "Anyone with the link" for the <video> to stream.
 const BIRDIE_VIDEO = {
   title: 'Birdie Buckets',
   subtitle: 'Finals Highlights',
-  driveFileId: '1CftdrpPJxho03w2obydS4zRU9jrkeD7f',
+  driveFileId: '107ybmw6XvW7WADQQx6VB2-7BA1XXJyeY',
 };
-const BIRDIE_EMBED_URL = `https://drive.google.com/file/d/${BIRDIE_VIDEO.driveFileId}/preview`;
+const BIRDIE_VIDEO_URL = `https://drive.usercontent.google.com/download?id=${BIRDIE_VIDEO.driveFileId}&export=download&confirm=t`;
 
 // ─── Players — highlights coming soon ────────────────────────────────────────
 interface Player {
@@ -129,12 +130,14 @@ export default function FilmHighlights() {
         {/* Video / poster */}
         <div style={{ position: 'relative', aspectRatio: '16/9', backgroundColor: '#000' }}>
           {playing ? (
-            <iframe
-              src={`${BIRDIE_EMBED_URL}?autoplay=1`}
+            <video
+              src={BIRDIE_VIDEO_URL}
               title={BIRDIE_VIDEO.title}
-              allow="autoplay; fullscreen"
-              allowFullScreen
-              style={{ width: '100%', height: '100%', border: 'none' }}
+              controls
+              autoPlay
+              playsInline
+              preload="metadata"
+              style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#000' }}
             />
           ) : (
             <button
@@ -276,12 +279,14 @@ export default function FilmHighlights() {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ position: 'relative', aspectRatio: '16/9', backgroundColor: '#000' }}>
-              <iframe
-                src={`${BIRDIE_EMBED_URL}?autoplay=1`}
+              <video
+                src={BIRDIE_VIDEO_URL}
                 title={BIRDIE_VIDEO.title}
-                allow="autoplay; fullscreen"
-                allowFullScreen
-                style={{ width: '100%', height: '100%', border: 'none' }}
+                controls
+                autoPlay
+                playsInline
+                preload="metadata"
+                style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#000' }}
               />
               <button
                 onClick={() => setExpanded(false)}
