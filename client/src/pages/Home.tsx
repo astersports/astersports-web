@@ -10,7 +10,7 @@ import { Mail, ArrowRight, ArrowUpRight, MapPin, Menu, X, ChevronDown, Send, Set
 import { useAuth } from "@/_core/hooks/useAuth";
 import { PRODUCTS, SERVICES, NAV_PRODUCTS, STATUS_META, type ServiceEntry } from "@/lib/services";
 
-const LOGO_URL = "/manus-storage/aster_sports_logo_high_res_2b537f86.png";
+const LOGO_URL = "/aster-mark.png";
 const HERO_BG_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663756289268/4gGAtBP2vWCBU9FC7zDMWA/hero-bg-kP7SSTui5UuAzDmbnWb2NK.webp";
 const SERVICES_VISUAL_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663756289268/4gGAtBP2vWCBU9FC7zDMWA/services-visual-iD7nJ76bKWcPDDk2JN8BYh.webp";
 const CTA_BG_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663756289268/4gGAtBP2vWCBU9FC7zDMWA/cta-bg-MXeCiZ4GFgLGRGyvD68mXc.webp";
@@ -97,7 +97,7 @@ function Header() {
           <img
             src={LOGO_URL}
             alt="Aster Sports"
-            className="w-10 h-10 md:w-12 md:h-12"
+            className="h-10 w-auto md:h-12"
           />
           <span className="text-lg md:text-xl font-semibold tracking-tight text-white" style={{ fontFamily: "var(--font-display)" }}>
             Aster Sports
@@ -872,7 +872,7 @@ function Footer() {
         <div className="flex flex-col gap-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <img src={LOGO_URL} alt="Aster Sports" className="w-8 h-8" />
+              <img src={LOGO_URL} alt="Aster Sports" className="h-8 w-auto" />
               <span className="text-base font-semibold text-white" style={{ fontFamily: "var(--font-display)" }}>
                 Aster Sports
               </span>

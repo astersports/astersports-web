@@ -42,6 +42,10 @@
   --color-sidebar-ring: var(--sidebar-ring);
   --font-display: "Space Grotesk", sans-serif;
   --font-body: "Inter", sans-serif;
+  /* Mono data face for scoreboards / jersey numbers (architect IA spec §2). */
+  --font-mono: "Space Mono", ui-monospace, monospace;
+  /* Canonical Aster brand gradient (Drive source of truth, IA spec §2). */
+  --brand-grad: linear-gradient(100deg, #E0631C, #E8902A, #F6CC55, #FBD56B);
   --color-gold: oklch(0.82 0.15 80);
   --color-gold-dim: oklch(0.82 0.15 80 / 15%);
   --color-orange: oklch(0.72 0.17 50);
