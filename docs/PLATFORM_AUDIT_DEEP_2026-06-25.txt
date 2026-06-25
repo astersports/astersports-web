@@ -1,0 +1,201 @@
+PLATFORM AUDIT — DEEP PASS (line-by-line, every file)
+For: Frank (+ architect relay) · From: Claude Code (audit lane) · Date: 2026-06-25
+Companion to PLATFORM_AUDIT_2026-06-25.txt (the breadth pass). This is the depth pass
+Frank requested after the breadth pass read too shallow. Method: 8 parallel agents each
+reading EVERY file in its slice line-by-line, told to skip the breadth findings and go
+deeper; each self-verified its load-bearing claims against source (several breadth-style
+false positives were caught and dropped). Live-system claims [GROUNDED] vs prod this
+session. READ-ONLY: no code changed.
+
+Slices: aster-sports {components, hooks+context, engine+briefings, pages+lib, edge+
+migrations}; astersports-web {client+server, excl. Print Studio money path}; st-patrick
+{client, server+shared}. legacy-hoopers excluded (Frank: queued rebuild, leave it).
+aster-weather already deep-covered in the breadth pass (clean, no P0/P1).
+
+════════════════════════════════════════════════════════════════════════
+0. WHAT THE DEEP PASS CHANGES vs THE BREADTH PASS
+════════════════════════════════════════════════════════════════════════
+The breadth pass said the apps were "healthy-to-routine." That holds at the architecture
+level — but line-by-line surfaced a real bug surface the breadth grep structurally
+COULD NOT see, plus several pre-onboarding auth/correctness holes in St Patrick. Two
+findings were also LIVE-VERIFIED into fact (academy drift = 1 real player; payment-scope
+drift = 2 real families). Net: the architecture is sound; the edges are not airtight, and
+St Patrick specifically is NOT yet hardened.
+
+Why breadth missed it [GROUNDED meta-finding]: the AP #36 audit test
+(destructureWithoutErrorAudit.test.js) only flags the `{ data: x = [] }` default form —
+NOT the bare `const { data } = await ...` form. A whole class of error-swallowing reads
+uses the bare form, so the breadth grep reported "0 hits" while the deep read found a
+cluster. RECOMMEND widening that audit test's grep (it's the cheapest systemic fix here).
+
+════════════════════════════════════════════════════════════════════════
+1. CROSS-CUTTING THEMES (AP #58 synthesis) — ranked by leverage
+════════════════════════════════════════════════════════════════════════
+
+T1. TIMEZONE-LOCALITY — the dominant systemic weakness, and it's a TENANT-#2 TIME BOMB.
+    Pattern: date/time computed in the runtime/browser-local zone instead of pinned to
+    America/New_York. DORMANT today (Eastern-only pilot, NY users) — but it goes LIVE the
+    moment St Patrick onboards (a UTC serverless host), or any non-Eastern/traveling
+    admin uses the app. Instances found:
+    aster-sports: digestPeriod.defaultPeriod (digestPeriod.js:16-26, local getDay/setHours
+      → UTC cron drafts the wrong week); coach_roundup + family_guide event windows
+      (coachRoundup.js:48, familyGuide.js:109 — UTC literal upper bound drops a Sat-night
+      ET game from the briefing); ScheduleForLaterPicker.jsx:22 (scheduled-send stores
+      browser-local wall-clock as the NY intent); ScheduleListSections.jsx:24 +
+      DateGroupedList.jsx:10 (week-boundary partition); recurrenceHelpers.js:9,24
+      (toISOString().slice off-by-one in positive-UTC-offset browsers).
+    st-patrick: the `new Date(x.toLocaleString("en-US",{timeZone}))` idiom at 11 sites /
+      7 files (zoneless re-parse → every getHours/getDay offset-wrong off-ET);
+      liturgicalSeason.ts:97-110 (Good Friday + Holy Saturday render as Ordinary Time;
+      late-Nov Advent mis-classified — the most liturgically conspicuous wrong days of
+      the year); icsGenerator.ts:43 (Mass .ics stamps local wall-clock as UTC Z → "Add
+      to Calendar" lands Mass ~4-5h off in subscribers' calendars); CcdManager.tsx:42
+      (datetime-local round-trip corrupts EVERY CCD event time on edit); formDefaults.ts:41
+      (CCD legal signatureDate is a UTC module-load snapshot); date-only→UTC day-shift
+      across AllCalendars/SEO/calendarData.
+    LEVERAGE: a single shared `nowInET()` / ET date-build helper per app kills most of
+    this. For St Patrick the two liturgical one-liners + a boundary test are nearly free.
+
+T2. ERROR-SWALLOWING ON DATA-INTEGRITY PATHS (AP #36, bare-`data` form).
+    Reads that drop `error` and substitute `[]`/null, rendering "empty" indistinguishably
+    from "failed." Worst instances touch money/comms:
+    aster-sports: leagueAppsImport.js:79 (unchecked guardians read → dedup maps go empty →
+      EVERY family re-inserts: duplicate guardians + RE-POSTED fee/payment transactions on
+      a re-run — money path); tournamentRosters.js:8,21 (unchecked read silently drops a
+      team from the CANONICAL tournament-audience seed → those kids miss every tournament
+      briefing); wizard StepDetails/StepTeam/CreateActivityWizard; the tournament-tab read
+      hooks (GamesTab/ScenariosTab/MessagesTab/RosterTab); useGameResultsMap.js:22 (throw
+      in uncaught .then → unhandled rejection); useDmThreads.js:25 spine query.
+    st-patrick: swallowed mutation errors with no onError (CcdPermissionsManager,
+      MassIntentionsManager, VolunteerNeedsManager, VolunteerManager resets form on
+      failure), routeNotification HTML-injection-adjacent unescaped fields.
+    LEVERAGE: widen the AP #36 audit test (the meta-fix in §0), then sweep the flagged
+    callsites. The two import/seed utilities are the priority (money + comms).
+
+T3. SAME-CONCEPT DIVERGENCE (AP #63) — still the platform's signature bug class.
+    aster-sports [LIVE-VERIFIED]: academy roster_type(per-team) vs member_type(global) —
+      1 real player mis-gated today; payment "owes?" season-scoped dot vs all-seasons
+      admin Outstanding/overdue + program-health % (useProgramHealthMetrics) — 2 real
+      families read opposite today. Plus: useHasUnread.js:30 (badge reads phantom
+      `global_last_check` key no writer sets → /messages badge NEVER clears);
+      CoachPayoutList.jsx:17 (header "Settled $X" excludes pending/disputed rows shown
+      below it — understates committed money); games_recap venue from raw events.location
+      text vs location_id join; useScoreDraft vs useLiveGame both write game_results with
+      no cross-read of published_at (clobber risk).
+    st-patrick: WeeklySchedule (Mass Times) NOT date-aware → shows seasonal/first-Friday
+      services every week, contradicting ThisWeekAccordion; weatherSuggestion duplicated +
+      already drifted (DashboardHome vs ClosureManager show different dates); 3 "next
+      service" engines (one a hardcoded Mass array in DailyReadings that goes stale);
+      split parish constants → a WRONG phone number (9325 vs 9724) on a failure message +
+      conflicting email/Flocknote domains (a dead inbox).
+
+T4. PRE-ONBOARDING AUTH / EXPOSURE HOLES (close before St Patrick goes live / hardens).
+    st-patrick: homilies.ts:19 + holyDays.ts:27 mutations gated only by protectedProcedure
+      → ANY logged-in parishioner (every OAuth signup is role 'user') can create/edit/
+      delete homilies (with an UNVALIDATED audio upload — the one file path skipping
+      magic-byte validation) and rewrite the Mass schedule; news/bulletins/events.getById
+      leak unpublished drafts (public, sequential-int id, no published filter); cron 500s
+      return full stack traces, and the errorHandlerMiddleware meant to sanitize them is
+      DEAD CODE (never .use()'d); siteSettings.get arbitrary-key leak (breadth P1, still
+      open). astersports-web: inviteLinks.ts:142,575 — a DISABLED admin can still mint +
+      list join links (status='active' check omitted; everywhere else checks it).
+
+T5. SILENT DATA LOSS (single but sharp).
+    aster-sports dutyReconcile.js:41-43: the removed-duty path deletes EVERY row for a
+    dropped duty type INCLUDING claimed ones — directly violating its own header
+    ("never deletes a CLAIMED slot"). Removing a duty from the wizard destroys a parent's
+    existing signup with no warning.
+
+T6. MULTI-TENANT LEAKS IN PLATFORM CODE (tenant facts hardcoded; pre-onboarding gate).
+    aster-sports: ADMIN_BCC_EMAIL='olivejuiceinc1@gmail.com' hardcoded in 4 send files —
+    every outbound parent email BCCs the owner's personal gmail; St Patrick's families
+    would too. unsubscribeUrl.js:18 hardcodes legacyhoopers.org; familyGuide.js:66 +
+    gameRecapHelpers hardcode 'Legacy Hoopers'. These violate §4 Tenant Data Boundary and
+    are gate items before tenant #2.
+
+T7. DEAD CODE (AP #51) — modest, real.
+    astersports-web: Map.tsx DEMO_MAP_ID + ~75 LOC boilerplate; DashboardLayout placeholder
+    nav ("/some-path"). st-patrick: components/ai-chat/* + AIChatBox.tsx (zero consumers),
+    DashboardLayout stubs, 4 unused hooks, next-themes (uninstalled dep read by sonner.tsx).
+    aster-sports: useSeasonFinancials.js (155 LOC) not in the §6 >150 exceptions list.
+
+════════════════════════════════════════════════════════════════════════
+2. P1 INVENTORY (real bugs — file:line, severity-ordered within repo)
+════════════════════════════════════════════════════════════════════════
+
+ASTER-SPORTS (app) — all routine/application-layer unless marked Architect-scoped:
+  · dutyReconcile.js:41-43 — deletes CLAIMED volunteer slots (silent data loss). ~2 lines.
+  · useHasUnread.js:30 — /messages nav badge never clears (phantom key). small.
+  · ScheduleForLaterPicker.jsx:22-54 — scheduled-send time browser-local not ET
+    (multi-tenant latent; correctness bug at tenant #2). medium.
+  · [Architect-scoped, surface-don't-edit] useProgramHealthMetrics season-% vs
+    useFamiliesOwingCount all-seasons (money-read AP #63); useScoreDraft vs useLiveGame
+    dual game_results writers (record clobber).
+  Edge fns: non-constant-time cron_secret compare ×3 (briefing-cron-dispatch:67,
+    send-push:34, briefing-auto-draft-tick:105) — low-lift hardening, money/fan-out path.
+
+ASTERSPORTS-WEB (non-studio):
+  · inviteLinks.ts:142-155 + :575-588 — disabled admin can mint/list join links
+    (status='active' omitted). authz, trivial fix.
+  · Map.tsx:101-107 — script loader: no dedupe + onerror never rejects → await hangs
+    forever on network failure. medium.
+
+ST-PATRICK (the repo you're fine-tuning/migrating — highest-value list):
+  Auth/exposure:
+  · homilies.ts:19,33,54,73 — protectedProcedure write hole + UNVALIDATED audio upload.
+  · holyDays.ts:27,32,40 — protectedProcedure → any user rewrites the Mass schedule.
+  · news/bulletins/events.getById — leak unpublished drafts (public, int-id enumerable).
+  · _core/index.ts:75,96,116 — cron 500s leak full stack traces; errorHandler dead (P2).
+  · siteSettings.get (admin.ts:55) — arbitrary-key read leaks staff emails (breadth P1).
+  Date/correctness:
+  · liturgicalSeason.ts:97-107 — Good Friday + Holy Saturday render Ordinary Time. 2 lines.
+  · liturgicalSeason.ts:110 — late-Nov Advent mis-classified Ordinary. 1 line.
+  · CcdManager.tsx:42,111 — datetime-local round-trip corrupts every CCD event time.
+  · icsGenerator.ts:43-45,118-120 — Mass .ics stamps local as UTC Z (every Add-to-Cal).
+  · WeeklySchedule.tsx + scheduleData.ts:86 — Mass Times not date-aware (shows seasonal/
+    first-Friday every week; contradicts ThisWeekAccordion).
+  Crashes/UX/a11y:
+  · UserManager.tsx:91 + SubscriberList.tsx:60 — format(new Date(null)) crashes the list.
+  · MassIntentionForm.tsx:201 — wrong parish phone (9325 vs 9724) on a failure message.
+  · Giving.tsx:23-151 — amount/fund/recurrence selector non-functional + http:// link.
+  · MobileBottomNav + MobileMenu — menu overlay stays open over the new page after a tap.
+  · HomilyArchive.tsx:32-46 — audio never cleaned up (keeps playing after navigate/filter).
+  · a11y blockers — unlabeled inputs (PrayerWall/ParishAssistant/Newsletter/TeenLife/Serve/
+    UserManager role-select) + icon-only CRUD/destructive buttons across ~11 admin managers
+    (VolunteerManager delete has NO confirm). §16.4 / WCAG 4.1.2.
+
+════════════════════════════════════════════════════════════════════════
+3. PER-REPO VERDICT (deep)
+════════════════════════════════════════════════════════════════════════
+aster-sports: architecture EXCELLENT (engine is the cleanest subsystem — AP #27/#28/#29/
+  #38 all hold; hooks/context disciplined — 0 AP #36 default-swallows, no realtime leaks,
+  no §11.5 wrong-source reads). Real surface = the T1/T2/T3/T5/T6 edges above. No cross-
+  tenant breach, no money-path corruption on the happy path. The two live-verified AP #63
+  drifts + dutyReconcile are the highest-value routine fixes; the money-read AP #63s are
+  Architect-scoped.
+astersports-web (non-studio): well-built, security-conscious; SSRF boundary + Stripe
+  webhook idempotency + invite-link atomic claim are notably careful. Public surface leaks
+  nothing. One real authz gap (disabled-admin join links) + Map loader reliability.
+st-patrick: competently built over a real single-source schedule engine, but NOT airtight
+  on the two axes a parish site lives on — DATES and FAILURE FEEDBACK — and it carries
+  several pre-hardening auth holes. This is the one to work before fine-tune/migration.
+
+════════════════════════════════════════════════════════════════════════
+4. RECOMMENDED FIX SEQUENCE (highest leverage first)
+════════════════════════════════════════════════════════════════════════
+1. St Patrick auth holes (homilies/holyDays → staffProcedure + validate audio; getById
+   published-filter; strip stack traces / wire errorHandler; siteSettings allowlist + the
+   already-ruled D6 JWT fail-fast). Self-contained; do before fine-tune/migration.
+2. St Patrick date core: one `nowInET()` helper + the 2 liturgical one-liners + boundary
+   tests + the .ics TZID fix + the CcdManager datetime-local fix. Kills most of T1 there.
+3. aster-sports routine bugs: dutyReconcile claimed-slot guard; useHasUnread real high-
+   water-mark; widen the AP #36 audit test then sweep the import/seed swallows
+   (leagueAppsImport + tournamentRosters first — money + comms).
+4. Multi-tenant gate items (T6): de-hardcode ADMIN_BCC + tenant URLs/literals before St
+   Patrick onboards as tenant #2.
+5. aster-sports TZ class (T1): ET-anchor digestPeriod + coachRoundup/familyGuide windows
+   + ScheduleForLaterPicker before non-Eastern usage.
+6. Architect-scoped (surface, don't auto-edit): the money-read AP #63s (program-health %,
+   scoreDraft/liveGame), the edge-fn constant-time compare, and D5's full DB-hygiene sweep.
+
+— end —

@@ -1,0 +1,385 @@
+PLATFORM IA & DESIGN-FLOW BRIEF — Aster Sports multi-property
+For: Architect (claude.ai) review + fork ratification
+From: Claude Code (CC)
+Date: 2026-06-25
+Status: DECISION REQUEST. Per CLAUDE.md §2.1/§11.8 — CC surfaces evidence + a
+        labeled lean per fork; the Architect/Frank decide. CC has NOT settled any
+        fork below unilaterally.
+
+────────────────────────────────────────────────────────────────────────
+0. HOW TO READ THIS (provenance)
+────────────────────────────────────────────────────────────────────────
+[GROUNDED] = verified this session against repo files (file:line), live PR state,
+  or Google Drive contents.
+[INFERRED] = CC's reasoning from grounded facts; labeled, not asserted as fact.
+[DECISION] = needs an Architect ruling and/or a Frank product call.
+
+This brief was produced after a deep read of ALL FOUR repos in scope
+(astersports-web, aster-sports, legacy-hoopers, st-patricks-armonk) plus the
+"Aster Sports" Google Drive folder. It exists because Frank asked whether to
+involve the Architect on "overall design and flow for main and sub sections" —
+the answer is yes, and the forks below are why.
+
+Frank's framing (2026-06-25, verbatim intent): legacy-hoopers + its Drive assets
+are an EXISTING AAU program he intends to (a) redesign the website for and
+(b) make the FIRST PILOT on the Aster Sports app (astersports.app).
+
+────────────────────────────────────────────────────────────────────────
+0a. FRANK'S RULINGS (2026-06-25) — fold these into the forks below
+────────────────────────────────────────────────────────────────────────
+The §7 questions were answered by Frank. These resolutions amend the CC leans in
+§3; the original fork reasoning is retained as the record.
+
+R1 (→F3, amends lean): "Aster AAU" is a Legacy reskin TODAY that is BECOMING a new
+   Aster-OWNED house team. So it is NOT a revert-to-Legacy. Going forward there are
+   TWO program identities:
+     • Aster AAU — a NEW Aster house program (legitimately wears the Aster brand;
+       originated as a reskin of Legacy's 11U girls during the transition).
+     • Legacy Hoopers — the existing program / pilot tenant on the app (keeps its
+       own cobalt+knight brand).
+   Consequence: astersports.io/aau is Aster's OWN house-team surface (Aster brand
+   is correct there — PR #107's "ASTER AAU 11U GIRLS" framing stands). Legacy
+   Hoopers lives on the app as a self-branded tenant. The §2 "three implementations"
+   problem resolves not by deletion but by IDENTITY SPLIT: P1/aau = Aster's house
+   team; P3/legacy = the Legacy tenant program. During the reskin→house-team
+   transition they may share the scraper feed; plan for them to diverge as Aster
+   fields its own roster.
+
+R2 (→F4, ratifies A + adds a service): main page is PRODUCT-PLATFORM-FIRST.
+   Print Studio is the NEXT build priority (product logic to be worked out). A NEW
+   productized SERVICE is now in scope: "Websites as a service" — bespoke org/parish
+   sites — with ST PATRICK as the first PUBLIC flagship/case study, going public by
+   FALL 2026. So the registry's service set is: Print Studio (product, live) ·
+   Sports App (product, beta) · Aster AAU (house program) · Websites (service,
+   launching fall — St Patrick flagship) · the remaining agency services.
+
+R3 (→F1/F6, ratifies A): "Always live data — the best-in-class experience." F1=A
+   (app-as-home, live data) and F6=A (fold legacy-hoopers into the app's live public
+   pages). No rich-static brochure site; the public presence is live app data.
+
+R4 (→Q4, ratified): registration moves OFF LeagueApps ONTO the app's /r/:slug. The
+   objective is to SHUT DOWN LeagueApps and run registration entirely on
+   astersports.app. (Sequencing TBD vs the active 2026 season.)
+
+────────────────────────────────────────────────────────────────────────
+0b. GROUNDED OPS / HOSTING FACTS (Frank, 2026-06-25)
+────────────────────────────────────────────────────────────────────────
+- P1 astersports-web deploys via RAILWAY. Print Studio is being built in a
+  SEPARATE parallel Claude Code lane against this same repo. CC (this lane) must
+  stay clear of the studio surface and rebase PR #107 on main before merge to
+  avoid colliding with that lane (shared files: server/routers.ts, Home.tsx).
+- P3 Legacy Hoopers' LIVE site (legacyhoopers.org) is on SQUARESPACE today, not
+  the legacy-hoopers React repo. Where to manage it is an OPEN Frank decision
+  (Squarespace stays / Railway React build / fold into the app). Interacts with
+  F6 + R3 below.
+- P2 the Sports App will be registered with APPLE (App Store) on a later build
+  pass. Today it is React + Supabase (PWA-wrap or React Native later).
+
+────────────────────────────────────────────────────────────────────────
+1. THE FOUR PROPERTIES — what each IS today  [GROUNDED]
+────────────────────────────────────────────────────────────────────────
+P1. astersports-web  →  astersports.io  (the platform marketing site)
+  - Stack: React + tRPC + Drizzle/MySQL, Manus/Forge host. Money-path lives here.
+  - Surfaces: marketing landing (Home.tsx), Print Studio (/studio, the monetized
+    product), Platform Console (/platform), an AAU section (/aau), billing/admin.
+  - Aesthetic: "Celestial Cartography" — deep navy (#0a0e1a) + gold→orange
+    gradient (currently #f5b731→#e67e22; see §5/F5 — canonical brand gradient
+    differs). Fonts Space Grotesk (display) / Inter (body).
+  - AAU section: LiveScores, TournamentHistory, SeasonLeaderboard, Film,
+    Locations, Mission — backed by server/scraper.ts (Tourney Machine scrape of
+    5 Zero-Gravity tournaments) + server/routers.ts games/leaderboard procedures.
+    Branded "ASTER AAU 11U GIRLS · 5th Grade Girls · Zero Gravity AAU" featuring
+    #5 Charlie, #24 Sofia.
+  - JUST SHIPPED (PR #107, draft, CI green): main page rebuilt around a typed
+    service registry (client/src/lib/services.ts); AAU section made public.
+
+P2. aster-sports  →  astersports.app  (the youth-sports SaaS — the real product)
+  - Stack: React 19 + Supabase (Postgres + Auth + RLS + Realtime) + Vercel.
+  - Multi-tenant: every table org_id-scoped; per-org brand_colors (JSONB) applied
+    to --as-* tokens at runtime by AuthContext. Light theme by default.
+  - HAS PUBLIC SURFACES (key finding): /schedule/:teamId (PublicSchedulePage,
+    gated by organizations.is_public_listed) + /r/:slug program registration.
+    So the app can already expose a program's public schedule + registration with
+    NO auth, branded in that org's colors.
+  - Pilot tenant #1 = Legacy Hoopers (live/permanent-free through 2027). Tenant #2
+    = St Patrick CYO planned 2027-28. System of record for rosters, schedule,
+    registration, messaging, financials.
+
+P3. legacy-hoopers  →  (the EXISTING AAU program's standalone site)  [redesign target]
+  - Stack: React + tRPC + Drizzle/MySQL, Manus host. Same family as P1.
+  - Pages: / (home), /records, /academy, /mission, /coach-kenny, /locations,
+    /highlights (film), /register (→ LeagueApps link).
+  - Aesthetic: "Court Noir" — deep navy + ELECTRIC COBALT (#4a8fd4) + gold; fonts
+    Barlow Condensed (display) / Inter. Knight mascot. Voice: "Five Teams. One
+    Standard. Zero Shortcuts." 5 teams, 60+ players, Spring 2026.
+  - Same data pattern as P1's AAU section: Tourney Machine scraping + a Claude AI
+    chatbot. Registration currently goes to LeagueApps, NOT the app.
+
+P4. st-patricks-armonk  →  (a separate CLIENT site — Catholic parish)
+  - Stack: React + tRPC + Drizzle/MySQL, Manus host. Most mature of the four:
+    24+ domain routers, 30+ tables, RBAC (7 roles), liturgical-season runtime
+    theming, weather module, AI parish assistant, ICS calendar sync, forms
+    pipeline. Aesthetic: emerald + liturgical gold, OKLCH tokens.
+  - Not part of the Aster product line — it's client work — but it is the best
+    reference architecture the org has, and it already received a full Architect
+    review (Drive: "Claude AI Architectural Review: St. Patrick in Armonk.pdf",
+    8 categories, P0–P3). That review's cross-cutting findings (mobile bottom-nav,
+    SEO/structured data, a11y tap targets, perf caching) apply to P1/P3 too.
+
+Google Drive [GROUNDED]: "Aster Sports/" is the brand source of truth — canonical
+constellation-mark gradient is E0631C → E8902A → F6CC55 → FBD56B; logos, favicons,
+OG image, and the Birdiebuckets-Finals.mp4 film reel all present.
+
+────────────────────────────────────────────────────────────────────────
+2. THE CORE PROBLEM  [INFERRED, from §1 grounded facts]
+────────────────────────────────────────────────────────────────────────
+The SAME AAU program is implemented THREE times:
+  (a) P1 astersports.io/aau  — "Aster AAU 11U Girls" (scraper-backed)
+  (b) P3 legacy-hoopers site — "Legacy Hoopers 11U Girls" (scraper-backed + chatbot)
+  (c) P2 astersports.app     — Legacy Hoopers as tenant #1 (system of record)
+
+(a) and (b) are the same team (11U girls, 5th grade, Zero Gravity, jerseys #5/#24)
+re-skinned under two brands. (c) is where that program's real roster/schedule/
+registration data will live. Three codebases, three designs, three data stories
+for one program. Without an IA ruling this drifts: scores diverge between scraper
+copies, registration splits (LeagueApps vs app /r/:slug), and a visitor can't tell
+how astersports.io, the program site, and the app relate.
+
+Secondary problem: BRAND + DESIGN FRAGMENTATION across four dark/navy-ish themes
+with four accent systems (P1 gold/orange, P3 cobalt, P2 per-org light, P4 emerald).
+Aster (platform) and Legacy Hoopers (program) are DIFFERENT brands — but P1's /aau
+currently wears "Aster AAU," blurring whose program this is. That ambiguity is
+itself a fork (F3).
+
+The forks in §3 are the decisions that resolve both problems.
+
+────────────────────────────────────────────────────────────────────────
+3. ARCHITECTURAL FORKS — Architect ruling requested
+   (each: REQUEST / EVIDENCE / OPTIONS+REQUIREMENTS / CC LEAN per §11.8 r6 + AP#39)
+────────────────────────────────────────────────────────────────────────
+
+── F1. Where does the AAU PROGRAM PRESENCE live? (the load-bearing fork) ──
+REQUEST: Define the canonical home of the AAU program's public presence, and what
+  each of the three AAU surfaces (P1/aau, P3 site, P2 public pages) is FOR.
+EVIDENCE: P2 already ships PublicSchedulePage (/schedule/:teamId) + /r/:slug
+  registration gated by organizations.is_public_listed [GROUNDED]. P1/aau and P3
+  both re-implement scores/records/film off the same Tourney Machine scrape
+  [GROUNDED]. Frank: P3 is the redesign target AND first pilot on P2.
+OPTIONS:
+  A) App-as-home. The program's living data (schedule, roster, records,
+     registration) is served by P2's public surfaces in Legacy Hoopers branding.
+     P3 (legacy-hoopers site) is redesigned as a thin marketing shell that links
+     INTO the app's public pages (or is retired, see F6). P1/aau becomes a
+     short CASE STUDY on astersports.io linking out — not a full duplicate.
+     Requires: enrich P2 public surfaces (public records/film/about, not just
+     schedule); set is_public_listed; a public program landing route on P2.
+  B) Standalone-site-as-home. Redesign P3 as the program's full public site;
+     P2 is the parents' logged-in operations app; P1/aau is a case study. The
+     scraper stays the program-site data source; the app owns ops only.
+     Requires: redesign P3; define scraper-vs-app data boundary (F2); P1/aau
+     demoted to teaser.
+  C) Status quo+. Keep all three, hand-define non-overlapping scopes + a shared
+     design kit + shared data source so they don't drift. Most surface area to
+     maintain; highest drift risk.
+CC LEAN: **A (App-as-home).** P2 is the only one of the three that is the actual
+  system of record, already has public infra, and is where Frank wants the pilot.
+  Two scraper re-implementations of the same scores (P1/aau, P3) are the drift
+  liability AP#63 (PATTERN A: one concept, many sources) warns about. Make the
+  app the single source of program truth; let astersports.io and any program
+  marketing shell be thin presentation that links in. (Hedge honesty per AP#39:
+  if the program needs a richer editorial/recruiting site than the app's public
+  pages can be, B is the truer answer — Frank's call on how "brochure-rich" vs
+  "live-data" the public presence should be.)
+
+── F2. Canonical DATA SOURCE for scores / records / schedule ──
+REQUEST: One source of truth for game scores, records, and schedule across all
+  surfaces that show them.
+EVIDENCE: P1/aau + P3 scrape Tourney Machine (server/scraper.ts, 5-tournament
+  registry) [GROUNDED]. P2 is the system of record for schedule/roster but does
+  NOT scrape live tournament scores today [GROUNDED]. PR #106 (open) adds venue
+  coords + Open-Meteo weather to P1's scraper.
+OPTIONS:
+  A) App owns it: move/mirror the scraper into P2 (or an edge function) so the
+     app holds scores+records; all public surfaces read the app. Requires
+     scraper port + a public read API/RPC on P2.
+  B) Scraper service owns it: one shared scraper service feeds all surfaces; the
+     app ingests from it for the program's records page.
+  C) Keep per-surface scrapers (status quo) — explicitly rejected by AP#63.
+CC LEAN: **A**, conditioned on F1=A. If the app is the program home, the app
+  should hold the scores. Near-term: keep P1's scraper running (it's live) but
+  treat it as a temporary source feeding the app, not a parallel truth. Pin the
+  cutover to after the pilot's app schedule is populated.
+
+── F3. BRAND MODEL: Aster (platform) vs program/tenant brand ──
+REQUEST: A rule for WHEN a surface wears Aster's brand vs. the program's own
+  brand — and resolve "Aster AAU" vs "Legacy Hoopers."
+EVIDENCE: P2 already encodes the right model: organizations.brand_colors applied
+  at runtime; Legacy Hoopers override = cobalt #4a8fd4 [GROUNDED]. P1/aau is
+  branded "Aster AAU 11U Girls" while P3 brands the same team "Legacy Hoopers"
+  [GROUNDED]. Aster mark = gold/orange constellation; Legacy = cobalt knight.
+OPTIONS:
+  A) Platform-vs-tenant split (mirror the app): Aster brand (gold/orange) wears
+     ONLY platform chrome — astersports.io marketing, Studio, Platform Console.
+     A PROGRAM always wears ITS OWN brand (Legacy Hoopers cobalt + knight),
+     everywhere it appears (app public pages, program site, and the case-study
+     card on astersports.io). "Aster AAU" is retired in favor of the program's
+     real identity, unless Frank is deliberately launching a NEW house program
+     called Aster AAU distinct from Legacy Hoopers.
+  B) Aster-forward: the program is presented under Aster's brand as a flagship
+     ("Aster AAU"), Legacy Hoopers name de-emphasized.
+CC LEAN: **A**, pending one Frank input: is "Aster AAU 11U Girls" (a) just a
+  re-skin of Legacy Hoopers' 11U girls that should revert to Legacy branding, or
+  (b) a genuinely NEW Aster-owned house team? The whole AAU section's identity
+  hinges on that one answer. Default lean = (a) revert to Legacy Hoopers branding;
+  it matches the app's tenant model and avoids inventing a second program identity
+  for one team.
+
+── F4. MAIN-PAGE IA: agency-studio vs product-hub framing ──
+REQUEST: What IS astersports.io — a design/tech studio that happens to have
+  products, or a product platform that also does agency work?
+EVIDENCE: Home.tsx today reads as a studio/agency site; PR #107 added a registry-
+  driven Platform section that lists products (Studio, App, AAU) AND keeps agency
+  services [GROUNDED]. The registry supports either framing without a rebuild.
+OPTIONS:
+  A) Product-platform-first: hero + primary nav lead with the products (Studio,
+     the Sports App, programs); agency services become a secondary "we also build"
+     band. Best if the SaaS app is the growth bet.
+  B) Studio/agency-first: lead with the studio story; products are showcased work.
+     Best if near-term revenue is project/agency work.
+  C) Audience-split entry: a top-level chooser (two doors: "For sports orgs" →
+     app/programs, "For brands" → studio/agency), each with its own narrative.
+CC LEAN: **A (product-platform-first)**, with the agency services retained as a
+  band (already built). The monetized, scalable assets are Studio + the app; the
+  registry already makes products first-class. C is attractive if the two
+  audiences barely overlap — flagging it as the truer option IF Frank sees the
+  brand/sports buyers as fully distinct funnels.
+
+── F5. CROSS-PROPERTY DESIGN LANGUAGE ──
+REQUEST: One shared design language across Aster-owned surfaces, or intentionally
+  distinct per property?
+EVIDENCE: Four accent systems today [GROUNDED]. Drive defines the canonical Aster
+  gradient E0631C→E8902A→F6CC55→FBD56B; P1 uses #f5b731→#e67e22 (close, not exact)
+  [GROUNDED]. P2 has a locked --as-* token system already.
+OPTIONS:
+  A) One Aster design kit for platform chrome (astersports.io, Studio, Console):
+     align P1's gradient to the Drive brand spec; shared type scale, tokens,
+     components. PROGRAMS keep their own brand inside their themed pages (per F3).
+  B) Per-property bespoke (status quo) — maximizes distinctiveness, maximizes drift.
+CC LEAN: **A.** Unify Aster platform chrome to the documented brand (fix the
+  gradient first — cheap, high-signal), keep tenant/program theming as the
+  deliberate exception driven by brand_colors. This is the only fork with an
+  immediate low-risk action (gradient alignment) I can take on request.
+
+── F6. FATE of the legacy-hoopers repo (P3) ──
+REQUEST: Redesign-in-place, fold into the app's public surface, or retire? AND
+  where does the legacyhoopers.org DOMAIN point?
+EVIDENCE: P3 is a full standalone site; P2 can already render a public program
+  presence; Frank wants P3 redesigned AND the program piloted on P2. legacyhoopers.org
+  is on SQUARESPACE today (§0b); management location is an open Frank decision.
+OPTIONS:
+  A) Fold-in: retire P3 as a separate app; the program's public presence becomes
+     P2 public pages (Legacy-branded) + optional thin marketing shell. One less
+     codebase to maintain. (Pairs with F1=A.)
+  B) Redesign-in-place: P3 stays a separate marketing site, redesigned, reading
+     program data from the app/scraper. (Pairs with F1=B.)
+CC LEAN: **A if F1=A; B if F1=B.** These two forks move together — F1's ruling
+  decides F6. Lean A overall (fewer codebases, app is the home). On the DOMAIN:
+  per R3 (live-data), point legacyhoopers.org at the app's live Legacy-branded
+  public pages (custom domain) once built; keep Squarespace up in the interim.
+  Standing up the legacy-hoopers React repo on Railway is the WEAKER option — it
+  re-creates the duplicate-data problem R3 rules against (CC recommends against it
+  unless Frank wants a distinct marketing-only shell).
+
+────────────────────────────────────────────────────────────────────────
+4. TARGET IA  [per Frank's §0a rulings; Architect to ratify the shape]
+────────────────────────────────────────────────────────────────────────
+  astersports.io (P1)  — PLATFORM HUB, Aster brand (gold/orange, align to Drive
+                         gradient per F5). PRODUCT-PLATFORM-FIRST (R2).
+    • Hero: the platform + its products/services
+    • Registry-driven Platform section (shipped, PR #107) — services light up with
+      status pills as they come online:
+        – Print Studio (product · LIVE · next build priority, R2)
+        – Sports App (product · BETA → astersports.app)
+        – Aster AAU (Aster HOUSE program · Aster brand, R1) — live-data team page
+        – Websites (service · launching FALL 2026 · St Patrick flagship, R2)
+        – + agency services band (we also build)
+    • /studio → Print Studio (unchanged) · /platform → Console (unchanged)
+    • /aau → Aster's OWN house-team surface (Aster brand is correct here, R1);
+      live data (scores/records) per R3. NOT a Legacy duplicate — it is Aster's
+      house team. Legacy's program lives on the app (below).
+
+  astersports.app (P2)  — THE PRODUCT + every program's living, live-data home (R3)
+    • Public, per-org-branded: program landing → public schedule
+      (/schedule/:teamId, shipped infra) + public records/film/about (to build),
+      each in the org's own brand_colors (Legacy = cobalt).
+    • Registration: /r/:slug becomes the ONLY path; LeagueApps is shut down (R4).
+    • App is the system of record + owns scores/records (F2=A).
+    • Authenticated ops app unchanged.
+
+  legacy-hoopers (P3)  — folded into P2's live public pages (F6=A, R3). Repo
+    retired or reduced to a redirect/marketing shell. Its best content (Coach
+    Kenny, mission, Court Noir cues) migrates into the Legacy-branded app pages.
+
+  st-patricks-armonk (P4)  — DUAL role now: (1) still the client parish site, and
+    (2) the FLAGSHIP public case study of the new "Websites" service (R2). Its
+    architecture remains the org's reference + the source of §5's checklist.
+
+Resulting flow is legible: astersports.io sells the platform → Print Studio, the
+Sports App, Aster AAU (house team), and Websites are its products/services →
+client programs (Legacy Hoopers) run as live, self-branded tenants on the app →
+St Patrick is the public proof of the Websites service.
+
+NEW SERVICE NOTE (R2): "Websites" is the productization of the P4-style build
+(St Patrick). It belongs in client/src/lib/services.ts as a `soon`/`beta` service
+with St Patrick as the example — a one-entry registry add when Frank greenlights.
+
+────────────────────────────────────────────────────────────────────────
+5. CROSS-CUTTING STANDARDS (adopt platform-wide)  [GROUNDED in the St Pat review]
+────────────────────────────────────────────────────────────────────────
+The St. Patrick Architect review already enumerated these; they apply to P1/P2/P3:
+  • Mobile persistent bottom-nav for primary destinations (P0 in that review).
+  • SEO: per-page meta/OG/Twitter cards + JSON-LD structured data (Event,
+    SportsTeam/Organization), dynamic sitemap/robots. astersports.io has an
+    ogimage.png in Drive ready to wire.
+  • A11y: 44px tap targets, WCAG AA contrast on hero-over-image, reduced-motion,
+    aria labels — applies to P1 hero + AAU pill nav.
+  • Perf: route-based lazy-loading, image optimization (WebP/AVIF + srcset),
+    stale-while-revalidate caching for scraper/ICS feeds.
+These are routine (non-architectural) and can ship incrementally once the IA
+forks land; listing them so the Architect can fold them into the design pass.
+
+────────────────────────────────────────────────────────────────────────
+6. WHAT'S ALREADY SHIPPED (and why it doesn't pre-empt the design)  [GROUNDED]
+────────────────────────────────────────────────────────────────────────
+PR #107 (astersports-web, draft, CI green): registry-driven main page + public
+AAU. It is deliberately reversible plumbing — the service registry expresses ANY
+F4 framing, and the public AAU flip matches Frank's stated direction. Held as a
+DRAFT so this brief can shape the IA before it merges. It also already carries the
+ratified additions: the Websites service in the registry + the brand-gradient
+alignment (R2/F5). If the Architect wants the AAU section reshaped, that's an edit
+on top of #107, not a rework. Recommendation: keep #107 a DRAFT until the Architect
+acks the IA, then rebase on main (parallel Print Studio lane, §0b) and merge as the
+new baseline.
+
+────────────────────────────────────────────────────────────────────────
+7. QUESTIONS FOR FRANK — RESOLVED 2026-06-25 (see §0a)
+────────────────────────────────────────────────────────────────────────
+Q1 (F3) → R1: Aster AAU = Legacy reskin transitioning to a NEW Aster house team.
+  Keep the Aster-AAU identity; Legacy stays the tenant. (Identity split, not revert.)
+Q2 (F4) → R2: product-platform-first; Print Studio is next build priority; NEW
+  "Websites" service with St Patrick as the public fall-2026 flagship.
+Q3 (F1/F6) → R3: live-data-first; fold legacy-hoopers into the app's live pages.
+Q4 → R4: shut down LeagueApps; registration runs entirely on the app /r/:slug.
+
+REMAINING for the Architect: ratify the §4 IA shape + the §3 fork mechanics
+(esp. F2 scraper→app cutover sequencing and the reskin→house-team data split in R1).
+
+────────────────────────────────────────────────────────────────────────
+8. OUT OF SCOPE for this brief
+────────────────────────────────────────────────────────────────────────
+- F1 AI Game Recaps (aau_recaps) — separate Architect-scoped DB-migration PR.
+- St Patrick (P4) product changes — client work, not the Aster product line.
+- Money-path / Studio internals — unaffected by this IA.
+- Any tenant onboarding schema work on P2 — tracked in aster-sports docs.
+
+— end of brief —

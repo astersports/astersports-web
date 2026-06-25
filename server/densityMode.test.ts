@@ -22,7 +22,7 @@ describe("resolveDensityRedistribute (flag-gated density mode routing)", () => {
     expect(resolveDensityRedistribute(undefined, false)).toBe(false);
   });
 
-  it("defaults to respace in the initial controls", () => {
-    expect(defaultControls().density.mode).toBe("respace");
+  it("defaults to inplace (the always-safe layout) in the initial controls", () => {
+    expect(defaultControls().density.mode).toBe("inplace");
   });
 });

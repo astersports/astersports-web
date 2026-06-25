@@ -1,0 +1,119 @@
+ASTER WEATHER PILOT — extraction plan + hosting decision
+For: Architect (claude.ai) + Frank · From: Claude Code (CC)
+Date: 2026-06-25
+Re: aster-shared-infra-track-spec.txt §3/§4 — @aster/weather pilot
+Status: [VERIFY] extraction COMPLETE (CC read St Patrick this session). Package
+        BUILD is gated on ONE decision (W1: hosting/publish) — Frank's call, since
+        it stands up new cross-repo tooling + likely a new repo.
+
+────────────────────────────────────────────────────────────────────────
+0. WHAT'S DONE vs GATED
+────────────────────────────────────────────────────────────────────────
+DONE (CC, this session): verified St Patrick's weather module against ground truth
+  — exact files, exports, deps, coupling, and the decoupling seams (§1–§3 below).
+  The extraction is fully scoped; CC can scaffold the package immediately on GO.
+GATED (W1, §4): WHERE the package lives + HOW the four SEPARATE repos consume it
+  (no monorepo, per the infra spec §2 ruling). This is new org tooling — surfaced
+  as a decision, not settled by CC.
+
+────────────────────────────────────────────────────────────────────────
+1. VERIFIED EXTRACTION SURFACE  [GROUNDED — st-patricks-armonk]
+────────────────────────────────────────────────────────────────────────
+~1050 lines, ~95% framework-agnostic. Split:
+
+SERVER (pure fetch, ZERO app coupling — extract as-is):
+  server/weather/types.ts (73)    — types + WMO/geo constants
+  server/weather/helpers.ts (75)  — WMO→icon map, fetchWithTimeout, time parse
+  server/weather/current.ts (96)  — getCurrentWeather(), 15-min cache + inflight dedup
+  server/weather/daily.ts (91)    — getDailyForecast(), 60-min cache + inflight dedup
+  server/weather/forecast.ts (257)— fetchForecast(), getWeatherForEvent(s), heuristics
+  server/weather/index.ts (27)    — barrel
+  Caching = module-level in-memory TTL + inflight-promise dedup. Native fetch/URL/
+  AbortController only. No npm runtime deps.
+
+CLIENT ICONS (pure React, no app imports — extract as-is):
+  client/src/components/weather-icons/DayIcons.tsx (95)            — 6 animated SVG icons
+  client/src/components/weather-icons/NightAndSevereIcons.tsx (95) — 7 SVG icons
+  client/src/components/weather-icons/ColorfulWeatherIcon.tsx (35) — name→component dispatch
+  (inline SVG + gradients; no icon library)
+
+APP-COUPLED (needs a seam — see §2):
+  server/routers/weather.ts (30)        — tRPC wrapper (app's tRPC)
+  client/.../WeatherBadge.tsx (134)     — display comp, uses app CSS token classes
+  client/src/hooks/useWeatherToken.ts   — maps condition → app's --weather-* classes
+
+NOTE on astersports-web: its weather (server/weather.ts + AAU card) lives on PR #106's
+branch, NOT main — so the agent that read `main` didn't see it (consistent with prior
+grounding). @aster/weather must satisfy #106's surface (current + hourly + 7-day +
+per-game forecast chip) — it does (superset).
+
+────────────────────────────────────────────────────────────────────────
+2. DECOUPLING SEAMS (the only edits needed to make it portable)
+────────────────────────────────────────────────────────────────────────
+S1 Geolocation — today hardcoded ARMONK_LAT/LON. → `createWeatherClient({ latitude,
+   longitude, timezone })` factory returns the get* fns bound to coords. (Each org/
+   venue passes its own; AAU passes the tournament venue coords from #106.)
+S2 tRPC — keep the router IN each app; the package exports pure fns the app wraps in
+   its own `publicProcedure`. Package ships NO tRPC dep (HARD GUARDRAIL §1 of infra
+   spec: no app/data-layer code in the package).
+S3 CSS tokens — WeatherBadge/useWeatherToken use St-Patrick `--weather-*` classes.
+   → package exports the badge with a `theme` config (default + override); each app
+   maps to its own tokens (AAU = gold). Or app keeps its own badge and consumes only
+   the icons + pure fns (lighter; CC lean for the pilot).
+S4 Event heuristics (outdoor/high-attendance keywords) — parameterize via optional
+   config; default keeps St-Patrick's list.
+
+────────────────────────────────────────────────────────────────────────
+3. PROPOSED @aster/weather PACKAGE  (no runtime deps; React peer)
+────────────────────────────────────────────────────────────────────────
+src/
+  client.ts        createWeatherClient({lat,lon,timezone}) → { getCurrent, getDaily,
+                   fetchForecast, getWeatherForEvent(s) }   (S1)
+  forecast.ts helpers.ts types.ts        (pure, from server/weather/*)
+  icons/           ColorfulWeatherIcon + the 13 SVG icons   (pure React)
+  components/WeatherBadge.tsx (theme-config)                (optional, S3)
+  index.ts (types + client + icons)   ·   icons-only subpath for lighter consumers
+package.json: peerDependencies { react } (optional); dependencies {} (none).
+Exports the superset both St Patrick and AAU/#106 need. ~1050 LOC moved, ~80 LOC of
+new seam/config.
+
+────────────────────────────────────────────────────────────────────────
+4. DECISION W1 — WHERE THE PACKAGE LIVES + HOW REPOS CONSUME IT  [FRANK + ARCHITECT]
+────────────────────────────────────────────────────────────────────────
+REQUEST: pick the hosting/publish mechanism for `@aster/*`. All options need a new
+  home for the package source (the 4 product repos are separate; monorepo ruled out).
+OPTIONS:
+  A) GitHub Packages (npm registry, astersports scope) + a NEW repo
+     `astersports/aster-weather` holding source; publish via GH Actions on tag;
+     consumers add `.npmrc` (registry + token) + pinned `@aster/weather@x.y.z`.
+     PROS: real semver, clean `npm i`. CONS: most tooling — registry auth token in
+     every consuming repo's CI AND its deploy build env (Railway/Vercel/Manus).
+  B) Git-tag dependency (NO registry) + a NEW repo `astersports/aster-weather`.
+     Consumers pin `"@aster/weather": "github:astersports/aster-weather#v0.1.0"`
+     (prebuilt dist committed, or a `prepare` build). PROS: minimal infra, pin-by-tag
+     = the deliberate-upgrade rule (§2) for free, no registry auth. CONS: no semver
+     range niceties; tag discipline manual.
+  C) Monorepo — RULED OUT by the infra spec §2.
+CC LEAN: **B for the pilot** — it's the smallest step that delivers cross-repo reuse
+  with pin-by-tag, no registry/token sprawl across three deploy platforms; graduate
+  to A if/when the @aster/* set grows. BOTH A and B need ONE thing from Frank: **authorize
+  a new repo `astersports/aster-weather`** (it's outside today's 4-repo scope, so CC
+  won't create it unprompted). Name/owner is Frank's call.
+[VERIFY before publish] confirm St Patrick's exact dep versions (react 19, date-fns is
+  consumer-only) and that the pure server fns run under each target runtime (Node/Deno
+  — St Patrick is Node; AAU/#106 is Node; fine).
+
+────────────────────────────────────────────────────────────────────────
+5. PILOT SEQUENCE (on W1 GO) + NON-BLOCKING GUARANTEE
+────────────────────────────────────────────────────────────────────────
+1. Create `astersports/aster-weather`; scaffold the package (§3) extracted from St
+   Patrick with seams S1–S4; tag v0.1.0.
+2. First consumer = astersports-web AAU per-game weather (the #106 surface) at the
+   pinned version — AFTER #106 merges. #106 SHIPS AS-IS now; swaps to the package
+   later (no rewrite). Nothing here blocks #106, Pass 1b/1c, or the migration.
+3. Later consumers (St Patrick swaps its inline module to the package; the app;
+   the Websites product) adopt the same pinned tag.
+ACCEPTANCE: one weather codebase; every repo pins its version; #106 keeps working
+  throughout; zero app/data-layer code in the package (HARD GUARDRAIL).
+
+— end —

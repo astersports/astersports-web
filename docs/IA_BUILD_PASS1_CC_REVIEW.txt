@@ -1,0 +1,118 @@
+CC REVIEW — Architect Build Spec "Aster IA Build Pass 1" + renderings
+For: Architect (claude.ai) / Frank
+From: Claude Code (CC) — ground-truth verification lane
+Date: 2026-06-25
+Re: aauiabuildpassspec.txt + aster-ia-renderings.html + constellation logo
+
+VERDICT: Spec is strong and buildable. Phasing (F2 Phase 1 only), the no-clone
+two-entity model (§4), the frozen embed contract (§5a), and the column-allowlist-
+as-privacy-enforcement (§3/§5) are all the right calls. CC verified the spec's
+[VERIFY] items against both repos; results below. Two findings the architect could
+NOT see (no repo access) warrant a short round-trip BEFORE the P2 migration is
+written — they don't block the P1 styling, which CC can proceed on now.
+
+────────────────────────────────────────────────────────────────────────
+A. GROUND-TRUTH VERIFICATION OF SPEC [VERIFY] ITEMS  [GROUNDED this session]
+────────────────────────────────────────────────────────────────────────
+1. Service-to-service auth on P2 (§3) → CONFIRMED EXISTS, reusable.
+   app_secrets table + shared-secret Bearer + `verify_jwt=false` config is
+   production-proven (migration 20260510002836; briefing-cron-dispatch pattern;
+   config.toml lists 11 such functions). `ingest.syncProgramData` follows it 1:1.
+2. Public-read gating (§3) → CONFIRMED EXISTS.
+   organizations gate via org_is_public_listed() SECDEF (migration
+   20260612030320); teams_select_public / events_select_public / tournaments_select_public
+   RLS already live.
+3. Scores storage (§3) → CONFIRMED EXISTS — and richer than the spec assumed.
+   game_results already holds (our_score, opponent_score, result, point_differential,
+   published_at) with a publish-to-parent workflow (migration 014) and a live Spring
+   2026 backfill. NO new scores table needed.
+4. Public column allowlist (§5) → PARTLY ALREADY SHIPPED.
+   Anon column grants on game_results already restrict to
+   (id, event_id, our_score, opponent_score, result, published_at) — migration
+   20260504213434. The spec's "new allowlisted view" can largely REUSE these grants
+   + a thin SECDEF RPC (get_public_team_records) rather than a net-new view.
+5. feed_source_mapping (§4) → CONFIRMED NET-NEW. No org→external-feed mapping exists
+   today. Design it in the Phase 1 DDL as the spec says.
+6. P1 fonts/gradient/logo (§2) → VERIFIED + PARTIALLY SHIPPED by CC this pass:
+   Space Grotesk/Inter/Barlow loaded; Space Mono was MISSING (now added); brand
+   gradient endpoints already swapped in #107, full 4-stop --brand-grad token now
+   registered; transparent constellation mark wired as header+footer wordmark.
+
+────────────────────────────────────────────────────────────────────────
+B. FINDINGS THE ARCHITECT COULD NOT SEE (no repo access) — RECONCILE
+────────────────────────────────────────────────────────────────────────
+B1. *** The app ALREADY ingests TourneyMachine. ***  [GROUNDED]
+    P2 has ImportSchedulePage (src/pages/ImportSchedulePage.jsx) + a
+    `parse-tournament-schedule` edge function + useImportSchedule commit flow
+    (parse → validate → dedup → bulk upsert of events). The spec frames F2 Phase 1
+    as "P1's scraper pushes to a NEW ingest route." That risks a SECOND TourneyMachine
+    ingestion path inside the very system the IA is trying to de-duplicate.
+    CC RECOMMENDATION: converge. Either (a) `ingest.syncProgramData` reuses the
+    existing `parse-tournament-schedule` parser + commit pipeline (preferred — one
+    TM parser, one upsert path), or (b) the spec explicitly states why a second,
+    automated path coexists with the human paste path and how they don't collide on
+    the same events. Architect to rule.
+
+B2. DATA-MODEL MAPPING GAP (scraper shape ≠ app shape).  [GROUNDED]
+    P1's scraper emits FLAT denormalized games (homeTeam, awayTeam, homeScore,
+    awayScore, gameTime, division, externalId, isLegacyHome, legacyWon). P2 stores
+    normalized: game_results.event_id → events (the org's own event) + opponents
+    (FK). So ingestion must, per scraped game: resolve/create the matching EVENT,
+    match/create the OPPONENT, then upsert game_results. The spec's idempotency key
+    "(tournamentId, divisionId, gameId)" lives on the SCRAPER side; on the app side
+    the natural key is event_id (+ an external_game_id column to dedupe re-runs).
+    CC RECOMMENDATION: the Phase 1 DDL needs an external-id column (e.g.
+    game_results.external_game_id UNIQUE-per-org) for idempotency, and the spec
+    should specify the event/opponent resolution rule (auto-create vs match-only).
+    gameId ≟ scraper externalId — CC to confirm in code.
+
+B3. game_results lacks a DIRECT org_id (RLS walks event→team→org).  [GROUNDED]
+    Fine for reads today, but a service-auth ingest path is cleaner with a direct
+    org_id + a BEFORE INSERT trigger deriving it from the event, and a simplified
+    RLS. CC RECOMMENDATION: add game_results.org_id (NOT NULL, indexed) in the
+    Phase 1 migration; low-risk, tightens the ingest scoping.
+
+────────────────────────────────────────────────────────────────────────
+C. DESIGN / RENDERINGS FEEDBACK
+────────────────────────────────────────────────────────────────────────
+- Renderings match ground truth well. Scene 2's Legacy cobalt + Barlow Condensed
+  is the ACTUAL legacy-hoopers brand (verified). The gold-vs-cobalt split reads as
+  intended.
+- "Constellation / services light up as stars" maps 1:1 to the registry status
+  model AND echoes the logo (which literally IS a constellation). Strong, non-
+  decorative signature. Endorse.
+- RESTYLE NOTE (P1 /aau): the current AAU page (AAUBasketball.tsx) is themed PURPLE
+  (--as-team-primary #a78bfa), not Aster gold. The renderings show Aster AAU in
+  gold. The /aau restyle must move it onto the Aster gold brand (R1/F3). Flagging
+  so the styling pass doesn't miss it.
+- Logo wiring: transparent mark is portrait (1192×1488, the constellation "A").
+  Wired at h-10/h-8 w-auto (header/footer). FAVICON + OG still generic — replacing
+  those needs square/sized exports of the mark (follow-up; not blocking).
+
+────────────────────────────────────────────────────────────────────────
+D. FRANK DECISIONS STILL OPEN (from the spec)
+────────────────────────────────────────────────────────────────────────
+D1 (§4 [DECISION]): History ownership of the shared-transition games. Architect
+   default = games stay LEGACY HOOPERS' record; Aster AAU's record starts at its
+   own-roster start. CC concurs (don't auto-assign Legacy's wins to Aster). Confirm.
+D2 (§5 indexing): index team + schedule pages (already public); noindex the
+   named-roster detail pages? Architect default = index team+schedule. Frank to
+   confirm whether named-minor roster pages are search-indexed.
+D3 (§5 consent): public roster/film showing OTHER families' minors needs the
+   program's standard consent on file (owner-managed precondition). Confirm it
+   exists before those names/faces go public.
+
+────────────────────────────────────────────────────────────────────────
+E. WHAT CC SHIPPED THIS PASS (PR #107 branch, draft, typecheck green)
+────────────────────────────────────────────────────────────────────────
+- Transparent constellation mark as header+footer wordmark (aster-mark.png).
+- Space Mono loaded (scoreboard/jersey data face).
+- --brand-grad (canonical 4-stop) + --font-mono tokens registered.
+- (Earlier in #107: registry main page, public AAU, Websites service, 2-stop brand
+  hue swap.)
+NEXT P1 (on Frank's go, independent of B1–B3): full hub + /aau restyle to the
+renderings (4-stop gradient application, mono scoreboards, constellation motif,
+gold /aau rebrand, bottom-nav, a11y/SEO). DB/RLS work (§3/§4) HOLDS for owner
+approval and should not start until B1–B3 are reconciled with the architect.
+
+— end of CC review —

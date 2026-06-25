@@ -1,0 +1,84 @@
+DENSITY — PHASE 1 PROGRESS (count-accurate density + 10/20/50% preview)
+=======================================================================
+Last updated: 2026-06-25. Author: Claude Code (CC). §2.2 cross-lane artifact.
+Reads on top of docs/DENSITY_SCALE_STRATEGY.txt (the decided strategy). This doc
+is the durable record of the P1 build so a fresh session resumes from committed
+files alone — no chat history needed.
+
+BRANCH / BASE
+-------------
+Work is on `claude/magical-goodall-d5uybq`, re-based onto `claude/modest-galileo-10ousj`
+(PR #102, the live studio branch with the density code + the strategy doc). The
+fresh session was originally cut from `main` (no density code); re-basing put the
+code + doc under it. Open as a draft PR; NOT merged into #102's branch.
+
+WHAT SHIPPED IN THIS PASS
+-------------------------
+1. REAL-GARMENT EVAL SET (strategy-doc §5/§8 action 1 — the immediate unblock).
+   eval/samples/cinqasept-likely/ : 14 PDP images, both brands (Cinq à Sept + LIKELY),
+   across the 4 surface buckets (scattered 6 / embellished 3 / solid 2 / lace 3),
+   flat-lay + on-model. Pulled live from the brands' open Shopify CDNs via the
+   …/products.json -> cdn.shopify.com path (network policy now allows it — confirmed
+   HTTP 200 on both domains + CDN).
+   - Binaries are gitignored by repo convention (eval/.gitignore). The DURABLE,
+     committed artifacts are manifest.json (per-image provenance) + fetch.mjs
+     (re-materializes the exact set from the recorded source URLs). Verified: all
+     14 re-fetch cleanly.
+
+2. P1 PREVIEW OP (the "+ 10/20/50% preview" deliverable).
+   server/_core/studio/ops/densityPreview.ts + server/densityPreview.test.ts (9 tests).
+   - Pins the "% drop" semantics: density is COUNTING. "remove p%" = remove
+     round(N * p/100) motif INSTANCES by count; survivors stay byte-identical.
+     Periodicity-agnostic -> exact + previewable on scattered prints (strategy §1).
+   - TRUTHFUL: every preview step is produced by the SAME deterministic densityThin
+     the billed op runs, so the p% a user previews is byte-identical to what they get
+     when they pick p%. (Test asserts this.)
+   - NO-OP HONESTY (§1 "never bill for a no-op"): each step reports requestedRemoval
+     AND actual removed; on a densityThin degrade (missing/empty raster, no bare
+     ground, instance dim-drift) removed=0 + noop=true. Caller must not bill.
+   - Pure/deterministic; carries raw RGBA, no encode in the op.
+
+3. OFFLINE MOTIF SEGMENTER (eval-only, to demo P1 on a REAL garment without SAM2).
+   eval/segmentMotifs.ts + eval/densityPreviewDemo.ts.
+   - Classical contrast+connected-components stand-in: estimate ground (k-means/Lab)
+     inside a fabric bbox, threshold far-from-ground pixels as motif, CC -> instances,
+     area-filter, emit an instance label-map PNG that evalMaskIO already understands.
+   - Lets densityPreview run end-to-end offline on a real piece. Demonstrated:
+       LIKELY Poppette (black dots/grey): 93 motifs detected -> -10% remove 9,
+         -20% remove 19, -50% remove 47. Visual: ~half the dots erased + ground-filled,
+         survivors intact (eval/out/density-preview-poppette.png).
+       LIKELY Tessa (roses/dark): 112 -> remove 11/22/56.
+   - Flat LAB fill leaves faint patches on the pinstriped Poppette ground — exactly
+     the textured-ground case the strategy doc (§3) says LaMa texture-fill would
+     polish (and notes LaMa is currently 404'ing in prod — latent bug, low priority).
+
+VERIFICATION
+------------
+- pnpm run check (tsc --noEmit): clean.
+- pnpm run test (vitest): 564 passed / 20 skipped (credential-gated). Includes the 9
+  new densityPreview tests. No existing test regressed.
+
+DESIGN LEAN TO RATIFY (Architect-scoped — flagged, not unilaterally shipped to prod)
+-----------------------------------------------------------------------------------
+The eval segmenter is deliberately EVAL-ONLY (under eval/, not wired to the mask
+provider or router) because mask-provider is Architect-scoped (CLAUDE.md §2.4) and a
+sub-processor-adjacent surface. Open question for the Architect:
+  Should a hardened classical motif counter become a real production InstanceMask
+  source for HIGH-CONTRAST scattered prints — a no-subprocessor fast path that avoids
+  a SAM2 call when contrast is clean — with SAM2 as the fallback for hard/low-contrast
+  grounds and on-model isolation?
+  CC's lean: YES as a guarded fast path (cheaper, no sub-processor for the easy cases),
+  but it does NOT replace SAM2 for the count GATE — G3 count accuracy must still be
+  proven on SAM2 instance masks. Decision deferred to the Architect.
+
+WHAT IS NOT DONE (next, in order)
+---------------------------------
+- SAM2 instance-count accuracy on real scattered/overlapping motifs (strategy §4 P1's
+  core): needs the credentialed run (STUDIO_MASK_PROVIDER=sam2 + Replicate creds).
+  This environment has no creds, so the count GATE (G3) is not yet run on real masks.
+  The eval set is now in place to run it the moment creds are available.
+- Wire densityPreview into the router/UI (currently op + eval only). Surface the
+  10/20/50 strip + the exact-count copy ("N motifs -> remove k -> kept") in StudioEditor.
+- Bucket C (solids) UI suppression: don't offer density/scale when there's nothing to
+  count (strategy §4).
+- Phase 2 (scale reframe: motif-resize not period-tiling) — separate build.

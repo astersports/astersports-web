@@ -138,14 +138,15 @@ export const inviteLinksRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      // Verify the user is admin/owner of this tenant
+      // Verify the user is an active admin/owner of this tenant
       const [mem] = await db
         .select()
         .from(memberships)
         .where(
           and(
             eq(memberships.tenantId, input.tenantId),
-            eq(memberships.userId, ctx.user.id)
+            eq(memberships.userId, ctx.user.id),
+            eq(memberships.status, "active")
           )
         )
         .limit(1);
@@ -574,14 +575,15 @@ export const inviteLinksRouter = router({
       const db = await getDb();
       if (!db) return [];
 
-      // Verify admin access
+      // Verify active admin access
       const [mem] = await db
         .select()
         .from(memberships)
         .where(
           and(
             eq(memberships.tenantId, input.tenantId),
-            eq(memberships.userId, ctx.user.id)
+            eq(memberships.userId, ctx.user.id),
+            eq(memberships.status, "active")
           )
         )
         .limit(1);

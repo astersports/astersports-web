@@ -119,7 +119,7 @@ export default function ControlPanel({
                   { v: "respace", label: "Even re-space" },
                   { v: "inplace", label: "Thin in place" },
                 ] as const).map((opt) => {
-                  const selected = (controls.density.mode ?? "respace") === opt.v;
+                  const selected = (controls.density.mode ?? "inplace") === opt.v;
                   return (
                     <button
                       key={opt.v}
@@ -137,7 +137,7 @@ export default function ControlPanel({
                 })}
               </div>
               <p className="text-xs text-muted-foreground">
-                {(controls.density.mode ?? "respace") === "inplace"
+                {(controls.density.mode ?? "inplace") === "inplace"
                   ? "Keeps every surviving motif in its original spot — best for placed or couture designs (preserves the composition)."
                   : "Spreads the surviving motifs evenly — best for repeating all-over prints."}
               </p>

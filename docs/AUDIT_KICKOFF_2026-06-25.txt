@@ -1,0 +1,76 @@
+AUDIT KICKOFF — Aster platform, all 5 repos
+For: the fresh-context audit chat · From: Claude Code (build lane) · Date: 2026-06-25
+Purpose: a clean-context, read-only audit of every Aster repo for bugs, drift, and
+cleanup. This brief is the starting map so the audit goes DEEPER instead of re-deriving
+what we already know. Read CC_REBASELINE_2026-06-25.txt (astersports-web/docs) FIRST —
+it inventories the properties, the weather triplication, and the open decisions.
+
+════════════════════════════════════════════════════════════════════════
+0. GROUND RULES (read before touching anything)
+════════════════════════════════════════════════════════════════════════
+- READ-ONLY survey. Do NOT merge, push to main, or flip flags. Produce findings +
+  a labeled lean per fork (CLAUDE.md §11.8 / AP #39); the operator/architect decide.
+- Branch-state first (AP #35): `git fetch` + check divergence per repo before reading.
+  astersports-web main is STABLE as of 2026-06-25 (PRs #106/#108/#107 just merged).
+- Do NOT touch the Print Studio lane (astersports-web PRs #102/#103/#104/#105) — a
+  separate active build lane. Money-path / DB-schema / RLS / auth = Architect-scoped
+  (no unilateral calls); surface them as findings, don't "fix" them inline.
+- Two CLAUDE.md operating agreements govern: astersports-web/CLAUDE.md (Studio money
+  path, phase rules) and aster-sports/CLAUDE.md (design tokens, anti-patterns #1–#63,
+  ground-truth tables). Tag every finding against the registered anti-patterns.
+- Methodology: line-by-line per category with the §16.15 2-pass deep-read addendum;
+  cross-batch pattern synthesis per AP #58. Output P0/P1/P2/P3 with file:line refs.
+
+════════════════════════════════════════════════════════════════════════
+1. THE 5 REPOS — "look here first"
+════════════════════════════════════════════════════════════════════════
+P1 astersports-web → astersports.io (React + tRPC + Drizzle/MySQL, Manus/Forge+Railway)
+   Marketing hub + Print Studio (money path) + Platform Console + AAU section.
+   Look first: client/src/pages/Home.tsx (Celestial hub), client/src/lib/services.ts
+   (service registry — single source for nav/products), client/src/pages/AAUBasketball.tsx
+   + client/src/components/aau/* (now PUBLIC), server/routers.ts (publicProcedure surface),
+   server/weather.ts (+ @aster/weather dep). Money path: server/_core/studio/* (do not
+   touch; audit-only). Known privacy tradeoff ON RECORD: AAU is fully public incl. a
+   girls' youth team's live venue/times + first names (operator decision, PR #107).
+P2 aster-sports → astersports.app (React 19 + Supabase/RLS + Vercel). Youth-sports app;
+   pilot tenant Legacy Hoopers. Look first: src/lib/engine/* (resolver/composer registry,
+   AP #27–#34, #38), src/components/weather/* + src/context/WeatherContext.jsx +
+   src/hooks/useWeather.js + src/lib/weather/* (W-b, merged #1075–77), supabase/migrations/*
+   (190+; ③ ingest migration 20260625120000 is LIVE in prod), the AP #36/#37/#43 classes.
+   ③ status: scores-ingest edge fn NOT deployed + app_secrets.ingest_secret NOT set.
+P3 legacy-hoopers → standalone AAU site (Squarespace live; React repo exists). Look first:
+   confirm what's actually deployed vs repo; dead-code / drift vs astersports.app.
+P4 st-patricks-armonk → client parish site; the ORIGINAL weather module (W-a). Look first:
+   server/weather/* + animated SVG weather-icons (~1050 LOC) — the pure/decoupled source.
+P5 aster-weather → shared @aster/weather package (v0.1.0 published; consumed by
+   astersports-web #108). Look first: the published surface vs W-a/W-b; what v0.1.0
+   froze vs what the consumers still keep local (animated icons, combined forecast).
+
+════════════════════════════════════════════════════════════════════════
+2. KNOWN SMELLS TO CONFIRM/QUANTIFY (don't rediscover — go deeper)
+════════════════════════════════════════════════════════════════════════
+S1 WEATHER TRIPLICATION (the headline drift). Three independent builds: W-a (St Patrick),
+   W-b (aster-sports app), W-c (astersports-web AAU, now converged to @aster/weather via
+   #108). @aster/weather v0.1.0 is the intended single source. AUDIT: how much logic in
+   W-a and W-b still duplicates the package? Map the convergence backlog (which files in
+   each consumer should drop local logic for the package; what v0.2.0 must grow to absorb
+   the animated icons + combined forecast the consumers kept). This is the AP #42
+   parallel-system / "one source, many consumers" thesis — quantify the remaining gap.
+S2 ③ INGEST not live: migration in prod but edge fn undeployed + secret unset — confirm no
+   half-wired path is reachable; verify get_public_team_records is the only public reader.
+S3 Cross-surface same-concept drift (AP #63 / aster-sports): re-run the "one concept, one
+   source+scope" check across app surfaces (payments, roster, records, academy badges).
+S4 Dead-feature mounts (AP #51) + config nothing reads (AP #16.16, two-bucket doctrine).
+S5 astersports-web AAU now public — audit the publicProcedure surface for any read that
+   leaks more than intended (the write/refresh path must stay owner-gated).
+
+════════════════════════════════════════════════════════════════════════
+3. DELIVERABLE
+════════════════════════════════════════════════════════════════════════
+Per repo: P0/P1/P2/P3 findings (file:line + anti-pattern tag + lift/risk), an
+enhancement surface, and a redesign-potential list. One cross-repo synthesis section
+(AP #58) for patterns that span repos (weather, same-concept drift, dead config). An
+explicit out-of-scope list. Commit as docs/PLATFORM_AUDIT_<date>.txt in the relevant
+repo + full chat paste (§49). No fixes in the audit pass — findings + leans only.
+
+— end —

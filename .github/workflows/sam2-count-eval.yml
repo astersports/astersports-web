@@ -1,0 +1,83 @@
+# SAM2 count-accuracy eval — billing-grade density go/no-go (MEASUREMENT, not a gate).
+#
+# Triggered by pushing a change to the sentinel file `eval/RUN_SAM2_EVAL` on a claude/**
+# branch. Runs the REAL SAM2 production count path against the hard synthetic fixtures
+# (known N) + real florals using the existing REPLICATE_API_TOKEN secret. The token is
+# never placed in a Claude-session env field; here it is consumed from GitHub secrets and
+# scoped to ONLY the steps that need it (not the job-wide env), so third-party setup
+# actions never see it. Then commits the report + overlays back to the branch.
+#
+# Cost: ~pennies/call on meta/sam-2; ~42 calls/run. Safe: synthetic = zero data concern;
+# reals = the brand's public PDP photos, SAM2/Replicate is the disclosed mask provider.
+#
+# It does NOT re-trigger itself: the result commit changes docs/ + eval/out, not the
+# sentinel.
+name: SAM2 count eval
+
+on:
+  push:
+    branches: ["claude/**"]
+    paths: ["eval/RUN_SAM2_EVAL"]
+
+permissions:
+  contents: write
+
+jobs:
+  sam2-count:
+    name: SAM2 count accuracy
+    runs-on: ubuntu-latest
+    # Production defaults on purpose (STUDIO_MAX_INSTANCES defaults to 200) so the measured
+    # pipeline matches production. REPLICATE_API_TOKEN is NOT job-wide — scoped per step below.
+    env:
+      STUDIO_MASK_PROVIDER: sam2
+      SAM2_EVAL_STAMP: "run ${{ github.run_id }} @ ${{ github.sha }}"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Guard — require Replicate token
+        env:
+          REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
+        run: |
+          if [ -z "$REPLICATE_API_TOKEN" ]; then
+            echo "::error::REPLICATE_API_TOKEN secret is not set — cannot run the SAM2 eval."
+            exit 1
+          fi
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Regenerate hard synthetic fixtures (gitignored PNGs; deterministic)
+        run: node eval/generatePhase1Hard.mjs
+
+      - name: Re-materialize real eval images from manifest (public Shopify CDN)
+        run: node eval/samples/cinqasept-likely/fetch.mjs
+
+      - name: Run SAM2 count eval
+        env:
+          REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
+        run: npx tsx eval/sam2CountEval.ts
+
+      - name: Commit report + overlays back to the branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f docs/SAM2_COUNT_EVAL.md eval/out/sam2-count/ || true
+          if git diff --cached --quiet; then
+            echo "No eval output to commit."
+          else
+            git commit -m "sam2 count eval: results + overlays (run ${{ github.run_id }})
+
+          Auto-committed by the SAM2 count-eval workflow. Branch-only review artifacts
+          (report + overlays); strip eval/out before any merge."
+            git pull --rebase origin "${GITHUB_REF_NAME}" || true
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi

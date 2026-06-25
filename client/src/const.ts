@@ -1,5 +1,8 @@
 export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
+/** Public URL of the youth-sports management app. Single source of truth. */
+export const APP_URL = "https://astersports.app";
+
 // Login sends the user to our own backend route, which redirects to Google's
 // consent screen and handles the callback (server/_core/oauth.ts). Replaces the
 // Manus OAuth portal. Same-origin, so the redirect_uri reflects the current host.
