@@ -38,9 +38,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { tenant } = useTenant();
   const { user } = useAuth();
-  // Super_admin: platform owner (role=admin + matching openId). Keeps the
-  // Platform Console entry point (org checkpoint 2c00e38).
-  const isSuperAdmin = user?.role === "admin" && user?.openId === import.meta.env.VITE_OWNER_OPEN_ID;
+  // Super_admin status comes from the server (the `platform_admins` table, the
+  // same gate superAdminProcedure enforces), surfaced on auth.me — no longer
+  // coupled to the build-time VITE_OWNER_OPEN_ID env var.
+  const isSuperAdmin = user?.isSuperAdmin === true;
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
