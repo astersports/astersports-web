@@ -9,9 +9,9 @@ import Locations from "../components/aau/Locations";
 import Mission from "../components/aau/Mission";
 import StatHeroBar from "../components/aau/StatHeroBar";
 import WeatherCard from "../components/aau/weather/WeatherCard";
+import { APP_URL } from "@/const";
 
 const LOGO_URL = "/aster-mark.png";
-const APP_URL = "https://astersports.app";
 
 const SECTIONS = [
   { id: "scores", label: "Live Scores", emoji: "⚡" },

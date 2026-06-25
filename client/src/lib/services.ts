@@ -20,6 +20,7 @@ import {
   Monitor,
   type LucideIcon,
 } from "lucide-react";
+import { APP_URL } from "@/const";
 
 export type ServiceStatus = "live" | "beta" | "members" | "soon";
 export type ServiceKind = "product" | "service";
@@ -83,7 +84,7 @@ export const PRODUCTS: ServiceEntry[] = [
     tagline: "One platform for youth sports orgs",
     description:
       "Schedules, rosters, RSVPs, messaging, and financials for youth sports organizations — replacing spreadsheets, group texts, and LeagueApps with one mobile-first app.",
-    href: "https://astersports.app",
+    href: APP_URL,
     external: true,
     status: "beta",
     icon: Smartphone,
