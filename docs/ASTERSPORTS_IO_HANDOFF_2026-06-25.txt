@@ -1,0 +1,231 @@
+ASTERSPORTS.IO — FULL HANDOFF (design · structure · sync · roadmap · game/schedule sync)
+For: the next chat (build or audit) · From: Claude Code (build lane) · Date: 2026-06-25
+Read alongside: CC_REBASELINE_2026-06-25.txt, PLATFORM_IA_BRIEF.txt, IA_PASS3_INGEST_FINDINGS.txt,
+AUDIT_KICKOFF_2026-06-25.txt (all in this repo's docs/). All claims [GROUNDED] against
+live repo/PRs/DB this session unless tagged [VERIFY].
+
+════════════════════════════════════════════════════════════════════════
+0. TL;DR — WHAT astersports.io IS NOW
+════════════════════════════════════════════════════════════════════════
+astersports.io is the PRODUCT-PLATFORM HUB for Aster Sports (Olive Juice Inc). It is
+NOT a single-service agency page anymore — as of this session it's a multi-product
+platform whose landing page is driven by a typed SERVICE REGISTRY, so each product
+"lights up" as it ships. The visual language is "Celestial Cartography": a navy night
+sky where live services are lit stars in a constellation and not-yet-shipped ones are
+faint stars in the same sky.
+
+URL MAP (one app, several surfaces):
+  astersports.io            → marketing hub (this rebuild)
+  astersports.io/studio     → Print Studio (the money-path product; separate CC lane)
+  astersports.io/platform   → Studio platform console
+  astersports.io/aau        → AAU basketball portal (public, gold-themed)
+  astersports.app           → the youth-sports OPERATIONS app (separate repo; system of record)
+
+DEPLOY: astersports-web auto-publishes from `main` via Manus/Forge (+ Railway). No
+Vercel project for THIS repo (Vercel is the aster-sports app's host, not this one).
+
+════════════════════════════════════════════════════════════════════════
+1. WHAT SHIPPED THIS SESSION (all merged to main)
+════════════════════════════════════════════════════════════════════════
+PR #106  AAU content: Birdie Buckets finals reel (native mp4), spring season close-out
+         (ZG NY Hoop Festival → Champions), event weather (Open-Meteo), banner-streak fix.
+PR #108  Weather convergence: AAU weather card sources WMO text + coord validation from
+         the shared @aster/weather package (v0.1.0) instead of a local 28-entry table.
+PR #107  THE IA REBUILD: dynamic service registry (services.ts), Celestial Cartography
+         hub (Home.tsx), public gold /aau portal (AAUBasketball.tsx), marketing sections
+         reconciled to the celestial panel system, transparent constellation mark +
+         favicon/OG/perf assets, Space Mono font, canonical brand-gradient token.
+PR #109  Docs: 5-repo audit kickoff brief.
+(Also merged by the Print Studio lane, not ours: #102 Manus-governance + density retry,
+ #105 density P1. main HEAD ~b127ea3 at handoff. Those are Studio/money-path lane — leave.)
+
+════════════════════════════════════════════════════════════════════════
+2. DESIGN SYSTEM — "Celestial Cartography" (LOCKED tokens in index.css)
+════════════════════════════════════════════════════════════════════════
+Palette: deep-space navy #0a0e1a / panel #0f1424→#141a2e. Brand gradient is the
+single decorative signature:
+  --brand-grad: linear-gradient(100deg, #E0631C, #E8902A, #F6CC55, #FBD56B);   (index.css:48)
+  --font-mono:  "Space Mono"  (index.css:46)  — used for stats/scores/record numerals.
+Fonts: Space Grotesk (display) · Inter (body) · Space Mono (data).
+Key classes (index.css ~640+): .aster-grad-text / .aster-grad-bg (gradient text/fill),
+.aster-sky (hero starfield), .aster-stars span(.tw) (twinkle, reduced-motion gated),
+.aster-hero-logo (glowing constellation mark), .aster-node (registry card),
+.aster-star(.on) (the "star" tile — LIT with gradient+glow when a service is live,
+faint star otherwise), .aster-panel (shared marketing-card surface so the whole page is
+one celestial system), .aster-constellation::before (faint shared star backdrop).
+PRINCIPLE: lit vs faint is driven by service STATUS, not hardcoded — see §3.
+/aau PORTAL THEME: gold house-team skin via runtime CSS-var override on the page root
+(--as-team-primary #F6CC55 etc.), mono scoreboards, mobile bottom-nav. It deliberately
+reads as a distinct "house team" surface inside the platform.
+
+════════════════════════════════════════════════════════════════════════
+3. STRUCTURE — the registry is the single source; everything derives from it
+════════════════════════════════════════════════════════════════════════
+client/src/lib/services.ts  — THE SINGLE SOURCE OF TRUTH for the platform surface.
+  ServiceEntry { id, label, navLabel, status, accent, icon, href, blurb, cta, inNav... }
+  STATUS_META: status → pill label/treatment ('live' | 'beta' | 'members' | 'soon').
+  PRODUCTS:  studio (live, nav "Studio") · app (beta, nav "App") · aau (live, nav
+             "Programs") · websites (soon).
+  SERVICES:  print-design · web · brand · strategy   (the agency "we also build" band).
+  NAV_PRODUCTS = PRODUCTS.filter(inNav); ALL_SERVICES = [...PRODUCTS, ...SERVICES].
+  → To bring a new service online or flip a status, edit ONE registry entry. Header nav,
+    mobile nav, footer, and the constellation tiles all derive from it. No page surgery.
+
+client/src/pages/Home.tsx  — the hub, composed of registry-driven sections:
+  Header (66) → HeroSection (207, starfield + glowing mark + gradient headline) →
+  PlatformSection (342, id="platform": ConstellationNode(315)+NodePill(296) render
+  PRODUCTS as lit/faint star tiles) → ServicesSection (386, id="services": the agency
+  band from SERVICES) → ProcessSection (470) → AboutSection (533) → FAQSection (628) →
+  ContactSection (697) → Footer (849). StarAccent(17) is the shared sky motif.
+
+client/src/pages/AAUBasketball.tsx  — the /aau portal (PUBLIC). Composes the AAU
+  components below; gold theme via root var override; mounts <WeatherCard/>; "Open in
+  the app" CTA → astersports.app; mobile bottom-nav (Scores/History/Records/Film).
+
+client/src/components/aau/  — StatHeroBar, LiveScores, TournamentHistory,
+  SeasonLeaderboard, FilmHighlights, Locations, Mission, SectionHeading, and
+  weather/{WeatherCard, WeatherIcon, GameWeather}.
+
+server/routers.ts  — tRPC. AAU READS are public; WRITES stay owner-gated:
+  games.list / games.live / games.completed  = publicProcedure   (89/99/109)
+  leaderboard.get                            = publicProcedure   (149)
+  games.refresh                              = ownerProcedure     (118)  ← scraper egress
+  weather.home / weather.get                 = ownerProcedure     (131/136)
+server/weather.ts  — Open-Meteo client (keyless, SSRF-safe, 10-min cache, stale-on-fail);
+  isValidCoord now re-exported from @aster/weather (the #108 convergence).
+
+════════════════════════════════════════════════════════════════════════
+4. SYNCHRONIZATION MODEL — "one source, many consumers"
+════════════════════════════════════════════════════════════════════════
+The platform thesis: each real-world concern has ONE authoritative source; every
+surface CONSUMES it. Two live instances of this:
+
+A) WEATHER → @aster/weather (the shared package; P5 repo astersports/aster-weather).
+   v0.1.0 published and CONSUMED by astersports-web (#108: WMO text + coord validation).
+   Weather still exists in THREE codebases historically (the drift the package removes):
+     W-a  st-patricks-armonk  — the ORIGINAL, pure/decoupled, ~1050 LOC + animated icons.
+     W-b  aster-sports (the app) — native build merged ~2026-06-18 (#1075–77).
+     W-c  astersports-web /aau — now partially converged onto the package (#108).
+   STATE: only astersports-web consumes the package so far. W-a (St Patrick) and W-b
+   (the app) still carry their own copies → the convergence backlog (see §5/roadmap).
+   What stays local on purpose (richer than v0.1.0): animated SVG icons, the combined
+   single-call forecast, UV/wind-direction/venue-timezone. A later @aster/weather grows
+   those into the shared surface.
+
+B) GAMES / RECORDS → the aster-sports app is the SYSTEM OF RECORD; astersports.io READS.
+   astersports.io must never be a second source of game truth. The frozen public read
+   contract is the RPC get_public_team_records (see §6). Today /aau still renders
+   scraper-backed data IN this repo; wiring it to the app's RPC is the deferred consumer
+   pass (§6 step 2). That cutover is what makes "one source" literally true for scores.
+
+PRIVACY-BY-ARCHITECTURE: astersports.io publishes NO roster. The public read projects
+display columns only (no player PII). AAU is exposed fully public AS-IS per the owner's
+on-record decision (PR #107) — that publishes a girls' youth team's live venue/times +
+first names; the safer redacted option was offered and not chosen. Write/refresh stays
+owner-gated.
+
+════════════════════════════════════════════════════════════════════════
+5. NEXT-LEVEL TECHNOLOGY DEPLOYMENTS (the roadmap, by track)
+════════════════════════════════════════════════════════════════════════
+T1 @aster/weather convergence:
+   - DONE: v0.1.0 published; astersports-web consumes it (#108).
+   - NEXT: converge W-a (St Patrick) and W-b (aster-sports app) onto the package — one
+     consumer at a time, no big-bang. Then v0.2.0 grows the richer surface (animated
+     icons, combined forecast, UV/wind/timezone) so consumers can drop their local code.
+   - BLOCKER for package work in a CC session: aster-weather is NOT in the default repo
+     allowlist — add it at code.claude.com → environment → Repositories first.
+T2 AAU live-data (F2) — see §6 in full. Phase 1 backend is LIVE in prod; the consumer
+   wiring (scraper push + /aau read swap) is the remaining work.
+T3 AAU AI game recaps (aau_recaps) — Architect-scoped DB migration; its own held spec,
+   not started.
+T4 legacyhoopers.org repoint (F6) and LeagueApps → /r/:slug registration (R4) — deferred.
+T5 Studio/Railway+Supabase migration — the Print Studio lane's track (PR #103 WIP). Not
+   ours; do not touch.
+
+════════════════════════════════════════════════════════════════════════
+6. GAME + SCHEDULING SYNC-UP (the detailed picture — read before touching ingest)
+════════════════════════════════════════════════════════════════════════
+ARCHITECTURE — DR-A=A1, "one writer per concern" (BUILD SPEC v3). TourneyMachine (TM) is
+the external source. It is parsed ONCE, by the SCHEDULE path. Scores are a SEPARATE
+writer that consumes already-identified games. The two never overlap:
+
+   TourneyMachine
+        │  (parsed once)
+        ▼
+   [SCHEDULE PATH]  parse-tournament-schedule  →  events            (tournaments/schedule)
+        │
+        └── games already identified as events
+                 │
+                 ▼
+   [SCORES PATH]   ingest-game-results  →  game_results             (scores only; NO TM parse)
+                 │   match-only to events (unmatched → reviewFlags, never phantom inserts)
+                 ▼
+   get_public_team_records(p_team_id)  →  astersports.io/aau        (public read; DR-B)
+
+LIVE STATE OF F2 PHASE 1 (aster-sports project vrwwpsbfbnveawqwbdmj) — ALL DONE this
+session, do NOT redo:
+  ✅ Migration applied to prod (PR #1094, merged): game_results +external_game_id
+     +org_id (NOT-NULL via BEFORE-INSERT derive-trigger event→team→org; existing rows
+     backfilled) +UNIQUE(org_id,external_game_id) for scraper idempotency;
+     feed_source_mapping table +org-scoped RLS (explicit with_check); get_public_team_records
+     SECDEF RPC. Advisor-clean (0029 fix: trigger fn EXECUTE revoked from authenticated).
+  ✅ Edge fn ingest-game-results DEPLOYED — v1, ACTIVE, verify_jwt=false. Auth = shared
+     secret app_secrets.ingest_secret (Bearer), service-role client, no Deno.env secret.
+  ✅ app_secrets.ingest_secret PROVISIONED (64-char value; lives ONLY in app_secrets).
+  ⚠️ Do NOT re-apply the migration, re-provision/ROTATE the secret (rotating breaks the
+     future caller unless coordinated), or redeploy unless the fn code changes.
+  ⚠️ Runtime gateway smoke (live 401/200) NOT run — CC env egress policy blocks
+     *.supabase.co. Verify with a curl from a normal network if desired.
+
+THE REMAINING WORK (§5a consumer pass — NOT started):
+  1. Build/point the SCRAPER CALLER: it scrapes TM, resolves games to events, and POSTs
+     them to ingest-game-results with `Authorization: Bearer <ingest_secret>` (read the
+     secret from app_secrets to configure the caller). The fn upserts on
+     (org_id, external_game_id); unmatched games come back as reviewFlags for review.
+     NOTE: today astersports-web has its own scraper (games.refresh, owner-gated) writing
+     into THIS repo's store — the cutover replaces that with the app-as-source flow.
+  2. Wire astersports.io/aau (and/or the app records surface) to get_public_team_records
+     for the public read, replacing the in-repo scraper-backed data. This is the moment
+     "one source of game truth" becomes literally true.
+  3. Later: tighten feed_source_mapping write policy from org-scoped to org-admin once an
+     is_org_admin() helper exists (real writes come from the service-role fn, which
+     bypasses RLS, so this only guards manual UI writes).
+
+SCHEDULING: the schedule path (parse-tournament-schedule → events) is UNTOUCHED by all of
+the above and remains the single schedule writer. Map-link priority, draft-schedule
+hiding, and venue handling for schedule surfaces live in the app repo (aster-sports);
+this handoff does not change them.
+
+════════════════════════════════════════════════════════════════════════
+7. REPOS · BRANCHES · DEPLOY CHAINS
+════════════════════════════════════════════════════════════════════════
+astersports-web   → astersports.io   (React + tRPC + Drizzle/MySQL; Manus/Forge+Railway;
+                    publishes from main). Branch protection: required status checks
+                    (typecheck+tests, money-path integration) — required-approval was
+                    RELAXED 2026-06-25 so CC can merge on green. This session's branch:
+                    claude/aster-sports-aau-redesign-uey0qc.
+aster-sports      → astersports.app  (React 19 + Supabase/RLS + Vercel; system of record).
+                    Required-approval relaxed 2026-06-19. Project vrwwpsbfbnveawqwbdmj.
+legacy-hoopers    → standalone AAU site (Squarespace live; React repo exists).
+st-patricks-armonk→ client parish site; original weather module (W-a).
+aster-weather     → shared @aster/weather package (v0.1.0). NOT in default CC repo scope.
+
+OPERATING MODEL: three lanes — CC (build/verify), Architect (design/ratify), Frank
+(operator/relay). Architect-scoped = money/credit/Stripe, DB schema/migrations, RLS,
+auth/permissions, sub-processor, any architectural fork (hold for review). Routine =
+UI/cosmetic/docs/tests/deps (auto-merge on green). Two CLAUDE.md agreements govern
+(astersports-web + aster-sports) — read both before building.
+
+════════════════════════════════════════════════════════════════════════
+8. OPEN DECISIONS / GAPS
+════════════════════════════════════════════════════════════════════════
+G1 [DEFERRED] /aau → get_public_team_records wiring (the scores "one source" cutover, §6).
+G2 [DEFERRED] @aster/weather: converge W-a + W-b onto the package; v0.2.0 richer surface (§5 T1).
+G3 [ENV] add aster-weather to the CC repo scope to do any package work.
+G4 [PRIVACY — owner ack'd] AAU fully public incl. live venue/times + first names (PR #107).
+   Revisit if the redacted-public option is ever wanted.
+G5 [DEFERRED] aau_recaps (AI recaps), legacyhoopers.org repoint, LeagueApps→/r/:slug.
+G6 [VERIFY] post-deploy smoke of astersports.io after the Manus rebuild from main — confirm
+   the hub + /aau render as intended on the live site (CC can't reach the Manus surface).
+
+— end —
