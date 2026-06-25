@@ -12,7 +12,9 @@ import { adminLogsRouter } from "./routers/adminLogs";
 import { platformRouter } from "./routers/platform";
 import { firmAdminRouter } from "./routers/firmAdmin";
 import { inviteLinksRouter } from "./routers/inviteLinks";
-import { fetchAllGames, invalidateAllCaches, getTournamentRegistry } from "./scraper";
+import { z } from "zod";
+import { fetchAllGames, invalidateAllCaches, getTournamentRegistry, HOME_VENUE, TOURNAMENT_REGISTRY } from "./scraper";
+import { fetchForecast, isValidCoord } from "./weather";
 import { notifyOwner } from "./_core/notification";
 import { sdk } from "./_core/sdk";
 import { pruneOldLogs } from './logRetention';
@@ -79,9 +81,12 @@ export const appRouter = router({
   // Invite Links (shareable signup/join links)
   inviteLinks: inviteLinksRouter,
 
-  // AAU Basketball endpoints (owner-only)
+  // AAU Basketball endpoints — public reads (the AAU section is a public showcase
+  // per owner product decision 2026-06-25). Reads expose only the scoreboard +
+  // schedule/venue data already surfaced on the page; the cache-invalidating
+  // `refresh` mutation stays owner-only so the public can't force scraper egress.
   games: router({
-    list: ownerProcedure.query(async () => {
+    list: publicProcedure.query(async () => {
       const result = await fetchAllGames();
       return {
         games: result.games,
@@ -91,7 +96,7 @@ export const appRouter = router({
       };
     }),
 
-    live: ownerProcedure.query(async () => {
+    live: publicProcedure.query(async () => {
       const result = await fetchAllGames();
       const liveGames = result.games.filter((g: Game) => g.status === 'live');
       return {
@@ -101,7 +106,7 @@ export const appRouter = router({
       };
     }),
 
-    completed: ownerProcedure.query(async () => {
+    completed: publicProcedure.query(async () => {
       const result = await fetchAllGames();
       const completedGames = result.games.filter((g: Game) => g.status === 'completed');
       return {
@@ -121,10 +126,27 @@ export const appRouter = router({
     }),
   }),
 
+  // Weather (owner-only — matches the AAU section). Powered by Open-Meteo.
+  weather: router({
+    home: ownerProcedure.query(async () => {
+      const forecast = await fetchForecast(HOME_VENUE.latitude, HOME_VENUE.longitude);
+      return { venue: HOME_VENUE, forecast };
+    }),
+
+    get: ownerProcedure
+      .input(z.object({ latitude: z.number(), longitude: z.number() }))
+      .query(async ({ input }) => {
+        if (!isValidCoord(input.latitude, input.longitude)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid coordinates" });
+        }
+        return fetchForecast(input.latitude, input.longitude);
+      }),
+  }),
+
   adminLogs: adminLogsRouter,
 
   leaderboard: router({
-    get: ownerProcedure.query(async () => {
+    get: publicProcedure.query(async () => {
       const result = await fetchAllGames();
       const completedGames = result.games.filter((g: Game) => g.status === 'completed');
 
@@ -141,6 +163,29 @@ export const appRouter = router({
       const sorted = [...completedGames].sort(
         (a, b) => new Date(a.gameTime).getTime() - new Date(b.gameTime).getTime()
       );
+
+      // Current streak — consecutive same-result games counting back from the
+      // most recent decided game. Signed by type so the banner can show W or L
+      // (maxStreak below is the season-long best, a different metric).
+      let streakType: 'W' | 'L' | null = null;
+      let streakCount = 0;
+      for (let i = sorted.length - 1; i >= 0; i--) {
+        const w = sorted[i].legacyWon;
+        if (w === null) continue;
+        const t: 'W' | 'L' = w ? 'W' : 'L';
+        if (streakType === null) { streakType = t; streakCount = 1; }
+        else if (t === streakType) streakCount++;
+        else break;
+      }
+
+      // Title counts derived from tournament results (not hardcoded).
+      const titles = { champions: 0, finalists: 0, finalFour: 0 };
+      for (const t of TOURNAMENT_REGISTRY) {
+        const r = ('result' in t && typeof t.result === 'string') ? t.result.toLowerCase() : '';
+        if (r.includes('champion')) titles.champions++;
+        else if (r.includes('finalist')) titles.finalists++;
+        else if (r.includes('final four')) titles.finalFour++;
+      }
 
       let totalWins = 0;
       let totalLosses = 0;
@@ -212,7 +257,10 @@ export const appRouter = router({
           avgPointDifferential: sorted.length > 0 ? Math.round((totalDiff / sorted.length) * 10) / 10 : 0,
           winStreak: maxStreak,
           currentStreak,
+          streakType,
+          streakCount,
         },
+        titles,
         lastUpdated: result.lastUpdated,
       };
     }),
