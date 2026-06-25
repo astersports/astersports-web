@@ -1,6 +1,6 @@
 # SAM2 count-accuracy eval — billing-grade density go/no-go
 
-Run: run 28195680920 @ 1b57b4535ea075256069af05403fc4943dfbba3b. Measures the REAL production count path (autoSegment → finishSam2Segmentation
+Run: run 28201243674 @ c101b6008d003b17ae97f17480f85a6432960f45. Measures the REAL production count path (autoSegment → finishSam2Segmentation
 → derived instances) on the hard conditions where the classical offline segmenter hit ~40%.
 This is a MEASUREMENT (truth, not a tuned target). Derived instance count = production
 derivation (specks <0.02% dropped, giants >20% crop dropped as ground, cap 200) — NOT raw
