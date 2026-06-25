@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Zap, Trophy, BarChart3, Film } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import LiveScores from "../components/aau/LiveScores";
 import TournamentHistory from "../components/aau/TournamentHistory";
@@ -8,6 +8,9 @@ import FilmHighlights from "../components/aau/FilmHighlights";
 import Locations from "../components/aau/Locations";
 import Mission from "../components/aau/Mission";
 import StatHeroBar from "../components/aau/StatHeroBar";
+
+const LOGO_URL = "/aster-mark.png";
+const APP_URL = "https://astersports.app";
 
 const SECTIONS = [
   { id: "scores", label: "Live Scores", emoji: "⚡" },
@@ -19,6 +22,14 @@ const SECTIONS = [
 ] as const;
 
 type SectionId = typeof SECTIONS[number]["id"];
+
+// Primary destinations for the persistent mobile bottom-nav (app-like surface).
+const BOTTOM_NAV: { id: SectionId; label: string; Icon: typeof Zap }[] = [
+  { id: "scores", label: "Scores", Icon: Zap },
+  { id: "history", label: "History", Icon: Trophy },
+  { id: "leaderboard", label: "Records", Icon: BarChart3 },
+  { id: "film", label: "Film", Icon: Film },
+];
 
 export default function AAUBasketball() {
   const [activeSection, setActiveSection] = useState<SectionId>("scores");
@@ -79,17 +90,29 @@ export default function AAUBasketball() {
     }
   }, [activeSection]);
 
+  // Aster AAU = the house program; it wears the Aster GOLD brand (R1/F3).
+  // Override the team tokens at the page root so every AAU sub-component
+  // (scores, records, film) inherits gold without per-component edits.
+  const goldTheme = {
+    minHeight: '100vh',
+    paddingBottom: 'calc(64px + env(safe-area-inset-bottom))',
+    '--as-team-primary': '#F6CC55',
+    '--as-team-primary-soft': 'rgba(246,204,85,0.12)',
+    '--as-accent': '#E8902A',
+    '--as-accent-soft': 'rgba(232,144,42,0.12)',
+  } as React.CSSProperties;
+
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div style={goldTheme}>
       {/* Hero Header */}
       <div style={{
         backgroundColor: 'var(--as-bg-secondary)',
         borderBottom: '1px solid var(--as-border-default)',
       }}>
-        {/* Top color bar */}
+        {/* Top color bar — canonical 4-stop brand gradient */}
         <div style={{
           height: 4, width: '100%',
-          background: `linear-gradient(90deg, var(--as-team-primary), var(--as-accent))`,
+          background: 'var(--brand-grad)',
         }} />
 
         <div className="container" style={{ paddingTop: 16, paddingBottom: 0 }}>
@@ -118,13 +141,9 @@ export default function AAUBasketball() {
             Back to Aster Sports
           </a>
 
-          {/* Team identity */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-            <div style={{
-              width: 10, height: 10, borderRadius: '50%',
-              backgroundColor: 'var(--as-team-primary)',
-              boxShadow: '0 0 8px rgba(167, 139, 250, 0.4)',
-            }} />
+          {/* Mark + team identity */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <img src={LOGO_URL} alt="Aster Sports" style={{ height: 26, width: 'auto', filter: 'drop-shadow(0 0 8px rgba(246,204,85,0.5))' }} />
             <span style={{
               fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
               color: 'var(--as-team-primary)', textTransform: 'uppercase',
@@ -137,31 +156,29 @@ export default function AAUBasketball() {
           <h1 className="font-display-xl" style={{
             fontSize: 'clamp(24px, 5vw, 36px)',
             color: 'var(--as-text-primary)',
-            margin: '0 0 8px',
-            lineHeight: 1.1,
+            margin: '0 0 12px',
+            lineHeight: 1.05,
           }}>
-            ASTER AAU 11U GIRLS
+            ASTER AAU{' '}
+            <span className="aster-grad-text">11U GIRLS</span>
           </h1>
 
-          {/* Featured players */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-            <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--as-text-tertiary)' }}>ft.</span>
-            <span style={{
-              fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 4,
-              backgroundColor: 'color-mix(in srgb, var(--as-team-primary) 12%, transparent)',
-              color: 'var(--as-team-primary)',
-            }}>
-              #5 Charlie
-            </span>
-            <span style={{ fontSize: 11, color: 'var(--as-text-tertiary)' }}>·</span>
-            <span style={{
-              fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 4,
-              backgroundColor: 'color-mix(in srgb, var(--as-accent) 12%, transparent)',
-              color: 'var(--as-accent)',
-            }}>
-              #24 Sofia
-            </span>
-          </div>
+          {/* Open in the app CTA (the program runs on astersports.app) */}
+          <a
+            href={APP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="as-press aster-grad-bg"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              fontSize: 13, fontWeight: 700, color: '#1a0e05',
+              padding: '9px 16px', borderRadius: 999, textDecoration: 'none',
+              marginBottom: 12, minHeight: 40,
+            }}
+          >
+            Open in the app
+            <ArrowUpRight style={{ width: 15, height: 15 }} />
+          </a>
 
           {/* Stats row */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
@@ -170,6 +187,7 @@ export default function AAUBasketball() {
             </span>
             {record && (
               <span style={{
+                fontFamily: 'var(--font-mono)',
                 fontSize: 13, fontWeight: 700, color: 'var(--as-text-primary)',
                 padding: '2px 8px', borderRadius: 6,
                 backgroundColor: 'var(--as-bg-tertiary)',
@@ -178,7 +196,7 @@ export default function AAUBasketball() {
               </span>
             )}
             {winRate !== null && (
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--as-success)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--as-success)' }}>
                 {winRate}%
               </span>
             )}
@@ -249,6 +267,42 @@ export default function AAUBasketball() {
         {activeSection === "locations" && <Locations />}
         {activeSection === "mission" && <Mission />}
       </div>
+
+      {/* Persistent mobile bottom-nav (app-like primary destinations) */}
+      <nav
+        className="lg:hidden"
+        aria-label="Sections"
+        style={{
+          position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 40,
+          display: 'flex', justifyContent: 'space-around',
+          padding: '8px 6px calc(8px + env(safe-area-inset-bottom))',
+          background: 'rgba(8,11,20,0.92)', backdropFilter: 'blur(12px)',
+          borderTop: '1px solid var(--as-border-default)',
+        }}
+      >
+        {BOTTOM_NAV.map(({ id, label, Icon }) => {
+          const active = activeSection === id;
+          return (
+            <button
+              key={id}
+              onClick={() => setActiveSection(id)}
+              aria-label={label}
+              aria-current={active ? 'page' : undefined}
+              className="as-press"
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                background: 'none', border: 'none', cursor: 'pointer',
+                minWidth: 56, minHeight: 44, fontFamily: 'inherit',
+                fontSize: 10, fontWeight: 600,
+                color: active ? 'var(--as-team-primary)' : 'var(--as-text-tertiary)',
+              }}
+            >
+              <Icon style={{ width: 20, height: 20 }} />
+              {label}
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 }
