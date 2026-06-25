@@ -35,11 +35,14 @@ export interface DensityPreviewStep {
   totalMotifs: number;
   /** round(totalMotifs * percent/100) — what "remove p%" asks for, by count. */
   requestedRemoval: number;
-  /** Motifs actually erased. Equals requestedRemoval on the happy path; 0 on a degrade. */
+  /** Motifs actually erased. Equals requestedRemoval on the happy path; 0 when nothing
+   *  was erased — either a legitimate no-op request (percent 0 / no motifs) or a degrade. */
   removed: number;
   /** Motifs remaining = totalMotifs - removed. */
   kept: number;
-  /** True when nothing was erased (degrade/refund path) — caller must not bill. */
+  /** True when nothing was erased (removed === 0) — caller must not bill. This covers BOTH
+   *  a legitimate no-op (percent 0 or totalMotifs 0) AND a degrade/refund; to single out a
+   *  degrade specifically, check `noop && requestedRemoval > 0` (see summarizePreviewStep). */
   noop: boolean;
   /** Preview pixels, raw RGBA (width*height*4). On a no-op this is the source, unchanged. */
   data: Buffer;

@@ -2,9 +2,10 @@
 #
 # Triggered by pushing a change to the sentinel file `eval/RUN_SAM2_EVAL` on a claude/**
 # branch. Runs the REAL SAM2 production count path against the hard synthetic fixtures
-# (known N) + real florals using the existing REPLICATE_API_TOKEN secret (the token is
-# NEVER put in an env-var field — only consumed here from secrets), then commits the
-# report (docs/SAM2_COUNT_EVAL.md) + overlays (eval/out/sam2-count/) back to the branch.
+# (known N) + real florals using the existing REPLICATE_API_TOKEN secret. The token is
+# never placed in a Claude-session env field; here it is consumed from GitHub secrets and
+# scoped to ONLY the steps that need it (not the job-wide env), so third-party setup
+# actions never see it. Then commits the report + overlays back to the branch.
 #
 # Cost: ~pennies/call on meta/sam-2; ~42 calls/run. Safe: synthetic = zero data concern;
 # reals = the brand's public PDP photos, SAM2/Replicate is the disclosed mask provider.
@@ -25,15 +26,17 @@ jobs:
   sam2-count:
     name: SAM2 count accuracy
     runs-on: ubuntu-latest
+    # Production defaults on purpose (STUDIO_MAX_INSTANCES defaults to 200) so the measured
+    # pipeline matches production. REPLICATE_API_TOKEN is NOT job-wide — scoped per step below.
     env:
       STUDIO_MASK_PROVIDER: sam2
-      STUDIO_MAX_INSTANCES: "300"
-      REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
       SAM2_EVAL_STAMP: "run ${{ github.run_id }} @ ${{ github.sha }}"
     steps:
       - uses: actions/checkout@v4
 
       - name: Guard — require Replicate token
+        env:
+          REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
         run: |
           if [ -z "$REPLICATE_API_TOKEN" ]; then
             echo "::error::REPLICATE_API_TOKEN secret is not set — cannot run the SAM2 eval."
@@ -59,6 +62,8 @@ jobs:
         run: node eval/samples/cinqasept-likely/fetch.mjs
 
       - name: Run SAM2 count eval
+        env:
+          REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
         run: npx tsx eval/sam2CountEval.ts
 
       - name: Commit report + overlays back to the branch

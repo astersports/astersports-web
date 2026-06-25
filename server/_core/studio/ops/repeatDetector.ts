@@ -361,7 +361,12 @@ function analyzeAllover(buf: Buffer, w: number, h: number, mask: Uint8Array, bb:
     if (cellFg[gi] / cellTot[gi] > ALLOVER_CELL_EPS) { occupied++; activeRows.add(gy); activeCols.add(gx); }
   }
   const occupancy = cells ? occupied / cells : 0;
-  const medianSpan = 0; // (component span no longer gates; FFT handles borders)
+  // Real median component span (max(w,h)/bbox). No longer gates (FFT handles borders),
+  // but reported for calibration/debugging so the diagnostic isn't misleading.
+  const spans = kept
+    .map((c) => Math.max((c.maxx - c.minx + 1) / bw, (c.maxy - c.miny + 1) / bh))
+    .sort((a, b) => a - b);
+  const medianSpan = spans.length ? spans[spans.length >> 1] : 0;
 
   const isAllover =
     numMotifs >= ALLOVER_MIN_MOTIFS &&
