@@ -1,0 +1,143 @@
+RAILWAY + SUPABASE MIGRATION — GROUNDED STATUS AUDIT
+=====================================================
+Author: Claude Code (CC).  Date: 2026-06-25.
+Scope audited: branch `claude/railway-supabase-migration` @ HEAD 8292875
+  (the branch Railway auto-deploys to production / astersports.io).
+Method: file:line + live-system reads (§2.3 source hierarchy). Each claim tagged
+  [GROUNDED] (verified against code / live runtime) or [VERIFY] (needs a check I
+  could not run from here).
+Reference plan: docs/RAILWAY_SUPABASE_MIGRATION_SCOPE.txt (P0–P9).
+
+-----------------------------------------------------------------------------------------
+0. HEADLINE
+-----------------------------------------------------------------------------------------
+The migration is **substantially COMPLETE and LIVE in production**, NOT "P1 done / P2
+pending" as PR #103's description still says. PR #103's body is STALE — it describes the
+state at PR-open (2026-06-23); the branch has advanced many commits since and now runs
+the full Railway + Supabase + Anthropic + Google-OAuth stack live on astersports.io.
+
+  Live evidence [GROUNDED]:
+   - https://astersports.io/                     -> 200
+   - https://astersports.io/api/auth/google/login -> 302 (redirects to Google consent)
+   - https://astersports.io/api/studio/posture    -> 403 (cron-secret gate enforcing; route exists)
+   - Railway service astersports-web latest deploy: SUCCESS (commit 8292875), domain
+     astersports.io, DNS DNS_RECORD_STATUS_PROPAGATED.
+
+The real remaining work is NOT the migration mechanics — it is (a) landing this branch to
+`main` so main reflects reality, (b) inert dead-code cleanup, (c) a couple of [VERIFY]
+items (ledger reconcile, scheduler-in-prod), and (d) stale-doc fixes. See §3.
+
+-----------------------------------------------------------------------------------------
+1. PHASE-BY-PHASE GROUND TRUTH
+-----------------------------------------------------------------------------------------
+P0 — Railway build skeleton ............................................. DONE [GROUNDED]
+   - package.json: build = `vite build && esbuild server/_core/index.ts ... --outdir=dist`;
+     start = `NODE_ENV=production node dist/index.js`.
+   - Built via Railpack (deploy meta: node 22 / vite / pnpm 10.4.1). .mcp.json present.
+   - Live deploys succeeding on push.
+
+P1 — Postgres schema + driver swap ..................................... DONE [GROUNDED]
+   - drizzle.config.ts: dialect "postgresql".
+   - server/db.ts: `drizzle-orm/postgres-js` (was mysql2); upsert via ON CONFLICT.
+   - drizzle/schema.ts: 20 pgTable, 0 live mysqlTable (the single "mysqlTable" hit is a
+     comment on line 5 describing the mapping).
+
+P2 — Money-path CAS re-port (the *** gate ***) ......................... DONE [GROUNDED]
+   - All atomic guards now use `.returning()` + length-check instead of mysql2
+     `affectedRows`. Every remaining "affectedRows" hit in server/ is either a comment
+     explaining the port (studioDb.ts:301/449/462, studioAsyncWorker.ts:15) or the new
+     pattern itself (webhook.ts:268 `const affectedRows = result.length;`).
+   - server/creditLedger.integration.test.ts exists, Postgres-gated (RUN_DB_TESTS=1 +
+     DATABASE_URL).
+   - CI proves it: .github/workflows/ci.yml job `db-integration` ("money-path integration
+     (real Postgres)") spins postgres:17, sets RUN_DB_TESTS=1, runs the integration test.
+   - NOTE: this is the Architect-scoped item (§2.4 money path). It is code-complete and
+     CI-gated, but Architect sign-off on the diff is still owed before it lands to main.
+
+P3 — Storage -> Supabase Storage ...................................... DONE [GROUNDED]
+   - server/storage.ts imports ./_core/supabaseStorage (getStorageClient,
+     createStorageSignedUrl); uploads to ENV.supabaseStorageBucket.
+   - The `/manus-storage/{key}` string is KEPT DELIBERATELY as the internal serving-URL
+     convention; server/_core/storageProxy.ts serves `/manus-storage/*` by minting a
+     Supabase signed URL. So the ~15 `manus-storage` refs in aiEngine/studioEngine/
+     studio.ts are the retained URL prefix, not unported Forge calls.
+
+P4 — Vision LLM -> Anthropic .......................................... DONE [GROUNDED]
+   - server/_core/llm.ts imports `@anthropic-ai/sdk`; OpenAI-shaped calls translated to
+     the Anthropic Messages API; client gated on ENV.anthropicApiKey.
+
+P5 — Auth -> Google OAuth; cron auth -> shared secret ........... DONE (live) + cleanup owed
+   - Live path migrated [GROUNDED]: server/_core/googleAuth.ts + oauth.ts implement
+     /api/auth/google/login -> Google consent -> /api/oauth/callback; client const.ts
+     getLoginUrl points at /api/auth/google/login (Manus portal login removed). Live
+     302 confirms it.
+   - cronAuth.ts accepts the CRON_SECRET via Authorization: Bearer or x-cron-secret.
+   - CLEANUP OWED [GROUNDED]: sdk.ts still carries the INERT dead Manus OAuth login path
+     (sdk.ts:32 "Dead Manus OAuth login path — superseded by Google in P5 ... Retained
+     inert pending the dead-code [removal]") and imports ./types/manusTypes (types only).
+     Functionally dead, but should be deleted for hygiene. Architect-scoped (auth, §2.4).
+
+P6 — Crons -> persistent scheduler; remove heartbeat ................. DONE [GROUNDED] (impl differs from plan)
+   - server/_core/heartbeat.ts REMOVED. server/_core/dataApi.ts REMOVED.
+   - Implemented as an IN-PROCESS scheduler (server/_core/scheduler.ts; "started 6
+     in-process cron jobs" in scheduler.test.ts), gated on ENABLE_SCHEDULER + refuses to
+     start without CRON_SECRET — rather than the plan's separate "Railway Cron services."
+     Reasonable on a persistent instance; flag for Architect ratification as a plan
+     deviation. [VERIFY] that ENABLE_SCHEDULER + CRON_SECRET are actually set in the
+     Railway prod env so the reaper/poll crons run (§6 stranded-job safety).
+
+P7 — Env wired; drop dataApi.ts ....................................... DONE [GROUNDED]
+   - server/_core/env.ts wires databaseUrl, anthropicApiKey, supabaseUrl,
+     supabaseServiceRoleKey, supabaseStorageBucket, and lists them in validateEnv.
+   - App boots live (200) => validateEnv passes => the required prod env is set.
+   - [VERIFY] STUDIO_WORKING_MEGAPIXELS raised to ~8–10 on the 4 GB box (plan P7) —
+     not checkable from here (runtime env).
+
+P8 — Data migration + ledger reconcile ................................ [VERIFY]
+   - Plan recommends "start fresh on Supabase, re-seed." Schema is clearly stood up (app
+     runs), but I could not verify from here that the ledger reconciles
+     (SUM(credit_ledger.delta) == tenants.creditBalance per tenant, §6) on the live
+     Supabase DB. Run the reconcile check before onboarding.
+
+P9 — Cutover (DNS astersports.io -> Railway) .......................... DONE [GROUNDED]
+   - astersports.io custom domain attached to the Railway service, DNS propagated,
+     serving 200. Decommission-Manus step is the only tail.
+
+-----------------------------------------------------------------------------------------
+2. THE TWO TREES TODAY
+-----------------------------------------------------------------------------------------
+[GROUNDED]
+ - origin/main (c41abe8): does NOT yet contain the migration. main is effectively the
+   pre-migration lineage. => Repointing Railway to `main` right now would REGRESS prod.
+ - claude/railway-supabase-migration (8292875): the full migrated stack, LIVE on
+   astersports.io. After CC merged origin/main into it earlier today, it is 0 commits
+   behind main and a clean superset (no drift).
+ - PR #103 tracks the migration branch but is draft / "DO NOT MERGE" with a stale body.
+
+-----------------------------------------------------------------------------------------
+3. REMAINING WORK (what's actually left)
+-----------------------------------------------------------------------------------------
+A. LAND IT. The migration is live but never merged to main. Decide the landing path:
+   either (i) update PR #103's body to reflect reality + Architect-review the money-path/
+   auth/schema diff + merge to main, then repoint Railway's deploy trigger from the
+   branch to `main` (the original ask's true end-state); or (ii) keep deploying the
+   branch knowingly. Recommended: (i) — main should equal production.            [decision]
+B. Dead-code cleanup: remove the inert Manus OAuth path in sdk.ts + ./types/manusTypes
+   and any other "retained inert" remnants. Architect-scoped (auth).             [cleanup]
+C. [VERIFY] ledger reconcile on live Supabase (P8/§6).                           [verify]
+D. [VERIFY] ENABLE_SCHEDULER + CRON_SECRET set in Railway prod so reaper/poll run;
+   and STUDIO_WORKING_MEGAPIXELS raised.                                          [verify]
+E. Stale docs: PR #103 body; and astersports-web/CLAUDE.md §2.5 / §4-G0 still name Manus
+   as the deploy/runtime platform ("auto-publish from main", "there is no Vercel project")
+   — rewrite to the Railway + Supabase chain.                                     [docs]
+F. Decommission Manus (plan P9 tail) once (A) lands and a rollback window passes. [cutover]
+
+-----------------------------------------------------------------------------------------
+4. CC LEAN (AP#39 — committed, not hedged)
+-----------------------------------------------------------------------------------------
+The "fix" Frank originally asked for — "deploy on Railway for astersports-web +
+astersports.io" — is ALREADY done and live. The correct next move is NOT more migration
+code; it is to make main tell the truth: refresh PR #103's body to this audit, get the
+Architect review on the money-path/auth/schema diff (the only gated parts), merge to
+main, then repoint the Railway trigger main. Do B–F alongside. Until A lands, leaving
+Railway on the branch is correct, not a bug.
