@@ -70,6 +70,20 @@ function paintInstances(orig: Buffer, W: number, H: number, instances: InstanceM
 }
 async function dataUrlOf(pngBuf: Buffer): Promise<string> { return `data:image/png;base64,${pngBuf.toString("base64")}`; }
 
+/** Compose PNG panels left-to-right, NORMALIZED to a common height (handles non-square
+ *  crops — fixes the "composite must be same dimensions or smaller" crash). ≤1600px wide. */
+async function composeStrip(panelPngs: Buffer[]): Promise<Buffer> {
+  const H = 520, gap = 6;
+  const resized = await Promise.all(panelPngs.map((b) => sharp(b).resize({ height: H }).png().toBuffer()));
+  const widths = await Promise.all(resized.map(async (b) => (await sharp(b).metadata()).width ?? H));
+  const totalW = widths.reduce((a, b) => a + b, 0) + gap * (resized.length - 1);
+  const comps: sharp.OverlayOptions[] = []; let x = 0;
+  for (let i = 0; i < resized.length; i++) { comps.push({ input: resized[i], left: x, top: 0 }); x += widths[i] + gap; }
+  let strip = await sharp({ create: { width: totalW, height: H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 1 } } }).composite(comps).png().toBuffer();
+  if (totalW > 1600) strip = await sharp(strip).resize(1600).png().toBuffer();
+  return strip;
+}
+
 interface Row { id: string; condition: string; N: number | string; classical: number; classErrPct: string; sam2Best: number; sam2ErrPct: string; bestParams: string; perParam: string; pass: boolean | null }
 
 async function runSynthetic(client: ReturnType<typeof defaultSam2Client>): Promise<Row[]> {
@@ -90,17 +104,15 @@ async function runSynthetic(client: ReturnType<typeof defaultSam2Client>): Promi
         if (err < bestErr) { bestErr = err; best = cnt; bestName = ps.name; bestInstances = instances; }
       } catch (e) { perParam.push(`${ps.name}:ERR`); }
     }
-    if (bestInstances.length || best >= 0) {
-      const overlay = paintInstances(origRGBA, W, H, bestInstances);
-      const classOverlay = paintInstances(origRGBA, W, H, []); // classical drawn separately below
-      const sceneP = await sharp(scenePng).resize(520).png().toBuffer();
-      const sam2P = await sharp(overlay, { raw: { width: W, height: H, channels: 4 } }).resize(520).png().toBuffer();
-      const classSeg = await segmentMotifs(f.scene, { deltaE: 20, minAreaFrac: 0.0002, maxAreaFrac: 0.03 });
-      const classP = await sharp(classSeg.labelMap, { raw: { width: classSeg.width, height: classSeg.height, channels: 4 } }).resize(520).png().toBuffer();
-      await mkdir(OUT_DIR, { recursive: true });
-      const strip = await sharp({ create: { width: 520 * 3 + 12, height: 520, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 1 } } })
-        .composite([{ input: sceneP, left: 0, top: 0 }, { input: sam2P, left: 526, top: 0 }, { input: classP, left: 1052, top: 0 }]).png().toBuffer();
-      await writeFile(path.join(OUT_DIR, `synth-${f.id}.png`), strip);
+    if (best >= 0) {
+      try {
+        const overlay = paintInstances(origRGBA, W, H, bestInstances);
+        const overlayPng = await sharp(overlay, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
+        const classSeg = await segmentMotifs(f.scene, { deltaE: 20, minAreaFrac: 0.0002, maxAreaFrac: 0.03 });
+        const classPng = await sharp(classSeg.labelMap, { raw: { width: classSeg.width, height: classSeg.height, channels: 4 } }).png().toBuffer();
+        await mkdir(OUT_DIR, { recursive: true });
+        await writeFile(path.join(OUT_DIR, `synth-${f.id}.png`), await composeStrip([scenePng, overlayPng, classPng]));
+      } catch (e) { console.warn(`[synth] overlay render failed for ${f.id}: ${(e as Error).message}`); }
     }
     rows.push({
       id: f.id, condition: f.condition, N: f.trueCount,
@@ -134,16 +146,16 @@ async function runReals(client: ReturnType<typeof defaultSam2Client>): Promise<R
       } catch (e) { perParam.push(`${ps.name}:ERR`); }
     }
     if (best >= 0) {
-      const overlay = paintInstances(origRGBA, W, H, bestInstances);
-      const cropBox = { left, top, width: cw, height: ch };
-      const sceneP = await sharp(r.image).extract(cropBox).resize(520).png().toBuffer();
-      const sam2P = await sharp(overlay, { raw: { width: W, height: H, channels: 4 } }).extract(cropBox).resize(520).png().toBuffer();
-      const classSeg = await segmentMotifs(r.image, { bbox: r.bbox, ...r.seg });
-      const classP = await sharp(classSeg.labelMap, { raw: { width: classSeg.width, height: classSeg.height, channels: 4 } }).resize(520).png().toBuffer();
-      await mkdir(OUT_DIR, { recursive: true });
-      const strip = await sharp({ create: { width: 520 * 3 + 12, height: 520, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 1 } } })
-        .composite([{ input: sceneP, left: 0, top: 0 }, { input: sam2P, left: 526, top: 0 }, { input: classP, left: 1052, top: 0 }]).png().toBuffer();
-      await writeFile(path.join(OUT_DIR, `real-${r.id}.png`), strip);
+      try {
+        const overlay = paintInstances(origRGBA, W, H, bestInstances);
+        const cropBox = { left, top, width: cw, height: ch };
+        const sceneP = await sharp(r.image).extract(cropBox).png().toBuffer();
+        const sam2P = await sharp(overlay, { raw: { width: W, height: H, channels: 4 } }).extract(cropBox).png().toBuffer();
+        const classSeg = await segmentMotifs(r.image, { bbox: r.bbox, ...r.seg });
+        const classP = await sharp(classSeg.labelMap, { raw: { width: classSeg.width, height: classSeg.height, channels: 4 } }).png().toBuffer();
+        await mkdir(OUT_DIR, { recursive: true });
+        await writeFile(path.join(OUT_DIR, `real-${r.id}.png`), await composeStrip([sceneP, sam2P, classP]));
+      } catch (e) { console.warn(`[real] overlay render failed for ${r.id}: ${(e as Error).message}`); }
     }
     const hc = r.handCount;
     rows.push({
