@@ -127,20 +127,27 @@ X2. WEATHER TRIPLICATION (S1) — the convergence map, quantified (AP #42)
     AP #27) and the animation from W-a (the canonical visual asset); have BOTH consumers
     refactor to import. Do NOT scaffold a 4th copy. Sequence consumers one at a time.
 
-X3. SAME-CONCEPT / SAME-SCOPE DRIFT (AP #63 PATTERN-A, S3)
+X3. SAME-CONCEPT / SAME-SCOPE DRIFT (AP #63 PATTERN-A, S3) — LIVE-VERIFIED this session
     · Academy classification (aster-sports P1): per-team `team_players.roster_type`
       (badge + RSVP denominator, migrated by ROSTER-3) vs global `players.member_type`
       (every per-player gate + all parent surfaces). A kid futures-global/rostered-on-
       this-team is in the denominator but excluded from the eligible numerator — the
       exact mismatch SD-6 was built to kill, re-introduced on the classification axis.
-      Parent context can't even SEE roster_type today (parentContext.js:49). Latent
-      until a live row hits the combo.
+      Parent context can't even SEE roster_type today (parentContext.js:49).
+      [VERIFIED LIVE 2026-06-25] NOT latent — prod has exactly 1 such row: of 119
+      team_players, 103 are cleanly both-rostered, and 1 player is member_type=
+      'futures_academy' globally but roster_type='rostered' on a team. (Schema note:
+      roster_type values are 'futures'/'rostered', member_type 'futures_academy'/
+      'roster'.) The bug is ACTIVE for that 1 player today.
     · Payment scope (aster-sports P2): roster payment dot was season-scoped (Frank,
       2026-06-19, useRoster.js:79-84) while admin-home "Outstanding"
       (useFamiliesOwingCount.js:18) + payment_overdue alert (alerts/queries.js:113)
       stayed all-seasons. Same family reads opposite across two admin surfaces for a
       prior-season debtor. Doctrine (§11.5 + AP #63 ROSTER-1) + paymentSignal.js:10-14
       comment now stale (still claim all-seasons). This is reconciliation, not re-scope.
+      [VERIFIED LIVE 2026-06-25] ACTIVE for 2 families: of 107 guardians, 0 owe the
+      active season but 2 owe a PRIOR season → their roster dot reads green (season-
+      scoped) while admin Outstanding + the overdue alert read owing (all-seasons).
     · Standalone-repo drift (legacy-hoopers): hardcodes the SAME Legacy Hoopers facts
       (records, schedules, locations) the astersports.app tenant serves dynamically —
       a third source of truth (Squarespace + app + this repo). See repo § / X4.
