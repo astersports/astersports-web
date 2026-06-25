@@ -419,6 +419,23 @@ export default function StudioEditor() {
             </label>
           </CardContent>
         </Card>
+
+        {/* How it works — fills the empty first-run space + orients new users. */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[
+            { n: "1", t: "Upload", d: "Drop a garment photo (JPEG, PNG, or WebP)." },
+            { n: "2", t: "Adjust", d: "Tune the print scale or motif density." },
+            { n: "3", t: "Generate", d: "Render the edited garment and download it." },
+          ].map((s) => (
+            <div key={s.n} className="rounded-lg border border-border bg-card p-4">
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                {s.n}
+              </div>
+              <p className="mt-2 text-sm font-medium">{s.t}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{s.d}</p>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

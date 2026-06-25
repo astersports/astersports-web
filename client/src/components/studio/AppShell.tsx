@@ -127,6 +127,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b border-border">
+        {/* Back to the Constellation hub — the desktop sidebar has this link, so
+            mobile needs its own (otherwise there's no way back to astersports.io). */}
+        <Link
+          href="/"
+          className="flex items-center gap-1.5 px-3 h-9 text-xs font-medium text-muted-foreground hover:text-foreground border-b border-border transition-colors"
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+          Back to Aster Sports
+        </Link>
         <div className="flex items-center gap-2 px-3 h-14">
           <Sparkles className="w-4 h-4 shrink-0 text-primary" />
           {tenant ? (
@@ -137,43 +146,47 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <span className="font-semibold">Print Studio</span>
           )}
         </div>
-        <nav className="flex border-t border-border overflow-x-auto">
-          {NAV_ITEMS.map((item) => {
-            const isActive = location === item.href || (item.href !== "/studio" && location.startsWith(item.href));
-            const Icon = item.icon;
-            return (
+        {/* Right-edge fade hints that the tab row scrolls (Orgs/Platform sit past the edge). */}
+        <div className="relative border-t border-border">
+          <nav className="flex overflow-x-auto">
+            {NAV_ITEMS.map((item) => {
+              const isActive = location === item.href || (item.href !== "/studio" && location.startsWith(item.href));
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex shrink-0 items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
+                    isActive
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground"
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {item.mobileLabel ?? item.label}
+                </Link>
+              );
+            })}
+            {isSuperAdmin && (
               <Link
-                key={item.href}
-                href={item.href}
+                href="/platform"
                 className={`flex shrink-0 items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
-                  isActive
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground"
+                  location === "/platform"
+                    ? "border-amber-500 text-amber-500"
+                    : "border-transparent text-amber-500/70"
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" />
-                {item.mobileLabel ?? item.label}
+                <Shield className="w-3.5 h-3.5" />
+                Platform
               </Link>
-            );
-          })}
-          {isSuperAdmin && (
-            <Link
-              href="/platform"
-              className={`flex shrink-0 items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
-                location === "/platform"
-                  ? "border-amber-500 text-amber-500"
-                  : "border-transparent text-amber-500/70"
-              }`}
-            >
-              <Shield className="w-3.5 h-3.5" />
-              Platform
-            </Link>
-          )}
-        </nav>
+            )}
+          </nav>
+          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-card to-transparent" />
+        </div>
       </div>
 
       {/* Main content */}
-      <main className="flex-1 min-w-0 md:p-6 p-4 pt-[7.5rem] md:pt-6">
+      <main className="flex-1 min-w-0 md:p-6 p-4 pt-[9.75rem] md:pt-6">
         {tenant && <TrialBanner tenantId={tenant.id} />}
         {children}
       </main>
