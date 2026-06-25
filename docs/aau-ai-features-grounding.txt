@@ -1,0 +1,80 @@
+GROUNDING CORRECTION + AMENDED PLAN — AAU AI Features
+Re: aauaifeatures.txt (Architect spec, 2026-06-25)
+Author: Claude Code (CC)
+Date: 2026-06-25
+Status: sent back to Architect for ratification (per CLAUDE.md §2.1/§2.3 — CC must
+re-verify [GROUNDED] facts and surface forks, not settle them alone)
+
+────────────────────────────────────────────────────────────────────────
+1. CRITICAL CORRECTION — LLM client already exists (Forge-backed)
+────────────────────────────────────────────────────────────────────────
+[GROUNDED] server/_core/llm.ts already implements invokeLLM(params): it POSTs to
+  ENV.forgeApiUrl + "/v1/chat/completions" (default https://forge.manus.im/...),
+  authorized with ENV.forgeApiKey (Bearer), OpenAI-compatible, with exponential
+  backoff + retry. listLLMModels() is also present.
+[GROUNDED] Forge is ALREADY a sub-processor (used by storage.ts presign + the
+  print-studio image pipeline). The forge key is an EXISTING secret.
+
+Impact on the spec:
+  - §2 "FIRST paid external dependency and FIRST API key" → FALSE. No new
+    sub-processor, no new secret, no new money-path human confirm needed.
+  - §5 "new server/ai.ts with its own provider + host allowlist" → REDUNDANT.
+    Recaps + assistant should call the existing invokeLLM(). (llm.ts uses plain
+    fetch to the trusted first-party Forge host with backoff — not safeFetch,
+    which is for untrusted/3rd-party URLs. Keep that; do NOT route Forge through
+    safeFetch.)
+  - §11 Q1 (provider/model/budget/secret) → mostly MOOT. Only "which model"
+    remains. CC lean: a small/cheap chat model via invokeLLM({ model }); default
+    null lets Forge pick. Cost rides existing Forge billing.
+
+────────────────────────────────────────────────────────────────────────
+2. OTHER RE-VERIFICATION RESULTS
+────────────────────────────────────────────────────────────────────────
+[GROUNDED] Latest migration drizzle/0019_stormy_sunset_bain.sql → this work adds
+  0020_*. aau_recaps does not exist yet.
+[GROUNDED] publicProcedure exists (server/_core/trpc.ts:11 = t.procedure) but is
+  an UNAUTHENTICATED passthrough (ctx.user may be null). Usable for F2.
+[VERIFY→CONFIRMED-ABSENT] No general per-IP rate-limiter / throttle util for
+  public tRPC endpoints was found. F2 requires one (§10).
+[GROUNDED] No public AAU UI surface exists — client/src/pages/AAUBasketball.tsx
+  hard-gates the entire section to the owner (frank@astersports.co); every games/
+  leaderboard/weather procedure is ownerProcedure. So F2's "public parent
+  assistant" has NO page to render on until open-access is decided.
+[GROUNDED] Venue coords + HOME_VENUE (which this spec's §3 leans on) live on
+  branch claude/awesome-euler-7gdpu0 / PR #106 and are NOT merged to main. Both
+  this work and #106 edit server/scraper.ts.
+
+────────────────────────────────────────────────────────────────────────
+3. AMENDED PLAN (CC recommendation)
+────────────────────────────────────────────────────────────────────────
+A. Merge PR #106 first (weather/venue dependency; avoids scraper.ts conflict).
+B. F1 (AI Game Recaps) — BUILD on the corrected design:
+     - reuse invokeLLM() from server/_core/llm.ts (no new ai.ts/provider/key).
+     - new table aau_recaps (migration 0020), exactly per spec §4.
+     - post-scrape, hash-gated generation in fetchAllGames(); templateRecap()
+       deterministic fallback when invokeLLM is unavailable/errors (keyless dev/
+       test stays green).
+     - owner-only regenerate/setPublished; reads can be public OR owner-only —
+       see open item O2.
+     - Open the implementation PR HELD for Architect approval (DB migration),
+       per §2.4.
+C. F2 (Parent Assistant) — DEFER until BOTH land:
+     (1) a minimal per-IP rate-limiter + monthly cap/kill-switch, and
+     (2) a decision on public parent/kid access (there's no public surface yet).
+     Ship behind a disabled feature flag so the endpoint can't be hit/charged.
+
+────────────────────────────────────────────────────────────────────────
+4. OPEN ITEMS NEEDING A DECISION
+────────────────────────────────────────────────────────────────────────
+O1 (model): default model for invokeLLM in recaps? CC lean: a cheap chat model;
+   leave configurable via env, default to Forge's choice.
+O2 (recap read visibility): aauRecaps.list/get public (spec §8) — but there's no
+   public page. CC lean: build them owner-only now (matches today's surface);
+   flip to public when open-access ships. Avoids exposing an endpoint with no UI.
+O3 (F2 timing): confirm deferring F2 behind a flag until rate-limit + public
+   access exist. CC lean: yes.
+O4 (spec §5): confirm dropping new server/ai.ts in favor of invokeLLM(). CC
+   lean: drop it; single LLM path is simpler and already hardened.
+
+CC will not start coding F1 until O4 (reuse invokeLLM) is ratified, since it
+changes the spec's §5/§12 file plan.
