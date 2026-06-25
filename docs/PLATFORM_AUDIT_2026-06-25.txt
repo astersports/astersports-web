@@ -41,9 +41,21 @@ clean extraction, not a scaffold.
 1. CROSS-REPO SYNTHESIS (AP #58) — patterns that span repos
 ════════════════════════════════════════════════════════════════════════
 
-X1. REPO↔PROD DRIFT: live infra with no committed source (AP #21, #30, #31) — P0
-    Three live prod artifacts have zero repo footprint [GROUNDED — verified by repo
-    grep returning 0 + prod edge-fn list + prod schema_migrations]:
+X1. REPO↔PROD DRIFT: prod ran ahead of an unmerged held PR (AP #21, #30, #31) — P0
+    REFINED after the open-PR scan: the ingest source is NOT missing — it is STRANDED
+    on held DRAFT PR #1094 (aster-sports, branch claude/aster-sports-aau-redesign-uey0qc,
+    labeled do-not-auto-merge). Its description enumerates exactly the deployed
+    artifacts (the 0625 migration, feed_source_mapping, get_public_team_records, the
+    ingest-game-results edge fn, the ingestGameResultsHelpers.js vitest mirror, the
+    config.toml verify_jwt entry). The PR even says "CC did NOT apply to prod … apply
+    on Frank's explicit word" — yet prod shows it APPLIED + ingest_secret set today.
+    So the build was applied to prod OUT-OF-BAND from a held branch that was never
+    merged; `main`/the working tree still lack all of it. The drift is a process gap,
+    not lost source. (stripe-webhook-handler, by contrast, has no PR found — genuinely
+    sourceless in any branch I can see.)
+    Three live prod artifacts have zero footprint on `main` [GROUNDED — verified by
+    repo grep returning 0 on the audit branch + prod edge-fn list + prod
+    schema_migrations + open-PR scan]:
       1. Migration `20260625132845_aau_ingest_phase1` (prod). Repo tops out at
          `20260619125024`. The 0625 migration (game_results.external_game_id+org_id,
          feed_source_mapping, get_public_team_records SECDEF) is uncommitted.
@@ -61,13 +73,14 @@ X1. REPO↔PROD DRIFT: live infra with no committed source (AP #21, #30, #31) �
     code no one can review, test, or safely redeploy. This is precisely the AP #21
     "mirror in the same turn as apply" + AP #30 "two mirrored files, change both"
     failure class — at money-path scale.
-    Lean (Architect-scoped — schema + money + public reader): reconcile the repo to
-    deployed bytes in one PR set — commit the 0625 migration mirror, both edge-fn
-    sources (ingest-game-results {index.ts,_helpers.ts} + stripe-webhook-handler),
-    the ingestGameResultsHelpers.js vitest mirror, and the two config.toml
-    verify_jwt entries, each reconciled to the running version. Then add the
-    out-of-band-deploy guardrail in X5. Do NOT redeploy from CI until config.toml is
-    correct. Risk low to commit / high to leave; lift medium.
+    Lean (Architect-scoped — schema + money + public reader; Frank's word per #1094's
+    do-not-auto-merge label): (1) rebase + merge PR #1094 to land the ingest source on
+    main, AFTER diffing its files against the DEPLOYED bytes (verified this session:
+    fn index.ts auth + match-only + idempotent upsert; confirm the migration + helpers
+    mirror + config.toml entry match what's running). (2) Separately source-control the
+    stripe-webhook-handler edge fn (no PR found for it). (3) Add the out-of-band-deploy
+    guardrail in X5. Do NOT redeploy these fns from CI until config.toml carries their
+    verify_jwt=false entries. Risk low to land / high to leave; lift medium.
 
 X2. WEATHER TRIPLICATION (S1) — the convergence map, quantified (AP #42)
     Four copies; @aster/weather v0.1.0 is the intended single source and is a CLEAN
@@ -355,10 +368,11 @@ v0.2.0 growth (to let W-a/W-b drop local copies): (1) combined daily-strip compo
 ════════════════════════════════════════════════════════════════════════
 3. DECISION FORKS (labeled leans — §11.8 rule 6; operator/architect decide)
 ════════════════════════════════════════════════════════════════════════
-D1 [Architect-scoped] X1/P0-1 repo↔prod reconciliation. Commit the 0625 migration +
-   both edge-fn sources + vitest mirror + config.toml entries to match deployed bytes,
-   in one Architect-reviewed PR set. LEAN: do it next — a live Stripe webhook + public-
-   records writer with no committed source is the platform's biggest risk right now.
+D1 [Architect-scoped] X1/P0-1 repo↔prod reconciliation. The ingest source is stranded
+   on held draft PR #1094 (do-not-auto-merge); prod already ran ahead of it. LEAN: do
+   it next — rebase + merge #1094 after diffing its files vs the deployed bytes, then
+   separately source-control stripe-webhook-handler. A live Stripe webhook + public-
+   records writer with main lacking the source is the platform's biggest risk now.
 D2 [Frank/Architect] @aster/weather canonical source (CC_REBASELINE G1, still open).
    LEAN: v0.2.0 extracts composer+hook from W-b, animation from W-a; both consumers
    refactor to import; sequence one at a time; no 4th copy. Decide before any more
@@ -376,6 +390,22 @@ D5 [Architect-scoped] DB hygiene sweep (X6) before St Patrick onboards: pin
 D6 [Routine] st-patricks-armonk P1-1 (siteSettings.get allowlist) + P2-1 (JWT fail-
    fast) are self-contained security fixes — LEAN: ship in that repo independent of the
    weather convergence.
+
+════════════════════════════════════════════════════════════════════════
+3b. OPEN-PR INVENTORY (are all PRs merged? — operator question, 2026-06-25)
+════════════════════════════════════════════════════════════════════════
+NOT all merged. Open PRs across the 5 repos [GROUNDED, this session]:
+· astersports-web: #110 (this audit, draft) · #105 (Print Studio density P1 — separate
+  active lane, ready) · #103 (Manus→Railway+Supabase migration, WIP draft, DO NOT MERGE).
+· aster-sports: #1094 (AAU ingest, HELD draft, do-not-auto-merge — the stranded P0
+  source, see X1) · #1092 (dependabot risky-runtime group, ready).
+· legacy-hoopers: #1 (dependabot vite, ready) — moot if the repo is retired (D3).
+· st-patricks-armonk: #1/#2/#3 (dependabot vite/vitest/axios, ready).
+· aster-weather: none.
+Note: #103 (off-Manus migration) and St Patrick's own off-Manus migration (operator
+intent, this session) are the same theme — see the platform-org note in chat. The
+dependabot PRs are routine; #1094 needs Frank's word (X1/D1); #103/#105 are the Print
+Studio lane (out of this audit's scope).
 
 ════════════════════════════════════════════════════════════════════════
 4. OUT OF SCOPE (explicitly not audited)
