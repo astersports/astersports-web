@@ -123,13 +123,13 @@ export function WeatherCardView({ venueName, forecast, eyebrow = "Weather Hub", 
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <WeatherIcon code={current.weatherCode} isDay={current.isDay} size={72} title={describeWeather(current.weatherCode)} />
+          <WeatherIcon code={current.weatherCode} isDay={current.isDay} size={56} title={describeWeather(current.weatherCode)} />
           <div>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 2 }}>
-              <span className="font-display" style={{ fontSize: 52, fontWeight: 800, lineHeight: 0.95, color: "var(--as-text-primary)", letterSpacing: "-0.03em" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
+              <span className="font-display" style={{ fontSize: 42, fontWeight: 800, lineHeight: 1, color: "var(--as-text-primary)", letterSpacing: "-0.03em" }}>
                 {current.temperatureF}
               </span>
-              <span style={{ fontSize: 22, fontWeight: 600, color: "var(--as-text-secondary)", marginTop: 4 }}>°F</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: "var(--as-text-secondary)", marginTop: 3 }}>°F</span>
             </div>
             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--as-text-primary)", marginTop: 2 }}>
               {describeWeather(current.weatherCode)}

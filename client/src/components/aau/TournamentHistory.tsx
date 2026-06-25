@@ -9,7 +9,7 @@ interface TournamentMeta {
 }
 
 const TOURNAMENT_META: TournamentMeta[] = [
-  { name: 'ZG NY Hoop Festival', dates: 'Jun 13–14, 2026', status: 'completed', result: 'Champions' },
+  { name: 'ZG NY Hoop Festival', dates: 'Jun 13–14, 2026', status: 'completed' },
   { name: 'ZG Girls National Finals', dates: 'May 30–31, 2026', status: 'completed', result: 'Final Four' },
   { name: 'ZG Rumble for the Ring CT', dates: 'May 16–17, 2026', status: 'completed', result: 'Finalists' },
   { name: 'ZG NY Metro Showdown', dates: 'Apr 18–19, 2026', status: 'completed' },

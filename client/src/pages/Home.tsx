@@ -210,7 +210,7 @@ function HeroSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section className="relative min-h-[100vh] flex items-center overflow-hidden">
+    <section className="relative flex items-center overflow-hidden md:min-h-[100svh]">
       <div className="aster-sky" />
       <div className="aster-stars absolute inset-0" aria-hidden="true">
         {STARS.map((s, i) => (
@@ -226,7 +226,7 @@ function HeroSection() {
         className="aster-hero-logo hidden lg:block absolute right-4 xl:right-16 top-24 h-[300px] xl:h-[400px] w-auto opacity-90 pointer-events-none select-none"
       />
 
-      <div className="container relative z-10 pt-32 pb-20" ref={ref}>
+      <div className="container relative z-10 pt-28 pb-12 md:pt-32 md:pb-20" ref={ref}>
         <div className="max-w-2xl">
           <div
             className={`mb-5 transition-all duration-500 ${
@@ -321,18 +321,18 @@ function ConstellationNode({ product, index, isVisible }: { product: ServiceEntr
     <a
       href={product.href}
       {...(product.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-      className={`aster-node group relative flex flex-col p-5 min-h-[160px] transition-all duration-500 ${
+      className={`aster-node group relative flex flex-col p-4 min-h-[124px] transition-all duration-500 ${
         isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
       }`}
       style={{ transitionDelay: `${120 + index * 100}ms` }}
     >
-      <div className={`aster-star ${lit ? "on" : ""} mb-4`}>
+      <div className={`aster-star ${lit ? "on" : ""} mb-2.5`}>
         <Icon className="w-5 h-5" />
       </div>
       <h3 className="text-base font-semibold text-white mb-1" style={{ fontFamily: "var(--font-display)" }}>
         {product.name}
       </h3>
-      <p className="text-[12.5px] text-slate-400 leading-snug mb-3">{product.tagline}</p>
+      <p className="text-[12.5px] text-slate-400 leading-snug mb-2.5">{product.tagline}</p>
       {product.status && <NodePill status={product.status} />}
       {product.external && (
         <ArrowUpRight className="absolute top-4 right-4 w-4 h-4 text-slate-500 group-hover:text-[#F6CC55] transition-colors" />
