@@ -1,0 +1,117 @@
+CC GROUND-TRUTH FINDINGS — P2 migration (③) pre-build + W1 block
+For: Architect (claude.ai) + Frank · From: Claude Code (CC)
+Date: 2026-06-25
+Re: Build Spec v2 §3/§4 (③ migration) + Shared-infra W1 (weather repo)
+Status: CC verified aster-sports against ground truth before writing the migration
+        (per kickoff §6: "flag any [VERIFY] mismatch before building"). TWO items
+        need a ruling before the migration is written. The migration is NOT written
+        yet — by design.
+
+────────────────────────────────────────────────────────────────────────
+0. HEADLINE
+────────────────────────────────────────────────────────────────────────
+- ③ schema parts are confirmed buildable (game_results + external_game_id + org_id;
+  feed_source_mapping; get_public_team_records RPC).
+- BUT B1's premise is partly wrong on the ground: the existing parse-tournament-
+  schedule pipeline writes SCHEDULE (events), NOT scores (game_results). So "one
+  parser, one write path" covers schedule ingest; SCORES ingest needs its own
+  handler. This is exactly the "STOP and flag" case in v2 §3. Need a ruling (DR-A).
+- A4's "reuse the anon column GRANTS" is slightly off: public game_results read is
+  gated by an RLS POLICY (published_at + event exists), not a column GRANT. Same
+  net effect; the RPC/allowlist wording needs a small correction (DR-B).
+- W1 (weather): CC CANNOT create the repo — GitHub integration 403s on org repo
+  creation. Frank must create astersports/aster-weather (DR-C). Everything else for
+  the weather pilot is ready.
+
+────────────────────────────────────────────────────────────────────────
+1. ③ VERIFIED SCHEMA  [GROUNDED — aster-sports migrations]
+────────────────────────────────────────────────────────────────────────
+game_results (014_game_results_publishing_workflow.sql + 20260501110331_032):
+  id, event_id (FK events ON DELETE CASCADE), our_score, opponent_score,
+  result CHECK IN ('W','L','T'), point_differential, coach_highlight (≤140),
+  published_at (nullable), published_by (FK auth.users), private_notes.
+  MISSING → add: external_game_id (text), org_id (uuid FK organizations).
+events (003 + 004 + 024): id, team_id (→ teams.org_id), event_type
+  ('practice'|'game'|'tournament'|'other'), title, start_at, end_at, opponent
+  (TEXT, name-only — no FK), tournament_id (nullable), tournament_name,
+  location_id, sub_location, home_away, status, publish_status ('draft'|'published').
+opponents (006 + 011): id, org_id, name, circuit, city, state, ...,
+  UNIQUE(org_id, name, COALESCE(circuit,'')). No auto-create in current pipeline.
+app_secrets (20260510002836): name PK, value. getAppSecret() + Bearer-vs-secret
+  auth confirmed (parse-tournament-schedule/index.ts:30-37). 11 verify_jwt=false
+  funcs in config.toml. Reuse 1:1 for a service-auth ingester.
+org_is_public_listed() SECDEF (20260612030320) — confirmed.
+
+────────────────────────────────────────────────────────────────────────
+2. DR-A — INGEST: schedule pipeline ≠ scores pipeline  [STOP-AND-FLAG, v2 §3]
+────────────────────────────────────────────────────────────────────────
+EVIDENCE: parse-tournament-schedule (edge fn) PARSES schedule text and RETURNS rows;
+  it does NOT write. The COMMIT is client-side in useImportSchedule.js:111-142 and
+  writes ONLY to `events` (insert/update), never to `game_results`. So the existing
+  "one pipeline" is schedule→events. The scraper's payload includes SCORES, which
+  have no home in that pipeline.
+IMPLICATION: B1 ("ingest = a trigger in front of the existing parser; one write
+  path") holds for SCHEDULE but NOT for SCORES. Scores need their own ingester.
+  Per v2 §3 ("if the existing parser can't accept P1's payload without forking,
+  STOP and flag"), CC is flagging.
+OPTIONS (Architect to rule):
+  A1) TWO converged paths, not one:
+      (i) SCHEDULE → reuse parse-tournament-schedule → events (unchanged).
+      (ii) SCORES → a NEW service-auth edge fn `ingest-game-results` (app_secrets
+           Bearer, verify_jwt=false) that, per scraped game: match the EVENT
+           (team_id + start_at + opponent, match-only → REVIEW FLAG if none, per
+           B2), match-or-create the OPPONENT (B2), then UPSERT game_results on
+           (org_id, external_game_id). Mirrors briefing-auto-draft-tick's structure
+           + the app_secrets auth. NOT a fork of the schedule parser — a sibling for
+           a concern the parser never had.
+  A2) Schedule-only this pass: ingest only schedule via the existing parser now;
+      defer scores ingest to a later spec. (Public /aau shows schedule + the
+      records already in game_results, but no NEW scraped scores until A1 lands.)
+CC LEAN: **A1** — it's the faithful realization of "app owns scores" (R3) and keeps
+  one write path PER CONCERN (schedule events; score results), with the same auth.
+  It's a sibling ingester, not a parser fork, so it respects B1's intent. A2 is the
+  truer pick only if Frank wants to ship the portal on existing records first and
+  add live-score ingest later.
+
+────────────────────────────────────────────────────────────────────────
+3. DR-B — PUBLIC READ is RLS-gated, not a column GRANT (A4 wording)
+────────────────────────────────────────────────────────────────────────
+EVIDENCE: there is NO direct `GRANT SELECT (cols) ON game_results TO anon`. Public
+  visibility is an RLS POLICY `game_results_select_public` (20260612030336) =
+  `USING (published_at IS NOT NULL AND EXISTS(event))`. The "allowlist" is therefore
+  (a) the RLS row filter + (b) the columns get_public_team_records SELECTs.
+RESOLUTION (no fork needed): build get_public_team_records as a SECDEF RPC gated by
+  org_is_public_listed(org_id) that SELECTs ONLY the display columns
+  (id, event_id, our_score, opponent_score, result, point_differential,
+  coach_highlight, published_at) for published rows — NEVER published_by/private_notes/
+  org_id. Functionally identical to A4's intent; the doc should say "RLS policy +
+  RPC column projection" instead of "reuse the anon column grants."
+
+────────────────────────────────────────────────────────────────────────
+4. DR-C — W1 weather repo: CC cannot create it (403)
+────────────────────────────────────────────────────────────────────────
+EVIDENCE: `create_repository` → 403 "Resource not accessible by integration" for the
+  astersports org. The GitHub app/token CC uses lacks repo-creation scope.
+NEEDS FRANK: create `astersports/aster-weather` (private), empty/with README, and
+  (if CC is to push the scaffold) add it to this session's repo scope. Once it
+  exists + is in scope, CC scaffolds the package (per ASTER_WEATHER_PILOT_PLAN.txt
+  §3) and tags v0.1.0. Mechanism still CC-lean = git-tag dependency (W1).
+
+────────────────────────────────────────────────────────────────────────
+5. WHAT CC BUILDS THE MOMENT DR-A/DR-B ARE RULED (one held migration PR)
+────────────────────────────────────────────────────────────────────────
+1. game_results: + external_game_id (text), + org_id (uuid FK, NOT NULL via
+   BEFORE INSERT trigger deriving from event→team→org), + UNIQUE(org_id,
+   external_game_id). Additive.
+2. feed_source_mapping (org/team → external feed scope). Additive. NO clone.
+3. get_public_team_records SECDEF RPC (DR-B), org_is_public_listed gate, display
+   columns only; its return shape = the §5a frozen contract.
+4. [If DR-A=A1] ingest-game-results edge fn (app_secrets Bearer, verify_jwt=false,
+   event match-only + opponent match-or-create + UPSERT on (org_id, external_game_id)).
+   + config.toml entry (anti-pattern #31).
+5. Tests: idempotent re-ingest (no dupes), unmatched-event→review-flag (no phantom),
+   RPC excludes PII, org_id trigger correctness, DB-less/keyless fallbacks.
+Opens HELD for owner approval (DB/RLS, §2.4). Applied to prod only on Frank's word
+  (CC writes the migration files; does NOT apply via MCP).
+
+— end —

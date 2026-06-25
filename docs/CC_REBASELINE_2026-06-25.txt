@@ -1,0 +1,128 @@
+CC RE-BASELINE — Aster platform, all tracks
+For: Frank (+ architect relay) · From: Claude Code (CC) · Date: 2026-06-25
+Why: multiple chats/lanes are building in parallel; this is the single grounded
+     "where everything stands / gaps / next steps" so nothing is tracked from memory.
+All items below are [GROUNDED] against live repos/DB/PRs this session unless tagged.
+
+════════════════════════════════════════════════════════════════════════
+0. TL;DR
+════════════════════════════════════════════════════════════════════════
+- astersports.io (web) IA rebuild: BUILT, on held draft PR #107 (astersports-web).
+- AAU live-data backend (③): MIGRATION APPLIED TO PROD + verified; PR #1094 (aster-sports)
+  holds the file + the scores-ingest edge fn (NOT yet deployed; needs a secret).
+- WEATHER is the messy part: it now exists in THREE repos independently, plus an
+  empty `aster-weather` package repo meant to unify them. That fork needs ONE decision
+  (which copy is canonical) before more weather work happens anywhere. See §3.
+- Print Studio: a separate active CC lane (astersports-web). Stay clear of it.
+
+════════════════════════════════════════════════════════════════════════
+1. THE PROPERTIES / REPOS (live state)
+════════════════════════════════════════════════════════════════════════
+P1 astersports-web → astersports.io (Manus/Forge + Railway). Marketing hub + Print
+   Studio + Platform Console + AAU section. THIS session's IA rebuild lives here.
+P2 aster-sports → astersports.app (Supabase + Vercel). Youth-sports app; pilot tenant
+   Legacy Hoopers. Has public surfaces + now an in-app weather feature.
+P3 legacy-hoopers → standalone AAU site (Squarespace live; React repo exists).
+P4 st-patricks-armonk → client parish site; the ORIGINAL weather module.
+P5 aster-weather → NEW empty package repo (Frank created today); the intended home of
+   the shared @aster/weather package. NOT yet in CC's session scope.
+
+════════════════════════════════════════════════════════════════════════
+2. TRACK-BY-TRACK STATUS
+════════════════════════════════════════════════════════════════════════
+A. astersports.io IA rebuild — PR #107 (astersports-web), HELD DRAFT, CI green.
+   Shipped: dynamic service-registry hub (Celestial Cartography), public AAU section,
+   gold /aau portal (purple→gold, mono scoreboards, bottom-nav, no public roster),
+   marketing-section celestial reconcile, Websites service card, transparent logo +
+   favicon/OG/perf resize, navLabel, dim-star. → Rebase on main + architect sign-off,
+   then merge. (Print Studio lane shares server/routers.ts + Home.tsx — rebase first.)
+
+B. AAU live-data backend ③ — PR #1094 (aster-sports), HELD DRAFT.
+   APPLIED TO PROD on your GO + verified + advisor-clean:
+     · game_results + external_game_id + org_id (backfilled, 0 nulls/91) + trigger + unique
+     · feed_source_mapping (RLS)
+     · get_public_team_records SECDEF RPC (public portal read; display cols only, no PII)
+   NOT DONE (next gated step): deploy the `ingest-game-results` edge fn + provision
+   `app_secrets.ingest_secret`. Until then, live SCORE ingest doesn't run (the public
+   RECORDS read works now). PR file held for repo record; merge after rebase.
+
+C. Wiring astersports.io/aau → get_public_team_records — NOT STARTED (deferred §5a
+   consumer pass). /aau still shows scraper-backed data today.
+
+D. WEATHER — see §3. Three independent builds + an empty unifier repo. BLOCKED on a
+   canonical-source decision.
+
+E. Print Studio — SEPARATE active CC lane (astersports-web, Railway). Not ours.
+
+════════════════════════════════════════════════════════════════════════
+3. THE WEATHER SITUATION  (the source of the confusion)  [GROUNDED]
+════════════════════════════════════════════════════════════════════════
+Weather is now implemented THREE times, independently:
+  W-a  st-patricks-armonk — server/weather/* + animated SVG weather-icons (~1050 LOC).
+       The ORIGINAL; my pilot plan named it the extraction source. Pure, decoupled.
+  W-b  aster-sports (THE APP) — MERGED TO MAIN by another chat (PRs #1075/#1076/#1077,
+       specs 2026-06-18): src/components/weather/{WeatherPopover,RainAlertBanner},
+       src/context/WeatherContext.jsx, src/hooks/useWeather.js, src/lib/weather/
+       {coordsForEvent,forecastWindow,parsePrecip,wmo}.js, engine renderers/resolvers.
+       App-integrated; Open-Meteo (same vendor as St Patrick).
+  W-c  astersports-web AAU — PR #106 (OPEN, unmerged): server/weather.ts + AAU weather
+       card + per-game forecast chip. Print-studio repo's own copy.
+  W-d  aster-weather (P5) — EMPTY package repo. The intended @aster/weather unifier.
+
+CORRECTION to my earlier pilot plan: it assumed St Patrick was the only mature source
+and "astersports-web has no weather." It MISSED W-b — the app got a fresh, native
+weather build merged a week ago. So the @aster/weather pilot now has TWO candidate
+canonical sources (W-a St Patrick vs W-b the app build), not one. This is the fork.
+
+This is precisely the "one source, many consumers" thesis the shared-infra track
+exists to enforce — currently violated by 3 parallel copies. The pilot is now MORE
+valuable (more drift to collapse) AND at risk of becoming "build a 4th copy" if the
+package is scaffolded blind.
+
+════════════════════════════════════════════════════════════════════════
+4. GAPS / OPEN DECISIONS
+════════════════════════════════════════════════════════════════════════
+G1 [DECISION — architect/Frank] @aster/weather CANONICAL SOURCE: extract from W-a
+   (St Patrick, pure/decoupled, server-side) or W-b (the app's newer build)? CC lean:
+   W-a as the framework-agnostic core (it's already pure + has the icon set), and have
+   W-b refactor to consume it. But W-b is newer/app-tuned — architect should rule. Do
+   NOT scaffold the package until this is decided (else a 4th copy is born).
+G2 [BLOCKER — Frank, env config] aster-weather not in CC's session repo scope. Add it
+   to the environment's repo list (code.claude.com → environment → Repositories), then
+   a fresh session scaffolds the package. Until then CC 403s on it.
+G3 [GATED — Frank's word] ③ scores ingest: deploy `ingest-game-results` + provision
+   `app_secrets.ingest_secret`. CC will prepare both, held, on your word.
+G4 [SEQUENCING] PR #107 + PR #1094 both need rebase on their mains before merge
+   (#107 shares files with the Print Studio lane; #1094's branch carries pre-existing
+   unrelated briefings test failures that clear on rebase).
+G5 [DEFERRED] /aau → get_public_team_records wiring (consumer pass, §5a); legacyhoopers.org
+   repoint (F6); LeagueApps→/r/:slug registration (R4, season-aware); F2 Phase 2/3 hard
+   cutover (after a verification window); aau_recaps (separate spec).
+
+════════════════════════════════════════════════════════════════════════
+5. NEXT STEPS (sequenced)
+════════════════════════════════════════════════════════════════════════
+NOW (Frank):
+  1. Rule G1 (weather canonical source) — or relay to the architect. This unblocks ALL
+     weather work and stops the duplication.
+  2. If pursuing the package: do G2 (add aster-weather to the environment repo scope).
+  3. Say the word on G3 (deploy the scores-ingest fn + set the secret) when ready.
+THEN (CC, on the above):
+  4. Scaffold @aster/weather from the ruled source (G1+G2); tag v0.1.0; converge the
+     three copies onto it as consumers (one at a time; no big-bang).
+  5. Prepare/hold the ③ edge-fn deploy + ingest_secret SQL (G3).
+  6. Rebase + shepherd #107 and #1094 to merge after architect sign-off (G4).
+HOLD/DEFER: G5 items, in their own later passes.
+
+════════════════════════════════════════════════════════════════════════
+6. RECOMMENDATION FOR THE OTHER CHAT'S "Added weather" PROMPT
+════════════════════════════════════════════════════════════════════════
+The screenshot's options were: Verify / Build aster-weather repo / Add to another app /
+Just an FYI. CC recommendation: pick "Just an FYI" (or "Verify it's working") for now —
+do NOT have that chat "Build aster-weather repo" yet. Reason: scaffolding the package
+before G1 (canonical source) is decided risks a 4th weather copy and re-introduces the
+exact drift the pilot removes. One coordinated extraction, one chosen source — after
+G1. The app's weather (W-b) is already merged and working; leave it as-is until the
+package exists to consume.
+
+— end —
