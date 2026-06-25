@@ -1,0 +1,160 @@
+DENSITY & SCALE — STRATEGY + HANDOFF
+=====================================
+Last updated: 2026-06-25. Author: Claude Code (CC). Purpose: durable context so a
+fresh session (or the Architect) can pick up the density/scale work without the chat
+history. Also a §2.2 cross-lane strategy artifact.
+
+If you are a new session: read this top-to-bottom, then `git log`/look at PRs #102 and
+#104 for the code. The strategy below is decided; the phase work is not yet built.
+
+
+0. THE CLIENT (ground truth)
+----------------------------
+Target client = Jaya Apparel Group, brands **Cinq à Sept** (cinqasept.nyc) and **LIKELY**
+(likely.nyc) — matches the seeded "Jaya" tenant in the app. Contemporary women's RTW.
+WIDE catalog, every garment/surface type. Their product images live on open Shopify CDNs
+(cdn.shopify.com) and on retailers (Nordstrom/Revolve/Saks). The brand HTML and retailer
+pages bot-block automated fetch; the brand `…/collections/<x>/products.json` → cdn.shopify.com
+image path is the reliable scrape route IF network policy allows those domains (see §8).
+
+Catalog splits into FOUR surface buckets (confirmed from their live collections — product
+names are diagnostic):
+  A. SCATTERED all-over prints — "Tossed Floral", "Trailing Floral/Hibiscus". Artfully
+     RANDOM placement, NOT a geometric repeat. High volume.
+  B. PLACED embellishment / sequins / paillettes — "Sequin Flower Cheyenne Blazer",
+     "Paillette Vines", "Crushed Sequin Loveletter Dress". Brand signature. Hard case.
+  C. SOLIDS — large share of RTW. Density/scale DO NOT APPLY.
+  D. LACE (e.g. trim).
+Photography: both flat-lay (e-comm cutout) AND on-model.
+
+
+1. THE KEY INSIGHT (reorganizes everything)
+-------------------------------------------
+Their prints are SCATTERED, not periodic — and that splits the two ops in OPPOSITE
+directions:
+  * DENSITY loves scattered. Counting motifs and removing an exact fraction is
+    periodicity-agnostic → their tossed/trailing florals are density's SWEET SPOT.
+  * SCALE chokes on scattered. The scale op's repeat guard (checkRepeatAdvanced, FFT +
+    autocorrelation, in generateScaledImage / server/aiEngine.ts) looks for a PERIODIC
+    tile. A "tossed floral" has no strict period → it gets REJECTED. This is almost
+    certainly why CLAUDE.md §4 G3 says the detector false-rejects ~1/3 of genuine repeats.
+    Fix is conceptual, not a threshold nudge: scale must treat "all-over scattered
+    coverage" as scalable and scale by RESIZING MOTIFS, not by re-tiling a period.
+
+So density is closer to ready for this client; scale needs a reframe.
+
+
+2. ARCHITECTURE — combine, don't pick (the brief from Frank)
+------------------------------------------------------------
+A paying client with a diverse catalog can't be served by a narrow deterministic lane +
+"reject the rest". Use each layer for what only it can do:
+  * FORMULA / DETERMINISTIC = ACCURACY. Only it can count + place EXACTLY ("remove exactly
+    50%", "enlarge exactly 20%"). Billable, reproducible. This is the spine.
+  * GENERATIVE AI = REALISM. Only it makes a hard garment look photographically right
+    (reconstruct busy grounds, re-light/shadow a moved/resized motif, conform to drape).
+  * THE TRICK: run the generative pass MASKED/constrained so it polishes the LOOK without
+    changing the COUNT or GEOMETRY. Deterministic decides the math → generative finishes
+    the photography → the mask guarantees the finish never alters the number. That yields
+    "exactly 50%" AND "looks real on a couture blazer" at once. Neither layer alone can.
+
+Route the generative finish to the GARMENT: simple/solid ground → cheap formula fill;
+busy/complex ground or on-model → constrained generative finish.
+
+
+3. THE FLUX SPIKE — EVALUATED, DO NOT ADOPT (PR #104)
+----------------------------------------------------
+We hypothesized the LaMa fill was the quality bottleneck and spiked FLUX.1 Fill as a
+generative replacement (research said FLUX.1 Fill: best mask-based inpainter, on Replicate,
+seed-deterministic in bf16, pixel-identity composite REQUIRED). Built dark behind
+STUDIO_INFILL_PROVIDER=flux. Code: server/_core/studio/ops/fluxFill.ts (+ compositeUnderMask,
+unit-tested), wired into densityThin/densityRedistribute, eval harness eval/fluxVsLama.ts +
+.github/workflows/flux-fill-eval.yml. All on branch claude/flux-fill-hybrid-spike / PR #104.
+
+VERDICT after running it on a real skirt (scattered floral, flat-lay) AND the embellished
+blazer (on-model): **FLUX ≈ the current simple fill. No visible win. Do not adopt.** Why:
+  * Both test garments are decorations on a BLACK ground. Filling "black behind a removed
+    motif" is trivial — the simple flat fill already nails it. FLUX's reconstruction edge
+    only matters on COMPLEX/varied grounds, which these don't have.
+  * The "blob" Frank saw earlier was NEVER the fill step — it comes from motif
+    SELECTION/RELOCATION (v2 redistribute) and SAM2 mask errors. Swapping the fill would
+    not have fixed it.
+  * FLUX costs ~100x/img more than the current fill, and needs a new sub-processor (BFL via
+    Replicate) + a paid commercial license (FLUX.1-dev weights are Non-Commercial) — real
+    legal/privacy overhead for zero benefit here.
+ACTION: park PR #104 as "evaluated, not adopted". Revisit only if a client garment has a
+genuinely busy/photographic ground (none seen yet). The hybrid PRINCIPLE (§2) still stands;
+just don't pay for generative fill where the ground is solid.
+
+BUG FOUND (real, low priority): replicate.run("allenhooo/lama") 404s — community model
+invoked without a version, same class as the SAM2-404 fix. So lamaInfill has been silently
+failing in prod and density falls back to flat fill. Flat fill is fine on solid grounds, so
+low priority, but it's a latent bug; pin the LaMa version if/when we want texture fill.
+
+
+4. THE PHASE PLAN (mapped to their catalog, biggest tractable value first)
+--------------------------------------------------------------------------
+P1 — DENSITY on SCATTERED all-over prints (their florals). Highest volume, count-accurate,
+     deterministic-friendly, clean 10/20/50% preview (we're counting). Nail end-to-end:
+     SAM2 instance count accuracy on dense/overlapping scattered motifs → thin-in-place →
+     formula fill. Define what "% drop" means + the preview. THIS IS THE NEXT BUILD.
+P2 — SCALE, reframed for scattered/all-over prints: motif-RESIZE (scale each motif, keep
+     coverage) instead of period-tiling; recovers the ~1/3 false-rejected prints. Recalibrate
+     checkRepeatAdvanced to accept all-over scattered coverage, not just periodic tiles.
+P3 — EMBELLISHED / PLACED (bucket B, brand signature, often on-model). Here the hybrid earns
+     its keep: deterministic count/geometry for accuracy → constrained generative FINISH for
+     the complex reconstruction + natural blending → masked so it never changes the count.
+     Plus on-model garment isolation.
+SOLIDS (bucket C): explicitly OUT OF SCOPE — UI should not offer scale/density when there is
+     nothing to scale/thin, so we never return a wrong result on a plain dress.
+
+% SEMANTICS PER TYPE (Frank wants accurate 10/20/50 with a real preview):
+  * scattered print → "% fewer motifs" (density) / "% larger motifs" (scale): precise +
+    previewable because we're counting.
+  * embellished/placed → "% drop" = remove a counted fraction of appliqués; generative
+    finish makes the gaps look right.
+
+
+5. THE SHARED LEVER + HOW WE PROVE IT
+-------------------------------------
+Shared lever: BOTH ops ride on SAM2 masks; the weak spot is ON-MODEL (isolating garment from
+skin/background). Better masks lift density (count/selection) AND scale (region) at once.
+
+Proof / gate (this is CLAUDE.md §4 G3, broadened): build a FIXED real-garment eval set from
+THEIR PDPs — ~4-5 pieces per bucket (A/B/C/D) × flat-lay/on-model — with accuracy + quality
+scored per route. Do NOT bill a route until it passes on real pieces. Calibrate against the
+set, not one cherry-picked photo. Getting this image set is the immediate unblock (§8).
+
+
+6. WHAT EXISTS IN CODE TODAY
+----------------------------
+Density ops: server/_core/studio/ops/densityThin.ts (v1, erase + keep-in-place — the SAFE,
+  always-valid product), densityRedistribute.ts (v2, erase + relocate survivors to blue-noise
+  — the BLOB source; flag-gated experimental). User-selectable modes already shipped
+  ("thin in place" default / "even re-space") — shared/controls.ts DensityControl.mode,
+  resolveDensityRedistribute(). Silhouette refinements for v2 are on #102.
+Scale op: server/_core/studio/ops/scaleRepeat.ts; non-repeat guard in
+  server/aiEngine.ts::generateScaledImage via checkRepeatAdvanced (repeatDetector.ts).
+Masks: SAM2 via server/_core/masking/* (replicateSam2.ts — note the SAM2-404 version-pin fix
+  is on #102). LaMa/flat fill: lamaInfill.ts / infill.ts.
+Eval harness: eval/run.ts (synthetic fixtures), eval/fluxVsLama.ts (#104 spike).
+
+
+7. STATE OF BRANCHES / PRs
+--------------------------
+* claude/modest-galileo-10ousj  (PR #102) — the live studio branch. Has: density user-modes,
+  v2 silhouette refinements, SAM2-404 fix, 2 security-HIGH dep fixes, webhook wiring,
+  empty-results UI guard, responsive results header. CI green. THIS is the base for new work.
+* claude/flux-fill-hybrid-spike (PR #104, DRAFT) — the FLUX spike. PARK per §3.
+* Prod deploys from `main`. #102 not yet merged. drizzle-orm high still pending (task #3).
+
+
+8. IMMEDIATE NEXT ACTIONS
+-------------------------
+1. Get the real-garment eval set (§5). Either Frank drops ~12-15 PDP images in chat, OR — if
+   network policy now allows cinqasept.nyc / likely.nyc / *.shopify.com — pull them via the
+   brand `…/collections/<x>/products.json` → cdn.shopify.com path. (Network policy is set per
+   environment; a session must be NEW for a policy change to take effect.)
+2. Build P1: count-accurate density on scattered florals + the 10/20/50% preview. Branch off
+   claude/modest-galileo-10ousj.
+3. Keep CC's lane: deterministic for accuracy, generative only where the ground is genuinely
+   complex, masked so the finish never changes the count. Prove on the eval set before billing.

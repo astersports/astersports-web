@@ -583,20 +583,21 @@ export default function StudioEditor() {
       </AlertDialogContent>
     </AlertDialog>
     <div className="max-w-full lg:max-w-5xl mx-auto overflow-hidden">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Results</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Compare before and after, then download or regenerate.
+            Compare before and after, then download, regenerate, or start a new image.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleRegenerate}>
+        <div className="flex flex-wrap gap-2 sm:flex-nowrap sm:shrink-0">
+          <Button variant="outline" size="sm" onClick={handleRegenerate} className="flex-1 sm:flex-none">
             <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
             Adjust & Regenerate
           </Button>
-          <Button variant="outline" size="sm" onClick={handleNewUpload}>
-            New Upload
+          <Button size="sm" onClick={handleNewUpload} className="flex-1 sm:flex-none">
+            <Upload className="mr-1.5 h-3.5 w-3.5" />
+            New Image
           </Button>
         </div>
       </div>
@@ -627,12 +628,19 @@ export default function StudioEditor() {
 
         {/* Before/After */}
         <div className="lg:col-span-3">
-          {results[selectedResult] && (
+          {results[selectedResult] ? (
             <BeforeAfter
               beforeUrl={originalUrl}
               afterUrl={results[selectedResult].url}
               onDownload={() => handleDownload(results[selectedResult].url)}
             />
+          ) : (
+            <div className="rounded-lg border border-border bg-card p-8 text-center">
+              <p className="text-sm font-medium">No result to display</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                The generation didn't return an image. Try again, or start a new image above.
+              </p>
+            </div>
           )}
         </div>
       </div>

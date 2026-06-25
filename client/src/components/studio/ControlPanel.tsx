@@ -105,12 +105,44 @@ export default function ControlPanel({
           <p className="text-xs text-amber-600 dark:text-amber-500">Temporarily unavailable.</p>
         )}
         {densityLive && controls.density.enabled && (
-          <PercentStepper
-            value={controls.density.percent}
-            onChange={(percent) => update({ density: { ...controls.density, percent } })}
-            min={DENSITY_MIN}
-            max={DENSITY_MAX}
-          />
+          <div className="space-y-3">
+            <PercentStepper
+              value={controls.density.percent}
+              onChange={(percent) => update({ density: { ...controls.density, percent } })}
+              min={DENSITY_MIN}
+              max={DENSITY_MAX}
+            />
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Survivor layout</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { v: "respace", label: "Even re-space" },
+                  { v: "inplace", label: "Thin in place" },
+                ] as const).map((opt) => {
+                  const selected = (controls.density.mode ?? "inplace") === opt.v;
+                  return (
+                    <button
+                      key={opt.v}
+                      type="button"
+                      onClick={() => update({ density: { ...controls.density, mode: opt.v } })}
+                      className={`rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
+                        selected
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border bg-card text-muted-foreground hover:bg-accent"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {(controls.density.mode ?? "inplace") === "inplace"
+                  ? "Keeps every surviving motif in its original spot — best for placed or couture designs (preserves the composition)."
+                  : "Spreads the surviving motifs evenly — best for repeating all-over prints."}
+              </p>
+            </div>
+          </div>
         )}
       </div>
 

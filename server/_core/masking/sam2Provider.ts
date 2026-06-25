@@ -29,6 +29,7 @@ import type { FabricMask, InstanceMask, MaskImageInput, MaskProvider, BBoxNormal
 import { decodeUpright } from "../image/decodeUpright";
 import { locateFabricRegion, locateFabricRegionForDensity } from "./locateFabricRegion";
 import { decodeMaskToRaster, instancesFromMasks } from "./sam2Mask";
+import { garmentSilhouetteFromInstances } from "../studio/ops/garmentSilhouette";
 import { defaultSam2Client, type Sam2Client } from "./replicateSam2";
 import { cachedSegmentation } from "./segCache";
 import { ENV } from "../env";
@@ -266,6 +267,21 @@ async function instancesFromSegment(s: CropSegment): Promise<InstanceMask[]> {
 }
 
 /**
+ * Replace the combined_mask boundary with an instance-derived garment silhouette so
+ * densityRedistribute (v2) lays out + clips survivor motifs on the GARMENT, never the
+ * backdrop. combined_mask unions every SAM2 segment (incl. background/wall on a product
+ * photo), so it bled off-garment; the instance hull tracks where motifs actually are.
+ * Falls back to the existing combined_mask boundary when no instance-derived silhouette
+ * is available (e.g. zero full-dim instance rasters). The full-crop `raster` (base-cloth
+ * SAMPLING mask) is untouched — only the v2 layout/clip boundary changes.
+ */
+function applyGarmentSilhouette(fabric: FabricMask, instances: InstanceMask[]): void {
+  if (!fabric.raster) return;
+  const silhouette = garmentSilhouetteFromInstances(instances, fabric.raster.width, fabric.raster.height);
+  if (silhouette) fabric.boundaryRaster = silhouette;
+}
+
+/**
  * Async seam (ASYNC_GENERATION_SPEC §2-§3): rebuild { fabric, instances } from a completed
  * prediction's mask buffers + the crop geometry persisted at enqueue (studio_jobs.predictionMeta)
  * — the same construction getSegmentation does synchronously, minus the vision-LLM locate (which
@@ -285,6 +301,7 @@ export async function finishSam2Segmentation(
     seg: segmentation,
   };
   const [fabric, instances] = await Promise.all([fabricFromSegment(s), instancesFromSegment(s)]);
+  applyGarmentSilhouette(fabric, instances);
   return { fabric, instances };
 }
 
@@ -325,6 +342,7 @@ export function createSam2Provider(client: Sam2Client): MaskProvider {
     async getSegmentation(image: MaskImageInput): Promise<{ fabric: FabricMask; instances: InstanceMask[] }> {
       const s = await cropAndSegment(client, image, undefined, true); // forDensity=true
       const [fabric, instances] = await Promise.all([fabricFromSegment(s), instancesFromSegment(s)]);
+      applyGarmentSilhouette(fabric, instances);
       return { fabric, instances };
     },
   };

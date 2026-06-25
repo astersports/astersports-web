@@ -20,7 +20,7 @@ import { sdk } from "./_core/sdk";
 import { pruneOldLogs } from './logRetention';
 import { log } from './serverLog';
 import { processTrialReminders } from './trialReminders';
-import { reapStuckJobs, listSam2ProcessingJobs } from './studioDb';
+import { reapStuckJobs, listSam2ProcessingJobs, recoverStrandedCpuJobs } from './studioDb';
 import { processAsyncJob } from './studioAsyncWorker';
 import { processTrialAutoCharges } from './shadowBilling';
 import { cronSecretOk as cronSecretMatches } from "./_core/cronAuth";
@@ -481,6 +481,14 @@ export function registerScheduledRoutes(app: any) {
       }
       if (!ENV.studioAsyncJobs) {
         return res.json({ success: true, skipped: 'async disabled', timestamp: new Date().toISOString() });
+      }
+      // T1.5: Before listing, recover any job stranded in cpu_processing by a mid-op container
+      // kill (the in-process 45s deadline dies with the process, so only the reaper would catch
+      // it — as a refund, not a retry). Reset stale claims back to sam2_processing so this tick
+      // re-claims and re-runs the op on a fresh container. pollAttempts/poison-pill bound retries.
+      const recovered = await recoverStrandedCpuJobs(ENV.studioCpuStaleMs);
+      if (recovered > 0) {
+        log.warn('cron', `[poll-predictions] recovered ${recovered} stranded cpu_processing job(s) -> sam2_processing for retry`);
       }
       const pending = await listSam2ProcessingJobs(1); // N=1 — stay well under the 60s cap
       if (pending.length > 0) {

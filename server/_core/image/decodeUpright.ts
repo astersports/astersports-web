@@ -91,8 +91,21 @@ async function decodeToEntry(url: string): Promise<CacheEntry> {
   // `.rotate()` with no args bakes the EXIF orientation tag into the pixels.
   // H6: `limitInputPixels` makes sharp reject an oversized image before it
   // allocates the raw RGBA frame; the post-decode assert is a second line.
-  const { data, info } = await sharp(input, { limitInputPixels: maxInputPixels() })
-    .rotate()
+  let pipeline = sharp(input, { limitInputPixels: maxInputPixels() }).rotate();
+  // T1.6: cap the WORKING resolution. The deterministic ops hold the image RGBA + up to
+  // STUDIO_MAX_INSTANCES full-frame motif masks at once; at full print resolution that peaks
+  // past a small instance's RAM and the process is OOM-killed mid-op (the job strands → the
+  // reaper refunds → no result). Downscaling here (the SINGLE decode boundary) bounds memory,
+  // and because every SAM2-derived mask is remapped to these same dims, the image and masks
+  // stay aligned. Bound the longer side so even a square stays under the megapixel cap; never
+  // ENLARGE (small images / eval fixtures pass through untouched). Raise the cap on a larger
+  // instance for full-resolution output.
+  const capMp = ENV.studioWorkingMegapixels;
+  if (capMp > 0) {
+    const maxSide = Math.max(1, Math.floor(Math.sqrt(capMp * 1_000_000)));
+    pipeline = pipeline.resize(maxSide, maxSide, { fit: "inside", withoutEnlargement: true });
+  }
+  const { data, info } = await pipeline
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });

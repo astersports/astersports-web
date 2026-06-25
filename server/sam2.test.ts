@@ -31,13 +31,17 @@ describe("resolveModelRef (REPLICATE_SAM2_MODEL -> run() ref)", () => {
     expect(resolveModelRef("fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83"))
       .toBe("meta/sam-2:fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83");
   });
-  it("passes a slug or owner/model:version through unchanged", () => {
-    expect(resolveModelRef("meta/sam-2")).toBe("meta/sam-2");
+  it("uses the explicit version from an owner/model:version ref", () => {
     expect(resolveModelRef("meta/sam-2:abc123")).toBe("meta/sam-2:abc123");
   });
-  it("defaults to the meta/sam-2 slug when unset", () => {
-    expect(resolveModelRef("")).toBe("meta/sam-2");
-    expect(resolveModelRef(undefined)).toBe("meta/sam-2");
+  it("pins the confirmed default version when unset or given any version-less slug", () => {
+    // A version-less slug 404s on run() for a community model, so it resolves to the confirmed
+    // default version exactly like an unset value does (an explicit version is required to override).
+    const DEFAULT_REF = "meta/sam-2:fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83";
+    expect(resolveModelRef("meta/sam-2")).toBe(DEFAULT_REF);
+    expect(resolveModelRef("zsxkib/segment-anything-2")).toBe(DEFAULT_REF);
+    expect(resolveModelRef("")).toBe(DEFAULT_REF);
+    expect(resolveModelRef(undefined)).toBe(DEFAULT_REF);
   });
 });
 

@@ -100,6 +100,29 @@ report (authoritative — reframe, don't defend), 3) installed source/types/migr
 - **Money-path boundary:** the guard is **backend** credit/ledger/Stripe logic +
   credentials/flips. **Cosmetic billing UI** (pricing copy, layout) is routine.
 
+### 2.5 Manus is the platform runtime, not a builder lane
+Code authoring is **CC-only**. Manus does not author commits, open PRs, or run the
+build toolchain — the Architect designs/reviews and Frank oversees, but neither writes
+code, and no agent but CC writes to the repo. This closes the incident-#61 vector (an
+agent flipping a `*_LIVE` flag as a side effect of a checkpoint commit): with CC the
+sole author and §3 barring any agent from flipping, a flag can no longer ride in on a
+builder checkpoint.
+
+Manus is retained ONLY as the deploy + runtime platform the app is built on — these are
+load-bearing infrastructure, not agent permissions:
+- **Auth / identity** — OAuth/WebDev session service (`server/_core/sdk.ts`).
+- **Storage** — Forge presigned-URL uploads, served as `/manus-storage/{key}`
+  (`server/storage.ts`).
+- **Crons** — Forge HeartbeatJob scheduler driving `poll-predictions` + the reaper
+  (`server/_core/heartbeat.ts`).
+- **Data API** — `callDataApi` Forge passthrough (`server/_core/dataApi.ts`).
+- **DB + deploy** — Autoscale MySQL/TiDB; auto-publish from `main`.
+
+The Manus **Agent API** client (programmatic `task.create`/`task.list`) is **retired** —
+it shipped dark and nothing in the app used it. AI-model connections (SAM2, LaMa) are
+**Replicate**, not Manus, and are unaffected. Replacing the platform services above is
+the deferred host migration — out of scope until after the first client is stable.
+
 ---
 
 ## 3. Flip Authority (LIVE phase) — HARD RULE

@@ -69,6 +69,10 @@ function validateControls(raw: any): ControlSettings {
     density: {
       enabled: Boolean(density.enabled),
       percent: Math.max(0, Math.min(90, Number(density.percent) || 0)),
+      // Survivor layout. Default "inplace" (the always-safe layout — keeps survivors put);
+      // "respace" is the opt-in even spread for repeating prints. Server still gates respace
+      // on the redistribute flag.
+      mode: density.mode === "respace" ? "respace" : "inplace",
     },
     variations: 1, // clamped to 1
   };

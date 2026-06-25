@@ -179,8 +179,8 @@ export default function BeforeAfter({ beforeUrl, afterUrl, onDownload }: Props) 
             <Maximize2 className="h-4 w-4" />
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {zoom > 1 ? "Drag to pan • Scroll to zoom" : "Scroll to zoom in"}
+        <p className="hidden text-xs text-muted-foreground sm:block">
+          {zoom > 1 ? "Drag to pan • scroll to zoom" : "Scroll to zoom in"}
         </p>
       </div>
 

@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { getDb } from "./db";
-import { deductCredits, grantCredits, countJobGenerationAttempts, reapStuckJobs } from "./studioDb";
+import { deductCredits, grantCredits, countJobGenerationAttempts, reapStuckJobs, recoverStrandedCpuJobs } from "./studioDb";
 import { tenants, creditLedger, jobs } from "../drizzle/schema";
 
 const RUN = process.env.RUN_DB_TESTS === "1";
@@ -139,5 +139,50 @@ describe.skipIf(!RUN)("reapStuckJobs (real MySQL) — B2 stranded-job backstop",
     expect((await refundRows(tid)).length).toBe(1);
     const [job] = await db.select().from(jobs).where(eq(jobs.id, jid)).limit(1);
     expect(job.status).toBe("failed"); // still marked failed
+  });
+});
+
+describe.skipIf(!RUN)("recoverStrandedCpuJobs (real MySQL) — T1.5 mid-op strand retry", () => {
+  beforeAll(async () => {
+    db = await getDb();
+    if (!db) throw new Error("RUN_DB_TESTS set but getDb() returned null (DATABASE_URL?)");
+  });
+
+  async function seedJob(tid: number, status: string): Promise<number> {
+    const res = await db.insert(jobs).values({
+      tenantId: tid, userId: 1, title: status, originalKey: "k", originalUrl: "u",
+      status, creditsUsed: 10,
+    });
+    return (res as any)[0].insertId as number;
+  }
+  const statusOf = async (jid: number): Promise<string> =>
+    (await db.select().from(jobs).where(eq(jobs.id, jid)).limit(1))[0].status as string;
+
+  // negative staleness => cutoff in the FUTURE => the just-claimed job counts as stranded
+  // (mirrors the reaper test's SWEEP_MS trick; avoids backdating updatedAt).
+  const STRANDED = -60_000;
+  // positive staleness => cutoff 60s in the PAST => a job claimed "just now" is NOT stale.
+  const FRESH = 60_000;
+
+  it("resets a stranded cpu_processing job back to sam2_processing for retry", async () => {
+    const tid = await seedTenant(100);
+    const jid = await seedJob(tid, "cpu_processing");
+    const n = await recoverStrandedCpuJobs(STRANDED);
+    expect(n).toBeGreaterThanOrEqual(1);
+    expect(await statusOf(jid)).toBe("sam2_processing");
+  });
+
+  it("leaves a freshly-claimed cpu_processing job alone (a live worker is not reset out from under)", async () => {
+    const tid = await seedTenant(100);
+    const jid = await seedJob(tid, "cpu_processing");
+    await recoverStrandedCpuJobs(FRESH);
+    expect(await statusOf(jid)).toBe("cpu_processing");
+  });
+
+  it("never revives a terminal job, even past the staleness cutoff", async () => {
+    const tid = await seedTenant(100);
+    const jid = await seedJob(tid, "done");
+    await recoverStrandedCpuJobs(STRANDED); // future cutoff, but the status filter excludes `done`
+    expect(await statusOf(jid)).toBe("done");
   });
 });

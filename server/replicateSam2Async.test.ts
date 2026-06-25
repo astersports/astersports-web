@@ -40,11 +40,18 @@ beforeEach(() => {
 });
 
 describe("resolvePredictionTarget", () => {
-  it("maps configured model refs to predictions.create's { model } | { version }", () => {
-    expect(resolvePredictionTarget("")).toEqual({ model: "meta/sam-2" });
-    expect(resolvePredictionTarget("meta/sam-2")).toEqual({ model: "meta/sam-2" });
+  const DEFAULT_VERSION = "fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83";
+  it("always resolves to a { version } — SAM2 is a community model, so the slug path 404s", () => {
+    // An explicit version (owner/model:version or :version) always wins.
     expect(resolvePredictionTarget("meta/sam-2:abc123")).toEqual({ version: "abc123" });
+    expect(resolvePredictionTarget("zsxkib/segment-anything-2:abc123")).toEqual({ version: "abc123" });
+    // A bare token is a version hash.
     expect(resolvePredictionTarget("deadbeefcafe")).toEqual({ version: "deadbeefcafe" });
+    // Empty OR any version-less slug pins the confirmed default version (the bare slug 404s on
+    // the official-model endpoint, so we never emit { model } for a community model here).
+    expect(resolvePredictionTarget("")).toEqual({ version: DEFAULT_VERSION });
+    expect(resolvePredictionTarget("meta/sam-2")).toEqual({ version: DEFAULT_VERSION });
+    expect(resolvePredictionTarget("zsxkib/segment-anything-2")).toEqual({ version: DEFAULT_VERSION });
   });
 });
 
@@ -58,7 +65,8 @@ describe("Sam2Client.startPrediction", () => {
     expect(mockCreate).toHaveBeenCalledTimes(1);
     const arg = mockCreate.mock.calls[0][0];
     expect(arg).toMatchObject({
-      model: "meta/sam-2",
+      // Empty REPLICATE_SAM2_MODEL -> the confirmed default version (NOT the bare slug, which 404s).
+      version: "fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83",
       input: {
         image: "data:image/png;base64,AAAA",
         points_per_side: 16,

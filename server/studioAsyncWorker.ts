@@ -25,7 +25,7 @@ import { getJob, updateJobStatus, addVariation, grantCredits, claimJobForCpuProc
 import { log } from "./serverLog";
 import { emitRefundTelemetry } from "./refundTelemetry";
 import { REFUND_REASONS, type RefundReason } from "../shared/refundReasons";
-import { type ControlSettings } from "../shared/controls";
+import { type ControlSettings, resolveDensityRedistribute } from "../shared/controls";
 
 export type AsyncJobOutcome = { status: "done" | "failed" | "pending" | "skipped"; reason?: string };
 
@@ -146,7 +146,10 @@ export async function processAsyncJob(
 
       let png: Buffer;
       if (controls.density?.enabled) {
-        const out = await runDensityOnSegmentation(srcUrl, fabric, instances, controls.density.percent, ENV.studioDensityRedistribute);
+        // v2 (respace) vs v1 (thin in place) per the user's chosen mode, gated by the
+        // redistribute flag (respace only runs when flipped live — §3 flip authority).
+        const redistribute = resolveDensityRedistribute(controls.density.mode, ENV.studioDensityRedistribute);
+        const out = await runDensityOnSegmentation(srcUrl, fabric, instances, controls.density.percent, redistribute);
         if (!out) {
           return failAndRefund(REFUND_REASONS.round0_noop, "density no-op (removed 0)");
         }
