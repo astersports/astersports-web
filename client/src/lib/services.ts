@@ -17,6 +17,7 @@ import {
   Sparkles,
   Globe,
   Palette,
+  Monitor,
   type LucideIcon,
 } from "lucide-react";
 
@@ -68,7 +69,7 @@ export const PRODUCTS: ServiceEntry[] = [
     href: "/studio",
     status: "live",
     icon: Shirt,
-    accent: "#f5b731",
+    accent: "#F6CC55",
     cta: "Open Studio",
     inNav: true,
   },
@@ -93,13 +94,28 @@ export const PRODUCTS: ServiceEntry[] = [
     name: "AAU Basketball",
     tagline: "Aster 11U Girls · Zero Gravity AAU",
     description:
-      "Live scores, tournament history, season records, film, and venues for the Aster AAU program — a working showcase of what the platform powers for a real team.",
+      "Live scores, tournament history, season records, film, and venues for the Aster AAU house program — a working showcase of what the platform powers for a real team.",
     href: "/aau",
     status: "live",
     icon: Trophy,
     accent: "#a78bfa",
     cta: "View the Program",
     inNav: true,
+  },
+  {
+    // Productized site-building service. St Patrick (Armonk) is the first public
+    // flagship, going live to the wider public in fall 2026.
+    id: "websites",
+    kind: "product",
+    name: "Websites",
+    tagline: "Bespoke org & community sites",
+    description:
+      "Full-featured websites for organizations and communities — live data, calendars, registration, and admin tools. St. Patrick's of Armonk is our first public build, launching fall 2026.",
+    href: "#contact",
+    status: "soon",
+    icon: Monitor,
+    accent: "#34d399",
+    cta: "Start a Site",
   },
 ];
 
@@ -114,7 +130,7 @@ export const SERVICES: ServiceEntry[] = [
       "AI-assisted print engineering for textiles and apparel — scale, recolor, and refine patterns with production-grade precision.",
     href: "/studio",
     icon: Palette,
-    accent: "#f5b731",
+    accent: "#F6CC55",
   },
   {
     id: "web",
@@ -136,7 +152,7 @@ export const SERVICES: ServiceEntry[] = [
       "Visual identity systems, logo design, and brand guidelines that give sports and lifestyle brands a distinctive creative edge.",
     href: "#contact",
     icon: Sparkles,
-    accent: "#e67e22",
+    accent: "#E0631C",
   },
   {
     id: "strategy",

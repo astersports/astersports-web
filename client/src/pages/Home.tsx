@@ -31,8 +31,8 @@ function StarAccent({ className }: { className?: string }) {
       />
       <defs>
         <linearGradient id="star-gradient" x1="8" y1="0" x2="8" y2="16" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#f5b731" />
-          <stop offset="1" stopColor="#e67e22" />
+          <stop stopColor="#F6CC55" />
+          <stop offset="1" stopColor="#E0631C" />
         </linearGradient>
       </defs>
     </svg>
@@ -111,28 +111,28 @@ function Header() {
               key={p.id}
               href={p.href}
               {...(p.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-              className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors"
+              className="text-sm text-slate-300 hover:text-[#F6CC55] transition-colors"
               style={{ fontFamily: "var(--font-display)" }}
             >
               {p.name}
             </a>
           ))}
-          <a href="#services" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
+          <a href="#services" className="text-sm text-slate-300 hover:text-[#F6CC55] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
             Services
           </a>
-          <a href="#about" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
+          <a href="#about" className="text-sm text-slate-300 hover:text-[#F6CC55] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
             About
           </a>
 
           {isOwner && (
-            <a href="/admin/billing" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors flex items-center gap-1" style={{ fontFamily: "var(--font-display)" }}>
+            <a href="/admin/billing" className="text-sm text-slate-300 hover:text-[#F6CC55] transition-colors flex items-center gap-1" style={{ fontFamily: "var(--font-display)" }}>
               <Settings className="w-3.5 h-3.5" />
               Billing
             </a>
           )}
           <a
             href="#contact"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#f5b731] to-[#e67e22] text-[#0a0e1a] font-medium text-sm transition-transform duration-160 hover:scale-[1.03] active:scale-[0.97]"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#F6CC55] to-[#E0631C] text-[#0a0e1a] font-medium text-sm transition-transform duration-160 hover:scale-[1.03] active:scale-[0.97]"
             style={{ fontFamily: "var(--font-display)" }}
           >
             <Mail className="w-4 h-4" />
@@ -162,29 +162,29 @@ function Header() {
               key={p.id}
               href={p.href}
               {...(p.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-              className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2"
+              className="text-base text-slate-300 hover:text-[#F6CC55] transition-colors py-2"
               style={{ fontFamily: "var(--font-display)" }}
               onClick={() => setMobileOpen(false)}
             >
               {p.name}
             </a>
           ))}
-          <a href="#services" className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
+          <a href="#services" className="text-base text-slate-300 hover:text-[#F6CC55] transition-colors py-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
             Services
           </a>
-          <a href="#about" className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
+          <a href="#about" className="text-base text-slate-300 hover:text-[#F6CC55] transition-colors py-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
             About
           </a>
 
           {isOwner && (
-            <a href="/admin/billing" className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2 flex items-center gap-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
+            <a href="/admin/billing" className="text-base text-slate-300 hover:text-[#F6CC55] transition-colors py-2 flex items-center gap-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
               <Settings className="w-4 h-4" />
               Billing
             </a>
           )}
           <a
             href="#contact"
-            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-gradient-to-r from-[#f5b731] to-[#e67e22] text-[#0a0e1a] font-medium text-sm transition-transform duration-160 active:scale-[0.97]"
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-gradient-to-r from-[#F6CC55] to-[#E0631C] text-[#0a0e1a] font-medium text-sm transition-transform duration-160 active:scale-[0.97]"
             style={{ fontFamily: "var(--font-display)" }}
             onClick={() => setMobileOpen(false)}
           >
@@ -225,7 +225,7 @@ function HeroSection() {
             }`}
           >
             <StarAccent className="animate-pulse-glow" />
-            <span className="text-sm font-medium text-[#f5b731] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
+            <span className="text-sm font-medium text-[#F6CC55] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
               A platform of design & sports technology
             </span>
           </div>
@@ -240,7 +240,7 @@ function HeroSection() {
             <br />
             elevate brands that
             <br />
-            <span className="bg-gradient-to-r from-[#f5b731] to-[#e67e22] bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#F6CC55] to-[#E0631C] bg-clip-text text-transparent">
               stand apart.
             </span>
           </h1>
@@ -260,7 +260,7 @@ function HeroSection() {
           >
             <a
               href="#contact"
-              className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full bg-gradient-to-r from-[#f5b731] to-[#e67e22] text-[#0a0e1a] font-semibold text-base transition-transform duration-160 hover:scale-[1.03] active:scale-[0.97] shadow-lg shadow-[#f5b731]/20"
+              className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full bg-gradient-to-r from-[#F6CC55] to-[#E0631C] text-[#0a0e1a] font-semibold text-base transition-transform duration-160 hover:scale-[1.03] active:scale-[0.97] shadow-lg shadow-[#F6CC55]/20"
               style={{ fontFamily: "var(--font-display)" }}
             >
               Start a Conversation
@@ -268,7 +268,7 @@ function HeroSection() {
             </a>
             <a
               href="#platform"
-              className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full border border-white/15 text-white font-medium text-base transition-all duration-200 hover:border-[#f5b731]/40 hover:text-[#f5b731]"
+              className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full border border-white/15 text-white font-medium text-base transition-all duration-200 hover:border-[#F6CC55]/40 hover:text-[#F6CC55]"
               style={{ fontFamily: "var(--font-display)" }}
             >
               Explore the Platform
@@ -280,7 +280,7 @@ function HeroSection() {
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
           >
-            <MapPin className="w-4 h-4 text-[#f5b731]/60" />
+            <MapPin className="w-4 h-4 text-[#F6CC55]/60" />
             <span>Based in Westchester, NY</span>
           </div>
         </div>
@@ -371,7 +371,7 @@ function PlatformSection() {
             }`}
           >
             <StarAccent />
-            <span className="text-sm font-medium text-[#f5b731] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
+            <span className="text-sm font-medium text-[#F6CC55] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
               The Platform
             </span>
           </div>
@@ -416,7 +416,7 @@ function ServicesSection() {
               }`}
             >
               <StarAccent />
-              <span className="text-sm font-medium text-[#f5b731] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
+              <span className="text-sm font-medium text-[#F6CC55] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
                 What We Do
               </span>
             </div>
@@ -506,7 +506,7 @@ function ProcessSection() {
             }`}
           >
             <StarAccent />
-            <span className="text-sm font-medium text-[#f5b731] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
+            <span className="text-sm font-medium text-[#F6CC55] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
               Our Process
             </span>
           </div>
@@ -524,7 +524,7 @@ function ProcessSection() {
           {steps.map((step, i) => (
             <div
               key={step.number}
-              className={`relative p-6 rounded-xl border border-white/5 bg-[#0d1220]/70 backdrop-blur-sm hover:border-[#f5b731]/20 hover:bg-[#0d1220] transition-all duration-300 group ${
+              className={`relative p-6 rounded-xl border border-white/5 bg-[#0d1220]/70 backdrop-blur-sm hover:border-[#F6CC55]/20 hover:bg-[#0d1220] transition-all duration-300 group ${
                 isVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-8 scale-95"
               }`}
               style={{
@@ -532,7 +532,7 @@ function ProcessSection() {
                 transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)",
               }}
             >
-              <span className="text-4xl font-bold bg-gradient-to-b from-[#f5b731] to-[#e67e22] bg-clip-text text-transparent group-hover:scale-110 inline-block transition-transform duration-200" style={{ fontFamily: "var(--font-display)" }}>
+              <span className="text-4xl font-bold bg-gradient-to-b from-[#F6CC55] to-[#E0631C] bg-clip-text text-transparent group-hover:scale-110 inline-block transition-transform duration-200" style={{ fontFamily: "var(--font-display)" }}>
                 {step.number}
               </span>
               <h3 className="text-lg font-semibold text-white mt-3 mb-2" style={{ fontFamily: "var(--font-display)" }}>
@@ -562,7 +562,7 @@ function AboutSection() {
             }`}
           >
             <StarAccent />
-            <span className="text-sm font-medium text-[#f5b731] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
+            <span className="text-sm font-medium text-[#F6CC55] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
               About Us
             </span>
           </div>
@@ -604,7 +604,7 @@ function AboutSection() {
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
           >
-            <MapPin className="w-4 h-4 text-[#f5b731]/60" />
+            <MapPin className="w-4 h-4 text-[#F6CC55]/60" />
             <span>Westchester, NY</span>
           </div>
         </div>
@@ -659,7 +659,7 @@ function FAQSection() {
               }`}
             >
               <StarAccent />
-              <span className="text-sm font-medium text-[#f5b731] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
+              <span className="text-sm font-medium text-[#F6CC55] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
                 FAQ
               </span>
             </div>
@@ -678,7 +678,7 @@ function FAQSection() {
               <div
                 key={i}
                 className={`border border-white/5 rounded-xl overflow-hidden transition-all duration-500 ${
-                  openIndex === i ? "bg-[#0d1220]/90 border-[#f5b731]/15" : "bg-[#0d1220]/50 hover:border-white/10"
+                  openIndex === i ? "bg-[#0d1220]/90 border-[#F6CC55]/15" : "bg-[#0d1220]/50 hover:border-white/10"
                 } ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
                 style={{ transitionDelay: `${200 + i * 60}ms` }}
               >
@@ -690,7 +690,7 @@ function FAQSection() {
                     {faq.question}
                   </span>
                   <ChevronDown
-                    className={`w-5 h-5 text-[#f5b731] flex-shrink-0 transition-transform duration-200 ${
+                    className={`w-5 h-5 text-[#F6CC55] flex-shrink-0 transition-transform duration-200 ${
                       openIndex === i ? "rotate-180" : ""
                     }`}
                   />
@@ -758,7 +758,7 @@ function ContactSection() {
               >
                 Ready to create something
                 <br />
-                <span className="bg-gradient-to-r from-[#f5b731] to-[#e67e22] bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-[#F6CC55] to-[#E0631C] bg-clip-text text-transparent">
                   that stands apart?
                 </span>
               </h2>
@@ -768,13 +768,13 @@ function ContactSection() {
               </p>
               <div className="space-y-3 text-slate-400">
                 <div className="flex items-center gap-3">
-                  <Mail className="w-4 h-4 text-[#f5b731]/60" />
-                  <a href="mailto:frank@astersports.co" className="hover:text-[#f5b731] transition-colors">
+                  <Mail className="w-4 h-4 text-[#F6CC55]/60" />
+                  <a href="mailto:frank@astersports.co" className="hover:text-[#F6CC55] transition-colors">
                     frank@astersports.co
                   </a>
                 </div>
                 <div className="flex items-center gap-3">
-                  <MapPin className="w-4 h-4 text-[#f5b731]/60" />
+                  <MapPin className="w-4 h-4 text-[#F6CC55]/60" />
                   <span>Westchester, NY</span>
                 </div>
               </div>
@@ -787,18 +787,18 @@ function ContactSection() {
               }`}
             >
               {submitted ? (
-                <div className="p-8 rounded-2xl border border-[#f5b731]/20 bg-[#0a0e1a]/60 backdrop-blur-sm text-center">
+                <div className="p-8 rounded-2xl border border-[#F6CC55]/20 bg-[#0a0e1a]/60 backdrop-blur-sm text-center">
                   <StarAccent className="mx-auto mb-4 w-6 h-6" />
                   <h3 className="text-xl font-semibold text-white mb-2" style={{ fontFamily: "var(--font-display)" }}>
                     Message ready to send
                   </h3>
                   <p className="text-slate-400 text-sm">
                     Your email client should have opened with your message. If not, email us directly at{" "}
-                    <a href="mailto:frank@astersports.co" className="text-[#f5b731]">frank@astersports.co</a>.
+                    <a href="mailto:frank@astersports.co" className="text-[#F6CC55]">frank@astersports.co</a>.
                   </p>
                   <button
                     onClick={() => { setSubmitted(false); setFormState({ name: "", email: "", message: "" }); }}
-                    className="mt-4 text-sm text-[#f5b731] hover:underline"
+                    className="mt-4 text-sm text-[#F6CC55] hover:underline"
                   >
                     Send another message
                   </button>
@@ -815,7 +815,7 @@ function ContactSection() {
                       required
                       value={formState.name}
                       onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-                      className="w-full px-4 py-3 rounded-lg bg-[#111827] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#f5b731]/40 focus:ring-1 focus:ring-[#f5b731]/20 transition-all"
+                      className="w-full px-4 py-3 rounded-lg bg-[#111827] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all"
                       placeholder="Your name"
                     />
                   </div>
@@ -829,7 +829,7 @@ function ContactSection() {
                       required
                       value={formState.email}
                       onChange={(e) => setFormState({ ...formState, email: e.target.value })}
-                      className="w-full px-4 py-3 rounded-lg bg-[#111827] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#f5b731]/40 focus:ring-1 focus:ring-[#f5b731]/20 transition-all"
+                      className="w-full px-4 py-3 rounded-lg bg-[#111827] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all"
                       placeholder="your@email.com"
                     />
                   </div>
@@ -843,13 +843,13 @@ function ContactSection() {
                       rows={4}
                       value={formState.message}
                       onChange={(e) => setFormState({ ...formState, message: e.target.value })}
-                      className="w-full px-4 py-3 rounded-lg bg-[#111827] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#f5b731]/40 focus:ring-1 focus:ring-[#f5b731]/20 transition-all resize-none"
+                      className="w-full px-4 py-3 rounded-lg bg-[#111827] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all resize-none"
                       placeholder="Tell us about your project..."
                     />
                   </div>
                   <button
                     type="submit"
-                    className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-gradient-to-r from-[#f5b731] to-[#e67e22] text-[#0a0e1a] font-semibold text-base transition-transform duration-160 hover:scale-[1.02] active:scale-[0.97] shadow-lg shadow-[#f5b731]/20"
+                    className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-gradient-to-r from-[#F6CC55] to-[#E0631C] text-[#0a0e1a] font-semibold text-base transition-transform duration-160 hover:scale-[1.02] active:scale-[0.97] shadow-lg shadow-[#F6CC55]/20"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     <Send className="w-4 h-4" />
@@ -885,12 +885,12 @@ function Footer() {
                   key={p.id}
                   href={p.href}
                   {...(p.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                  className="text-[#f5b731] hover:text-[#e67e22] transition-colors"
+                  className="text-[#F6CC55] hover:text-[#E0631C] transition-colors"
                 >
                   {p.name}
                 </a>
               ))}
-              <a href="mailto:frank@astersports.co" className="text-[#f5b731] hover:text-[#e67e22] transition-colors">
+              <a href="mailto:frank@astersports.co" className="text-[#F6CC55] hover:text-[#E0631C] transition-colors">
                 frank@astersports.co
               </a>
             </div>
