@@ -1,0 +1,395 @@
+PLATFORM AUDIT — Aster platform, all 5 repos
+For: Frank (+ architect relay) · From: Claude Code (audit lane) · Date: 2026-06-25
+Methodology: line-by-line per category (5 parallel read-only repo passes) + 2-pass
+deep-read addendum (§16.15), cross-batch synthesis (AP #58). Findings tagged against
+the registered anti-patterns. READ-ONLY: no fixes, no merges, no flips. Forks carry a
+labeled lean (AP #39 / §11.8); the operator/architect decide.
+
+Companion to AUDIT_KICKOFF_2026-06-25.txt + CC_REBASELINE_2026-06-25.txt (this repo,
+docs/). Live-system claims [GROUNDED] against prod DB / deployed edge fns / advisors
+this session; file claims against the working tree at the heads below.
+
+Branch-state (AP #35): all 5 repos clean, on claude/audit-cc-rebaseline-2026-fhpthm,
+zero divergence from their origin/main. Heads: astersports-web 7047ccc · aster-sports
+13e3cda2 · st-patricks-armonk eeb2a73 · legacy-hoopers 595a8f3 · aster-weather a3f0a84.
+
+════════════════════════════════════════════════════════════════════════
+0. HEADLINE — what changed since the kickoff brief was written
+════════════════════════════════════════════════════════════════════════
+Two brief premises are now STALE/INVERTED by live state (verified this session):
+
+(A) S2 "ingest not live" is INVERTED. The brief said the scores-ingest edge fn was
+    NOT deployed and app_secrets.ingest_secret was NOT set. LIVE PROD [GROUNDED]:
+      · edge fn `ingest-game-results` v1 is DEPLOYED + ACTIVE (verify_jwt:false).
+      · `app_secrets.ingest_secret` HAS a value, rotated_at 2026-06-25 15:46 UTC (today).
+    The AAU score-ingest path is LIVE and HTTP-reachable — not dark. The good news:
+    the deployed function is well-built and fail-closed (see P0-1 / repo §B). The bad
+    news: NONE of this build is in any repo (P0-1).
+
+(B) The single most important finding is a REPO↔PROD drift, not a code bug:
+    P0-1 — the entire AAU ingest build (Phase-1 migration + ingest-game-results edge
+    fn + its vitest mirror + config.toml entry) AND the live `stripe-webhook-handler`
+    edge fn exist ONLY in prod, with ZERO repo footprint. Out-of-band deploys with no
+    CI coverage and no source of truth. Details in aster-sports §B / synthesis X1.
+
+Everything else is healthy-to-routine. No P0 in the money path (Print Studio audited
+at surface only, per scope). The weather triplication (S1) is real and now precisely
+quantified — and CHEAPER to collapse than feared because @aster/weather v0.1.0 is a
+clean extraction, not a scaffold.
+
+════════════════════════════════════════════════════════════════════════
+1. CROSS-REPO SYNTHESIS (AP #58) — patterns that span repos
+════════════════════════════════════════════════════════════════════════
+
+X1. REPO↔PROD DRIFT: live infra with no committed source (AP #21, #30, #31) — P0
+    Three live prod artifacts have zero repo footprint [GROUNDED — verified by repo
+    grep returning 0 + prod edge-fn list + prod schema_migrations]:
+      1. Migration `20260625132845_aau_ingest_phase1` (prod). Repo tops out at
+         `20260619125024`. The 0625 migration (game_results.external_game_id+org_id,
+         feed_source_mapping, get_public_team_records SECDEF) is uncommitted.
+      2. Edge fn `ingest-game-results` v1 ACTIVE — entrypoint `/tmp/user_fn_…` (a
+         dashboard/MCP deploy, not from CI). Its `_helpers.ts` names a vitest mirror
+         `src/lib/cron/ingestGameResultsHelpers.js` (AP #30) that DOES NOT EXIST in
+         the repo. No `[functions.ingest-game-results] verify_jwt=false` in
+         supabase/config.toml (AP #31) — it works today only because the out-of-band
+         deploy bypassed the CI deploy the audit test guards. A future
+         `supabase functions deploy` from CI would flip verify_jwt:true and 401 the
+         gateway.
+      3. Edge fn `stripe-webhook-handler` v1 ACTIVE — entrypoint `/tmp/user_fn_…`,
+         not in repo. A LIVE MONEY-PATH webhook with no committed source or config.
+    Why P0: a live writer to public records AND a live Stripe webhook are running
+    code no one can review, test, or safely redeploy. This is precisely the AP #21
+    "mirror in the same turn as apply" + AP #30 "two mirrored files, change both"
+    failure class — at money-path scale.
+    Lean (Architect-scoped — schema + money + public reader): reconcile the repo to
+    deployed bytes in one PR set — commit the 0625 migration mirror, both edge-fn
+    sources (ingest-game-results {index.ts,_helpers.ts} + stripe-webhook-handler),
+    the ingestGameResultsHelpers.js vitest mirror, and the two config.toml
+    verify_jwt entries, each reconciled to the running version. Then add the
+    out-of-band-deploy guardrail in X5. Do NOT redeploy from CI until config.toml is
+    correct. Risk low to commit / high to leave; lift medium.
+
+X2. WEATHER TRIPLICATION (S1) — the convergence map, quantified (AP #42)
+    Four copies; @aster/weather v0.1.0 is the intended single source and is a CLEAN
+    extraction (no P0/P1 in the package itself — see aster-weather repo §). St
+    Patrick (W-a) is the literal donor; the package headers say so and the SVG icons
+    diff BYTE-IDENTICAL between W-a and the package.
+      Copy      Repo                 Local weather LOC   State
+      W-a       st-patricks-armonk   ~896 (469 server +  Original donor. ~750 LOC is
+                                      427 client)        pure duplication of v0.1.0.
+      W-b       aster-sports (app)   ~475 (9 files)      Merged #1075-77. ~70 LOC pure
+                                                         dup; rest app-specific.
+      W-c       astersports-web AAU  ~640 dup (+178 svr) Imports only 2 symbols
+                                                         (isValidCoord, getWeatherInfo)
+                                                         — ~95% un-converged.
+      pkg       @aster/weather       v0.1.0 PRESENT:     ABSENT (the v0.2.0 backlog):
+                                      current/hourly/     combined daily-strip composer,
+                                      daily fetch+cache,  React hook/context + persistent
+                                      WMO map+emoji+      cache, batch getWeatherForEvents,
+                                      labels, parsePrecip,confirmed-animated icons,
+                                      coordsForEvent,     staleness signal.
+                                      isWithinForecastWin,
+                                      static SVG icons,
+                                      tests.
+    Convergence backlog (one source, many consumers — the AP #42 close the pilot
+    exists to enforce):
+      · W-a: drop ~750 LOC → import package core + icons. INCIDENTALLY FIXES W-a P2-5
+        (no-op shape guard) and W-a's TZ-naive class (package uses timeformat=unixtime).
+      · W-b: delete-and-import the 5 pure files (parsePrecip, wmo, coordsForEvent,
+        forecastWindow, weatherLocationFrom/getWeatherForTime) ~70 LOC now; keep the
+        sessionStorage/localStorage/sign-out-buster cache + daily-strip + UI app-side.
+      · W-c: delete most of server/weather.ts (its own buildUrl/normalize/fetch/cache)
+        → package fetchForecast/getDailyForecast; keep the animated AAU SVGs app-side.
+      · v0.2.0 must grow to fully absorb consumers: (1) a combined/daily-strip composer
+        taking a label config (parish vs sports framing as a parameter, not a fork);
+        (2) an optional React hook with injectable persistent-cache strategy; (3) batch
+        getWeatherForEvents; (4) confirm/port real icon ANIMATION (the v0.1.0 icons are
+        colorful but STATIC — no <animate>/keyframes — a correction to the brief's
+        "animated icons" wording); (5) the package P2/P3 polish (WMO_LABELS missing 7
+        codes, injected-fetch timeout not enforced, no CI workflow, current/daily
+        untested) BEFORE three repos depend on it.
+    Canonical-source ruling still pending (CC_REBASELINE G1). Lean: v0.1.0 already made
+    the right primitive call (W-a shape + W-b's unixtime/cache fixes). For v0.2.0,
+    extract the composer + hook from W-b (newer, app-tuned, pure resolver/composer per
+    AP #27) and the animation from W-a (the canonical visual asset); have BOTH consumers
+    refactor to import. Do NOT scaffold a 4th copy. Sequence consumers one at a time.
+
+X3. SAME-CONCEPT / SAME-SCOPE DRIFT (AP #63 PATTERN-A, S3)
+    · Academy classification (aster-sports P1): per-team `team_players.roster_type`
+      (badge + RSVP denominator, migrated by ROSTER-3) vs global `players.member_type`
+      (every per-player gate + all parent surfaces). A kid futures-global/rostered-on-
+      this-team is in the denominator but excluded from the eligible numerator — the
+      exact mismatch SD-6 was built to kill, re-introduced on the classification axis.
+      Parent context can't even SEE roster_type today (parentContext.js:49). Latent
+      until a live row hits the combo.
+    · Payment scope (aster-sports P2): roster payment dot was season-scoped (Frank,
+      2026-06-19, useRoster.js:79-84) while admin-home "Outstanding"
+      (useFamiliesOwingCount.js:18) + payment_overdue alert (alerts/queries.js:113)
+      stayed all-seasons. Same family reads opposite across two admin surfaces for a
+      prior-season debtor. Doctrine (§11.5 + AP #63 ROSTER-1) + paymentSignal.js:10-14
+      comment now stale (still claim all-seasons). This is reconciliation, not re-scope.
+    · Standalone-repo drift (legacy-hoopers): hardcodes the SAME Legacy Hoopers facts
+      (records, schedules, locations) the astersports.app tenant serves dynamically —
+      a third source of truth (Squarespace + app + this repo). See repo § / X4.
+    · Cross-repo: every "is this a girls' youth team's live venue/times public?"
+      surface (astersports-web AAU, legacy-hoopers ThisWeekend) reproduces the same
+      exposure; only astersports-web has it on-record as an operator decision (PR #107).
+
+X4. DEAD / REDUNDANT SURFACES (AP #51, #42)
+    · legacy-hoopers: an unshipped 2-day Manus prototype (29 commits 06-13→06-15, then
+      silent; live site is Squarespace). ~1.6K LOC dead (Map.tsx, ComponentShowcase.tsx
+      1437 LOC, AIChatBox.tsx — a 2nd chat component beside the live AIChatbot.tsx). It
+      is a redundant reimplementation of the app's Legacy Hoopers tenant. Lean: RETIRE
+      the repo; salvage only the "Court Noir" design language (ideas.md) as a doc ref
+      for a future tenant public-site template — built as a thin consumer of the app's
+      public API, never hardcoded constants/scraper.
+    · st-patricks-armonk: dead/risky exports DAILY_SCHEDULE (module-load snapshot) +
+      duplicate weather-icon barrels.
+    · astersports-web: tournament registry triplicated 4× (server scraper + 3 client
+      consts); a dead SectionHeading import.
+    · aster-weather: WindIcon/DropletIcon exported but unreachable via the dispatcher.
+
+X5. PUBLIC-SURFACE HYGIENE (S5) — two genuine leaks + one accepted tradeoff
+    · st-patricks-armonk P1-1 (real leak): `siteSettings.get` is a public arbitrary-
+      KEY read (admin.ts:55-59) — anon can read `notification_routing` (staff emails)
+      and `form_export_spreadsheet_id`, defeating the adminProcedure-gated dedicated
+      endpoint. Allowlist public keys.
+    · astersports-web P1 (functional inverse leak — fails CLOSED, so a UX bug not a
+      data leak): the AAU page is public but weather.home/weather.get are still
+      ownerProcedure (routers.ts:131,136) → every anon visitor gets UNAUTHORIZED and
+      the weather card renders "unavailable." Make them publicProcedure (the
+      isValidCoord guard already bounds input; Open-Meteo is keyless+cached).
+    · Accepted tradeoff (NOT a new finding): AAU exposes a girls' youth team's venue/
+      times + first names (PR #107). BUT astersports-web client-side hardcodes MORE
+      than that decision covered — a minor roster (first names + jersey #s,
+      FilmHighlights.tsx:26) + recurring practice gym addresses/days/times
+      (Locations.tsx:12). DECISION for Frank: confirm in-scope or gate. legacy-hoopers
+      reproduces the same exposure without any on-record decision.
+    · OUT-OF-BAND DEPLOY GUARDRAIL (ties to X1): add a CI/process check that flags edge
+      functions or migrations live in prod but absent from the repo. This audit found 3.
+
+X6. DB HYGIENE (aster-sports, prod advisors [GROUNDED] this session) — Architect-scoped
+    Security advisors: 76 (71 WARN/5 INFO). 62 are the noisy self-authorizing
+    `authenticated_security_definer_function_executable` class (mostly benign — these
+    SECDEF helpers do internal authz). Signal items worth a triage pass:
+      · function_search_path_mutable on `fin_tx_append_only` — a FINANCIAL trigger fn
+        with a mutable search_path (SECDEF + mutable search_path = classic injection
+        vector). Real hardening gap. Pin search_path.
+      · extension_in_public: pg_net in public schema — move to an extensions schema.
+      · 7 anon-executable SECDEF RPCs — confirm each exposes only intended data:
+        get_public_team_records (verified clean, display cols only, no PII),
+        get_public_program, get_public_subscribe_info, get_invitation_by_token,
+        org_is_public_listed, message_is_not_archived (why anon?), submit_registration
+        (anon WRITE — confirm validation/rate-limit).
+    Performance advisors: 292. 173 multiple_permissive_policies (RLS eval cost at
+    scale), 85 unused_index (cleanup candidates), 32 unindexed_foreign_keys, 1 bloat.
+    A consolidate-RLS-policies + prune-unused-index hygiene sweep is worth one
+    Architect-scoped pass before the second tenant (St Patrick) onboards.
+
+════════════════════════════════════════════════════════════════════════
+2. PER-REPO FINDINGS
+════════════════════════════════════════════════════════════════════════
+
+──────────────────────────────────────────────────────────────
+P1. astersports-web → astersports.io  (React + tRPC + Drizzle/MySQL)
+──────────────────────────────────────────────────────────────
+SSRF boundary (server/_core/net/safeFetch.ts), secrets fail-fast (env.ts), and
+owner-gating (fails closed in prod) all verified clean. No P0 in scope (Print Studio
+audited at surface only).
+
+P0: none in scope.
+P1-1: AAU weather dead for the public — weather.home/weather.get are ownerProcedure
+  (server/routers.ts:131,136) → protectedProcedure → requireUser throws UNAUTHORIZED
+  for anon (_core/trpc.ts:13). WeatherCard shows "unavailable"; per-game chips never
+  render. games/leaderboard were converted to publicProcedure; weather was missed.
+  Fix: publicProcedure (isValidCoord guard at :139 already bounds input). AP #43/#63.
+  Risk low / lift trivial (2 lines).
+P1-2: leaderboard.get hardcodes division:'11U Girls' (routers.ts:242) — latent AP #63
+  if a 2nd team ever flows through the scraper. Risk low / lift low.
+P2-1: tournament registry quadruplicated — server/scraper.ts:28 (source of truth) +
+  LiveScores.tsx:24 + TournamentHistory.tsx:11 + FilmHighlights.tsx:34. games.list
+  already exposes it; client copies are drift-prone. AP #7/#42. Lift medium.
+P2-2: weather.home always returns HOME_VENUE (Armonk) even during an away tournament —
+  card-vs-chip inconsistency (chips use venue coords). Lift medium.
+P2-3: three parallel streak computations for one concept (routers.ts:170-179 vs
+  193-200 vs SeasonLeaderboard.tsx:63-76 client recompute). AP #63. Lift medium.
+P2-4: auth.logout cookie-only — stateless JWT valid until exp (already TODO-tagged
+  routers.ts:54). Architect-scoped (needs revocation store). Lift high.
+P2-5: service-registry label drift (services.ts:99 "Aster 11U Girls" vs eyebrow "5th
+  Grade Girls"). Cosmetic — verify intended.
+P3: WeatherCard eyebrow hardcoded "Weather Hub"; lastKnownStatuses module-level
+  in-memory (game-check cron mis-fires on restart/multi-instance); FilmHighlights
+  backdrop rgba(0,0,0,0.85); dead SectionHeading import.
+Enhancement: single typed tournament registry; venue-aware Weather Hub; single streak
+  helper; a "public AAU surface reachable unauthenticated" integration test (would have
+  caught P1-1).
+Redesign: server-computed aauSeasonSummary procedure (kills the 3× client recompute);
+  full @aster/weather consumption (deletes most of server/weather.ts); move the minor
+  roster behind an owner-curated "public roster" config with an explicit decision record.
+S5 verdict: every publicProcedure enumerated; all reads safe-public except the two
+  weather procs that should BE public (P1-1). The only mutating AAU path (games.refresh)
+  is correctly ownerProcedure. Cron routes correctly cronSecret+isCron gated.
+
+──────────────────────────────────────────────────────────────
+P2. aster-sports → astersports.app  (React 19 + Supabase/RLS)
+──────────────────────────────────────────────────────────────
+Engine registry HEALTHY: RESOLVER_REGISTRY holds all 10 calendar-anchored kinds;
+KIND_COMPOSERS carries only the 2 legacy free-form kinds. AP #38 renderer-emit parity
+HOLDS (every resolver-emitted section kind has a SECTION_RENDERERS entry). AP #34
+schedule_change dispatch correctly migrated (the "did nothing for weeks" bug is fixed).
+AP #36 destructured-default error swallowing: 0 hits, clean. §0 grep-1 (warm palette) +
+grep-2 (invented tokens): PASS.
+
+P0-1 (= synthesis X1): AAU ingest build is prod-only, zero repo footprint. [GROUNDED:
+  repo grep 0 hits; prod migration 20260625132845 vs repo top 20260619125024; no
+  config.toml entries; no ingest-game-results/stripe-webhook-handler dirs in
+  supabase/functions/; no ingestGameResultsHelpers.js mirror.] Also stripe-webhook-
+  handler (money path) prod-only. AP #21/#30/#31. The deployed ingest fn ITSELF is
+  sound (shared-secret auth, throws on NULL secret → 500, 401 on mismatch — fail-closed
+  both axes; service-role only after auth; events match-ONLY → review flag never
+  phantom insert; idempotent upsert on (org_id, external_game_id); batched, AP #36-
+  clean). The defect is governance, not the code. Architect-scoped. Risk low to commit
+  / high to leave; lift medium.
+P1-1 (= X3): academy gating diverges roster_type (per-team) vs member_type (global) —
+  numerator/denominator mismatch. Callsites: useRsvps.js:47,58; rsvpEligibility.js:19;
+  EventCard.jsx:53; TeamDetailHero.jsx:84; EventHeroActions.jsx:51; ChildRsvp.jsx:20;
+  EventRsvpTab.jsx:85; parentContext.js:49. AP #63/#43. Latent — verify a live row
+  before fixing. Architect-scoped (eligibility contract + parent-context shape).
+P2-1: 5 files >150 LOC not in the §6 documented exceptions: familyGuide.js (163),
+  useCreateActivity.js (156), useSeasonFinancials.js (155), briefings/audience.js (154),
+  rsvpNudge.js (151). AP #6 — split or add to the exceptions table (latter needs §11.7
+  rule-7 chat-side review). Lift low-medium.
+P2-2 (= X3): roster payment-dot season-scope regression + stale doctrine/comment
+  (useRoster.js:79-84 vs useFamiliesOwingCount.js:18 + alerts/queries.js:113;
+  paymentSignal.js:10-14 + §11.5 + AP #63 ROSTER-1 now stale). Reconcile, don't
+  re-scope. Lift low.
+P3-1: game_results queries lack app-layer org_id filter (useTeamRecords.js:39 +6 more)
+  — RLS covers it (FK-scoped), defense-in-depth only per AP #37. Sweep after X1 commits
+  the migration. P3-2: hardcoded #FFFFFF in a test file (LoginPageBrandResetInvariant
+  .test.jsx:76) trips §0 grep-3 — whitelist test files or accept.
+S2 verdict (= X1/§0-A): path is LIVE, fail-closed, well-built; the issue is it's not in
+  the repo / under CI. get_public_team_records verified the only public records reader,
+  no PII (display cols only; gated on published_at NOT NULL + org_is_public_listed;
+  grants follow AP #23/#57). S3 verdict: payments consolidated on family_balances
+  (except the scope regression P2-2); records consolidated on teamRecords.computeSummary;
+  the only real same-concept drift is academy classification (P1-1).
+Enhancement: adopt @aster/weather for the 5 pure W-b files; commit the ingest vitest
+  mirror + config.toml; surface payment scope label in UI. Redesign: single academy-
+  classification resolver; weather as a thin app-shell over the package; out-of-band
+  deploy guardrail.
+
+──────────────────────────────────────────────────────────────
+P3. legacy-hoopers → standalone AAU site
+──────────────────────────────────────────────────────────────
+Assessment: UNSHIPPED 2-day Manus prototype (commits 06-13→06-15 only, then silent;
+live site is Squarespace; no CI/deploy target/README). NO weather code (not a 4th copy).
+P1-1: in-memory cron de-dup (scheduledGameCheck.ts:14) + scrape cache (tournament.ts:261)
+  re-notify on every restart/multi-instance. P1-2: regex HTML scraper with no parse
+  validation serves stale data indefinitely as "live" (tournament.ts:175). P1-3: scraper
+  spoofs a Chrome UA to bypass TourneyMachine bot protection (tournament.ts:124) —
+  ToS-fragile.
+P2-1: ~1.6K LOC dead code (Map.tsx, ComponentShowcase.tsx 1437, AIChatBox.tsx). P2-2:
+  records/teams hardcoded across 4+ files incl. inside the LLM system prompt
+  (routers.ts:18) — and season.ts OMITS 11U Girls while Records + the prompt feature it.
+  AP #63. P2-3: scrape errors swallowed (catch{}). P2-4: game-check leaks stack traces.
+P3: public unauth exposure of a girls' youth team's live venues/times (no on-record
+  decision); 29 any/as-any; thin a11y. Secrets clean.
+Drift: redundant reimplementation of the app's LH tenant (records/schedules/locations/
+  live-scores all hand-maintained vs DB-backed in the platform). LEAN (AP #39): RETIRE
+  the repo; salvage the "Court Noir" design language only, as a doc reference.
+
+──────────────────────────────────────────────────────────────
+P4. st-patricks-armonk → parish site (W-a, the original weather)
+──────────────────────────────────────────────────────────────
+P1-1 (= X5): public siteSettings.get arbitrary-key read leaks staff emails +
+  spreadsheet id (admin.ts:55-59) — allowlist public keys, route the rest through
+  staffProcedure. AP #63/S5. Risk medium / lift low.
+P2-1: JWT_SECRET silently defaults to "" (env.ts:3 → sdk.ts:158) — no boot fail-fast;
+  empty HMAC key is forgeable if unset in prod. Port the astersports-web validateEnv
+  pattern. High risk if misconfigured / low lift.
+P2-2: Sept 12:30 Mass shows ~2 weeks early — seasonal model is month-granular only;
+  the recent fix added month 9 but no intra-month boundary (scheduleEngine.ts:65,141).
+P2-3: findNextMass uses an inconsistent "now" (fresh new Date() at NowStatusBar.tsx:52
+  vs the ET-adjusted now) + ignores date-aware filtering. P2-4: TZ-mangling idiom
+  new Date(toLocaleString(...)) in 4+ places — .getTime()/.toISOString() are offset-
+  wrong (feeds the weather query) — the same DL-13 class @aster/weather fixed. P2-5:
+  current.ts:62 shape-guard is a no-op (`!x === undefined` always false) — package
+  already fixes this.
+P3: weather coords (types.ts:7) disagree with parish mapCoordinates (scheduleEngine
+  .ts:104) ~1.5km; DAILY_SCHEDULE dead/stale export; sacrament status-emails fail
+  silently (sacraments.ts:54,98,147,199 catch{}); 155 `any`; `[i]||0` masks data gaps.
+Weather W-a map (= X2): ~896 LOC local; ~750 collapsible by adopting the package
+  (drops icon set + engine core, INCIDENTALLY fixes P2-5 + the TZ class). KEEP local
+  (parish-domain): getWeatherForEvents batch wrapper, isOutdoorEvent/getParkingAdvisory
+  heuristics, useWeatherToken, presentational components (re-typed off the package).
+  v0.2.0 must grow batch enrichment + reconcile the forecastStrip time/timestamp field.
+Top-3 to action: P1-1, P2-1, the package adoption.
+
+──────────────────────────────────────────────────────────────
+P5. aster-weather → @aster/weather v0.1.0 (the shared package)
+──────────────────────────────────────────────────────────────
+Bottom line: a CLEAN, deliberate extraction — well-typed, tested (2 suites), error-
+handled (never throws/never fabricates), with a written 3-way merge derivation. NO
+P0/P1. Distributed as a git tag dependency (dist/ committed). The real gap is SCOPE:
+v0.1.0 froze the primitives and left the composition layer (combined daily-strip, hook/
+context, banners, classifiers) in the consumers — that's the v0.2.0 backlog.
+P2-1: fetchWithTimeout does NOT enforce timeout on the injected-fetch path
+  (helpers.ts:62) — the path server consumers actually use. P2-3: WMO_LABELS missing 7
+  codes (56,57,66,67,77,85,86) → labelForCode returns "Unknown" while emoji/SVG render
+  (AP #63 cross-surface). P2-4: WindIcon/DropletIcon exported but unreachable via the
+  dispatcher (no wind-icon path for severe wind events).
+P3: 3 unbounded module-global caches (no eviction); stale-cache fallback has no max-
+  staleness bound/signal; no tests for current.ts/daily.ts/icons; NO CI workflow (a
+  regression to a 3-consumer package ships via a tag with no gate); coordsForEvent
+  return type can carry null lat/lon; DEFAULT_FORECAST_WINDOW_DAYS=10 exceeds the real
+  7-day horizon.
+CORRECTION to the brief: v0.1.0 icons are COLORFUL but STATIC (no <animate>/keyframes),
+  and the icon set is ~190 LOC not "~1050" (that figure likely counted W-a wrappers).
+  Confirm whether W-a originals are genuinely animated before claiming the package
+  preserves animation.
+v0.2.0 growth (to let W-a/W-b drop local copies): (1) combined daily-strip composer
+  w/ label config; (2) optional React hook w/ injectable persistent cache; (3) batch
+  getWeatherForEvents; (4) confirm/port real animation + wire WindIcon; (5) close the
+  P2/P3 polish + add CI before consumers wire in.
+
+════════════════════════════════════════════════════════════════════════
+3. DECISION FORKS (labeled leans — §11.8 rule 6; operator/architect decide)
+════════════════════════════════════════════════════════════════════════
+D1 [Architect-scoped] X1/P0-1 repo↔prod reconciliation. Commit the 0625 migration +
+   both edge-fn sources + vitest mirror + config.toml entries to match deployed bytes,
+   in one Architect-reviewed PR set. LEAN: do it next — a live Stripe webhook + public-
+   records writer with no committed source is the platform's biggest risk right now.
+D2 [Frank/Architect] @aster/weather canonical source (CC_REBASELINE G1, still open).
+   LEAN: v0.2.0 extracts composer+hook from W-b, animation from W-a; both consumers
+   refactor to import; sequence one at a time; no 4th copy. Decide before any more
+   weather work.
+D3 [Frank] legacy-hoopers disposition. LEAN: RETIRE the repo (unshipped, redundant with
+   the app's LH tenant); salvage the Court Noir design language as a doc ref only.
+D4 [Frank] AAU public-exposure scope. The PR #107 decision covered scoreboard venue/
+   times + first names; the client ALSO hardcodes a minor roster (names+jersey#s) +
+   recurring practice addresses/times. CONFIRM in-scope or gate. Same exposure exists
+   un-recorded in legacy-hoopers.
+D5 [Architect-scoped] DB hygiene sweep (X6) before St Patrick onboards: pin
+   fin_tx_append_only search_path, move pg_net out of public, consolidate the 173
+   multiple-permissive policies, prune the 85 unused indexes, confirm the 7 anon SECDEF
+   RPCs. LEAN: one batched advisor-hygiene pass, Architect-reviewed.
+D6 [Routine] st-patricks-armonk P1-1 (siteSettings.get allowlist) + P2-1 (JWT fail-
+   fast) are self-contained security fixes — LEAN: ship in that repo independent of the
+   weather convergence.
+
+════════════════════════════════════════════════════════════════════════
+4. OUT OF SCOPE (explicitly not audited)
+════════════════════════════════════════════════════════════════════════
+· Print Studio money path (astersports-web server/_core/studio/*, routers/studio*,
+  PRs #102-105) — separate active CC lane; surfaced at router-wiring surface only, no
+  egregious issue seen, NOT deeply audited.
+· Full RLS policy enumeration across all 274 aster-sports migrations (recent spot-
+  checked; advisor-level coverage in X6).
+· Accessibility/axe runs (spot-checks only across repos).
+· Drizzle/MySQL schema correctness in the three Forge repos (no DB access for those).
+· Dependabot/CVE triage (a legacy-hoopers vite-7.3.5 bump branch exists; not assessed).
+· 60+ vendored shadcn/ui primitives (legacy-hoopers/st-patrick client/components/ui/*).
+· @aster/weather runtime execution (no node_modules; assessed by reading src + committed
+  dist, which match).
+
+— end —
