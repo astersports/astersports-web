@@ -1,145 +1,26 @@
 {
   "version": "7",
-  "dialect": "mysql",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "5",
-      "when": 1781521172505,
-      "tag": "0000_perpetual_mach_iv",
+      "version": "7",
+      "when": 1782250944375,
+      "tag": "0000_init",
       "breakpoints": true
     },
     {
       "idx": 1,
-      "version": "5",
-      "when": 1781525774147,
-      "tag": "0001_goofy_newton_destine",
+      "version": "7",
+      "when": 1782251001630,
+      "tag": "0001_updatedat_triggers",
       "breakpoints": true
     },
     {
       "idx": 2,
-      "version": "5",
-      "when": 1781887173018,
-      "tag": "0002_spooky_titania",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "5",
-      "when": 1781895046201,
-      "tag": "0003_wild_sunspot",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "5",
-      "when": 1781900571246,
-      "tag": "0004_yellow_doorman",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "5",
-      "when": 1781901590961,
-      "tag": "0005_slow_dragon_man",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "5",
-      "when": 1781959279304,
-      "tag": "0006_kind_vector",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "5",
-      "when": 1781974607009,
-      "tag": "0007_early_dragon_lord",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "5",
-      "when": 1781985721243,
-      "tag": "0008_superb_black_queen",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "5",
-      "when": 1781988842021,
-      "tag": "0009_mature_roxanne_simpson",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "5",
-      "when": 1781995458813,
-      "tag": "0010_simple_the_renegades",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "5",
-      "when": 1782009372022,
-      "tag": "0011_kind_dakota_north",
-      "breakpoints": true
-    },
-    {
-      "idx": 12,
-      "version": "5",
-      "when": 1782071512371,
-      "tag": "0012_moaning_lady_mastermind",
-      "breakpoints": true
-    },
-    {
-      "idx": 13,
-      "version": "5",
-      "when": 1782072836791,
-      "tag": "0013_dry_gressill",
-      "breakpoints": true
-    },
-    {
-      "idx": 14,
-      "version": "5",
-      "when": 1782073480374,
-      "tag": "0014_elite_weapon_omega",
-      "breakpoints": true
-    },
-    {
-      "idx": 15,
-      "version": "5",
-      "when": 1782073941264,
-      "tag": "0015_studio_jobs_fulltext_search",
-      "breakpoints": true
-    },
-    {
-      "idx": 16,
-      "version": "5",
-      "when": 1782153885231,
-      "tag": "0016_async_gen_phase1",
-      "breakpoints": true
-    },
-    {
-      "idx": 17,
-      "version": "5",
-      "when": 1782156127479,
-      "tag": "0017_async_prediction_meta",
-      "breakpoints": true
-    },
-    {
-      "idx": 18,
-      "version": "5",
-      "when": 1782211392677,
-      "tag": "0018_lovely_jane_foster",
-      "breakpoints": true
-    },
-    {
-      "idx": 19,
-      "version": "5",
-      "when": 1782212808311,
-      "tag": "0019_stormy_sunset_bain",
+      "version": "7",
+      "when": 1782252634556,
+      "tag": "0002_trial_reminders_sent",
       "breakpoints": true
     }
   ]

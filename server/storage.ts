@@ -1,22 +1,20 @@
-// Preconfigured storage helpers for Manus WebDev templates
-// Uploads via Forge Server presigned URL to S3 (PUT direct).
-// Downloads return /manus-storage/{key} paths served via 307 redirect.
+// Storage helpers. Migrated from the Manus Forge presigned-URL/S3 path to Supabase
+// Storage (private `media` bucket). The public surface is unchanged on purpose:
+//   - storagePut returns { key, url: "/manus-storage/{key}" } — same serving path,
+//     so keys already persisted in the DB and rendered in the UI stay valid.
+//   - storageGet returns that path without a network round-trip.
+//   - storageGetSignedUrl returns a time-limited URL the sub-processors (Claude /
+//     Replicate) can fetch directly.
+// The /manus-storage/{key} route (server/_core/storageProxy.ts) keeps the
+// tenant-isolation auth check and 307-redirects the browser to a short-lived
+// signed URL — the bucket itself is never public.
 
 import { ENV } from "./_core/env";
-import { fetchWithTimeout, TIMEOUT } from "./fetchTimeout";
+import { createStorageSignedUrl, getStorageClient } from "./_core/supabaseStorage";
 
-function getForgeConfig() {
-  const forgeUrl = ENV.forgeApiUrl;
-  const forgeKey = ENV.forgeApiKey;
-
-  if (!forgeUrl || !forgeKey) {
-    throw new Error(
-      "Storage config missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY",
-    );
-  }
-
-  return { forgeUrl: forgeUrl.replace(/\/+$/, ""), forgeKey };
-}
+/** TTL for read URLs handed to sub-processors (Claude vision, Replicate SAM2/LaMa).
+ *  Generous so a queued async prediction can still fetch the source when it runs. */
+const READ_SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hour
 
 function normalizeKey(relKey: string): string {
   return relKey.replace(/^\/+/, "");
@@ -35,42 +33,25 @@ export async function storagePut(
   contentType = "application/octet-stream",
   opts?: { deterministicKey?: boolean },
 ): Promise<{ key: string; url: string }> {
-  const { forgeUrl, forgeKey } = getForgeConfig();
   // Default appends a random suffix so distinct user assets sharing a path don't clobber.
   // Content-addressed callers (the LaMa reproducible-by-cache layer) pass deterministicKey
   // so the write address equals the later read address — otherwise the cache never hits.
   const key = opts?.deterministicKey ? normalizeKey(relKey) : appendHashSuffix(normalizeKey(relKey));
 
-  // 1. Get presigned PUT URL from Forge
-  const presignUrl = new URL("v1/storage/presign/put", forgeUrl + "/");
-  presignUrl.searchParams.set("path", key);
+  // Normalize to a Buffer (Supabase storage-js accepts Buffer/ArrayBuffer/Blob in Node).
+  const body = typeof data === "string" ? Buffer.from(data) : Buffer.from(data as Uint8Array);
 
-  const presignResp = await fetchWithTimeout(presignUrl.toString(), {
-    headers: { Authorization: `Bearer ${forgeKey}` },
-  }, TIMEOUT.STORAGE_PRESIGN);
+  const { error } = await getStorageClient()
+    .storage.from(ENV.supabaseStorageBucket)
+    .upload(key, body, {
+      contentType,
+      // Deterministic (content-addressed) keys are written repeatedly with identical
+      // bytes, so overwrite is expected; random-suffix keys are unique, so don't.
+      upsert: Boolean(opts?.deterministicKey),
+    });
 
-  if (!presignResp.ok) {
-    const msg = await presignResp.text().catch(() => presignResp.statusText);
-    throw new Error(`Storage presign failed (${presignResp.status}): ${msg}`);
-  }
-
-  const { url: s3Url } = (await presignResp.json()) as { url: string };
-  if (!s3Url) throw new Error("Forge returned empty presign URL");
-
-  // 2. PUT file directly to S3
-  const blob =
-    typeof data === "string"
-      ? new Blob([data], { type: contentType })
-      : new Blob([data as any], { type: contentType });
-
-  const uploadResp = await fetchWithTimeout(s3Url, {
-    method: "PUT",
-    headers: { "Content-Type": contentType },
-    body: blob,
-  }, TIMEOUT.IMAGE_GENERATION);
-
-  if (!uploadResp.ok) {
-    throw new Error(`Storage upload to S3 failed (${uploadResp.status})`);
+  if (error) {
+    throw new Error(`Storage upload failed: ${error.message}`);
   }
 
   return { key, url: `/manus-storage/${key}` };
@@ -82,21 +63,5 @@ export async function storageGet(relKey: string): Promise<{ key: string; url: st
 }
 
 export async function storageGetSignedUrl(relKey: string): Promise<string> {
-  const { forgeUrl, forgeKey } = getForgeConfig();
-  const key = normalizeKey(relKey);
-
-  const getUrl = new URL("v1/storage/presign/get", forgeUrl + "/");
-  getUrl.searchParams.set("path", key);
-
-  const resp = await fetchWithTimeout(getUrl.toString(), {
-    headers: { Authorization: `Bearer ${forgeKey}` },
-  }, TIMEOUT.STORAGE_PRESIGN);
-
-  if (!resp.ok) {
-    const msg = await resp.text().catch(() => resp.statusText);
-    throw new Error(`Storage signed URL failed (${resp.status}): ${msg}`);
-  }
-
-  const { url } = (await resp.json()) as { url: string };
-  return url;
+  return createStorageSignedUrl(normalizeKey(relKey), READ_SIGNED_URL_TTL_SECONDS);
 }

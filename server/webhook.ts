@@ -261,10 +261,11 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         stripeSubscriptionId: subscriptionId,
         subscriptionStatus: "active",
       })
-      .where(eq(billingClients.stripeCustomerId, customerId));
+      .where(eq(billingClients.stripeCustomerId, customerId))
+      .returning({ id: billingClients.id });
 
-    // mysql2 returns [ResultSetHeader, ...] where ResultSetHeader has affectedRows
-    const affectedRows = (result as any)?.[0]?.affectedRows ?? 0;
+    // Postgres: .returning() yields one row per updated record; length = rows affected.
+    const affectedRows = result.length;
     console.log(`[Stripe Webhook] DB update affected ${affectedRows} row(s)`);
 
     if (affectedRows === 0) {

@@ -1,11 +1,11 @@
 /**
  * Money-path INTEGRATION tests — exercise the REAL credit primitives against a
- * real MySQL (the rest of the suite mocks studioDb, so the atomic conditional
+ * real Postgres (the rest of the suite mocks studioDb, so the atomic conditional
  * debit, (refId,reason) idempotency, and concurrency behavior were untested).
  *
- * Gated on RUN_DB_TESTS=1 (+ a DATABASE_URL pointing at a throwaway MySQL), so it
- * SKIPS in local runs and the normal CI job, and runs only in the dedicated
- * `db-integration` CI job that provisions MySQL. See .github/workflows/ci.yml.
+ * Gated on RUN_DB_TESTS=1 (+ a DATABASE_URL pointing at a throwaway Postgres), so
+ * it SKIPS in local runs and the normal CI job, and runs only in the dedicated
+ * `db-integration` CI job that provisions Postgres. See .github/workflows/ci.yml.
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { eq } from "drizzle-orm";
@@ -20,9 +20,12 @@ let db: any;
 
 async function seedTenant(balance: number): Promise<number> {
   const slug = `it-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
-  const res = await db.insert(tenants).values({ name: "IT", slug, categoryId: 1, creditBalance: balance });
-  // mysql2 returns insertId on the ResultSetHeader
-  return (res as any)[0].insertId as number;
+  // postgres-js has no insertId; RETURNING is the portable way to read the new PK.
+  const res = await db
+    .insert(tenants)
+    .values({ name: "IT", slug, categoryId: 1, creditBalance: balance })
+    .returning({ id: tenants.id });
+  return (res as any)[0].id as number;
 }
 
 async function balanceOf(tid: number): Promise<number> {
@@ -30,7 +33,7 @@ async function balanceOf(tid: number): Promise<number> {
   return t.creditBalance as number;
 }
 
-describe.skipIf(!RUN)("credit primitives (real MySQL)", () => {
+describe.skipIf(!RUN)("credit primitives (real Postgres)", () => {
   beforeAll(async () => {
     db = await getDb();
     if (!db) throw new Error("RUN_DB_TESTS set but getDb() returned null (DATABASE_URL?)");
@@ -91,7 +94,7 @@ describe.skipIf(!RUN)("credit primitives (real MySQL)", () => {
   });
 });
 
-describe.skipIf(!RUN)("reapStuckJobs (real MySQL) — B2 stranded-job backstop", () => {
+describe.skipIf(!RUN)("reapStuckJobs (real Postgres) — B2 stranded-job backstop", () => {
   beforeAll(async () => {
     db = await getDb();
     if (!db) throw new Error("RUN_DB_TESTS set but getDb() returned null (DATABASE_URL?)");
@@ -101,8 +104,8 @@ describe.skipIf(!RUN)("reapStuckJobs (real MySQL) — B2 stranded-job backstop",
     const res = await db.insert(jobs).values({
       tenantId: tid, userId: 1, title: "stuck", originalKey: "k", originalUrl: "u",
       status: "processing", creditsUsed: cost,
-    });
-    return (res as any)[0].insertId as number;
+    }).returning({ id: jobs.id });
+    return (res as any)[0].id as number;
   }
   const refundRows = async (tid: number) =>
     (await db.select().from(creditLedger).where(eq(creditLedger.tenantId, tid))).filter((x: any) => x.reason === "refund");
@@ -142,7 +145,7 @@ describe.skipIf(!RUN)("reapStuckJobs (real MySQL) — B2 stranded-job backstop",
   });
 });
 
-describe.skipIf(!RUN)("recoverStrandedCpuJobs (real MySQL) — T1.5 mid-op strand retry", () => {
+describe.skipIf(!RUN)("recoverStrandedCpuJobs (real Postgres) — T1.5 mid-op strand retry", () => {
   beforeAll(async () => {
     db = await getDb();
     if (!db) throw new Error("RUN_DB_TESTS set but getDb() returned null (DATABASE_URL?)");
@@ -152,8 +155,8 @@ describe.skipIf(!RUN)("recoverStrandedCpuJobs (real MySQL) — T1.5 mid-op stran
     const res = await db.insert(jobs).values({
       tenantId: tid, userId: 1, title: status, originalKey: "k", originalUrl: "u",
       status, creditsUsed: 10,
-    });
-    return (res as any)[0].insertId as number;
+    }).returning({ id: jobs.id });
+    return (res as any)[0].id as number;
   }
   const statusOf = async (jid: number): Promise<string> =>
     (await db.select().from(jobs).where(eq(jobs.id, jid)).limit(1))[0].status as string;

@@ -4,10 +4,10 @@
  * Idempotent: uses a `trial_reminders_sent` table to avoid duplicate sends.
  */
 import { getDb } from "./db";
-import { tenants } from "../drizzle/schema";
+import { tenants, trialRemindersSent } from "../drizzle/schema";
 import { getTrialStatus } from "./studioDb";
 import { notifyOwner } from "./_core/notification";
-import { and, isNotNull, sql } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 
 /** Trial-day thresholds (1-indexed) at which a reminder should fire. */
 const REMINDER_THRESHOLDS = [4, 6] as const;
@@ -177,10 +177,12 @@ async function checkReminderSent(
   tenantId: number,
   trialDay: number
 ): Promise<boolean> {
-  const rows = await db.execute(
-    sql`SELECT 1 FROM trial_reminders_sent WHERE tenant_id = ${tenantId} AND trial_day = ${trialDay} LIMIT 1`
-  );
-  return (rows as any).length > 0 || ((rows as any).rows?.length ?? 0) > 0;
+  const [row] = await db
+    .select({ tenantId: trialRemindersSent.tenantId })
+    .from(trialRemindersSent)
+    .where(and(eq(trialRemindersSent.tenantId, tenantId), eq(trialRemindersSent.trialDay, trialDay)))
+    .limit(1);
+  return !!row;
 }
 
 /**
@@ -191,7 +193,7 @@ async function markReminderSent(
   tenantId: number,
   trialDay: number
 ): Promise<void> {
-  await db.execute(
-    sql`INSERT IGNORE INTO trial_reminders_sent (tenant_id, trial_day, sent_at) VALUES (${tenantId}, ${trialDay}, NOW())`
-  );
+  // ON CONFLICT (tenantId, trialDay) DO NOTHING — idempotent on the composite PK
+  // (replaces MySQL INSERT IGNORE). sentAt defaults to now().
+  await db.insert(trialRemindersSent).values({ tenantId, trialDay }).onConflictDoNothing();
 }

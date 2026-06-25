@@ -1,4 +1,16 @@
+import Anthropic from "@anthropic-ai/sdk";
 import { ENV } from "./env";
+
+/**
+ * Vision LLM client. Migrated from the Manus forge OpenAI-compatible gateway
+ * (forge.manus.im/v1/chat/completions) to the official Anthropic SDK (Claude).
+ *
+ * The public surface is unchanged on purpose: callers (aiEngine, locateFabricRegion)
+ * and the test mocks pass OpenAI-shaped `InvokeParams` and read an OpenAI-shaped
+ * `InvokeResult` (`choices[0].message.content`). This module adapts that contract
+ * onto Anthropic's Messages API — OpenAI `messages`/`image_url`/`response_format`
+ * translate to Anthropic `system` + `messages` (image blocks) + `output_config.format`.
+ */
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -113,344 +125,139 @@ export type ResponseFormat =
   | { type: "json_object" }
   | { type: "json_schema"; json_schema: JsonSchema };
 
+/** Anthropic requires max_tokens; our structured-extraction calls emit small JSON,
+ *  so a modest default avoids truncating an element list without inflating latency. */
+const DEFAULT_MAX_TOKENS = 4096;
+
+const ALLOWED_IMAGE_MEDIA = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
+type AllowedImageMedia = (typeof ALLOWED_IMAGE_MEDIA)[number];
+
+let cachedClient: Anthropic | null = null;
+const getClient = (): Anthropic => {
+  if (!ENV.anthropicApiKey) {
+    throw new Error("ANTHROPIC_API_KEY is not configured");
+  }
+  if (!cachedClient) {
+    // maxRetries mirrors the old custom backoff (4 tries); the SDK retries 429/5xx
+    // and connection errors with exponential backoff automatically.
+    cachedClient = new Anthropic({ apiKey: ENV.anthropicApiKey, maxRetries: 4 });
+  }
+  return cachedClient;
+};
+
 const ensureArray = (
   value: MessageContent | MessageContent[]
 ): MessageContent[] => (Array.isArray(value) ? value : [value]);
 
-const normalizeContentPart = (
-  part: MessageContent
-): TextContent | ImageContent | FileContent => {
-  if (typeof part === "string") {
-    return { type: "text", text: part };
+/** Translate one OpenAI image_url part (data URL or http(s) URL) into an Anthropic image block. */
+const toImageBlock = (part: ImageContent): Anthropic.ImageBlockParam => {
+  const url = part.image_url.url;
+  // Inline data URL (the locate path downscales to a base64 JPEG): decode to a
+  // base64 source so Anthropic never has to fetch anything.
+  const dataMatch = /^data:([^;,]+)?(;base64)?,([\s\S]*)$/.exec(url);
+  if (url.startsWith("data:") && dataMatch) {
+    const declared = (dataMatch[1] || "image/jpeg").toLowerCase();
+    const media: AllowedImageMedia = (ALLOWED_IMAGE_MEDIA as readonly string[]).includes(declared)
+      ? (declared as AllowedImageMedia)
+      : "image/jpeg";
+    return { type: "image", source: { type: "base64", media_type: media, data: dataMatch[3] ?? "" } };
   }
-
-  if (part.type === "text") {
-    return part;
-  }
-
-  if (part.type === "image_url") {
-    return part;
-  }
-
-  if (part.type === "file_url") {
-    return part;
-  }
-
-  throw new Error("Unsupported message content part");
+  // Signed/remote URL (detect + no-op judge paths): Anthropic fetches it server-side.
+  return { type: "image", source: { type: "url", url } };
 };
 
-const normalizeMessage = (message: Message) => {
-  const { role, name, tool_call_id } = message;
-
-  if (role === "tool" || role === "function") {
-    const content = ensureArray(message.content)
-      .map(part => (typeof part === "string" ? part : JSON.stringify(part)))
-      .join("\n");
-
-    return {
-      role,
-      name,
-      tool_call_id,
-      content,
-    };
-  }
-
-  const contentParts = ensureArray(message.content).map(normalizeContentPart);
-
-  // If there's only text content, collapse to a single string for compatibility
-  if (contentParts.length === 1 && contentParts[0].type === "text") {
-    return {
-      role,
-      name,
-      content: contentParts[0].text,
-    };
-  }
-
-  return {
-    role,
-    name,
-    content: contentParts,
-  };
+const toContentBlock = (part: MessageContent): Anthropic.ContentBlockParam => {
+  if (typeof part === "string") return { type: "text", text: part };
+  if (part.type === "text") return { type: "text", text: part.text };
+  if (part.type === "image_url") return toImageBlock(part);
+  // file_url is unused by the current vision callers; surface loudly if one appears.
+  throw new Error("Unsupported message content part for the Anthropic vision client");
 };
 
-const normalizeToolChoice = (
-  toolChoice: ToolChoice | undefined,
-  tools: Tool[] | undefined
-): "none" | "auto" | ToolChoiceExplicit | undefined => {
-  if (!toolChoice) return undefined;
+/** Split OpenAI-style messages into Anthropic's top-level `system` string + user/assistant turns. */
+const toAnthropicMessages = (
+  messages: Message[]
+): { system: string; messages: Anthropic.MessageParam[] } => {
+  const systemParts: string[] = [];
+  const out: Anthropic.MessageParam[] = [];
 
-  if (toolChoice === "none" || toolChoice === "auto") {
-    return toolChoice;
-  }
-
-  if (toolChoice === "required") {
-    if (!tools || tools.length === 0) {
-      throw new Error(
-        "tool_choice 'required' was provided but no tools were configured"
+  for (const message of messages) {
+    if (message.role === "system") {
+      systemParts.push(
+        ensureArray(message.content)
+          .map((p) => (typeof p === "string" ? p : p.type === "text" ? p.text : ""))
+          .filter(Boolean)
+          .join("\n")
       );
+      continue;
     }
-
-    if (tools.length > 1) {
-      throw new Error(
-        "tool_choice 'required' needs a single tool or specify the tool name explicitly"
-      );
-    }
-
-    return {
-      type: "function",
-      function: { name: tools[0].function.name },
-    };
+    // tool/function roles are unused here; fold anything non-assistant into a user turn.
+    const role: "user" | "assistant" = message.role === "assistant" ? "assistant" : "user";
+    out.push({ role, content: ensureArray(message.content).map(toContentBlock) });
   }
 
-  if ("name" in toolChoice) {
-    return {
-      type: "function",
-      function: { name: toolChoice.name },
-    };
-  }
-
-  return toolChoice;
+  return { system: systemParts.join("\n\n"), messages: out };
 };
 
-const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-    : "https://forge.manus.im/v1/chat/completions";
-
-const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+/** Map an OpenAI response_format / outputSchema onto Anthropic's structured-output config. */
+const toOutputConfig = (params: InvokeParams): Anthropic.OutputConfig | undefined => {
+  const explicit = params.responseFormat || params.response_format;
+  if (explicit && explicit.type === "json_schema") {
+    return { format: { type: "json_schema", schema: explicit.json_schema.schema } };
   }
-};
-
-const normalizeResponseFormat = ({
-  responseFormat,
-  response_format,
-  outputSchema,
-  output_schema,
-}: {
-  responseFormat?: ResponseFormat;
-  response_format?: ResponseFormat;
-  outputSchema?: OutputSchema;
-  output_schema?: OutputSchema;
-}):
-  | { type: "json_schema"; json_schema: JsonSchema }
-  | { type: "text" }
-  | { type: "json_object" }
-  | undefined => {
-  const explicitFormat = responseFormat || response_format;
-  if (explicitFormat) {
-    if (
-      explicitFormat.type === "json_schema" &&
-      !explicitFormat.json_schema?.schema
-    ) {
-      throw new Error(
-        "responseFormat json_schema requires a defined schema object"
-      );
-    }
-    return explicitFormat;
+  const schema = params.outputSchema || params.output_schema;
+  if (schema?.schema) {
+    return { format: { type: "json_schema", schema: schema.schema } };
   }
-
-  const schema = outputSchema || output_schema;
-  if (!schema) return undefined;
-
-  if (!schema.name || !schema.schema) {
-    throw new Error("outputSchema requires both name and schema");
-  }
-
-  return {
-    type: "json_schema",
-    json_schema: {
-      name: schema.name,
-      schema: schema.schema,
-      ...(typeof schema.strict === "boolean" ? { strict: schema.strict } : {}),
-    },
-  };
-};
-
-const RETRY_MAX_RETRIES = 4;
-const RETRY_BASE_DELAY_MS = 500;
-const RETRY_MAX_DELAY_MS = 30_000;
-
-type FetchInit = NonNullable<Parameters<typeof fetch>[1]>;
-
-const sleep = (ms: number) =>
-  new Promise<void>(resolve => setTimeout(resolve, ms));
-
-const parseRetryAfter = (value: string | null): number | undefined => {
-  if (!value) return undefined;
-  const seconds = Number(value);
-  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
-  const at = Date.parse(value);
-  return Number.isNaN(at) ? undefined : Math.max(0, at - Date.now());
-};
-
-// Equal-jitter exponential backoff. The cap/2 floor guarantees a minimum
-// delay so a misbehaving caller loop slows down instead of hammering the
-// upstream while it keeps returning errors.
-const computeBackoffDelay = (
-  attempt: number,
-  retryAfterMs?: number
-): number => {
-  const cap = Math.min(RETRY_BASE_DELAY_MS * 2 ** attempt, RETRY_MAX_DELAY_MS);
-  const jittered = cap / 2 + Math.random() * (cap / 2);
-  return Math.min(Math.max(jittered, retryAfterMs ?? 0), RETRY_MAX_DELAY_MS);
-};
-
-// Retries non-2xx responses and network errors with exponential backoff, then
-// returns the final Response so callers keep their existing error handling.
-const fetchWithBackoff = async (
-  url: string,
-  init: FetchInit
-): Promise<Response> => {
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt <= RETRY_MAX_RETRIES; attempt++) {
-    try {
-      const response = await fetch(url, init);
-      if (response.ok || attempt === RETRY_MAX_RETRIES) {
-        return response;
-      }
-
-      const retryAfterMs = parseRetryAfter(
-        response.headers.get("retry-after")
-      );
-      try {
-        await response.body?.cancel();
-      } catch {
-        // Body already settled; nothing to clean up.
-      }
-      console.warn(
-        `LLM request retry ${attempt + 1}/${RETRY_MAX_RETRIES} after status ${response.status}`
-      );
-      await sleep(computeBackoffDelay(attempt, retryAfterMs));
-    } catch (error) {
-      lastError = error;
-      if (attempt === RETRY_MAX_RETRIES) throw error;
-      console.warn(
-        `LLM request retry ${attempt + 1}/${RETRY_MAX_RETRIES} after network error`
-      );
-      await sleep(computeBackoffDelay(attempt));
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("LLM request failed after exhausting retries");
+  return undefined;
 };
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  assertApiKey();
+  // Resolve the client (and its API-key check) BEFORE the try so a missing-key
+  // configuration error surfaces verbatim instead of being masked as a call failure.
+  const client = getClient();
+  const { system, messages } = toAnthropicMessages(params.messages);
+  const outputConfig = toOutputConfig(params);
+  const maxTokens = params.max_tokens ?? params.maxTokens ?? DEFAULT_MAX_TOKENS;
 
-  const {
-    messages,
-    tools,
-    toolChoice,
-    tool_choice,
-    outputSchema,
-    output_schema,
-    responseFormat,
-    response_format,
-    model,
-    thinking,
-    reasoning,
-    maxTokens,
-    max_tokens,
-  } = params;
-
-  const payload: Record<string, unknown> = {
-    messages: messages.map(normalizeMessage),
-  };
-
-  if (model) {
-    payload.model = model;
-  }
-
-  if (tools && tools.length > 0) {
-    payload.tools = tools;
-  }
-
-  const normalizedToolChoice = normalizeToolChoice(
-    toolChoice || tool_choice,
-    tools
-  );
-  if (normalizedToolChoice) {
-    payload.tool_choice = normalizedToolChoice;
-  }
-
-  const resolvedMaxTokens = max_tokens ?? maxTokens;
-  if (typeof resolvedMaxTokens === "number") {
-    payload.max_tokens = resolvedMaxTokens;
-  }
-
-  if (thinking) {
-    payload.thinking = thinking;
-  }
-  if (reasoning) {
-    payload.reasoning = reasoning;
-  }
-
-  const normalizedResponseFormat = normalizeResponseFormat({
-    responseFormat,
-    response_format,
-    outputSchema,
-    output_schema,
-  });
-
-  if (normalizedResponseFormat) {
-    payload.response_format = normalizedResponseFormat;
-  }
-
-  const response = await fetchWithBackoff(resolveApiUrl(), {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    // H4: the upstream LLM body can echo internal hosts/request content — log it
-    // server-side only; the thrown message (which propagates into serverLogs and
-    // can reach clients) stays generic.
-    const errorText = await response.text().catch(() => "");
-    console.error(`[llm] invoke failed ${response.status} ${response.statusText}: ${errorText}`);
-    throw new Error(`LLM invoke failed: ${response.status}`);
-  }
-
-  return (await response.json()) as InvokeResult;
-}
-
-export type ModelInfo = {
-  id: string;
-  object: string;
-  created: number;
-  owned_by: string;
-};
-
-export type ModelsResponse = {
-  object: string;
-  data: ModelInfo[];
-};
-
-export async function listLLMModels(): Promise<ModelsResponse> {
-  assertApiKey();
-
-  const url = ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/models`
-    : "https://forge.manus.im/v1/models";
-
-  const response = await fetchWithBackoff(url, {
-    headers: { authorization: `Bearer ${ENV.forgeApiKey}` },
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
+  let response: Anthropic.Message;
+  try {
+    response = await client.messages.create({
+      model: params.model || ENV.anthropicModel,
+      max_tokens: maxTokens,
+      ...(system ? { system } : {}),
+      messages,
+      ...(outputConfig ? { output_config: outputConfig } : {}),
+    });
+  } catch (error) {
+    // H4 parity: keep upstream detail server-side; throw a generic message so it
+    // can't leak request content through serverLogs to a client.
+    console.error(`[llm] invoke failed:`, error);
     throw new Error(
-      `List LLM models failed: ${response.status} ${response.statusText} – ${errorText}`
+      `LLM invoke failed: ${error instanceof Anthropic.APIError ? error.status : "error"}`
     );
   }
 
-  return (await response.json()) as ModelsResponse;
+  const text = response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("");
+
+  return {
+    id: response.id,
+    created: 0,
+    model: response.model,
+    choices: [
+      {
+        index: 0,
+        message: { role: "assistant", content: text },
+        finish_reason: response.stop_reason ?? null,
+      },
+    ],
+    usage: {
+      prompt_tokens: response.usage.input_tokens,
+      completion_tokens: response.usage.output_tokens,
+      total_tokens: response.usage.input_tokens + response.usage.output_tokens,
+    },
+  };
 }

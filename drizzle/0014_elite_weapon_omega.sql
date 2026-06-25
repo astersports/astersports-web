@@ -1,1 +1,0 @@
-CREATE INDEX `idx_credit_ledger_tenant_user_delta` ON `credit_ledger` (`tenantId`,`userId`,`delta`);

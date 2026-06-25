@@ -161,7 +161,10 @@ export async function processAsyncJob(
       }
 
       const key = `studio/${job.tenantId}/${job.id}/async-1.png`;
-      const { url } = await storagePut(key, png, "image/png");
+      // storagePut appends a random suffix to the key, so the stored object lives at
+      // `storedKey`, NOT `key`. Record storedKey as resultKey (mirrors the sync paths at
+      // studio.ts:410 / studioEngine.ts:99) so getVariationByResultKey can resolve it.
+      const { key: storedKey, url } = await storagePut(key, png, "image/png");
 
       // Cancel-safe finalize: atomically flip cpu_processing -> done. If the deadline (or a
       // peer) already finalized this job as failed+refunded, we LOSE the CAS — discard the
@@ -172,7 +175,7 @@ export async function processAsyncJob(
         log.warn("studio", "async-worker: result discarded — job finalized (deadline/peer) before op completed", { jobId: job.id, metadata: { refundRefId } });
         return { status: "skipped", reason: "finalized before op completed" };
       }
-      await addVariation({ jobId: job.id, tenantId: job.tenantId, resultKey: key, resultUrl: url, round: 1 });
+      await addVariation({ jobId: job.id, tenantId: job.tenantId, resultKey: storedKey, resultUrl: url, round: 1 });
       return { status: "done" };
     } catch (err) {
       return failAndRefund(

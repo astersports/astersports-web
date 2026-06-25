@@ -1,7 +1,7 @@
 import type { Express } from "express";
-import { ENV } from "./env";
 import { sdk } from "./sdk";
 import { getMembership, getVariationByResultKey } from "../studioDb";
+import { createStorageSignedUrl, isStorageConfigured } from "./supabaseStorage";
 
 export function registerStorageProxy(app: Express) {
   app.get("/manus-storage/*", async (req, res) => {
@@ -64,36 +64,17 @@ export function registerStorageProxy(app: Express) {
       }
     }
 
-    if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
+    if (!isStorageConfigured()) {
       res.status(500).send("Storage proxy not configured");
       return;
     }
 
     try {
-      const forgeUrl = new URL(
-        "v1/storage/presign/get",
-        ENV.forgeApiUrl.replace(/\/+$/, "") + "/",
-      );
-      forgeUrl.searchParams.set("path", key);
+      // Private bucket: 307 the browser to a short-lived signed URL. 60s is ample
+      // for an immediate redirect and limits the blast radius if the URL leaks.
+      const url = await createStorageSignedUrl(key, 60);
 
-      const forgeResp = await fetch(forgeUrl, {
-        headers: { Authorization: `Bearer ${ENV.forgeApiKey}` },
-      });
-
-      if (!forgeResp.ok) {
-        const body = await forgeResp.text().catch(() => "");
-        console.error(`[StorageProxy] forge error: ${forgeResp.status} ${body}`);
-        res.status(502).send("Storage backend error");
-        return;
-      }
-
-      const { url } = (await forgeResp.json()) as { url: string };
-      if (!url) {
-        res.status(502).send("Empty signed URL from backend");
-        return;
-      }
-
-      // H1: only ever 307 the browser to an http(s) presigned URL — never a
+      // H1: only ever 307 the browser to an http(s) signed URL — never a
       // javascript:/data: or otherwise unexpected scheme from the backend.
       let redirectScheme: string;
       try {

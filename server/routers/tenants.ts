@@ -169,7 +169,11 @@ export const tenantsRouter = router({
     if (mems.length === 0) return [];
     const tenantId = ctx.tenant.id;
     const userIds = Array.from(new Set(mems.map((m) => m.userId)));
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    // Serialized for the raw-sql CASE below: postgres-js can't bind a raw JS Date
+    // inside a sql`` template (drizzle maps Dates only on typed-column helpers), so
+    // pass the naive-UTC string and cast it (`::timestamp`) at the use site.
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      .toISOString().replace("T", " ").replace("Z", "");
 
     const [userRows, jobAgg, spendAgg] = await Promise.all([
       db
@@ -189,7 +193,7 @@ export const tenantsRouter = router({
         .select({
           userId: creditLedger.userId,
           spentAll: sql<number>`ABS(SUM(CASE WHEN ${creditLedger.delta} < 0 THEN ${creditLedger.delta} ELSE 0 END))`,
-          spent7d: sql<number>`ABS(SUM(CASE WHEN ${creditLedger.delta} < 0 AND ${creditLedger.createdAt} >= ${sevenDaysAgo} THEN ${creditLedger.delta} ELSE 0 END))`,
+          spent7d: sql<number>`ABS(SUM(CASE WHEN ${creditLedger.delta} < 0 AND ${creditLedger.createdAt} >= ${sevenDaysAgo}::timestamp THEN ${creditLedger.delta} ELSE 0 END))`,
         })
         .from(creditLedger)
         .where(and(eq(creditLedger.tenantId, tenantId), inArray(creditLedger.userId, userIds)))

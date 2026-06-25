@@ -7,6 +7,36 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  /** Anthropic (Claude) vision LLM — fabric-region locate, element detection, and
+   *  the no-op QA judge (server/_core/llm.ts). Replaces the Manus forge LLM gateway.
+   *  Absent key => invokeLLM throws at call time; the locate path degrades to
+   *  DEFAULT_REGION rather than crashing, so it warns at boot, never blocks. */
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
+  /** Vision model id. Default Claude Opus 4.8 (best vision). Set ANTHROPIC_MODEL
+   *  to e.g. claude-haiku-4-5 to trade some accuracy for ~5x lower per-call cost
+   *  on the locate/detect/judge calls — an env flip, no code change. */
+  anthropicModel:
+    process.env.ANTHROPIC_MODEL && process.env.ANTHROPIC_MODEL.trim().length > 0
+      ? process.env.ANTHROPIC_MODEL.trim()
+      : "claude-opus-4-8",
+  /** Supabase Storage — customer image uploads + signed reads (server/storage.ts,
+   *  server/_core/storageProxy.ts). Replaces the Manus Forge presigned-URL/S3 path.
+   *  The bucket is PRIVATE; the browser never talks to Supabase directly — it goes
+   *  through /manus-storage/{key}, which auth-checks (tenant isolation) then 307s to
+   *  a short-lived server-signed URL. SUPABASE_URL is the project URL; the
+   *  service-role key is server-only (bypasses RLS) — never ships to the client. */
+  supabaseUrl: process.env.SUPABASE_URL ?? "",
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+  supabaseStorageBucket:
+    process.env.SUPABASE_STORAGE_BUCKET && process.env.SUPABASE_STORAGE_BUCKET.trim().length > 0
+      ? process.env.SUPABASE_STORAGE_BUCKET.trim()
+      : "media",
+  /** Google OAuth 2.0 — the identity provider that replaces the Manus WebDev auth
+   *  server. Sessions stay our own JWT (cookieSecret); Google only verifies who the
+   *  user is. Client secret is server-only (token exchange) — never shipped to the
+   *  client. Absent => the Google login route 503s (no silent insecure fallback). */
+  googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
@@ -135,10 +165,15 @@ export const ENV = {
     .split(",")
     .map((h) => h.trim())
     .filter(Boolean),
-  /** H3: shared secret for server-to-server scheduled (cron) endpoints. When set,
-   *  /api/scheduled/* requires a matching `x-cron-secret` header IN ADDITION to the
-   *  existing session check. Backward-compatible: unset = no extra gate. */
+  /** H3: shared secret for server-to-server scheduled (cron) endpoints. Post-Manus
+   *  this is the SOLE gate on /api/scheduled/* (the Manus isCron session check was
+   *  removed) — so in production it must be set or the endpoints fail closed. */
   cronSecret: process.env.CRON_SECRET ?? "",
+  /** In-process scheduler (replaces the Manus Heartbeat). When true, the running
+   *  app triggers its own /api/scheduled/* endpoints on intervals (self-HTTP with
+   *  CRON_SECRET). Off by default so dev/CI/tests never schedule; set
+   *  ENABLE_SCHEDULER=true on exactly one running instance in prod. */
+  schedulerEnabled: process.env.ENABLE_SCHEDULER === "true",
 };
 
 /**
@@ -156,7 +191,12 @@ export function validateEnv(): { errors: string[]; warnings: string[] } {
   const required: Array<[string, string]> = [
     ["JWT_SECRET", ENV.cookieSecret],
     ["DATABASE_URL", ENV.databaseUrl],
-    ["OAUTH_SERVER_URL", ENV.oAuthServerUrl],
+    // Google OAuth is the sole identity provider since the Railway/Supabase
+    // migration retired the Manus OAuth server (OAUTH_SERVER_URL). Without these
+    // no user can authenticate, so they gate boot exactly as OAUTH_SERVER_URL did
+    // before — failing fast beats booting green with every login 503ing.
+    ["GOOGLE_CLIENT_ID", ENV.googleClientId],
+    ["GOOGLE_CLIENT_SECRET", ENV.googleClientSecret],
     ["VITE_APP_ID", ENV.appId],
     // Required so owner-only routes fail closed at boot rather than silently
     // downgrading to "any admin" at runtime (see ownerProcedure in routers.ts).
@@ -195,6 +235,10 @@ export function validateEnv(): { errors: string[]; warnings: string[] } {
     ["MANUS_API_KEY", ENV.manusApiKey, "Manus Agent API integration"],
     ["BUILT_IN_FORGE_API_URL", ENV.forgeApiUrl, "Forge LLM/image generation"],
     ["BUILT_IN_FORGE_API_KEY", ENV.forgeApiKey, "Forge LLM/image generation"],
+    ["ANTHROPIC_API_KEY", ENV.anthropicApiKey, "Claude vision LLM (fabric locate / element detect / no-op judge)"],
+    ["SUPABASE_URL", ENV.supabaseUrl, "Supabase Storage (image uploads / signed reads)"],
+    ["SUPABASE_SERVICE_ROLE_KEY", ENV.supabaseServiceRoleKey, "Supabase Storage (image uploads / signed reads)"],
+    ["CRON_SECRET", ENV.cronSecret, "scheduled cron endpoints (reaper/poll/billing) — gate fails closed in prod if unset"],
   ];
   for (const [name, val, feature] of optional) {
     if (!val) warnings.push(`${name} missing — ${feature} disabled`);

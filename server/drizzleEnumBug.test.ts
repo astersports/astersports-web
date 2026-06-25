@@ -38,7 +38,7 @@ describe.skipIf(!RUN)("P3: Drizzle eq() vs inArray() on MySQL ENUM (TiDB)", () =
       status: "sam2_processing",
       predictionId: testPredictionId,
       enqueuedAt: new Date(),
-    }).$returningId();
+    }).returning({ id: jobs.id });
     seededJobId = result.id;
     console.log(`[P3] Seeded job id=${seededJobId} with status=sam2_processing, predictionId=${testPredictionId}`);
   });

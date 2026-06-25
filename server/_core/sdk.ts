@@ -29,14 +29,11 @@ const GET_USER_INFO_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfo`;
 const GET_USER_INFO_WITH_JWT_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfoWithJwt`;
 
 class OAuthService {
-  constructor(private client: ReturnType<typeof axios.create>) {
-    console.log("[OAuth] Initialized with baseURL:", ENV.oAuthServerUrl);
-    if (!ENV.oAuthServerUrl) {
-      console.error(
-        "[OAuth] ERROR: OAUTH_SERVER_URL is not configured! Set OAUTH_SERVER_URL environment variable."
-      );
-    }
-  }
+  // Dead Manus OAuth login path — superseded by Google in P5 (see
+  // server/_core/googleAuth.ts + oauth.ts). Retained inert pending the dead-code
+  // sweep; the constructor no longer logs a misleading OAUTH_SERVER_URL error now
+  // that the var is intentionally unset post-migration.
+  constructor(private client: ReturnType<typeof axios.create>) {}
 
   private decodeState(state: string): string {
     // H2: `state` carries the OAuth redirect target. Without validation an
@@ -311,22 +308,17 @@ class SDKServer {
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
 
-    // If user not in DB, sync from OAuth server automatically
+    // The session JWT is ours (HS256, our secret), so its openId/name are trusted.
+    // Google login always upserts the user (server/_core/oauth.ts), so this only
+    // fires if the row was deleted mid-session — recreate a minimal user from the
+    // session payload. No identity-provider round-trip (the Manus sync is retired).
     if (!user) {
-      try {
-        const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
-        await db.upsertUser({
-          openId: userInfo.openId,
-          name: userInfo.name || null,
-          email: userInfo.email ?? null,
-          loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
-          lastSignedIn: signedInAt,
-        });
-        user = await db.getUserByOpenId(userInfo.openId);
-      } catch (error) {
-        console.error("[Auth] Failed to sync user from OAuth:", error);
-        throw ForbiddenError("Failed to sync user info");
-      }
+      await db.upsertUser({
+        openId: sessionUserId,
+        name: session.name || null,
+        lastSignedIn: signedInAt,
+      });
+      user = await db.getUserByOpenId(sessionUserId);
     }
 
     if (!user) {

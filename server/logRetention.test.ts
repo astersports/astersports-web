@@ -6,7 +6,7 @@ vi.mock("./db", () => ({
 }));
 
 vi.mock("../drizzle/schema", () => ({
-  serverLogs: { createdAt: "createdAt" },
+  serverLogs: { createdAt: "createdAt", id: "id" },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -18,12 +18,15 @@ import { getDb } from "./db";
 import { lt } from "drizzle-orm";
 
 describe("logRetention", () => {
+  let mockReturning: ReturnType<typeof vi.fn>;
   let mockWhere: ReturnType<typeof vi.fn>;
   let mockDelete: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockWhere = vi.fn().mockResolvedValue([{ affectedRows: 15 }]);
+    // Postgres: .delete().where().returning() yields one row per deleted record (length = count).
+    mockReturning = vi.fn().mockResolvedValue(new Array(15).fill({ id: 1 }));
+    mockWhere = vi.fn().mockReturnValue({ returning: mockReturning });
     mockDelete = vi.fn().mockReturnValue({ where: mockWhere });
     (getDb as any).mockResolvedValue({ delete: mockDelete });
   });
@@ -64,7 +67,7 @@ describe("logRetention", () => {
   });
 
   it("returns 0 when no rows match the cutoff", async () => {
-    mockWhere.mockResolvedValue([{ affectedRows: 0 }]);
+    mockReturning.mockResolvedValue([]);
 
     const result = await pruneOldLogs();
 
@@ -72,7 +75,7 @@ describe("logRetention", () => {
   });
 
   it("handles large deletion counts", async () => {
-    mockWhere.mockResolvedValue([{ affectedRows: 50000 }]);
+    mockReturning.mockResolvedValue(new Array(50000).fill({ id: 1 }));
 
     const result = await pruneOldLogs();
 
@@ -80,7 +83,7 @@ describe("logRetention", () => {
   });
 
   it("propagates database errors", async () => {
-    mockWhere.mockRejectedValue(new Error("Connection lost"));
+    mockReturning.mockRejectedValue(new Error("Connection lost"));
 
     await expect(pruneOldLogs()).rejects.toThrow("Connection lost");
   });

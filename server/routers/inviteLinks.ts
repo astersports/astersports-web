@@ -298,9 +298,12 @@ export const inviteLinksRouter = router({
             or(isNull(inviteLinks.maxUses), lt(inviteLinks.useCount, inviteLinks.maxUses)),
             or(isNull(inviteLinks.expiresAt), gt(inviteLinks.expiresAt, now))
           )
-        );
+        )
+        .returning({ id: inviteLinks.id });
 
-      const claimed = (claimRes as any)?.[0]?.affectedRows ?? 0;
+      // Postgres: .returning() yields one row per claimed link; length 0 => the predicate
+      // (still active, under the use cap, unexpired) failed, so this redeem lost the race.
+      const claimed = claimRes.length;
       if (claimed === 0) {
         // The claim failed its predicate — re-read to report an accurate reason.
         const [fresh] = await db

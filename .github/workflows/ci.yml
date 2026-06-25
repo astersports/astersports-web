@@ -41,23 +41,23 @@ jobs:
         run: pnpm run test
 
   db-integration:
-    name: money-path integration (real MySQL)
+    name: money-path integration (real Postgres)
     runs-on: ubuntu-latest
     services:
-      mysql:
-        image: mysql:8
+      postgres:
+        image: postgres:17
         env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: studio_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: studio_test
         ports:
-          - 3306:3306
+          - 5432:5432
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-cmd="pg_isready -U postgres"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=20
     env:
-      DATABASE_URL: "mysql://root:root@127.0.0.1:3306/studio_test"
+      DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:5432/studio_test"
       RUN_DB_TESTS: "1"
     steps:
       - uses: actions/checkout@v4

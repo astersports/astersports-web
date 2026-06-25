@@ -3,18 +3,7 @@ export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 /** Public URL of the youth-sports management app. Single source of truth. */
 export const APP_URL = "https://astersports.app";
 
-// Generate login URL at runtime so redirect URI reflects the current origin.
-export const getLoginUrl = () => {
-  const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL;
-  const appId = import.meta.env.VITE_APP_ID;
-  const redirectUri = `${window.location.origin}/api/oauth/callback`;
-  const state = btoa(redirectUri);
-
-  const url = new URL(`${oauthPortalUrl}/app-auth`);
-  url.searchParams.set("appId", appId);
-  url.searchParams.set("redirectUri", redirectUri);
-  url.searchParams.set("state", state);
-  url.searchParams.set("type", "signIn");
-
-  return url.toString();
-};
+// Login sends the user to our own backend route, which redirects to Google's
+// consent screen and handles the callback (server/_core/oauth.ts). Replaces the
+// Manus OAuth portal. Same-origin, so the redirect_uri reflects the current host.
+export const getLoginUrl = () => `${window.location.origin}/api/auth/google/login`;

@@ -1,0 +1,137 @@
+PRE-DENSITY/SCALE-TESTING AUDIT — astersports-web on Railway + Supabase + Replicate
+====================================================================================
+Prepared by Claude Code (CC) overnight while Frank was away. Branch:
+claude/railway-supabase-migration (PR #103). Everything below is either DONE (CC),
+a FRANK action (env/dashboard), or a CC action I'll run via the Supabase tooling
+once you've logged in once.
+
+Headline: the migration code is in good shape. The login failure is NOT a code bug
+— it's the wrong Supabase pooler. One DATABASE_URL change is the most likely fix.
+The DB dialect audit came back CLEAN (no runtime-breaking MySQL leftovers).
+
+------------------------------------------------------------------------------------
+PART 1 — THE LOGIN FAILURE ("OAuth callback failed")  ← do this first
+------------------------------------------------------------------------------------
+What happens: Google login completes, then the app shows {"error":"OAuth callback
+failed"} when it tries to write your user row.
+
+What I proved (so we don't chase ghosts):
+  - I reproduced the EXACT failing database insert (same drizzle + postgres-js +
+    prepare:false, same SQL, same parameters) against a real Postgres locally.
+    It PASSED. The timestamp is serialised correctly — the earlier "Date" theory
+    was WRONG, and I did NOT ship a fix for a non-bug.
+  - In production every app DB connection goes through `user=pgbouncer` (the
+    Supabase TRANSACTION pooler, port 6543), and Postgres logged NO error for the
+    failed insert. So the failure is at the pooler/driver layer, not the query.
+
+THE FIX (Frank, ~2 min):  switch DATABASE_URL to the SESSION pooler.
+  - The transaction pooler (port 6543) is meant for serverless. A long-running
+    server like Railway should use the SESSION pooler (port 5432).
+  - Supabase dashboard -> Connect -> Connection string -> choose "Session pooler"
+    (port 5432, host ends in ...pooler.supabase.com) -> copy it, put your DB
+    password in -> replace DATABASE_URL in Railway -> redeploy.
+  - No code change needed (prepare:false is harmless on the session pooler).
+
+Backstop I shipped (commit c3aa5c9): the OAuth callback now logs the REAL underlying
+cause instead of swallowing it. So if the session pooler does NOT fully fix it, the
+next login attempt will print "[OAuth] Google callback failed -> ... cause ..." in
+the Railway deploy logs — paste me that line and I'll know exactly what to fix.
+
+------------------------------------------------------------------------------------
+PART 2 — FROM "LOGGED IN" TO "READY TO TEST" (bootstrap runbook)
+------------------------------------------------------------------------------------
+The database is empty (no users/orgs/credits). Audit found ONE hard blocker: the
+`platform_admins` table has no in-app way to seed the first super-admin — it needs a
+direct DB insert. I can do that (and the org+credits) via the Supabase tooling once
+your user row exists.
+
+Order of operations (after login works):
+  1. [you]  Log in once via Google at https://astersports.io.  (creates your user row)
+  2. [CC]   Read your openId (google:<sub>) from the users table.
+  3. [you]  Set OWNER_OPEN_ID (and VITE_OWNER_OPEN_ID) in Railway to that value;
+            redeploy. (Promotes you to role=admin; also satisfies the boot guard
+            with your real id instead of the google:PENDING placeholder.)
+  4. [CC]   INSERT your user into platform_admins  (the one unavoidable direct DB
+            write — opens the /platform super-admin console for you).
+  5. [CC or you] Provision a firm (org) with ~150 credits via /platform -> Add
+            Account (owner = your email). This uses the ledger-safe grantCredits
+            path. 150 credits = ~15 generations at 10 credits each.
+  6. [you]  Open /studio, upload artwork, and you're ready to generate.
+
+Note: users.role='admin' does NOT gate the studio or the platform console — the
+platform console is gated by the platform_admins row (step 4), and studio access is
+gated by an active membership in the org (created in step 5).
+
+------------------------------------------------------------------------------------
+PART 3 — DENSITY / SCALE SETUP
+------------------------------------------------------------------------------------
+Env already set (confirmed by the clean boot earlier): STUDIO_MASK_PROVIDER=sam2,
+REPLICATE_API_TOKEN, REPLICATE_SAM2_MODEL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+ANTHROPIC_API_KEY, CRON_SECRET, ENABLE_SCHEDULER=true, STUDIO_WORKING_MEGAPIXELS=8.
+
+To set before testing:
+  - STUDIO_ASYNC_JOBS=true  (recommended): runs SAM2 jobs off the HTTP request via
+    the in-process cron poller (ENABLE_SCHEDULER is already on, so jobs resolve).
+    If you leave it OFF, generation runs on the synchronous SSE path (up to 180s,
+    holds the request open) — works on Railway, just less robust.
+  - The live flags — YOU flip these by hand, one at a time (CLAUDE.md §1/§3):
+      STUDIO_DENSITY_LIVE=true         (density v1 "thin")
+      STUDIO_DENSITY_REDISTRIBUTE=true (density v2 "redistribute", takes precedence)
+      STUDIO_SCALE_LIVE=true           (scale)
+    These REQUIRE STUDIO_MASK_PROVIDER=sam2 (already set) or the app refuses to
+    boot — that's the intended guard against charging for an op that can't run.
+  - After flipping, confirm posture: GET /api/studio/posture (cron-secret auth)
+    should show the flag live and replicateConfigured:true.
+
+Known code gaps (NOT blocking — they degrade gracefully):
+  - The Replicate WEBHOOK URL is never wired into the job-enqueue call, so async
+    jobs resolve via the cron POLLER only (every ~1 min). That's fine for testing
+    (the poller is the reliable path); the webhook would just make completion
+    faster. Wiring it needs a public-base-URL env + a one-line change — I can do
+    that as a follow-up if you want snappier async completion.
+  - The first real SAM2 call also confirms Replicate accepts our base64 data-URL
+    input (flagged unverified in the code). The first eval doubles as that check.
+
+------------------------------------------------------------------------------------
+PART 4 — AUDIT RESULTS (4 parallel deep audits)
+------------------------------------------------------------------------------------
+DB DIALECT (MySQL->Postgres): CLEAN. No remaining runtime-breaking MySQL-isms. The
+  tsParam() Date-in-raw-SQL fix is applied everywhere it's needed; money-path CAS,
+  reaper, credit settlement, upserts, ILIKE, CAST, enums all dialect-correct.
+  - Fixed this session (latent): isMissingTableError only recognised MySQL's
+    "table missing" code; now also matches Postgres 42P01 and walks the drizzle
+    cause chain. (Dead defensive code today — the table always exists — but correct.)
+
+STORAGE (Supabase): Upload + retrieval are correct. The private `media` bucket
+  exists and is PRIVATE (verified). Tenant-isolation in the /manus-storage proxy is
+  intact. Minor items:
+  - Public marketing assets (logo, AAU highlight videos) reference /manus-storage/
+    keys that lived in Manus storage; re-upload them to the Supabase `media` bucket
+    at the same keys or those images/videos 404 on the landing pages. (Cosmetic;
+    not on the density/scale path.)
+  - The upscale DPI guard runs the SSRF check on the Supabase signed URL; it
+    fails SAFE (warn-only) and normal Supabase URLs pass, so it's a benign
+    inconsistency, left as-is.
+
+DENSITY/SCALE MONEY-PATH: traced end-to-end; correct. No-op safety is structural
+  (density returns null -> refund), settlement is idempotent + atomic. The env
+  checklist above is the gating item set. See PART 3 for the webhook gap.
+
+BOOTSTRAP: see PART 2. The platform_admins seed is the one hard blocker.
+
+CLEANUP (deferred, non-blocking): delete dead server/_core/heartbeat.ts and
+  server/_core/dataApi.ts; fix stale "Forge" comments in storageProxy.ts/etc;
+  update docs/RAILWAY_SUPABASE_MIGRATION_SCOPE.txt (header still says "not started"
+  though P1-P7 are committed). The dead Manus OAuth methods in sdk.ts are inert.
+
+------------------------------------------------------------------------------------
+SHIPPED THIS SESSION (commit c3aa5c9, on the migration branch, CI green)
+------------------------------------------------------------------------------------
+  - oauth.ts: un-swallow the real OAuth-callback DB error (cause chain logged).
+  - db.ts: session-pooler guidance in the connection comment.
+  - studioDb.ts: isMissingTableError recognises Postgres 42P01 + cause chain.
+  - (earlier overnight) P7 env guard fix + this audit doc.
+
+YOUR NEXT STEP WHEN YOU WAKE: switch DATABASE_URL to the SESSION pooler (PART 1),
+redeploy, try the Google login, and tell me how it goes. If it works, ping me and
+I'll run the owner/admin/firm/credits bootstrap (PART 2) for you.
