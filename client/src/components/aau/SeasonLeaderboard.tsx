@@ -197,7 +197,7 @@ export default function SeasonLeaderboard() {
   });
 
   const entries: LeaderboardEntry[] = useMemo(() => data?.entries || [], [data]);
-  const overall = useMemo(() => data?.overall || { wins: 0, losses: 0, avgPointDifferential: 0, winStreak: 0, currentStreak: 0 }, [data]);
+  const overall = useMemo(() => data?.overall || { wins: 0, losses: 0, avgPointDifferential: 0, winStreak: 0, currentStreak: 0, streakType: null as 'W' | 'L' | null, streakCount: 0 }, [data]);
 
   const stats = useMemo(() => {
     const totalGames = overall.wins + overall.losses;
@@ -262,7 +262,7 @@ export default function SeasonLeaderboard() {
           SEASON RECORDS
         </h2>
         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--as-text-tertiary)' }}>
-          Spring 2026 · Live
+          Spring 2026 · Final
         </span>
       </div>
 
@@ -273,7 +273,7 @@ export default function SeasonLeaderboard() {
       }}>
         <HeroStat icon={Target} label="PPG" value={stats.ppg} accent="var(--as-accent)" delay={0} />
         <HeroStat icon={Shield} label="OPP PPG" value={stats.oppPpg} accent="var(--as-team-primary)" delay={1} />
-        <HeroStat icon={Flame} label="WIN STREAK" value={`W${overall.winStreak}`} accent="var(--as-success)" delay={2} />
+        <HeroStat icon={Flame} label="STREAK" value={overall.streakType ? `${overall.streakType}${overall.streakCount}` : '—'} accent={overall.streakType === 'L' ? 'var(--as-danger)' : 'var(--as-success)'} delay={2} />
         <HeroStat icon={TrendingUp} label="AVG DIFF" value={`${overall.avgPointDifferential > 0 ? '+' : ''}${overall.avgPointDifferential}`} accent={overall.avgPointDifferential > 0 ? 'var(--as-success)' : 'var(--as-danger)'} delay={3} />
       </div>
 

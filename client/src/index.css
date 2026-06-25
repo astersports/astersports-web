@@ -631,3 +631,41 @@
   color: #f59e0b;
   vertical-align: middle;
 }
+
+/* ─── Weather icon animations (wx-*) ─── */
+@keyframes wx-spin { to { transform: rotate(360deg); } }
+@keyframes wx-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.06); opacity: 0.92; }
+}
+@keyframes wx-drift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(3px); }
+}
+@keyframes wx-fall {
+  0% { transform: translateY(-6px); opacity: 0; }
+  25% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateY(8px); opacity: 0; }
+}
+@keyframes wx-snow {
+  0% { transform: translateY(-5px) translateX(0); opacity: 0; }
+  25% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateY(9px) translateX(2px); opacity: 0; }
+}
+@keyframes wx-flash {
+  0%, 44%, 56%, 100% { opacity: 0.25; }
+  48%, 52% { opacity: 1; }
+}
+@keyframes wx-twinkle {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+@keyframes wx-fog {
+  0%, 100% { transform: translateX(-3px); opacity: 0.55; }
+  50% { transform: translateX(3px); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [style*="wx-"] { animation: none !important; }
+}

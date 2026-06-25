@@ -9,6 +9,7 @@ import FilmHighlights from "../components/aau/FilmHighlights";
 import Locations from "../components/aau/Locations";
 import Mission from "../components/aau/Mission";
 import StatHeroBar from "../components/aau/StatHeroBar";
+import WeatherCard from "../components/aau/weather/WeatherCard";
 
 const SECTIONS = [
   { id: "scores", label: "Live Scores", emoji: "⚡" },
@@ -65,13 +66,16 @@ export default function AAUBasketball() {
     }
     const ppg = gamesWithScores > 0 ? (totalPoints / gamesWithScores).toFixed(1) : '0';
 
+    const titles = leaderboardData.titles ?? { champions: 0, finalists: 0, finalFour: 0 };
+    const streak = o.streakType ? `${o.streakType}${o.streakCount}` : '—';
+
     return [
-      { value: '1', label: 'CHAMPS', variant: 'gold' as const },
-      { value: '1', label: 'FINALIST', variant: 'gold' as const },
+      { value: String(titles.champions), label: 'CHAMPS', variant: 'gold' as const },
+      { value: String(titles.finalists), label: 'FINALIST', variant: 'gold' as const },
       { value: String(o.wins), label: 'WINS', variant: 'green' as const },
       { value: ppg, label: 'PPG', variant: 'default' as const },
-      { value: `${o.avgPointDifferential > 0 ? '+' : ''}${o.avgPointDifferential}`, label: 'AVG DIFF', variant: 'green' as const },
-      { value: `W${o.winStreak}`, label: 'STREAK', variant: 'default' as const },
+      { value: `${o.avgPointDifferential > 0 ? '+' : ''}${o.avgPointDifferential}`, label: 'AVG DIFF', variant: (o.avgPointDifferential > 0 ? 'green' : 'default') as 'green' | 'default' },
+      { value: streak, label: 'STREAK', variant: (o.streakType === 'W' ? 'green' : 'default') as 'green' | 'default' },
     ];
   }, [leaderboardData]);
 
@@ -198,7 +202,7 @@ export default function AAUBasketball() {
           {/* Stats row */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
             <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--as-text-secondary)' }}>
-              Spring 2026
+              Spring 2026 · Final
             </span>
             {record && (
               <span style={{
@@ -274,7 +278,12 @@ export default function AAUBasketball() {
 
       {/* Section Content */}
       <div className="container" style={{ paddingTop: 24, paddingBottom: 48 }}>
-        {activeSection === "scores" && <LiveScores />}
+        {activeSection === "scores" && (
+          <>
+            <WeatherCard />
+            <LiveScores />
+          </>
+        )}
         {activeSection === "history" && <TournamentHistory />}
         {activeSection === "leaderboard" && <SeasonLeaderboard />}
         {activeSection === "film" && <FilmHighlights />}

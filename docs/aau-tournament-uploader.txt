@@ -1,0 +1,153 @@
+BUILD SPEC — Admin Tournament Uploader (AAU)
+Status: PROPOSED — Architect review requested (DB schema = Architect-scoped, CLAUDE.md §2.4)
+Author: Claude Code (CC)
+Date: 2026-06-25
+Branch (when implemented): claude/awesome-euler-7gdpu0 (or a fresh feature branch)
+
+────────────────────────────────────────────────────────────────────────
+1. GOAL
+────────────────────────────────────────────────────────────────────────
+Let the admin (Frank) add a tournament by pasting its TourneyMachine link and a
+venue address. The app then:
+  - parses the TourneyMachine IDs from the URL,
+  - geocodes the address to coordinates,
+  - persists the tournament,
+  - and automatically wires it into live scores, the weather card/per-game
+    forecast, and venue maps/directions — with no code change or redeploy.
+
+This replaces the hardcoded TOURNAMENT_REGISTRY in server/scraper.ts.
+[GROUNDED] TOURNAMENT_REGISTRY is currently a hardcoded array (server/scraper.ts:16-72).
+
+────────────────────────────────────────────────────────────────────────
+2. WHY THIS IS ARCHITECT-SCOPED
+────────────────────────────────────────────────────────────────────────
+Per CLAUDE.md §2.4, "DB schema + migrations" is Architect-scoped in BOTH phases:
+design reviewed before code; the PR HOLDS for Architect approval (relayed by
+Frank) and does NOT auto-merge. This doc is that design artifact.
+
+────────────────────────────────────────────────────────────────────────
+3. CURRENT STATE (grounded)
+────────────────────────────────────────────────────────────────────────
+[GROUNDED] Stack: MySQL + Drizzle ORM. Migrations are numbered SQL files in
+  drizzle/ (latest: 0019_stormy_sunset_bain.sql). DB client: server/db.ts getDb()
+  (lazy mysql2 pool, no-ops when DATABASE_URL is unset).
+[GROUNDED] Tables `games` (drizzle/schema.ts:42) and `scraper_cache`
+  (drizzle/schema.ts:70) already exist but the LIVE scraper currently uses an
+  in-memory Map cache (server/scraper.ts), not these tables.
+[GROUNDED] The scraper reads TOURNAMENT_REGISTRY and fetches each division page
+  via safeFetch (SSRF-safe boundary). Game rows are filtered to the "Legacy"
+  team. Tournament metadata (name, dates, status, result, venue coords) lives in
+  the registry; I added venue coords + HOME_VENUE in the weather work.
+
+────────────────────────────────────────────────────────────────────────
+4. PROPOSED SCHEMA — new table `aau_tournaments`
+────────────────────────────────────────────────────────────────────────
+export const aauTournaments = mysqlTable("aau_tournaments", {
+  id:            int("id").autoincrement().primaryKey(),
+  name:          varchar("name", { length: 160 }).notNull(),
+  dates:         varchar("dates", { length: 64 }),            // display, e.g. "Jun 13–14, 2026"
+  tournamentId:  varchar("tournamentId", { length: 64 }).notNull(), // TM IDTournament
+  divisionId:    varchar("divisionId", { length: 64 }).notNull(),   // TM IDDivision
+  teamFilter:    varchar("teamFilter", { length: 80 }).default("legacy"), // row match
+  // Venue
+  venueName:     varchar("venueName", { length: 160 }),
+  venueAddress:  varchar("venueAddress", { length: 255 }),
+  latitude:      decimal("latitude", { precision: 9, scale: 6 }),
+  longitude:     decimal("longitude", { precision: 9, scale: 6 }),
+  // Outcome / display
+  status:        varchar("status", { length: 16 }).default("live"),   // live|completed|upcoming
+  result:        varchar("result", { length: 40 }),                   // Champions|Finalists|Final Four|...
+  sortOrder:     int("sortOrder").default(0),
+  isActive:      boolean("isActive").notNull().default(true),
+  createdAt:     timestamp("createdAt").defaultNow().notNull(),
+  updatedAt:     timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({ uniqTd: unique().on(t.tournamentId, t.divisionId) }));
+
+Notes:
+  - UNIQUE(tournamentId, divisionId) prevents dup uploads.
+  - latitude/longitude as DECIMAL(9,6) (~0.1 m precision); nullable until geocoded.
+  - Mirrors existing table conventions (autoincrement PK, createdAt/updatedAt).
+
+────────────────────────────────────────────────────────────────────────
+5. URL PARSING (no network)
+────────────────────────────────────────────────────────────────────────
+Accept any TourneyMachine results URL the admin pastes, e.g.:
+  Tournament.aspx?IDTournament=...
+  Division.aspx?IDTournament=...&IDDivision=...
+  Team.aspx?IDTournament=...&IDDivision=...&IDTeam=...
+Extract IDTournament (required) and IDDivision via URLSearchParams.
+  - Validate host === "tourneymachine.com" (reject anything else).
+  - If IDDivision is missing (Tournament-level link), prompt the admin to also
+    paste the Division/Team link, OR (future) scrape the tournament page to list
+    divisions for selection. v1: require a Division- or Team-level link.
+
+────────────────────────────────────────────────────────────────────────
+6. GEOCODING (address → lat/lon)
+────────────────────────────────────────────────────────────────────────
+Use Open-Meteo's free geocoding API (keyless, same provider as weather):
+  https://geocoding-api.open-meteo.com/v1/search?name=<q>&count=1
+Routed through safeFetch (SSRF boundary). On 0 results, save the tournament
+without coords (weather/maps degrade gracefully) and surface a "couldn't locate"
+warning so the admin can refine the address. Cache geocode results by address.
+[VERIFY] Open-Meteo geocoding works best on "City, State" / place names; exact
+  street addresses may need a fallback (e.g., Nominatim) — confirm in testing.
+
+────────────────────────────────────────────────────────────────────────
+7. tRPC ENDPOINTS (owner-only)
+────────────────────────────────────────────────────────────────────────
+aauTournaments: router({
+  list:   ownerProcedure.query(...)                       // for admin UI + scraper
+  create: ownerProcedure.input({ url, venueAddress, name?, dates?, result?, status? })
+          .mutation(...)   // parse URL, geocode, insert
+  update: ownerProcedure.input({ id, ...patch }).mutation(...)
+  remove: ownerProcedure.input({ id }).mutation(...)      // soft-delete (isActive=false)
+})
+All mutations: §1 invariants hold; owner-only; no money path touched.
+
+────────────────────────────────────────────────────────────────────────
+8. SCRAPER INTEGRATION
+────────────────────────────────────────────────────────────────────────
+fetchAllGames() reads the registry from the DB when available, falling back to
+the hardcoded array as a seed/default (keeps local/dev + tests runnable with no
+DB, per the getDb() no-op pattern). The hardcoded registry becomes the seed for
+a one-time migration insert. Per-game weather/map already consume venue coords;
+they will read them from the DB-backed registry transparently.
+
+────────────────────────────────────────────────────────────────────────
+9. ADMIN UI
+────────────────────────────────────────────────────────────────────────
+New "Manage" affordance in the AAU section (owner-only):
+  - Paste link + address form with live validation (parsed IDs shown back).
+  - List of tournaments with edit/remove, status & result selectors, drag sort.
+  - "Locate" button re-runs geocoding; shows a mini map pin preview.
+
+────────────────────────────────────────────────────────────────────────
+10. SECURITY / SAFETY
+────────────────────────────────────────────────────────────────────────
+- All outbound fetches (geocode + scrape) go through safeFetch (SSRF re-validated
+  per redirect hop) — CLAUDE.md net guard.
+- Host allowlist on the pasted URL (tourneymachine.com only).
+- Owner-only procedures (matches the rest of the AAU surface).
+- No secrets introduced (Open-Meteo is keyless).
+- Migration is additive (new table only); no change to money/ledger/auth tables.
+
+────────────────────────────────────────────────────────────────────────
+11. OPEN QUESTIONS FOR ARCHITECT
+────────────────────────────────────────────────────────────────────────
+Q1. v1 require a Division/Team-level link, or build tournament→division scraping
+    + a division picker now? (CC lean: require Division/Team link in v1; add the
+    picker as a fast-follow.)
+Q2. Geocoder: Open-Meteo only, or add a Nominatim fallback for street addresses?
+    (CC lean: ship Open-Meteo; add fallback if testing shows street-level misses.)
+Q3. Keep the hardcoded registry as the seed + permanent dev/test fallback?
+    (CC lean: yes — preserves no-DB runnability and the unit suite.)
+Q4. Soft-delete (isActive) vs hard delete? (CC lean: soft-delete for history.)
+
+────────────────────────────────────────────────────────────────────────
+12. ROLLOUT
+────────────────────────────────────────────────────────────────────────
+- Phase: pre-onboarding (prod is the test bed). Migration applied via the normal
+  Drizzle flow; verify with the Supabase/DB tooling before/after.
+- The implementation PR will be opened and HELD for Architect approval (no
+  auto-merge), per §2.4. CI (typecheck + tests + money-path integration) must be
+  green before merge.
