@@ -136,8 +136,8 @@ function normalize(
 // the shared package (re-exported so `server/routers.ts` keeps importing it from
 // here). The combined single-call forecast + richer fields (UV, wind direction,
 // venue timezone) stay local until a later @aster/weather version carries them.
-export { isValidCoord } from "@aster/weather";
 import { isValidCoord } from "@aster/weather";
+export { isValidCoord };
 
 /**
  * Fetch a 7-day forecast for a coordinate. Returns cached data within the TTL,
