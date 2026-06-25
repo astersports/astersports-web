@@ -166,5 +166,65 @@
     "image": "eval/samples/cinqasept-likely/lace__cinqasept__guipure-lace-cropped-stevie-jeans__flatlay.jpg",
     "sourceProductUrl": "https://cinqasept.nyc/products/guipure-lace-cropped-stevie-je-in-indigo-zp13021502z",
     "sourceImageUrl": "https://cdn.shopify.com/s/files/1/1881/3095/files/8BFD2EBB-14B8-48EB-816C-BDBF32CEB7F6-m_c709abe4-1518-4e85-a960-e6cadc6f78fb.jpg"
+  },
+  {
+    "id": "scattered-cinqasept-pindot-galea-dress",
+    "brand": "Cinq à Sept",
+    "store": "cinqasept.nyc",
+    "title": "Pindot Galea Dress",
+    "handle": "pindot-galea-dress-in-twilight-bay-ivory-zd299912004z",
+    "bucket": "scattered",
+    "view": "flatlay",
+    "image": "eval/samples/cinqasept-likely/scattered__cinqasept__pindot-galea-dress__flatlay.jpg",
+    "sourceProductUrl": "https://cinqasept.nyc/products/pindot-galea-dress-in-twilight-bay-ivory-zd299912004z",
+    "sourceImageUrl": "https://cdn.shopify.com/s/files/1/1881/3095/files/ZD299912004Z_PINDOTGALEADRESS_TWILIGHTBAYIVORY_1.jpg"
+  },
+  {
+    "id": "scattered-cinqasept-stassie-dress",
+    "brand": "Cinq à Sept",
+    "store": "cinqasept.nyc",
+    "title": "Stassie Dress",
+    "handle": "polka-dot-stassie-dress-in-gardenia-black",
+    "bucket": "scattered",
+    "view": "flatlay",
+    "image": "eval/samples/cinqasept-likely/scattered__cinqasept__stassie-dress__flatlay.jpg",
+    "sourceProductUrl": "https://cinqasept.nyc/products/polka-dot-stassie-dress-in-gardenia-black",
+    "sourceImageUrl": "https://cdn.shopify.com/s/files/1/1881/3095/files/JAG4841_ZD25618321Z-GABK_POLKADOTSTASSIEDRESS_GARDENIA_BLACK_GH_Front_1.jpg"
+  },
+  {
+    "id": "scattered-cinqasept-tossed-floral-walker-dress",
+    "brand": "Cinq à Sept",
+    "store": "cinqasept.nyc",
+    "title": "Tossed Floral Walker Dress",
+    "handle": "tossed-floral-walker-dress-in-mauve-orchid-multi",
+    "bucket": "scattered",
+    "view": "flatlay",
+    "image": "eval/samples/cinqasept-likely/scattered__cinqasept__tossed-floral-walker-dress__flatlay.jpg",
+    "sourceProductUrl": "https://cinqasept.nyc/products/tossed-floral-walker-dress-in-mauve-orchid-multi",
+    "sourceImageUrl": "https://cdn.shopify.com/s/files/1/1881/3095/files/TOSSEDFLORALWALKERDRESS_ZD20819003Z-MAOM_MAUVEORCHIDMU_GH_Front_1.jpg"
+  },
+  {
+    "id": "scattered-likely-ditsy-floral-marullo-dress",
+    "brand": "LIKELY",
+    "store": "likely.nyc",
+    "title": "Ditsy Floral Marullo Dress",
+    "handle": "ditsy-floral-marullo-dress-in-white",
+    "bucket": "scattered",
+    "view": "flatlay",
+    "image": "eval/samples/cinqasept-likely/scattered__likely__ditsy-floral-marullo-dress__flatlay.jpg",
+    "sourceProductUrl": "https://likely.nyc/products/ditsy-floral-marullo-dress-in-white",
+    "sourceImageUrl": "https://cdn.shopify.com/s/files/1/1087/4960/files/DITSY_FLORAL_MARULLO_DRESS_YD1974A001LYB_WHT_v1.jpg"
+  },
+  {
+    "id": "scattered-cinqasept-trailing-peonies-maude-dress",
+    "brand": "Cinq à Sept",
+    "store": "cinqasept.nyc",
+    "title": "Trailing Peonies Maude Dress",
+    "handle": "trailing-peonies-maude-dress-in-khaki-white",
+    "bucket": "scattered",
+    "view": "flatlay",
+    "image": "eval/samples/cinqasept-likely/scattered__cinqasept__trailing-peonies-maude-dress__flatlay.jpg",
+    "sourceProductUrl": "https://cinqasept.nyc/products/trailing-peonies-maude-dress-in-khaki-white",
+    "sourceImageUrl": "https://cdn.shopify.com/s/files/1/1881/3095/files/JAG5525_ZD2470A7728Z-KHW_TRAILINGPEONIESMAUDEDRESS_KHAKI-WHITE_GH_Front_1.jpg"
   }
 ]
