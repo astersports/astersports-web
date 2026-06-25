@@ -19,7 +19,7 @@ interface Game {
 
 // ─── Tournament metadata ───
 const TOURNAMENT_META: { name: string; dates: string; result?: string }[] = [
-  { name: 'ZG NY Hoop Festival', dates: 'Jun 13–14, 2026' },
+  { name: 'ZG NY Hoop Festival', dates: 'Jun 13–14, 2026', result: 'Champions' },
   { name: 'ZG Girls National Finals', dates: 'May 30–31, 2026', result: 'Final Four' },
   { name: 'ZG Rumble for the Ring CT', dates: 'May 16–17, 2026', result: 'Finalists' },
   { name: 'ZG NY Metro Showdown', dates: 'Apr 18–19, 2026' },

@@ -262,7 +262,7 @@ export default function SeasonLeaderboard() {
           SEASON RECORDS
         </h2>
         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--as-text-tertiary)' }}>
-          Spring 2026 · Live
+          Spring 2026 · Final
         </span>
       </div>
 

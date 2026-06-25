@@ -9,7 +9,7 @@ interface TournamentMeta {
 }
 
 const TOURNAMENT_META: TournamentMeta[] = [
-  { name: 'ZG NY Hoop Festival', dates: 'Jun 13–14, 2026', status: 'live' },
+  { name: 'ZG NY Hoop Festival', dates: 'Jun 13–14, 2026', status: 'completed', result: 'Champions' },
   { name: 'ZG Girls National Finals', dates: 'May 30–31, 2026', status: 'completed', result: 'Final Four' },
   { name: 'ZG Rumble for the Ring CT', dates: 'May 16–17, 2026', status: 'completed', result: 'Finalists' },
   { name: 'ZG NY Metro Showdown', dates: 'Apr 18–19, 2026', status: 'completed' },
@@ -93,7 +93,7 @@ export default function TournamentHistory() {
         </h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--as-text-secondary)' }}>
-            Spring 2026
+            Spring 2026 · Final
           </span>
           <span style={{
             fontSize: 14, fontWeight: 700, color: 'var(--as-text-primary)',

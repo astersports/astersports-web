@@ -66,7 +66,7 @@ export default function AAUBasketball() {
     const ppg = gamesWithScores > 0 ? (totalPoints / gamesWithScores).toFixed(1) : '0';
 
     return [
-      { value: '1', label: 'CHAMPS', variant: 'gold' as const },
+      { value: '2', label: 'CHAMPS', variant: 'gold' as const },
       { value: '1', label: 'FINALIST', variant: 'gold' as const },
       { value: String(o.wins), label: 'WINS', variant: 'green' as const },
       { value: ppg, label: 'PPG', variant: 'default' as const },
@@ -198,7 +198,7 @@ export default function AAUBasketball() {
           {/* Stats row */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
             <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--as-text-secondary)' }}>
-              Spring 2026
+              Spring 2026 · Final
             </span>
             {record && (
               <span style={{

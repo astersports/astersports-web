@@ -16,7 +16,8 @@ export const TOURNAMENT_REGISTRY = [
   {
     name: 'ZG NY Hoop Festival',
     dates: 'Jun 13–14, 2026',
-    status: 'live' as const,
+    status: 'completed' as const,
+    result: 'Champions',
     tournamentId: 'h202602231534241950edcf7493d244b',
     divisionId: 'h202606101618262527126b329099740',
   },
