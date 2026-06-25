@@ -113,7 +113,7 @@ function Header() {
               className="text-sm text-slate-300 hover:text-[#F6CC55] transition-colors"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              {p.name}
+              {p.navLabel ?? p.name}
             </a>
           ))}
           <a href="#services" className="text-sm text-slate-300 hover:text-[#F6CC55] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
@@ -165,7 +165,7 @@ function Header() {
               style={{ fontFamily: "var(--font-display)" }}
               onClick={() => setMobileOpen(false)}
             >
-              {p.name}
+              {p.navLabel ?? p.name}
             </a>
           ))}
           <a href="#services" className="text-base text-slate-300 hover:text-[#F6CC55] transition-colors py-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
@@ -344,7 +344,7 @@ function PlatformSection() {
 
   return (
     <section id="platform" className="relative py-16 md:py-24 bg-[#0a0e1a]">
-      <div className="container" ref={ref}>
+      <div className="container aster-constellation" ref={ref}>
         <h2
           className={`flex items-center gap-3 text-[13px] font-semibold tracking-[0.2em] uppercase text-slate-400 mb-6 transition-all duration-500 ${
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"

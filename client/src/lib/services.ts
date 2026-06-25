@@ -45,6 +45,8 @@ export interface ServiceEntry {
   cta?: string;
   /** Show in the top nav / footer link rail. */
   inNav?: boolean;
+  /** Short label for the nav rail (falls back to `name` on detail surfaces). */
+  navLabel?: string;
 }
 
 export const STATUS_META: Record<
@@ -72,6 +74,7 @@ export const PRODUCTS: ServiceEntry[] = [
     accent: "#F6CC55",
     cta: "Open Studio",
     inNav: true,
+    navLabel: "Studio",
   },
   {
     id: "app",
@@ -87,6 +90,7 @@ export const PRODUCTS: ServiceEntry[] = [
     accent: "#4a9fff",
     cta: "Explore the App",
     inNav: true,
+    navLabel: "App",
   },
   {
     id: "aau",
@@ -101,6 +105,7 @@ export const PRODUCTS: ServiceEntry[] = [
     accent: "#a78bfa",
     cta: "View the Program",
     inNav: true,
+    navLabel: "Programs",
   },
   {
     // Productized site-building service. St Patrick (Armonk) is the first public
