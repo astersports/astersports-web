@@ -24,6 +24,9 @@ import { processAsyncJob } from './studioAsyncWorker';
 import { processTrialAutoCharges } from './shadowBilling';
 import { cronSecretOk as cronSecretMatches } from "./_core/cronAuth";
 import type { Game } from "../shared/types";
+import { getDb } from "./db";
+import { platformAdmins } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
 
 // Owner-only procedure: restricts access to the site owner (OWNER_OPEN_ID)
 const ownerProcedure = protectedProcedure.use(async ({ ctx, next }) => {
@@ -49,7 +52,25 @@ const lastKnownStatuses: Map<string, string> = new Map();
 export const appRouter = router({
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query(async (opts) => {
+      const user = opts.ctx.user;
+      if (!user) return null;
+      // Surface cross-org super-admin status from the real gate (the
+      // `platform_admins` table, same source superAdminProcedure checks) so the
+      // client doesn't have to rely on the build-time VITE_OWNER_OPEN_ID env
+      // heuristic to decide whether to show platform-admin surfaces.
+      let isSuperAdmin = false;
+      const database = await getDb();
+      if (database) {
+        const rows = await database
+          .select({ userId: platformAdmins.userId })
+          .from(platformAdmins)
+          .where(eq(platformAdmins.userId, user.id))
+          .limit(1);
+        isSuperAdmin = rows.length > 0;
+      }
+      return { ...user, isSuperAdmin };
+    }),
     // TODO(security): logout is cookie-only; stateless JWT stays valid until exp — add a tokenValidAfter/sessionVersion revocation store (needs migration).
     logout: publicProcedure.mutation(({ ctx }) => {
       // Clear with a fixed canonical attribute set in production so the clear

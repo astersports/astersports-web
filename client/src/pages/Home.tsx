@@ -67,7 +67,9 @@ function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user } = useAuth();
-  const isOwner = user?.role === "admin" && user?.openId === import.meta.env.VITE_OWNER_OPEN_ID;
+  // Show owner/admin surfaces based on the server's super-admin flag (the
+  // platform_admins gate), not the build-time VITE_OWNER_OPEN_ID heuristic.
+  const isOwner = user?.isSuperAdmin === true;
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
