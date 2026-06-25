@@ -132,16 +132,12 @@ function normalize(
   };
 }
 
-export function isValidCoord(lat: number, lon: number): boolean {
-  return (
-    Number.isFinite(lat) &&
-    Number.isFinite(lon) &&
-    lat >= -90 &&
-    lat <= 90 &&
-    lon >= -180 &&
-    lon <= 180
-  );
-}
+// Convergence (PR #106 → @aster/weather): coordinate validation now comes from
+// the shared package (re-exported so `server/routers.ts` keeps importing it from
+// here). The combined single-call forecast + richer fields (UV, wind direction,
+// venue timezone) stay local until a later @aster/weather version carries them.
+export { isValidCoord } from "@aster/weather";
+import { isValidCoord } from "@aster/weather";
 
 /**
  * Fetch a 7-day forecast for a coordinate. Returns cached data within the TTL,
