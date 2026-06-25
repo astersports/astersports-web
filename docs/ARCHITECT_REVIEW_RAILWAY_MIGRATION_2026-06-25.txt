@@ -1,0 +1,162 @@
+ARCHITECT REVIEW PACKET — Railway/Supabase migration (PR #103)
+==============================================================
+For: Architect (claude.ai) lane — review to merge PR #103 -> main.
+From: Claude Code.  Date: 2026-06-25.  Relayed by: Frank.
+Subject SHA: claude/railway-supabase-migration @ 8292875 (the branch Railway
+  auto-deploys to production / astersports.io).
+Companion: docs/RAILWAY_MIGRATION_STATUS_AUDIT_2026-06-25.txt (merged to main via #112)
+  — the full phase-by-phase ground-truth audit. This packet is the *review-and-decide*
+  artifact for the Architect-scoped surfaces only (§2.4: money-path, auth, schema).
+
+DECISION REQUESTED
+  Approve merging PR #103 to `main` (then CC repoints the Railway deploy trigger from the
+  branch to `main`). The migration is COMPLETE and LIVE in production already; merging
+  makes `main` reflect production. Per §2.4 it holds for this Architect sign-off.
+
+STANDING CONTEXT (grounded)
+  - Production is live on Railway + Supabase + Anthropic + Google OAuth NOW.
+    astersports.io -> 200; /api/auth/google/login -> 302; /api/studio/posture -> 403.
+  - `main` does NOT yet contain the migration; merging #103 is the catch-up.
+  - Branch reconciled with main (0 behind; CC merged origin/main in earlier 2026-06-25).
+  - Phase: PRE-ONBOARDING (§0) — prod is a test bed, zero live clients.
+
+=========================================================================================
+SURFACE 1 — MONEY-PATH CAS re-port (mysql2 affectedRows -> postgres-js .returning())
+=========================================================================================
+REQUEST: confirm the atomic credit/ledger + job-lifecycle guards preserve the §1
+  invariants under Postgres (atomic conditional debit never oversells; (refId,reason)
+  idempotency; no deliver-AND-refund; refund-once).
+
+EVIDENCE (file:line, server/studioDb.ts @ 8292875):
+  - deductCredits (263-322): wrapped in db.transaction; (a) idempotency pre-check on
+    (refId,reason) returns current balance as a clean no-op on retry (281-289); (b)
+    atomic conditional debit `UPDATE tenants SET creditBalance = creditBalance - amount
+    WHERE id=? AND creditBalance >= amount` via .returning({id}); res.length===0 =>
+    throw "Insufficient credits" (293-302). Mirrors the old affectedRows guard exactly.
+  - grantCredits (339-): .returning({id}); res.length===0 => "Tenant not found" (373-375).
+  - claimJobForCpuProcessing (445-457): CAS via .returning({id}); res.length>0 (456-457).
+  - completeJobIfProcessing (464-472) / failJobIfClaimable (480-488): same CAS shape.
+  - recoverStrandedCpuJobs (532-541): .returning() count (T1.5 strand recovery).
+  - Per-attempt deduct refId minting (326-393 region) so a regenerate on the same jobId
+    actually charges and a refund only offsets the attempt that debited (no free gen, no
+    over-refund).
+  - server/db.ts (1-30): postgres-js, prepare:false, max:10; comment warns to use the
+    Supabase SESSION pooler (5432), not the TRANSACTION pooler (6543), to avoid the
+    suspected first-login upsert failures.
+
+VERIFICATION CC RAN:
+  - CI gate: .github/workflows/ci.yml job `db-integration` ("money-path integration
+    (real Postgres)") stands up postgres:17, RUN_DB_TESTS=1, runs
+    server/creditLedger.integration.test.ts. Green.
+  - Live ledger reconcile (Supabase project eyitivulszubtdfpsbdx, 2026-06-25):
+    tenant "Aster Sports" creditBalance 30 == SUM(credit_ledger.delta) 30, diff 0
+    (27 entries); zero duplicate (refId,reason) rows. §1/§6 invariants hold live.
+
+CC LEAN [GROUNDED]: APPROVE. The CAS semantics are faithfully ported and proven both in
+  CI (Postgres) and against live data. Residual risk is the pooler-mode footgun, already
+  mitigated in-code by prepare:false + the SESSION-pooler note; confirm the prod
+  DATABASE_URL points at the session pooler.
+
+=========================================================================================
+SURFACE 2 — AUTH swap (Manus WebDev OAuth -> Google OAuth, own-JWT session)
+=========================================================================================
+REQUEST: ratify the identity model. Scope chosen = §3.B option (b): keep the own-JWT
+  session layer, swap ONLY the OAuth provider to Google (preserves the `openId` model;
+  does NOT remap to Supabase Auth user IDs). Confirm tenant-isolation is unaffected.
+
+EVIDENCE:
+  - server/_core/googleAuth.ts: buildGoogleAuthUrl (scope "openid email profile",
+    state CSRF), exchangeGoogleCode -> id_token, verified against Google JWKS via jose
+    (createRemoteJWKSet). No client secret/Google token reaches the browser.
+  - server/_core/oauth.ts: GET /api/auth/google/login sets an oauth_state CSRF cookie
+    (41-55); GET /api/oauth/callback re-checks state (56-69), derives
+    openId = googleOpenId(profile.sub) (83-86), mints the app session via
+    sdk.createSessionToken(openId, ...) and sets COOKIE_NAME (93-99). => identity is
+    keyed on a Google-derived openId; the own-JWT session is unchanged downstream.
+  - server/_core/cronAuth.ts: accepts CRON_SECRET via x-cron-secret OR Authorization:
+    Bearer (plus a legacy x-webdev-schedule-uid path retained for transition); secret
+    gate open only when CRON_SECRET unset (unit CI).
+  - client/src/const.ts getLoginUrl -> /api/auth/google/login (Manus portal removed;
+    resolved in the origin/main reconcile merge).
+
+OPEN ITEMS FOR THE ARCHITECT:
+  (i)  openId derivation: googleOpenId(profile.sub) becomes the PK/FK identity. For a
+       fresh pre-onboarding DB (no legacy Manus openIds to preserve) this is clean; the
+       Architect should confirm no downstream code assumes the old Manus openId shape.
+  (ii) Dead-code: sdk.ts still carries the INERT Manus OAuth login path + ./types/
+       manusTypes (sdk.ts:32 "Dead Manus OAuth login path ... Retained inert pending the
+       dead-code removal"). CC proposes a SEPARATE post-merge cleanup PR (Architect-
+       scoped) rather than folding it into #103 — keeps this review focused and avoids
+       auth surgery riding the migration merge. (See POST-MERGE below.)
+  (iii)cronAuth still accepts the legacy x-webdev-schedule-uid header — harmless on
+       Railway (nothing injects it) but can be dropped with the dead-code PR.
+
+CC LEAN [GROUNDED]: APPROVE option (b) as shipped; track (ii)/(iii) as the cleanup PR.
+  Option (b) is the smaller, lower-risk choice and the live 302 + working sessions prove
+  the path. (Full Supabase Auth remap was the larger alternative and is unnecessary
+  pre-onboarding.)
+
+=========================================================================================
+SURFACE 3 — SCHEMA + driver (MySQL/TiDB -> Postgres)
+=========================================================================================
+REQUEST: ratify the Postgres schema port + the migration baseline strategy.
+
+EVIDENCE:
+  - drizzle.config.ts: dialect "postgresql". drizzle/schema.ts: 20 pgTable, 0 live
+    mysqlTable. server/db.ts on postgres-js.
+  - Migration baseline regenerated for Postgres: drizzle/0000_init.sql,
+    0001_updatedat_triggers.sql, 0002_trial_reminders_sent.sql (the 20 legacy MySQL .sql
+    files do not apply and were not carried).
+  - onUpdateNow() replacement: 0001 installs a BEFORE UPDATE trigger set_updated_at()
+    stamping updatedAt=now(). Header flags it LOAD-BEARING: recoverStrandedCpuJobs (T1.5)
+    ages stranded cpu_processing jobs off studio_jobs.updatedAt, so the claim write must
+    bump it — the trigger preserves that semantic faithfully.
+
+CC LEAN [GROUNDED]: APPROVE. The one subtle correctness item (updatedAt semantics for
+  strand detection) is explicitly handled by the trigger. Suggest the Architect spot-read
+  0000_init.sql enum/jsonb/serial mappings against drizzle/schema.ts.
+
+=========================================================================================
+SURFACE 4 — PLAN DEVIATION: in-process scheduler (vs the plan's "Railway Cron services")
+=========================================================================================
+REQUEST: ratify the deviation from RAILWAY_SUPABASE_MIGRATION_SCOPE.txt §2.E/P6.
+
+EVIDENCE (server/_core/scheduler.ts):
+  - In-process interval scheduler replaces Manus Heartbeat: poll-predictions every 1 min,
+    reap-stuck-jobs every 5 min (27-29), self-HTTP to localhost with x-cron-secret (44).
+  - Safe-by-default: no-op unless ENABLE_SCHEDULER=true AND CRON_SECRET set; refuses to
+    start (logs error) if CRON_SECRET missing (56-63). Idempotency-safe: underlying jobs
+    (atomic claim CAS, refund-once reaper, ON CONFLICT billing) tolerate a duplicate run.
+  - heartbeat.ts and dataApi.ts removed.
+
+RATIONALE FOR DEVIATION: on a persistent Railway instance the cold-start/scale-to-zero
+  failures the plan worried about disappear, so an in-process scheduler is simpler than
+  standing up separate Railway Cron services and keeps the cron handlers self-contained.
+
+OPEN [VERIFY] (CC could not read prod env): confirm ENABLE_SCHEDULER=true AND CRON_SECRET
+  are set in the Railway prod env — otherwise the reaper does NOT run and a stranded job
+  is never refunded (§6 stranded-job safety). This is the one item that could silently
+  bite. CC recommends verifying before onboarding regardless of the merge decision.
+
+CC LEAN [GROUNDED]: RATIFY the in-process approach; gate onboarding on the ENABLE_SCHEDULER
+  + CRON_SECRET prod-env check.
+
+=========================================================================================
+POST-MERGE SEQUENCE (CC executes after Architect approval)
+=========================================================================================
+  1. Squash/merge #103 -> main.
+  2. Repoint the Railway deploy trigger from claude/railway-supabase-migration to `main`;
+     smoke (astersports.io 200 + /api/studio/posture) per §1.
+  3. Dead-code cleanup PR (Architect-scoped): remove inert Manus OAuth in sdk.ts +
+     ./types/manusTypes + the legacy x-webdev cron header. Held for review.
+  4. CLAUDE.md §2.5/§4-G0 rewrite to the Railway+Supabase chain — Architect owns the
+     wording (§2.1); CC supplies the factual diff on request.
+  5. Decommission Manus after a rollback window.
+
+OUT OF SCOPE (this packet): the dead-code cleanup diff (separate PR), the CLAUDE.md
+  wording, and STUDIO_WORKING_MEGAPIXELS tuning (P7 perf knob).
+
+OPEN [VERIFY] ITEMS SUMMARY (carry to onboarding gate §7):
+  - prod DATABASE_URL uses the Supabase SESSION pooler (Surface 1).
+  - ENABLE_SCHEDULER=true + CRON_SECRET set in Railway prod (Surface 4).
+  - STUDIO_WORKING_MEGAPIXELS raised on the 4GB box (P7).
