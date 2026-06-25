@@ -199,7 +199,7 @@ EVIDENCE: P1/aau + P3 scrape Tourney Machine (server/scraper.ts, 5-tournament
   NOT scrape live tournament scores today [GROUNDED]. PR #106 (open) adds venue
   coords + Open-Meteo weather to P1's scraper.
 OPTIONS:
-  A) App owns it: move/мirror the scraper into P2 (or an edge function) so the
+  A) App owns it: move/mirror the scraper into P2 (or an edge function) so the
      app holds scores+records; all public surfaces read the app. Requires
      scraper port + a public read API/RPC on P2.
   B) Scraper service owns it: one shared scraper service feeds all surfaces; the
@@ -354,9 +354,12 @@ forks land; listing them so the Architect can fold them into the design pass.
 PR #107 (astersports-web, draft, CI green): registry-driven main page + public
 AAU. It is deliberately reversible plumbing — the service registry expresses ANY
 F4 framing, and the public AAU flip matches Frank's stated direction. Held as a
-DRAFT so this brief can shape the IA before it merges. If the Architect wants the
-AAU section slimmed to a case study (F1=A), that's an edit on top of #107, not a
-rework. Recommendation: merge #107 as the new baseline, iterate per the ruling.
+DRAFT so this brief can shape the IA before it merges. It also already carries the
+ratified additions: the Websites service in the registry + the brand-gradient
+alignment (R2/F5). If the Architect wants the AAU section reshaped, that's an edit
+on top of #107, not a rework. Recommendation: keep #107 a DRAFT until the Architect
+acks the IA, then rebase on main (parallel Print Studio lane, §0b) and merge as the
+new baseline.
 
 ────────────────────────────────────────────────────────────────────────
 7. QUESTIONS FOR FRANK — RESOLVED 2026-06-25 (see §0a)
