@@ -20,7 +20,7 @@ importers:
     dependencies:
       '@aster/weather':
         specifier: github:astersports/aster-weather#v0.1.0
-        version: git+https://git@github.com:astersports/aster-weather.git#2b099594bd0ebc93e44402f715c3cd36cbbdea44(react@19.2.1)
+        version: git+https://github.com/astersports/aster-weather.git#2b099594bd0ebc93e44402f715c3cd36cbbdea44(react@19.2.1)
       '@aws-sdk/client-s3':
         specifier: ^3.693.0
         version: 3.1068.0
@@ -313,8 +313,8 @@ importers:
 
 packages:
 
-  '@aster/weather@git+https://git@github.com:astersports/aster-weather.git#2b099594bd0ebc93e44402f715c3cd36cbbdea44':
-    resolution: {commit: 2b099594bd0ebc93e44402f715c3cd36cbbdea44, repo: git@github.com:astersports/aster-weather.git, type: git}
+  '@aster/weather@git+https://github.com/astersports/aster-weather.git#2b099594bd0ebc93e44402f715c3cd36cbbdea44':
+    resolution: {commit: 2b099594bd0ebc93e44402f715c3cd36cbbdea44, repo: https://github.com/astersports/aster-weather.git, type: git}
     version: 0.1.0
     peerDependencies:
       react: '>=18'
@@ -3891,7 +3891,7 @@ packages:
 
 snapshots:
 
-  '@aster/weather@git+https://git@github.com:astersports/aster-weather.git#2b099594bd0ebc93e44402f715c3cd36cbbdea44(react@19.2.1)':
+  '@aster/weather@git+https://github.com/astersports/aster-weather.git#2b099594bd0ebc93e44402f715c3cd36cbbdea44(react@19.2.1)':
     optionalDependencies:
       react: 19.2.1
 
