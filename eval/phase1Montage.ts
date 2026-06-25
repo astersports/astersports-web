@@ -20,7 +20,8 @@ const DIR = "eval/samples/cinqasept-likely";
 interface C { id: string; image: string; title: string; bbox: BBoxNormalized; seg: SegmentOptions }
 const CASES: C[] = [
   { id: "poppette", image: `${DIR}/scattered__likely__poppette-dress__flatlay.jpg`, title: "LIKELY Poppette — dots", bbox: { x: 0.2, y: 0.55, w: 0.6, h: 0.38 }, seg: { deltaE: 18, maxAreaFrac: 0.012, minAreaFrac: 0.0003 } },
-  { id: "ditsy", image: `${DIR}/scattered__likely__ditsy-floral-marullo-dress__flatlay.jpg`, title: "LIKELY Ditsy Marullo — appliqués", bbox: { x: 0.16, y: 0.18, w: 0.68, h: 0.6 }, seg: { deltaE: 16, maxAreaFrac: 0.02, minAreaFrac: 0.0005 } },
+  { id: "stassie", image: `${DIR}/scattered__cinqasept__stassie-dress__flatlay.jpg`, title: "Cinq à Sept Stassie — dots", bbox: { x: 0.18, y: 0.45, w: 0.64, h: 0.30 }, seg: { deltaE: 18, maxAreaFrac: 0.03, minAreaFrac: 0.0005 } },
+  { id: "ditsy", image: `${DIR}/scattered__likely__ditsy-floral-marullo-dress__flatlay.jpg`, title: "LIKELY Ditsy Marullo — appliqués", bbox: { x: 0.16, y: 0.18, w: 0.68, h: 0.6 }, seg: { deltaE: 10, maxAreaFrac: 0.03, minAreaFrac: 0.0005 } },
   { id: "tessa", image: `${DIR}/scattered__likely__tessa-gown__flatlay.jpg`, title: "LIKELY Tessa — roses", bbox: { x: 0.18, y: 0.42, w: 0.64, h: 0.5 }, seg: { deltaE: 30, maxAreaFrac: 0.03 } },
 ];
 const LH = 44;

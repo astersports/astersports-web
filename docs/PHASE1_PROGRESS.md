@@ -81,3 +81,54 @@ Real prints are not checkerboards, so this does not affect the client scope.
 
 Status: **all three metrics ≥90% on the achievable offline scope.** Remaining work is
 real-segmenter param tuning (M2 real validation, non-gating) and the FINAL writeup.
+
+---
+
+## Round 3 — real-segmenter validation + FINAL
+
+| metric | value | bar | pass |
+|---|---|---|:--:|
+| M1 density count fidelity (synthetic, exact N) | 8/8 = 100% | ≥90% | ✅ |
+| M2 segmenter detection (clean synthetic, known N) | 3/3 = 100% | ≥90% | ✅ |
+| M3 scale detector recall | 20/21 = 95% | ≥90% | ✅ |
+| M3 false-accepts (placement/border/gradient) | 0 | 0 | ✅ |
+
+Real-segmenter params retuned to sensible values (poppette 93 vs hand ~95 = 2% err;
+stassie/pindot/ditsy now detect plausibly instead of the earlier gross under-counts).
+But real counts stay **approximate, non-gating**: on draped flat-lays the classical
+contrast+CC counter locks onto only the cleanest sub-region (see `montage-stassie.png` —
+partial), and on dense/overlapping or low-contrast prints it under- or over-segments.
+That is the documented classical CEILING, not a tuning miss.
+
+# FINAL — Phase-1 outcome
+
+**At ≥90% (achievable offline scope), locked + regression-guarded in CI:**
+- **M1 density count fidelity — 100%.** The deterministic remover takes exactly
+  round(N·p/100) instances; on synthetic fixtures with known N it removes the requested
+  fraction within ±10% at 30% and 50% for N=30/60/90/120. (`densityThin` + `densityPreview`.)
+- **M2 segmenter detection — 100% on clean discrete synthetic** (N=30/60/90 recovered
+  exactly). Dense/overlapping N=120 → 104 (13% under) is the classical ceiling.
+- **M3 scale recall — 95% with 0 false-accepts.** The coverage reframe accepts aperiodic
+  tossed/scattered prints (synthetic + all real-scattered) that the FFT-only detector
+  rejected (~⅓ false-reject → fixed), while never accepting a placement/border/gradient.
+
+**Blocked on credentialed SAM2 (cannot close offline — no creds, no paid sub-processor):**
+- Real-garment count ACCURACY at billing grade. The classical segmenter is a stand-in;
+  on draped/dense/low-contrast real prints it cannot hit ±10% reliably (stassie/ditsy/
+  tessa partial). The real G3 gate is SAM2 instance masks on the eval set — which is now
+  staged and ready (`eval/samples/cinqasept-likely/`, 19 images).
+- Dense/overlapping motif counting (touching florals) — same ceiling; needs SAM2 instance
+  segmentation, not contrast+CC.
+
+**Exact next step (for the credentialed run):**
+1. Set `STUDIO_MASK_PROVIDER=sam2` + Replicate creds; run SAM2 instance masks over
+   `eval/samples/cinqasept-likely/` (regenerate per-image instance label-maps).
+2. Re-run `eval/phase1Metrics.ts` with SAM2 instances feeding M1/M2 (replace the classical
+   segmenter for the real rows) → this is the billing-grade G3 count gate.
+3. Keep the M3 coverage detector as-is (it is mask-quality-independent — runs on the image
+   + fabric raster); re-confirm 0 false-accepts on the SAM2 fabric masks.
+4. Wire `densityPreview` + the scale motif-resize into the router/UI; suppress density/scale
+   on solids (bucket C).
+
+Harness to reproduce any time: `npx tsx eval/phase1Metrics.ts`. Montages:
+`eval/out/phase1/montage-*.png` (branch-only; strip before merge).

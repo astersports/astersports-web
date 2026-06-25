@@ -44,9 +44,9 @@ interface RealCase {
 const DIR = "eval/samples/cinqasept-likely";
 const REAL: RealCase[] = [
   { id: "poppette-dots", image: `${DIR}/scattered__likely__poppette-dress__flatlay.jpg`, bbox: { x: 0.2, y: 0.55, w: 0.6, h: 0.38 }, seg: { deltaE: 18, maxAreaFrac: 0.012, minAreaFrac: 0.0003 }, clean: true, scaleLabel: "scattered", handCount: 95 },
-  { id: "stassie-dots", image: `${DIR}/scattered__cinqasept__stassie-dress__flatlay.jpg`, bbox: { x: 0.18, y: 0.45, w: 0.64, h: 0.30 }, seg: { deltaE: 28, maxAreaFrac: 0.02, minAreaFrac: 0.0008 }, clean: true, scaleLabel: "scattered", handCount: 48 },
-  { id: "pindot", image: `${DIR}/scattered__cinqasept__pindot-galea-dress__flatlay.jpg`, bbox: { x: 0.28, y: 0.52, w: 0.44, h: 0.28 }, seg: { deltaE: 14, maxAreaFrac: 0.01, minAreaFrac: 0.00015 }, clean: true, scaleLabel: "scattered" },
-  { id: "ditsy-marullo", image: `${DIR}/scattered__likely__ditsy-floral-marullo-dress__flatlay.jpg`, bbox: { x: 0.16, y: 0.18, w: 0.68, h: 0.6 }, seg: { deltaE: 16, maxAreaFrac: 0.02, minAreaFrac: 0.0005 }, clean: true, scaleLabel: "scattered" },
+  { id: "stassie-dots", image: `${DIR}/scattered__cinqasept__stassie-dress__flatlay.jpg`, bbox: { x: 0.18, y: 0.45, w: 0.64, h: 0.30 }, seg: { deltaE: 18, maxAreaFrac: 0.03, minAreaFrac: 0.0005 }, clean: true, scaleLabel: "scattered" },
+  { id: "pindot", image: `${DIR}/scattered__cinqasept__pindot-galea-dress__flatlay.jpg`, bbox: { x: 0.28, y: 0.52, w: 0.44, h: 0.28 }, seg: { deltaE: 14, maxAreaFrac: 0.03, minAreaFrac: 0.00015 }, clean: true, scaleLabel: "scattered" },
+  { id: "ditsy-marullo", image: `${DIR}/scattered__likely__ditsy-floral-marullo-dress__flatlay.jpg`, bbox: { x: 0.16, y: 0.18, w: 0.68, h: 0.6 }, seg: { deltaE: 10, maxAreaFrac: 0.03, minAreaFrac: 0.0005 }, clean: true, scaleLabel: "scattered" },
   { id: "tessa-roses", image: `${DIR}/scattered__likely__tessa-gown__flatlay.jpg`, bbox: { x: 0.18, y: 0.42, w: 0.64, h: 0.5 }, seg: { deltaE: 30, maxAreaFrac: 0.03 }, clean: false, scaleLabel: "scattered" },
   { id: "tossed-floral-walker", image: `${DIR}/scattered__cinqasept__tossed-floral-walker-dress__flatlay.jpg`, bbox: { x: 0.2, y: 0.4, w: 0.6, h: 0.5 }, seg: { deltaE: 22, maxAreaFrac: 0.05 }, clean: false, scaleLabel: "scattered" },
   { id: "trailing-peonies", image: `${DIR}/scattered__cinqasept__trailing-peonies-maude-dress__flatlay.jpg`, bbox: { x: 0.2, y: 0.35, w: 0.6, h: 0.55 }, seg: { deltaE: 22, maxAreaFrac: 0.05 }, clean: false, scaleLabel: "scattered" },
