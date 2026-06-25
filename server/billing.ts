@@ -162,8 +162,6 @@ export const billingRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      const db = await getDb();
-
       // Create a one-time price
       const { productId } = await ensureProducts();
 
