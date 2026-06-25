@@ -11,7 +11,6 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { PRODUCTS, SERVICES, NAV_PRODUCTS, STATUS_META, type ServiceEntry } from "@/lib/services";
 
 const LOGO_URL = "/aster-mark.png";
-const HERO_BG_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663756289268/4gGAtBP2vWCBU9FC7zDMWA/hero-bg-kP7SSTui5UuAzDmbnWb2NK.webp";
 const SERVICES_VISUAL_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663756289268/4gGAtBP2vWCBU9FC7zDMWA/services-visual-iD7nJ76bKWcPDDk2JN8BYh.webp";
 const CTA_BG_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663756289268/4gGAtBP2vWCBU9FC7zDMWA/cta-bg-MXeCiZ4GFgLGRGyvD68mXc.webp";
 
@@ -197,52 +196,55 @@ function Header() {
   );
 }
 
+const STARS = [
+  { top: "14%", left: "9%", tw: true }, { top: "8%", left: "30%", tw: true },
+  { top: "22%", left: "52%", tw: true }, { top: "18%", left: "70%", tw: false },
+  { top: "11%", left: "86%", tw: true }, { top: "34%", left: "20%", tw: false },
+  { top: "40%", left: "78%", tw: false }, { top: "6%", left: "62%", tw: false },
+  { top: "30%", left: "40%", tw: true }, { top: "26%", left: "92%", tw: false },
+];
+
 function HeroSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section
-      className="relative min-h-[100vh] flex items-center overflow-hidden"
-      style={{
-        background: `linear-gradient(180deg, #0a0e1a 0%, #0d1220 100%)`,
-      }}
-    >
-      <div
-        className="absolute inset-0 opacity-70"
-        style={{
-          backgroundImage: `url(${HERO_BG_URL})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
+    <section className="relative min-h-[100vh] flex items-center overflow-hidden">
+      <div className="aster-sky" />
+      <div className="aster-stars absolute inset-0" aria-hidden="true">
+        {STARS.map((s, i) => (
+          <span key={i} className={s.tw ? "tw" : ""} style={{ top: s.top, left: s.left }} />
+        ))}
+      </div>
+
+      {/* Big constellation mark glowing behind the hero (desktop only) */}
+      <img
+        src={LOGO_URL}
+        alt=""
+        aria-hidden="true"
+        className="aster-hero-logo hidden lg:block absolute right-4 xl:right-16 top-24 h-[300px] xl:h-[400px] w-auto opacity-90 pointer-events-none select-none"
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-[#0a0e1a]/40 via-transparent to-[#0a0e1a]/80" />
 
       <div className="container relative z-10 pt-32 pb-20" ref={ref}>
-        <div className="max-w-3xl">
+        <div className="max-w-2xl">
           <div
-            className={`flex items-center gap-2 mb-6 transition-all duration-500 ${
+            className={`mb-5 transition-all duration-500 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
           >
-            <StarAccent className="animate-pulse-glow" />
-            <span className="text-sm font-medium text-[#F6CC55] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
-              A platform of design & sports technology
+            <span className="aster-mono text-xs tracking-[0.32em] uppercase text-[#FBD56B]/85">
+              Celestial cartography · we map the work
             </span>
           </div>
 
           <h1
-            className={`text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.1] tracking-tight text-white mb-6 transition-all duration-700 delay-100 ${
+            className={`text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.02] tracking-tight text-white mb-6 transition-all duration-700 delay-100 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
             style={{ fontFamily: "var(--font-display)" }}
           >
-            We design, build &
+            The platform your
             <br />
-            elevate brands that
-            <br />
-            <span className="bg-gradient-to-r from-[#F6CC55] to-[#E0631C] bg-clip-text text-transparent">
-              stand apart.
-            </span>
+            program <span className="aster-grad-text">orbits.</span>
           </h1>
 
           <p
@@ -250,7 +252,7 @@ function HeroSection() {
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
           >
-            One studio, many products — AI print engineering, a youth-sports management app, and a live AAU program, alongside bespoke web and brand work. New services light up here as they come online.
+            One studio building the products youth sports actually run on — print, the app, and the programs we field ourselves. Every surface charted, every service lit as it comes online.
           </p>
 
           <div
@@ -260,10 +262,10 @@ function HeroSection() {
           >
             <a
               href="#contact"
-              className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full bg-gradient-to-r from-[#F6CC55] to-[#E0631C] text-[#0a0e1a] font-semibold text-base transition-transform duration-160 hover:scale-[1.03] active:scale-[0.97] shadow-lg shadow-[#F6CC55]/20"
+              className="aster-grad-bg inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full text-[#1a0e05] font-semibold text-base transition-transform duration-160 hover:scale-[1.03] active:scale-[0.97] shadow-lg shadow-[#E0631C]/20"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              Start a Conversation
+              Start a project
               <ArrowRight className="w-4 h-4" />
             </a>
             <a
@@ -271,7 +273,7 @@ function HeroSection() {
               className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full border border-white/15 text-white font-medium text-base transition-all duration-200 hover:border-[#F6CC55]/40 hover:text-[#F6CC55]"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              Explore the Platform
+              Explore the constellation
             </a>
           </div>
 
@@ -291,69 +293,48 @@ function HeroSection() {
   );
 }
 
-function StatusPill({ status }: { status: NonNullable<ServiceEntry["status"]> }) {
+function NodePill({ status }: { status: NonNullable<ServiceEntry["status"]> }) {
   const meta = STATUS_META[status];
+  if (status === "live" || status === "members") {
+    return (
+      <span className="aster-grad-bg aster-mono self-start mt-auto text-[10.5px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full text-[#1a0e05] font-bold">
+        {meta.label}
+      </span>
+    );
+  }
   return (
     <span
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide"
-      style={{ color: meta.color, backgroundColor: meta.bg, fontFamily: "var(--font-display)" }}
+      className="aster-mono self-start mt-auto text-[10.5px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full border"
+      style={{ color: meta.color, borderColor: `color-mix(in srgb, ${meta.color} 45%, transparent)` }}
     >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: meta.color }} />
       {meta.label}
     </span>
   );
 }
 
-function ProductCard({ product, index, isVisible }: { product: ServiceEntry; index: number; isVisible: boolean }) {
+function ConstellationNode({ product, index, isVisible }: { product: ServiceEntry; index: number; isVisible: boolean }) {
   const Icon = product.icon;
+  const lit = product.status === "live" || product.status === "members";
   return (
     <a
       href={product.href}
       {...(product.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-      className={`group relative flex flex-col p-6 md:p-7 rounded-2xl border border-white/5 bg-[#0a0e1a]/60 backdrop-blur-sm overflow-hidden transition-all duration-500 hover:-translate-y-1 ${
+      className={`aster-node group relative flex flex-col p-5 min-h-[160px] transition-all duration-500 ${
         isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
       }`}
-      style={{ transitionDelay: `${150 + index * 110}ms` }}
+      style={{ transitionDelay: `${120 + index * 100}ms` }}
     >
-      {/* accent glow */}
-      <div
-        className="absolute -top-16 -right-16 w-40 h-40 rounded-full blur-3xl opacity-20 group-hover:opacity-40 transition-opacity duration-300"
-        style={{ backgroundColor: product.accent }}
-      />
-      <div className="relative flex items-start justify-between mb-5">
-        <div
-          className="w-12 h-12 rounded-xl flex items-center justify-center border transition-all duration-200"
-          style={{
-            backgroundColor: `color-mix(in srgb, ${product.accent} 12%, transparent)`,
-            borderColor: `color-mix(in srgb, ${product.accent} 30%, transparent)`,
-          }}
-        >
-          <Icon className="w-6 h-6" style={{ color: product.accent }} />
-        </div>
-        {product.status && <StatusPill status={product.status} />}
+      <div className={`aster-star ${lit ? "on" : ""} mb-4`}>
+        <Icon className="w-5 h-5" />
       </div>
-
-      <h3 className="relative text-xl font-semibold text-white mb-1" style={{ fontFamily: "var(--font-display)" }}>
+      <h3 className="text-base font-semibold text-white mb-1" style={{ fontFamily: "var(--font-display)" }}>
         {product.name}
       </h3>
-      <p className="relative text-sm font-medium mb-3" style={{ color: product.accent }}>
-        {product.tagline}
-      </p>
-      <p className="relative text-slate-400 leading-relaxed text-[15px] flex-1">
-        {product.description}
-      </p>
-
-      <span
-        className="relative mt-6 inline-flex items-center gap-1.5 text-sm font-semibold transition-colors"
-        style={{ color: product.accent, fontFamily: "var(--font-display)" }}
-      >
-        {product.cta ?? "Learn more"}
-        {product.external ? (
-          <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-        ) : (
-          <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
-        )}
-      </span>
+      <p className="text-[12.5px] text-slate-400 leading-snug mb-3">{product.tagline}</p>
+      {product.status && <NodePill status={product.status} />}
+      {product.external && (
+        <ArrowUpRight className="absolute top-4 right-4 w-4 h-4 text-slate-500 group-hover:text-[#F6CC55] transition-colors" />
+      )}
     </a>
   );
 }
@@ -364,38 +345,38 @@ function PlatformSection() {
   return (
     <section id="platform" className="relative py-16 md:py-24 bg-[#0a0e1a]">
       <div className="container" ref={ref}>
-        <div className="max-w-2xl mb-12">
-          <div
-            className={`flex items-center gap-2 mb-4 transition-all duration-500 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
-            }`}
-          >
-            <StarAccent />
-            <span className="text-sm font-medium text-[#F6CC55] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
-              The Platform
-            </span>
-          </div>
-          <h2
-            className={`text-3xl md:text-4xl font-bold text-white mb-4 tracking-tight transition-all duration-700 delay-100 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
-            }`}
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            Products in the constellation.
-          </h2>
-          <p
-            className={`text-lg text-slate-400 leading-relaxed transition-all duration-700 delay-200 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
-            }`}
-          >
-            Each product runs on the same foundation. As new services come online, they appear here — no redesign required.
-          </p>
+        <h2
+          className={`flex items-center gap-3 text-[13px] font-semibold tracking-[0.2em] uppercase text-slate-400 mb-6 transition-all duration-500 ${
+            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+          }`}
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          The constellation
+          <span className="flex-1 h-px bg-white/10" />
+        </h2>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {PRODUCTS.map((product, i) => (
+            <ConstellationNode key={product.id} product={product} index={i} isVisible={isVisible} />
+          ))}
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {PRODUCTS.map((product, i) => (
-            <ProductCard key={product.id} product={product} index={i} isVisible={isVisible} />
-          ))}
+        <div
+          className={`mt-4 flex items-center gap-4 flex-wrap rounded-2xl border border-dashed border-white/14 px-5 py-4 text-slate-400 text-[13.5px] transition-all duration-700 delay-300 ${
+            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+          }`}
+        >
+          <b className="text-white font-semibold tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
+            We also build
+          </b>
+          <span>agency work for brands &amp; orgs</span>
+          <div className="flex gap-2 flex-wrap sm:ml-auto">
+            {["Brand", "Web", "Apps", "Print"].map((t) => (
+              <span key={t} className="text-xs text-slate-400 border border-white/10 rounded-md px-2.5 py-1">
+                {t}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </section>
