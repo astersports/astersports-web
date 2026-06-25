@@ -18,6 +18,8 @@ import {
   Globe,
   Palette,
   Monitor,
+  Church,
+  Medal,
   type LucideIcon,
 } from "lucide-react";
 import { APP_URL } from "@/const";
@@ -109,14 +111,40 @@ export const PRODUCTS: ServiceEntry[] = [
     navLabel: "Programs",
   },
   {
-    // Productized site-building service. St Patrick (Armonk) is the first public
-    // flagship, going live to the wider public in fall 2026.
+    id: "stpatrick",
+    kind: "product",
+    name: "St. Patrick's of Armonk",
+    tagline: "Parish website & digital forms",
+    description:
+      "A full parish website — Mass times, bulletins, daily readings, calendar, and a digital forms suite for sacraments, CCD, and CYO registration. Rebuilt for the Armonk parish; launching to the public fall 2026.",
+    href: "#contact",
+    status: "soon",
+    icon: Church,
+    accent: "#34d399",
+    cta: "Preview the Site",
+  },
+  {
+    id: "legacy-hoopers",
+    kind: "product",
+    name: "Legacy Hoopers",
+    tagline: "Program site · beyond LeagueApps",
+    description:
+      "A public program site for Legacy Hoopers — live scores, tournament history, season records, and film — powered by the Aster platform in place of LeagueApps. Rebuild in progress.",
+    href: "#contact",
+    status: "soon",
+    icon: Medal,
+    accent: "#E0631C",
+    cta: "Follow the Team",
+  },
+  {
+    // Productized site-building service. St. Patrick (Armonk) and Legacy Hoopers
+    // are the first concrete builds — each surfaced as its own node above.
     id: "websites",
     kind: "product",
     name: "Websites",
     tagline: "Bespoke org & community sites",
     description:
-      "Full-featured websites for organizations and communities — live data, calendars, registration, and admin tools. St. Patrick's of Armonk is our first public build, launching fall 2026.",
+      "Full-featured websites for organizations and communities — live data, calendars, registration, and admin tools, built on the Aster platform.",
     href: "#contact",
     status: "soon",
     icon: Monitor,
