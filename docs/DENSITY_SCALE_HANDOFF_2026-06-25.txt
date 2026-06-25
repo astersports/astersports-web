@@ -1,0 +1,329 @@
+DENSITY & SCALE — FULL HANDOFF TO A NEW SESSION
+================================================
+Written: 2026-06-25 by Claude Code (CC). Purpose: a single self-contained document so a
+brand-new chat can pick up the density/scale Print-Studio work cold, with zero prior chat
+history. Read this top-to-bottom. Everything it references is committed to `main` unless
+noted. Companion docs (all on main): docs/DENSITY_SCALE_STRATEGY.txt (the decided
+strategy), docs/PHASE1_PROGRESS.md (per-round metric log), docs/DENSITY_P1_PROGRESS.txt
+(P1 build record), docs/SAM2_COUNT_EVAL.md (the go/no-go measurement).
+
+================================================================================
+0. TL;DR (read this first)
+================================================================================
+- Product: Aster "Print Studio" — deterministic image-edit ops (recolor / scale / density)
+  on apparel print patterns, billed per op via a credit/money-path.
+- Client driving this work: Jaya Apparel Group — brands Cinq à Sept (cinqasept.nyc) +
+  LIKELY (likely.nyc). Maps to the seeded "Jaya" tenant.
+- DENSITY = remove X% of print motifs (count-based). SCALE = resize the print.
+- The decided architecture: DETERMINISTIC math owns accuracy (exact count/geometry);
+  GENERATIVE AI owns realism (finish), run MASKED so the finish never changes the count.
+  Masks come from SAM2 (the count gate). See §2.
+- STATUS: Phase-1 is built, measured, and MERGED to main (PRs #102 + #105). The
+  go/no-go question "can we count motifs accurately enough to bill?" is ANSWERED:
+  **YES, with SAM2** (synthetic 10/10 within ±10%, including the hard cases where the
+  offline classical counter hit ~40%). Classical alone is NOT billing-grade on real
+  prints (bunched / multicolor / low-contrast / varied-ground).
+- NEXT: wire it into the product (router/UI + the SAM2 count path on real images), and
+  the Scale "motif-resize" reframe (Phase 2). See §9.
+
+================================================================================
+1. PLATFORM CONTEXT — IMPORTANT, RECENTLY CHANGED
+================================================================================
+The repo just MIGRATED OFF MANUS. As of 2026-06-25 `main` includes PR #103
+("Migrate off Manus → Railway + Supabase + Anthropic + Google OAuth") plus follow-ups
+(#112 status audit, #114 studio/landing polish, #115 super-admin, #117 dead-OAuth removal).
+
+So CLAUDE.md (which still describes Manus/Forge + MySQL/TiDB) is PARTIALLY STALE. Current
+reality on main:
+- DB: Postgres on Supabase (was MySQL/TiDB via Manus Autoscale). drizzle dialect=postgresql.
+- Compute/deploy: Railway (was Manus auto-publish from main).
+- LLM (vision locate, chat): Anthropic (was Manus WebDev SDK).
+- Auth: Google OAuth (was Manus OAuth/WebDev session).
+- Storage/crons: moved to the Railway/Supabase stack.
+- UNCHANGED + load-bearing for our work: SAM2 + LaMa are on REPLICATE (never were Manus).
+  The deterministic image ops are platform-agnostic (pure raster math).
+
+ACTION for a new session: re-verify money-path/DB specifics against the current code, not
+against CLAUDE.md's Manus/MySQL wording. The density/scale OP code is unaffected by the
+migration; the surrounding wiring (DB driver, env, crons) is what moved.
+
+Branch model: develop on your assigned `claude/...` branch; PRs target `main`.
+Governance (still in force, §1/§2.4 of CLAUDE.md): money-path / credit / Stripe / DB
+schema / auth / mask-provider / any architectural fork = ARCHITECT-SCOPED → the PR holds
+for Architect approval relayed by Frank, never auto-merges. Routine (UI, refactors, tests,
+docs, eval tooling) auto-merges on green CI. No agent flips a *_LIVE flag — Frank does.
+Always-on invariants: CI green before merge; ledger idempotent; NEVER bill a no-op;
+secrets never printed/committed.
+
+================================================================================
+2. THE STRATEGY (decided — do not re-derive; full text in DENSITY_SCALE_STRATEGY.txt)
+================================================================================
+2.1 The client's catalog splits into FOUR surface buckets (product names are diagnostic):
+  A. SCATTERED all-over prints ("tossed/trailing floral", dots) — artfully RANDOM, NOT a
+     geometric repeat. High volume. → DENSITY'S SWEET SPOT.
+  B. PLACED embellishment / sequins / paillettes (brand signature) — hard case.
+  C. SOLIDS — density/scale DO NOT APPLY (UI must suppress the controls).
+  D. LACE.
+
+2.2 The key insight that reorganizes everything:
+  Their prints are SCATTERED, not periodic. That splits the two ops in OPPOSITE directions:
+  - DENSITY loves scattered: counting motifs + removing an exact fraction is
+    periodicity-agnostic. Their florals are ideal for density.
+  - SCALE chokes on scattered: the old repeat guard (FFT + autocorrelation) looks for a
+    PERIODIC tile; a tossed floral has no strict period → it gets FALSE-REJECTED (~1/3 of
+    genuine repeats — the CLAUDE.md §4 G3 complaint). FIX (Phase 2): scale must treat
+    "all-over scattered coverage" as scalable and scale by RESIZING MOTIFS, not re-tiling.
+
+2.3 The architecture (combine, don't pick):
+  - FORMULA/DETERMINISTIC = ACCURACY. Only it can count + place EXACTLY ("remove exactly
+    50%"). Billable, reproducible. The spine.
+  - GENERATIVE AI = REALISM. Only it makes a hard garment look photographically right.
+  - THE TRICK: run the generative pass MASKED so it polishes the LOOK without changing the
+    COUNT/GEOMETRY. Route the finish to the garment: solid ground → cheap formula fill;
+    busy/complex ground or on-model → constrained generative finish.
+
+2.4 FLUX.1 Fill spike (PR #104) — EVALUATED, NOT ADOPTED (closed/parked). FLUX ≈ the
+  simple fill on solid grounds (no visible win), ~100x cost, new sub-processor + paid
+  licence. Reopen only if a client garment has a genuinely busy/photographic ground.
+
+================================================================================
+3. WHAT IS BUILT + MERGED (PRs #102 and #105, both on main)
+================================================================================
+PR #102 — "Manus governance retirement + [MONEY-PATH] density mid-op strand retry" (merged).
+  - Retired the dark/unused Manus Agent API client; scoped Manus to platform runtime
+    (now superseded by the #103 migration).
+  - [MONEY-PATH] recoverStrandedCpuJobs(stalenessMs): a worker killed mid-CPU-op leaves a
+    job stuck in `cpu_processing`; the reaper only refunded. This atomically resets stale
+    cpu_processing → sam2_processing so the poll path re-claims + re-runs on a fresh
+    container. STUDIO_CPU_STALE_MS default 60s (must exceed the 45s worker deadline).
+    pollAttempts persists → poison-pill still fails+refunds; CAS keeps deliver/charge once.
+
+PR #105 — "density P1: real-garment eval set + count-accurate 10/20/50% preview" (merged).
+  THE CORE PHASE-1 DELIVERABLE. Contents:
+
+  (a) Real-garment eval set — eval/samples/cinqasept-likely/
+      - 19 PDP images (6→ later +5 clean discrete added), both brands, 4 buckets,
+        flat-lay + on-model. Pulled from the brands' open Shopify CDNs via
+        `…/collections|products.json` → cdn.shopify.com.
+      - Image BINARIES ARE GITIGNORED (eval/.gitignore: *.jpg/*.png/*.webp). The durable,
+        committed artifacts are manifest.json (per-image provenance + sourceImageUrl) and
+        fetch.mjs (re-materializes the exact set). Run: `node eval/samples/cinqasept-likely/fetch.mjs`.
+
+  (b) Density PREVIEW op — server/_core/studio/ops/densityPreview.ts (+ server/densityPreview.test.ts, 9 tests)
+      - Pins "% drop = % fewer motifs": remove round(N·p/100) instances by COUNT; survivors
+        byte-identical. Periodicity-agnostic → exact + previewable on scattered prints.
+      - TRUTHFUL: every preview step is produced by the SAME deterministic densityThin the
+        billed op runs (asserted in tests) — the p% you preview == the p% you get.
+      - NO-OP HONESTY (§1 "never bill a no-op"): each step reports requestedRemoval AND
+        actual removed; noop = (removed===0) covers a legit no-op (percent 0 / 0 motifs)
+        AND a degrade; degrade specifically = noop && requestedRemoval>0.
+      - Default percents [10,20,50]; pure, deterministic, returns raw RGBA (no encode).
+
+  (c) Scale-detector REFRAME — server/_core/studio/ops/repeatDetector.ts
+      (+ server/repeatDetector.test.ts; eval corpus server/_core/studio/eval/detectorAccuracy.ts;
+       guard server/detectorAccuracy.test.ts)
+      - Added an "ALL-OVER COVERAGE" acceptance path to detectRepeat. When the FFT finds
+        NO periodic axis (the cases the old detector blanket-rejected), it classifies by
+        the motif SPATIAL DISTRIBUTION: foreground (far-from-ground pixels) WITH an
+        edge-energy floor (rejects smooth gradients/solids), accept when foreground spreads
+        across the fabric (5×5 grid occupancy ≥0.6 in ≥4 rows AND ≥4 cols) within a
+        coverage band. Handles SPARSE dots and DENSE florals alike. Borders stay caught by
+        the FFT one-axis path (coverage only runs at 0 periodic axes); blobs/placements
+        fail the occupancy/2D-spread guard.
+      - Tuned constants (calibration starting points, exported): ALLOVER_FG_TAU=12,
+        ALLOVER_FRAC_LO=0.012, ALLOVER_FRAC_HI=0.96, ALLOVER_MIN_MOTIFS=2,
+        ALLOVER_MIN_OCCUPANCY=0.60, ALLOVER_CELL_EPS=0.008, ALLOVER_EDGE_MIN=0.4,
+        ALLOVER_MIN_GRID_AXIS=4 (GRID=5).
+      - Result: scale recall 22% → ~95% with 0 false-accepts (see §4 M3). detectRepeat now
+        returns acceptPath ("periodic"|"coverage"|null) + coverage diagnostics.
+
+  (d) Eval-only OFFLINE motif segmenter — eval/segmentMotifs.ts (+ eval/densityPreviewDemo.ts)
+      - Classical contrast + connected-components stand-in (no SAM2/creds): estimate ground
+        (k-means/Lab), threshold far-from-ground = motif, CC → instances, area-filter,
+        emit an instance label-map PNG that evalMaskIO already understands.
+      - Lets the preview run end-to-end OFFLINE on a real garment. CEILING is real (see §4/§5).
+
+  (e) Phase-1 measurement harnesses (all `npx tsx eval/<file>`):
+      - eval/phase1Metrics.ts — M1/M2/M3 table.
+      - eval/generatePhase1Synthetic.mjs — rigorous aperiodic scattered fixtures, exact known N.
+      - eval/generatePhase1Hard.mjs — adversarial fixtures (overlap/multicolor/varied-ground/
+        low-contrast), exact known N.
+      - eval/phase1Audit.ts — adversarial audit separating remover robustness from
+        segmentation sensitivity.
+      - eval/phase1Montage.ts — branch-only review montages (eval/out/, gitignored).
+      - eval/sam2CountEval.ts + .github/workflows/sam2-count-eval.yml + eval/RUN_SAM2_EVAL —
+        the SAM2 go/no-go (see §5).
+
+  NOTE: branch-only review artifacts (eval/out/** montages + force-added synthetic fixture
+  PNGs) were STRIPPED before #105 merged. The JSON manifests (phase1.synthetic.json,
+  phase1.hard.json) are committed; regenerate the PNGs with the generators.
+
+================================================================================
+4. THE THREE PHASE-1 METRICS + RESULTS (rigorous bar = synthetic, exact known N)
+================================================================================
+M1 — Density count fidelity (pipeline removes the requested fraction within ±10%):
+  100% on synthetic (8/8 at 30% & 50%, N=30/60/90/120). The deterministic remover takes
+  exactly round(N·p/100) given correct instances — robust to overlap/colour/contrast.
+  CAVEAT: M1 is CONDITIONAL on correct instances; alone it proves the math, not detection.
+
+M2 — Segmenter detection (count within ±10% of known N):
+  - Clean discrete synthetic (well-separated): 100% (3/3, exact).
+  - HARD conditions (the adversarial audit, eval/phase1Audit.ts): classical = 4/10 = 40%.
+    It collapses on heavy overlap (23% err), multicolor-bunched (23%), two-tone ground
+    (63%), low-contrast (100% — finds nothing). THIS IS THE CLASSICAL CEILING → needs SAM2.
+
+M3 — Scale detector recall (accept all-over/scattered; 0 false-accepts on placed/border):
+  22% → ~95% after the coverage reframe, with 0 false-accepts maintained. Only miss is a
+  synthetic checkerboard stress case (not a real garment print). Locked in CI via the
+  detectorAccuracy corpus (scattered + gradient fixtures; accept floor raised 4→8) and
+  repeatDetector unit tests (coverage path, gradient-reject, placement-reject).
+
+Honest reckoning (after Frank challenged the headline): the early "90%" for M1/M2 was on
+EASY synthetic and over-stated readiness. The TRUE picture: density MATH (M1) and scale
+DETECTION (M3) are robust offline wins; offline COUNT accuracy on real bunched/multicolor/
+low-contrast florals is ~40% — NOT billing-grade. That gap is what the SAM2 eval (§5) closes.
+
+================================================================================
+5. THE SAM2 GO/NO-GO MEASUREMENT (docs/SAM2_COUNT_EVAL.md) — THE DECISIVE RESULT
+================================================================================
+Question: does the REAL production SAM2 count path hit ±10% on the hard conditions where
+classical hit 40%?  Measured via a CI workflow (creds via the REPLICATE_API_TOKEN secret;
+sentinel-triggered): autoSegment(dataUrl, params) → finishSam2Segmentation(seg, meta) →
+DERIVED instances (production derivation: specks <0.02% dropped, giants >20% crop dropped
+as ground, cap STUDIO_MAX_INSTANCES=200) → count. NOT raw mask count. Best of pps16/32/64,
+no per-image cherry-picking, no fitting to N. The vision-LLM fabric LOCATE is bypassed (full
+frame for synthetic, manual bbox for reals) so it measures SAM2's COUNTING, not the locator.
+
+RESULT — SYNTHETIC (rigorous, exact N): SAM2 = 10/10 within ±10%. Per condition:
+  heavy-overlap   classical 23% → SAM2 8%
+  multicolor-bunch classical 23% → SAM2 3%
+  two-tone ground  classical 63% → SAM2 2%
+  gradient ground  classical 12% → SAM2 3%
+  low-contrast     classical 100% (blind) → SAM2 2%;  contrast-mid 100% → 0%
+  (separated/high-contrast controls all 2-3%)
+
+VERDICT: BILLING-GRADE DENSITY IS ACHIEVABLE — with SAM2 as the count source. SAM2 does
+what classical fundamentally cannot: split touching motifs, and see low-contrast / varied-
+ground prints. This is the go.
+
+CAVEAT (do not skip): the REAL-floral rows are NOISY and NOT trustworthy yet —
+  poppette SAM2 45 vs classical 93 (UNDER), pindot 1 (found ~nothing), tossed 143,
+  tessa 211, stassie 130 — because (a) no firm hand ground-truth, and (b) the eval fed a
+  MANUAL bbox crop, not the production vision-LLM locate. So the real-image path needs the
+  full production locate + crop + per-route tuning before billing. The trustworthy signal
+  is the synthetic known-N bar (10/10).
+
+To re-run: bump `eval/RUN_SAM2_EVAL` (the "run:" line) and push on a claude/** branch →
+the workflow runs (~42 SAM2 calls, ~pennies each) and commits docs/SAM2_COUNT_EVAL.md +
+eval/out/sam2-count/ overlays back to the branch. Cost ~$0.1–0.4/run.
+
+================================================================================
+6. KEY CODE MAP (ground truth — file:symbol)
+================================================================================
+Deterministic density:
+  server/_core/studio/ops/densityThin.ts        — v1 erase-in-place (the SAFE billed op)
+  server/_core/studio/ops/densityRedistribute.ts— v2 erase+relocate (flag-gated; "blob" source)
+  server/_core/studio/ops/densityPreview.ts      — NEW 10/20/50% preview (truthful, no-op-honest)
+  server/_core/studio/ops/stratifiedSelect.ts    — which instances to remove (even spread)
+  server/_core/studio/ops/infill.ts / lamaInfill.ts — flat LAB fill / LaMa (LaMa 404s in prod = latent bug)
+Scale:
+  server/_core/studio/ops/scaleRepeat.ts         — the scale op
+  server/_core/studio/ops/repeatDetector.ts      — detectRepeat: FFT path + NEW coverage path
+  server/aiEngine.ts::generateScaledImage        — calls checkRepeatAdvanced before scaling
+Masks (the count gate):
+  server/_core/masking/index.ts                  — getMaskProvider() (env STUDIO_MASK_PROVIDER), fail-safe wrap
+  server/_core/masking/sam2Provider.ts           — getSegmentation() (vision locate→crop→SAM2→fabric+instances);
+                                                    finishSam2Segmentation() = derivation WITHOUT the locate (eval seam);
+                                                    instancesFromSegment() = area filter (MAX_INSTANCE_FRACTION 0.20) + cap
+  server/_core/masking/replicateSam2.ts          — SAM2 client; meta/sam-2 version
+                                                    fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83;
+                                                    base64 data-URL input; pps default 16; pred_iou 0.82; stability 0.88
+  server/_core/masking/classicalProvider.ts      — classical floor (NO instance masks — throws; needs SAM2)
+  server/_core/masking/sam2Mask.ts               — instancesFromMasks, decodeMaskToRaster, rasterBBox
+Eval I/O + metrics:
+  server/_core/studio/eval/evalMaskIO.ts         — loadFabricMask / loadInstanceLabelMap (label-map PNG = 1 colour/motif)
+  server/_core/studio/eval/densityMetrics.ts     — count/survivor/evenness/NNI
+  server/_core/studio/eval/detectorAccuracy.ts   — scale-detector corpus + runDetectorEval()
+Shared:
+  shared/controls.ts                             — DensityControl/ScaleControl, DensityMode, resolveDensityRedistribute
+
+================================================================================
+7. PR / BRANCH STATE (as of 2026-06-25)
+================================================================================
+MERGED to main: #102 (foundation), #103 (Railway/Supabase/Anthropic/Google migration),
+  #105 (density P1), plus #106/#107/#108 (AAU + @aster/weather event-weather card +
+  landing service registry), #112/#114/#115/#117 (audit/polish/auth).
+CLOSED (parked): #104 (FLUX spike) — branch claude/flux-fill-hybrid-spike kept for revisit.
+This work was authored on branch claude/magical-goodall-d5uybq (now merged; do NOT reopen
+#105 or re-open a PR for the same change).
+
+GOTCHA for stacked branches: a private git dependency `@aster/weather`
+(github:astersports/aster-weather#v0.1.0) is now in package.json. main pins it as
+`git+https://github.com/...` (CI clones with its token). If you regenerate the lockfile,
+make sure that dep stays `git+https://github.com/...` — a local git `insteadOf` can rewrite
+it to a non-cloneable `git@github.com:`/SSH form that fails CI with "Permission denied
+(publickey)". This session's scoped HTTP proxy also 403s on aster-weather (only
+astersports-web is in scope), so a local `pnpm install` may fail to fetch that one dep —
+that's an environment limit, not a lockfile error ("Lockfile is up to date" = fine for CI).
+
+================================================================================
+8. HOW TO RUN EVERYTHING
+================================================================================
+  pnpm install --frozen-lockfile          # deps (sharp native ok; aster-weather may 403 locally)
+  pnpm run check                           # tsc --noEmit
+  pnpm run test                            # vitest (credential-gated tests self-skip)
+  node eval/samples/cinqasept-likely/fetch.mjs      # re-materialize real eval images
+  node eval/generatePhase1Synthetic.mjs             # rigorous scattered fixtures (known N)
+  node eval/generatePhase1Hard.mjs                  # adversarial fixtures (known N)
+  npx tsx eval/phase1Metrics.ts                     # M1/M2/M3 table
+  npx tsx eval/phase1Audit.ts                       # classical-vs-(robustness) hard audit
+  npx tsx eval/densityPreviewDemo.ts [poppette|tessa]  # offline preview strip on a real garment
+  npx tsx eval/phase1Montage.ts                     # review montages → eval/out/phase1/
+  # SAM2 count eval (CI only — needs the secret): bump eval/RUN_SAM2_EVAL "run:" + push.
+
+================================================================================
+9. NEXT STEPS (priority order) — what a new session should do
+================================================================================
+P1 finish (productionize what's proven):
+  1. Wire densityPreview into the studio router/UI: surface the 10/20/50 strip + exact-count
+     copy ("N motifs → remove k → kept"). densityPreview is op+eval only today.
+  2. SOLIDS (bucket C) suppression: UI must not offer scale/density when there's nothing to
+     count/scale (don't return a wrong result on a plain dress).
+  3. Firm up the REAL SAM2 count number: re-run the eval through the FULL production path
+     (vision-LLM locate + crop), not the manual bbox, so the real-image rows become
+     trustworthy. This is the remaining gap before billing density on real garments (G3).
+     The synthetic bar already says the method works (10/10).
+
+Phase 2 — SCALE reframe (the doc's P2):
+  4. Make scale RESIZE MOTIFS for all-over/scattered coverage instead of period-tiling.
+     The detector already ACCEPTS scattered (the §3c reframe); now scaleRepeat.ts must act
+     on accepted-by-coverage prints by resizing motifs while preserving coverage. Recovers
+     the ~1/3 false-rejected prints.
+
+Phase 3 — EMBELLISHED/PLACED (bucket B): deterministic count/geometry + constrained
+  generative FINISH (masked), plus on-model garment isolation.
+
+Open decision DEFERRED TO ARCHITECT (flagged in #105): should a hardened classical motif
+  counter become a PRODUCTION InstanceMask fast-path for HIGH-CONTRAST/clean prints (no
+  sub-processor, cheaper), with SAM2 the fallback + the billing count gate? CC's lean: yes
+  as a guarded fast path, but SAM2 still owns the count GATE. Not built — needs Architect ok
+  (mask-provider is Architect-scoped).
+
+Standing tech debt to watch: LaMa (allenhooo/lama) 404s in prod (community model invoked
+  without a version pin) → density silently falls back to flat fill. Fine on solid grounds;
+  pin the version if/when texture fill is wanted. Calibrate scale on real garments before
+  any *_LIVE flip (G3). Re-verify money-path/DB on the new Postgres/Supabase stack.
+
+================================================================================
+10. GUARDRAILS (do not violate)
+================================================================================
+- Offline/eval work is routine. Anything touching credit/ledger/Stripe/DB-schema/auth/
+  mask-provider/sub-processor or a *_LIVE flag is ARCHITECT-SCOPED → PR holds for Architect
+  approval (Frank relays), never auto-merge. No agent flips a flag.
+- Never bill a no-op (densityPreview/densityThin already enforce removed===0 → don't charge).
+- SAM2/Replicate is the disclosed sub-processor; crop-to-fabric minimization + org_id
+  stamping are privacy-gate requirements before real customer images flow.
+- Don't put REPLICATE_API_TOKEN in a session env field; in CI scope it to only the steps
+  that need it (the sam2-count-eval workflow does this).
+- Synthetic fixtures are the trustworthy bar (exact N). Real images are approximate; never
+  fit params to a known count or cherry-pick per image.
