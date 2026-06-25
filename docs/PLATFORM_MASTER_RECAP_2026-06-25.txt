@@ -1,0 +1,351 @@
+PLATFORM MASTER RECAP — Aster platform, all 5 repos
+For: Frank → hand to Architect → next steps · From: Claude Code · Date: 2026-06-25
+Purpose: ONE consolidated record of everything the 2026-06-25 audit cycle found, what
+shipped, and what's left — routed into clear lanes so the architect can ratify and we
+can sequence. Synthesizes four source docs (all committed; read them for full file:line
+detail):
+  · docs/PLATFORM_AUDIT_2026-06-25.txt        (breadth, all 5 repos)
+  · docs/PLATFORM_AUDIT_DEEP_2026-06-25.txt    (line-by-line depth, themes T1–T7)
+  · docs/OPERATIONAL_GAP_AUDIT_2026-06-25.txt  (deployment/hosting — the Manus gap)
+  · st-patricks-armonk/docs/DATA_RECOVERY_PLAN_2026-06-25.txt (parish data rescue)
+
+Grounding (§11.7 source hierarchy): [GROUNDED] = verified this session vs live prod DB /
+deployed edge fns / advisors / repo working tree / git. [VERIFY] = strong inference
+needing a live confirm I can't make from this sandbox (no Manus/Railway access; egress
+policy blocks the parish + Manus origins).
+
+════════════════════════════════════════════════════════════════════════
+0. THE SITUATION IN ONE PAGE (read this first)
+════════════════════════════════════════════════════════════════════════
+The audit cycle found two different KINDS of problem, and the second one is the one
+that actually threatens the business:
+
+  (1) CODE findings — bugs, drift, auth holes, hygiene. Real, catalogued in §4, mostly
+      routine, the worst clustered in St Patrick. Largely FIXED this session for the
+      live app (aster-sports) and staged for the others.
+
+  (2) An OPERATIONAL/HOSTING gap the code audit structurally could not see, surfaced by
+      Frank: THREE of the five repos (astersports-web, st-patricks-armonk, legacy-
+      hoopers) were ENTIRELY hosted on Manus/Forge — host + MySQL database + OAuth +
+      LLM + image-gen + storage + notifications all came from the Forge platform SDK
+      (server/_core/*). MANUS WAS DECOMMISSIONED last week. So for those three repos,
+      merging to `main` deployed NOTHING — there is no live host behind them right now.
+
+The blast radius is precise, not total:
+  · aster-sports (astersports.app) + aster-weather are on Vercel/Supabase and npm —
+    UNAFFECTED. The live youth-sports app and the Legacy Hoopers tenant data are fine.
+    Everything merged there this session IS live. [GROUNDED]
+  · astersports-web (astersports.io / Print Studio) — the off-Manus migration #103
+    (→ Railway + Supabase + Anthropic + Google OAuth) HAS NOW MERGED to main this
+    session [GROUNDED: origin/main top commits show #103, #114, #115]. So its migration
+    is no longer "not started" — the code landed. OPEN: is it actually deployed + serving
+    on Railway, with all env/secrets/DB set? [VERIFY]
+  · st-patricks-armonk — the WORST-positioned: a LIVE CLIENT deliverable holding
+    parishioner PII, still 100% Manus-dependent, with NO migration in flight and a
+    DATA-RECOVERY RACE against Manus teardown (forms + uploaded files). This is the
+    single most urgent item on the whole board.
+  · legacy-hoopers — same Manus shape but LOW urgency (unshipped prototype; live LH
+    site is Squarespace; its data is served by aster-sports). Frank's queued rebuild.
+
+So the headline for the architect: the code is in good shape; the PLATFORM PLUMBING is
+the emergency. St Patrick needs a data rescue THEN a new home, and astersports-web needs
+its just-merged Railway migration verified live.
+
+════════════════════════════════════════════════════════════════════════
+1. PER-REPO STATE TABLE [GROUNDED unless tagged]
+════════════════════════════════════════════════════════════════════════
+Repo                Live URL            Host/DB now         Deploy state          Audit verdict
+aster-sports        astersports.app     Vercel + Supabase   LIVE, wired ✔         Architecture EXCELLENT; edge bugs fixed
+aster-weather       (npm/git-tag lib)   n/a (library)       published ✔ (CI added)Clean extraction, no P0/P1
+astersports-web     astersports.io      Railway + Supabase  #103 MERGED to main;  Well-built, security-conscious;
+                                        (was Manus)         live-on-Railway = VERIFY 1 authz gap + weather-public bug
+st-patricks-armonk  stpatrickinarmonk   Manus (DOWN)        NO migration;         Competent but NOT airtight on dates
+                    .org                MySQL+S3+OAuth gone  DATA AT RISK           + failure feedback; auth holes (fixed in main, undeployed)
+legacy-hoopers      (Squarespace is     Manus (can't deploy)unshipped prototype   Redundant reimpl of LH tenant;
+                    the real live site)                     (Frank's rebuild queue) leave per D3
+
+Critical nuance (G7 repo↔prod inversion): for st-patricks-armonk, the security/date/a11y
+fixes merged to `main` this session are NOT live — there's no host serving main. They are
+not lost; they merge forward into whatever new host St Patrick lands on. But until then
+they protect nothing. astersports-web's fixes go live only once #103's Railway deploy is
+confirmed serving.
+
+════════════════════════════════════════════════════════════════════════
+2. MASTER ACTION LEDGER — routed by lane (THE part to action)
+════════════════════════════════════════════════════════════════════════
+Legend: [P0]=do-now/blocking · [P1]=this week · [P2]=before St-Patrick-onboards ·
+[ARCH]=needs architect design/ratification · status: ☐ open · ◐ in flight · ✔ done.
+
+──────────────────────────────────────────────────────────────
+LANE A — FRANK (operator): decisions, credentials, external accounts, things only you can do
+──────────────────────────────────────────────────────────────
+A1 [P0] ☐ ST PATRICK DATA RESCUE — the irreversible race (recovery plan §0,§1,§4).
+   Two time-critical pulls before Manus storage/DB is purged, IN THIS ORDER:
+   (a) PULL THE FILES FIRST. Homily audio, gallery photos, bulletin PDFs, parish docs,
+       birth-cert uploads live in a Forge-managed S3 bucket whose name+keys are NOT in
+       the repo. No DB dump can recover them. Reachable ONLY while a live instance +
+       Forge key still exist. If Manus can export the bucket, request it; else run the
+       file-pull off the DB key list.
+   (b) DUMP THE MYSQL — P0 PII subset first (sacrament forms, ccd_permissions,
+       registrations, mass intentions, subscribers), then full. A website scrape
+       recovers ZERO of these (19 of 34 tables were never public). If you can't reach
+       the DB, ask Manus support for a DB export before decommission completes.
+   What CC needs from you to help: Manus DB credentials / a dashboard DB-export, a live
+   instance URL that still answers, OR allowlist stpatrickinarmonk.org in this env's
+   network policy so a fresh CC session can run scripts/recover-stpat.mjs.
+A2 [P0] ☐ VERIFY astersports-web IS LIVE on Railway post-#103. Confirm the Railway
+   service is deployed + serving astersports.io, env/secrets set (Supabase URL+keys,
+   Anthropic, Google OAuth client, Stripe, CRON_SECRET), and the MySQL→Supabase data
+   migration actually ran (the #103 description flagged the studioDb.ts money-path CAS
+   port — affectedRows→.returning() — as needing a re-prove). CC can help diagnose with
+   Railway/Supabase access or logs.
+A3 [P1] ☐ ST PATRICK NEW HOME — decide the target host + stack for the parish site's
+   off-Manus rebuild (the migration that does NOT exist yet). This is the big one for
+   the client deliverable. Architect should frame options (Lane C / NEEDS-SOLVING S1).
+A4 [P1] ☐ EXTERNAL-ACCOUNT EXPORTS for St Patrick (survive Manus, recover at leisure,
+   recovery plan §3): Droplet.io (live CCD registrations), Flocknote (newsletter
+   subscribers), eCatholic site 10907 (bulletin archive), the 3 Google Calendar ICS
+   feeds. The parish formExport Google Sheet is NOT in your Drive (I searched —
+   frank@astersports.co only has the Legacy Hoopers LeagueApps export); it may live in
+   the parish office Google account. Ask the office; the exact sheet id is in
+   site_settings.form_export_spreadsheet_id (comes out of the DB dump).
+A5 [P2] ☐ DECISION confirms still needed from you are captured in §3 (D-items). Most are
+   RULED; the remaining operator confirms: St Patrick host (A3), and whether to fold the
+   astersports-web Print Studio lane (PRs #103/#105/#114/#115) into this audit's tracking
+   or keep it separate (it was OUT OF SCOPE here).
+A6 [P1] ☐ Restore/confirm full GitHub MCP reach for aster-sports + st-patrick if you
+   want CC to drive their PRs (it dropped mid-session; recovered for st-patrick — PR #5
+   merged via API this session — but re-confirm aster-sports).
+
+──────────────────────────────────────────────────────────────
+LANE B — CC (me): build/audit work I can do, mostly once unblocked by Lane A/D
+──────────────────────────────────────────────────────────────
+B1 [P0] ✔ DONE this session: all in-scope ROUTINE cleanup merged —
+   · aster-sports #1095: dutyReconcile claimed-slot guard (T5 silent data loss),
+     useHasUnread per-channel badge fix (T3), ScheduleForLaterPicker ET round-trip (T1).
+   · astersports-web #110: AAU weather-public fix + auth/date/dead-code cleanup.
+   · st-patrick #4: auth holes (homilies/holyDays→staffProcedure + audio magic-byte
+     validation), liturgical-season + .ics + datetime TZ fixes, a11y labels, onError toasts.
+   · aster-weather #2: injected-fetch timeout, WMO labels, type honesty, CI + tests.
+   · st-patrick #5: this recovery plan + runnable recovery script.
+B2 [P0] ◐ RUN THE ST PATRICK RECOVERY once Lane A1 unblocks (creds or allowlist). The
+   script + mysqldump spec are written and ready; I just can't reach the origin from here.
+B3 [P1] ☐ WIDEN THE AP #36 AUDIT TEST (the cheapest systemic fix — deep §0 meta-finding):
+   the existing test only flags `{ data: x = [] }`, not bare `const { data } = await …`,
+   which is why breadth reported "0 hits" while depth found a cluster. Widen the grep,
+   then sweep the flagged swallows — leagueAppsImport.js:79 + tournamentRosters.js:8,21
+   FIRST (money + comms). aster-sports, PR-gated.
+B4 [P2] ☐ MULTI-TENANT GATE de-hardcode (T6) before St Patrick onboards as tenant #2:
+   ADMIN_BCC_EMAIL (4 send files → org config), unsubscribeUrl legacyhoopers.org,
+   familyGuide/gameRecap 'Legacy Hoopers' literals. §4 Tenant Data Boundary. aster-sports.
+B5 [P2] ☐ aster-sports TZ class (T1): ET-anchor digestPeriod + coachRoundup/familyGuide
+   windows + recurrenceHelpers before any non-Eastern admin usage.
+B6 [P1] ☐ @aster/weather v0.2.0 build (D2 HYBRID): grow the combined daily-strip composer
+   + React hook (from W-b) + animated icons (from W-a) + batch getWeatherForEvents; then
+   refactor W-a/W-b/W-c consumers to import, one at a time. No 4th copy. PR-gated.
+B7 [P2] ☐ PREPARE (not apply) the D5 DB-hygiene migrations — see Lane C (ARCH).
+B8 [P1] ☐ St Patrick remaining deep-pass P1s NOT yet fixed (catalogued §4-P4): getById
+   unpublished-draft leak (published filter), cron stack-trace strip + wire the dead
+   errorHandler, WeeklySchedule date-awareness, UserManager/SubscriberList null-date
+   crash, Giving.tsx non-functional selector + http:// link, mobile nav overlay, homily
+   audio cleanup. (These merged to main only partially in #4; remainder staged for the
+   next St-Patrick pass — but gated on A3 since the repo's future host is undecided.)
+
+──────────────────────────────────────────────────────────────
+LANE C — ARCHITECT: design + ratification (do NOT let CC settle these alone, AP #39/§11.8)
+──────────────────────────────────────────────────────────────
+C1 [ARCH][P0] ☐ ST PATRICK OFF-MANUS ARCHITECTURE (NEEDS-SOLVING S1). The repo's entire
+   server/_core/* is the Forge SDK: replacing it means re-homing host + DB (MySQL→?) +
+   auth (Forge OAuth→?) + LLM (parish assistant + bulletin compose) + storage (S3) +
+   notifications. astersports-web's #103 is the template (Railway+Supabase+Anthropic+
+   Google OAuth) but there is NO equivalent effort for St Patrick. Frame the target stack
+   + migration plan. Biggest single piece of work on the board.
+C2 [ARCH][P0] ☐ X1 / P0-1 REPO↔PROD DRIFT close-out (aster-sports). #1094 (AAU ingest)
+   landed this session, reconciling the stranded ingest source. STILL OPEN: the live
+   `stripe-webhook-handler` edge fn (MONEY PATH) is prod-only with NO committed source or
+   config.toml entry in ANY branch — genuinely sourceless. Architect to ratify: source-
+   control it + add the out-of-band-deploy guardrail (X5) so this class can't recur. Do
+   NOT redeploy it from CI until config.toml carries its verify_jwt=false entry.
+C3 [ARCH][P1] ☐ ACADEMY CLASSIFICATION resolver (T3/P1-1, LIVE: 1 mis-gated player today).
+   roster_type(per-team) vs member_type(global) numerator/denominator mismatch across 8
+   callsites + parentContext can't see roster_type. Needs the eligibility contract +
+   parent-context shape decided before a single-resolver fix lands.
+C4 [ARCH][P1] ☐ MONEY-READ AP #63s (surface, don't auto-edit): useProgramHealthMetrics
+   season-% vs useFamiliesOwingCount all-seasons; CoachPayoutList "Settled" excludes
+   pending/disputed. Plus the DUAL game_results WRITER (useScoreDraft vs useLiveGame, no
+   cross-read of published_at → clobber risk). Reconciliation contracts, not re-scopes.
+C5 [ARCH][P1] ☐ D5 FULL DB-HYGIENE SWEEP before St Patrick onboards (breadth X6). Pin
+   fin_tx_append_only search_path (SECDEF financial trigger w/ mutable path — injection
+   vector); move pg_net out of public; consolidate 173 multiple-permissive RLS policies;
+   prune 85 unused indexes + add 32 FK indexes; confirm the 7 anon-executable SECDEF RPCs.
+   CC PREPARES migration+mirror+PR; applies via merged-PR→Supabase flow only (NOT out-of-
+   band — that would repeat the X1 P0). Architect ratifies the schema changes.
+C6 [ARCH][P2] ☐ Edge-fn constant-time cron_secret compare ×3 (briefing-cron-dispatch:67,
+   send-push:34, briefing-auto-draft-tick:105) — low-lift hardening on money/fan-out path.
+C7 [ARCH][P2] ☐ astersports-web auth.logout statelessness (P2-4): JWT valid until exp,
+   needs a revocation store. Already TODO-tagged. Design call.
+C8 [ARCH][P1] ☐ Ratify the convergence sequencing for @aster/weather v0.2.0 (D2) — which
+   consumer refactors first, and the v0.1.0→v0.2.0 API surface.
+
+──────────────────────────────────────────────────────────────
+LANE D — NEEDS SETUP (infrastructure that must exist; owner in brackets)
+──────────────────────────────────────────────────────────────
+D-1 [P0][Frank+Arch] ☐ St Patrick: a NEW HOST + DB + auth + storage + secrets (the C1
+    architecture, then provisioned). Nothing exists yet.
+D-2 [P0][Frank] ☐ astersports-web: confirm the Railway project env/secrets/DB are fully
+    provisioned + the data migrated (A2).
+D-3 [P1][CC] ☐ CI workflow on st-patricks-armonk AND legacy-hoopers (G5 — neither has
+    .github/workflows; their tests/typecheck run only locally). Add lint+typecheck+test.
+    St Patrick now carries real auth/security code (the #4 fixes) and must be gated.
+D-4 [P1][CC+Arch] ☐ Out-of-band-deploy guardrail (X5/C2): a CI/process check flagging
+    edge fns or migrations live in prod but absent from the repo. This audit found 3.
+D-5 [P2][Frank] ☐ astersports-web 30 Dependabot vulns outstanding (kickoff/onboarding gate
+    §6); plus routine dependabot PRs open across repos (st-patrick #1/#2/#3, legacy #1,
+    aster-sports #1092). Triage to 0 criticals/highs before onboarding.
+D-6 [P2][Frank] ☐ St Patrick onboarding-as-tenant-#2 question: is the parish going onto
+    the aster-sports multi-tenant platform, or staying a standalone site on a new host?
+    This determines whether C1 is "re-home the standalone repo" or "migrate into the
+    platform." OPERATOR DECISION — drives everything in Lane C1/D-1. (See NEEDS-SOLVING S2.)
+
+──────────────────────────────────────────────────────────────
+LANE E — NEEDS SOLVING (open problems without a settled answer yet)
+──────────────────────────────────────────────────────────────
+S1 St Patrick's entire off-Manus path (host/DB/auth/LLM/storage/notifications). No plan
+   exists. → Architect frames (C1); Frank rules target.
+S2 Standalone-site vs platform-tenant for St Patrick (D-6). The parish site is a CMS-style
+   site (bulletins, sacraments, Mass schedule) — NOT obviously a fit for the youth-sports
+   multi-tenant schema. Likely a standalone rehost, but unconfirmed. → Frank + Architect.
+S3 The sourceless stripe-webhook-handler edge fn (C2) — money path running with no
+   reviewable source. → Architect ratifies source-control + guardrail.
+S4 Can the St Patrick data even be recovered? Depends entirely on whether a live Manus
+   instance / Forge key / DB export still exists (A1). If Manus already purged, the 19
+   PII tables + uploaded files may be PERMANENTLY LOST (recovery plan §7). → Frank confirms
+   reachability NOW.
+S5 Weather triplication end-state (D2) — agreed HYBRID v0.2.0, but the exact API the
+   package must expose so all three consumers can drop local copies is a design surface. → C8.
+
+════════════════════════════════════════════════════════════════════════
+3. DECISIONS — D1–D6 status (RULED by Frank 2026-06-25) + what's left
+════════════════════════════════════════════════════════════════════════
+D1 [GO ✔ LANDED] X1 repo↔prod reconciliation — PR #1094 (AAU ingest) merged to aster-
+   sports main this session. REMAINDER: stripe-webhook-handler still sourceless (C2).
+D2 [HYBRID v0.2.0 ◐] @aster/weather convergence. v0.1.0 (#1) + polish (#2) merged. NEXT:
+   build v0.2.0 (B6) + ratify sequencing (C8).
+D3 [LEAVE ✔] legacy-hoopers stays — Frank's queued website REBUILD, not a retire. No action
+   this cycle. Revisit when Frank picks it up.
+D4 [KEEP ALL PUBLIC ✔] AAU public roster (first names + jersey #s) + practice gym
+   addresses/times are an ON-RECORD operator decision (extends PR #107). NOT a finding.
+   Same applies to the legacy-hoopers equivalent surface.
+D5 [FULL SWEEP NOW ◐] DB hygiene before St Patrick onboards. CC prepares; Architect
+   ratifies; apply via merged-PR→Supabase. NOT started (C5).
+D6 [GO ✔ LANDED] St Patrick siteSettings allowlist + JWT fail-fast — merged in st-patrick
+   #4 (to main; live only after the repo is re-hosted, G7).
+
+════════════════════════════════════════════════════════════════════════
+4. FULL FINDINGS CATALOG (consolidated, for the architect's detailed review)
+════════════════════════════════════════════════════════════════════════
+Severity within repo; [FIXED]=merged this session, [OPEN]=remaining, [ARCH]=architect-scoped,
+[LIVE]=verified active in prod, [GATE]=close before tenant #2. Full file:line in the source docs.
+
+CROSS-REPO THEMES (deep pass T1–T7):
+  T1 Timezone-locality — dominant systemic weakness; DORMANT now (Eastern pilot) but a
+     TENANT-#2 TIME BOMB (St Patrick on a UTC host, or any non-ET admin). Fix = one
+     nowInET() helper per app. aster-sports [FIXED: ScheduleForLaterPicker; OPEN: digest/
+     window/recurrence B5]; st-patrick [FIXED: liturgical+ics+datetime in #4; OPEN: the
+     11-site toLocaleString idiom].
+  T2 Error-swallowing on data-integrity paths (AP #36 bare-data form). Worst: leagueApps
+     Import (money — re-run re-posts fees), tournamentRosters (comms — drops a team from
+     briefings). [OPEN: B3 widen audit test + sweep].
+  T3 Same-concept divergence (AP #63) — platform signature bug. [LIVE: academy 1 player,
+     payment-scope 2 families]. aster-sports [FIXED: useHasUnread; ARCH: academy C3,
+     money-reads C4]; st-patrick [partial in #4].
+  T4 Pre-onboarding auth/exposure holes. st-patrick [FIXED in #4: homilies/holyDays gate +
+     audio validation; OPEN: getById draft leak, cron stack traces, errorHandler dead code].
+     astersports-web [OPEN: inviteLinks disabled-admin can mint/list join links].
+  T5 Silent data loss — dutyReconcile deleted CLAIMED volunteer slots. [FIXED #1095].
+  T6 Multi-tenant leaks (hardcoded tenant facts) — ADMIN_BCC personal gmail BCCs every
+     parent email; legacyhoopers.org / 'Legacy Hoopers' literals. [GATE: B4 before tenant #2].
+  T7 Dead code — modest, real, across all repos. [partially FIXED; rest low priority].
+
+P1. astersports-web (astersports.io — now Railway+Supabase):
+  [FIXED #110] P1-1 AAU weather dead for public (ownerProcedure→publicProcedure);
+    date/auth/dead-code cleanup.
+  [OPEN] inviteLinks.ts:142,575 disabled-admin join-link mint/list (authz, trivial).
+  [OPEN] Map.tsx loader no-dedupe + onerror never rejects → await hangs on net failure.
+  [OPEN/ARCH] auth.logout stateless JWT (C7). P1-2 leaderboard hardcodes '11U Girls'
+    (latent). P2 tournament registry quadruplicated; weather.home always HOME_VENUE;
+    3× streak recompute. (Print Studio money path OUT OF SCOPE — separate lane #102-105/114/115.)
+
+P2. aster-sports (astersports.app — LIVE, Vercel+Supabase):
+  [FIXED #1095] dutyReconcile claimed-slot guard; useHasUnread per-channel badge;
+    ScheduleForLaterPicker ET; routine hygiene.
+  [OPEN B3] AP #36 swallows (leagueAppsImport, tournamentRosters + tab hooks).
+  [OPEN B4 GATE] T6 multi-tenant literals. [OPEN B5] TZ digest/window/recurrence.
+  [ARCH C3] academy classification [LIVE 1 player]. [ARCH C4] money-read AP #63s + dual
+    game_results writer. [ARCH C5/X6] DB hygiene (76 security + 292 perf advisors).
+  [ARCH C6] edge-fn constant-time compare ×3. P2-1 five files >150 LOC not in exceptions.
+
+P3. legacy-hoopers (LEAVE — D3):
+  Unshipped Manus prototype. In-memory cron de-dup re-notifies on restart; regex scraper
+  serves stale as "live"; spoofs Chrome UA (ToS-fragile); ~1.6K LOC dead; records/teams
+  hardcoded 4+ files incl. LLM prompt (omits 11U Girls). NO ACTION this cycle.
+
+P4. st-patricks-armonk (parish — Manus DOWN; fixes in main are UNDEPLOYED until re-host):
+  [FIXED #4] homilies/holyDays → staffProcedure + audio magic-byte validation; siteSettings
+    allowlist (D6); JWT fail-fast (D6); liturgicalSeason Good Friday/Holy Saturday/Advent;
+    icsGenerator TZID; CcdManager datetime-local; a11y labels + destructive-confirm; onError.
+  [OPEN B8] news/bulletins/events.getById unpublished-draft leak (published filter);
+    cron 500 stack-trace strip + wire the DEAD errorHandlerMiddleware; WeeklySchedule not
+    date-aware (contradicts ThisWeekAccordion); UserManager/SubscriberList format(new
+    Date(null)) crash; Giving.tsx non-functional amount/fund selector + http:// link;
+    MobileBottomNav/MobileMenu overlay stays open after tap; HomilyArchive audio never
+    cleaned up; weather coords vs parish mapCoordinates ~1.5km disagree; wrong parish phone
+    (9325 vs 9724) on a failure message; split parish constants (conflicting email/Flocknote
+    domain → dead inbox). [these gated on A3 — the repo's future host is undecided]
+  [OPEN X2] weather W-a ~750 LOC collapsible into @aster/weather (D2/B6).
+
+P5. aster-weather (@aster/weather — clean):
+  [FIXED #2] injected-fetch timeout, 7 missing WMO labels, WindIcon/type honesty, CI+tests.
+  [OPEN D2/B6] v0.2.0 composition layer (daily-strip composer, React hook, batch enrich,
+    confirm/port real icon ANIMATION — v0.1.0 icons are colorful but STATIC).
+
+════════════════════════════════════════════════════════════════════════
+5. WHAT SHIPPED THIS SESSION (with the live-vs-main caveat)
+════════════════════════════════════════════════════════════════════════
+Merged to main [GROUNDED git]:
+  · aster-sports     #1094 (AAU ingest, D1) + #1095 (cleanup) — LIVE (Vercel from main).
+  · aster-weather    #1 (v0.1.0) + #2 (polish) — published.
+  · astersports-web  #110 (audit+cleanup); also #103 off-Manus migration + #114/#115 (the
+    other lane). #110 live ONLY once #103's Railway deploy is confirmed (A2).
+  · st-patricks-armonk #4 (security+dates+a11y, D6) + #5 (recovery plan+script). NOT live —
+    no host serves main (G7); merges forward into the re-host.
+Held / Architect-scoped (NOT merged, by design): academy resolver (C3), money-read
+  reconciles + dual game_results writer (C4), D5 DB sweep (C5), edge-fn constant-time
+  compare (C6), stripe-webhook-handler source-control (C2).
+
+════════════════════════════════════════════════════════════════════════
+6. CRITICAL PATH (suggested sequence)
+════════════════════════════════════════════════════════════════════════
+NOW (irreversible):     A1 St Patrick data rescue (files then DB) — clock vs Manus teardown.
+NOW (verify live):      A2 confirm astersports-web Railway deploy + data migration.
+THIS WEEK (design):     C1 St Patrick off-Manus architecture (+ S2 standalone-vs-tenant, D6).
+THIS WEEK (build):      B3 AP#36 audit-test widen + money/comms sweep; B6 weather v0.2.0;
+                        D-3 CI on st-patrick/legacy; D-4 out-of-band-deploy guardrail.
+BEFORE TENANT #2:       B4 multi-tenant de-hardcode; B5 aster-sports TZ; C5 DB-hygiene sweep;
+                        D-5 dependabot to 0 criticals; C3/C4 money + academy contracts.
+WHEN FRANK PICKS IT UP: legacy-hoopers rebuild (D3); St Patrick remaining P1s (B8) on its new host.
+
+════════════════════════════════════════════════════════════════════════
+7. OPEN QUESTIONS FOR THE ARCHITECT (decide these to unblock)
+════════════════════════════════════════════════════════════════════════
+Q1 St Patrick: standalone rehost vs fold into the aster-sports platform as tenant #2? (S2/D6)
+Q2 St Patrick target stack — mirror astersports-web's Railway+Supabase, or different? (C1)
+Q3 stripe-webhook-handler: source-control as-is, or rebuild from the committed Stripe code? (C2)
+Q4 Academy classification: which is canonical — per-team roster_type or global member_type —
+   and does parent context gain roster_type visibility? (C3)
+Q5 D5 DB-hygiene: do the RLS-policy consolidation + index prune ship as ONE migration or
+   staged? (C5)
+Q6 @aster/weather v0.2.0: which consumer refactors first, and is the React hook in-scope
+   for v0.2.0 or deferred? (C8)
+
+— end —

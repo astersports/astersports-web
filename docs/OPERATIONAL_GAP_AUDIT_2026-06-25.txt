@@ -1,0 +1,163 @@
+OPERATIONAL / DEPLOYMENT GAP AUDIT — Aster platform, all 5 repos
+For: Frank (fix in progress in another lane) · From: Claude Code · Date: 2026-06-25
+Why: the 2026-06-25 platform audit (PLATFORM_AUDIT_*.txt) covered CODE (bugs, drift,
+cleanup) + the Supabase DB, but did NOT verify DEPLOYMENT/HOSTING health — whether each
+repo's `main` actually deploys, and whether the platform it deploys to is alive. The
+Manus decommission exposed that gap. This doc identifies the whole class.
+
+Grounding: [GROUNDED] = verified from repo files / live platform this session.
+[VERIFY] = strong inference from those files + Frank's report; needs a live confirm I
+can't make from here (no Manus/Railway access; the live URLs WAF-403 my fetches).
+Source of the trigger: Frank's report that astersports-web pointed to Manus, Manus was
+decommissioned last week, so today's `main` merges never deployed — AUTHORITATIVE.
+
+════════════════════════════════════════════════════════════════════════
+0. THE ONE-LINE FINDING
+════════════════════════════════════════════════════════════════════════
+THREE of the five repos (astersports-web, st-patricks-armonk, legacy-hoopers) were
+ENTIRELY hosted on Manus/Forge — host + database (MySQL) + auth (OAuth) + LLM + image-
+gen + storage + notifications all came from the Forge platform SDK (`server/_core/*`).
+Manus was decommissioned. So all three have NO running backend, NO database, and NO
+working deploy target right now. Only aster-sports (Vercel + Supabase) and aster-weather
+(a published library) are unaffected. The code cleanup merged today is real in GitHub
+but only the aster-sports half is actually live.
+
+════════════════════════════════════════════════════════════════════════
+1. PER-REPO DEPLOYMENT STATE [GROUNDED unless tagged]
+════════════════════════════════════════════════════════════════════════
+                     Hosting   DB           Deploy config in repo   CI   Status
+astersports-web      Manus     MySQL (Forge) template.json only     ci   DOWN (Manus gone)
+st-patricks-armonk   Manus     MySQL (Forge) template.json only     none DOWN [VERIFY]
+legacy-hoopers       Manus     MySQL (Forge) template.json only     none can't deploy (proto)
+aster-sports         Vercel    Supabase PG   vercel.json + 2 wf     ci   LIVE + wired ✔
+aster-weather        (library) n/a           (npm/git tag)          ci   published ✔
+
+Evidence (all three Forge apps, [GROUNDED]):
+  · `template.json` = the Manus app manifest (astersports-web/legacy-hoopers tagged
+    "web-static"; st-patrick tagged "web-db-user"). No vercel.json / railway.* /
+    Dockerfile / Procfile / fly.toml / render.yaml anywhere.
+  · `server/_core/*` + `client/src/_core/*` = the Forge platform SDK. astersports-web:
+    44 files reference "manus", 23 reference "forge". st-patrick: 25 / 17. legacy: 20 / 11.
+  · `build` script bundles `server/_core/index.ts` via esbuild → a Node server that only
+    ran inside Manus's runtime.
+  · `DATABASE_URL` → `dialect: "mysql"` (drizzle), with `BUILT_IN_FORGE_API_URL` +
+    `BUILT_IN_FORGE_API_KEY` env — both Forge-provisioned.
+aster-sports [GROUNDED]: `src/lib/supabase.js` (Supabase client), `vercel.json`,
+  `.github/workflows/ci.yml` + `deploy-edge-functions.yml` (path-scoped edge-fn deploy
+  on push to main). Zero real Forge coupling in `src/`. Fully Manus-independent.
+
+════════════════════════════════════════════════════════════════════════
+2. GAPS, RANKED
+════════════════════════════════════════════════════════════════════════
+
+G0 — [P0, DATA] Manus-provisioned MySQL for the Forge apps — DATA AT RISK. [VERIFY]
+   All three Forge apps read `DATABASE_URL` → a MySQL DB. If that DB was Forge/Manus-
+   MANAGED (the default for the "web-db-user" template), then decommissioning Manus may
+   have taken the DATABASE with it. At stake:
+     · astersports-web: the Print Studio MONEY PATH — credit ledger, Stripe records,
+       studio jobs. (CLAUDE.md §1 ledger-integrity invariants live in this DB.)
+     · st-patricks-armonk: parishioner PII — baptism / marriage / funeral / sponsor /
+       CCD sacrament-form submissions, subscriber lists, mass intentions, uploaded
+       documents (birth certs).
+   THE single most urgent verify: is the Manus MySQL still reachable / backed up /
+   exported, or already purged? If `DATABASE_URL` actually pointed at an EXTERNAL
+   provider (PlanetScale/RDS/etc.), the data survives and this drops to P2. If Manus-
+   managed, this is a P0 data-recovery race. (astersports-web's #103 migrating TO
+   Supabase implies the data needs to come OFF the old MySQL — confirm a dump exists.)
+
+G1 — [P0] astersports.io (astersports-web) is DOWN. [GROUNDED — Frank's report + no
+   deploy config]. Manus gone → no host, no MySQL, no Forge (auth/LLM/imagegen/storage).
+   #103 (Manus→Railway+Supabase) is the migration but INCOMPLETE — its own description
+   flags the `studioDb.ts` atomic-CAS money-path port as runtime-wrong (mysql2
+   `affectedRows` → postgres-js). Today's #110 merge is on GitHub `main`, not live.
+
+G2 — [P0] St Patrick is ALSO a Manus app and almost certainly DOWN — and it's WORSE
+   positioned than astersports-web. [GROUNDED it's a Manus/Forge app; VERIFY it's down]:
+   · Same total Forge dependency (host + MySQL + OAuth + LLM + storage + notifications).
+   · It's a LIVE CLIENT deliverable holding parishioner PII (see G0).
+   · There is NO migration in flight (astersports-web at least has #103). Nothing.
+   · The #4 security fixes I merged today are on GitHub `main` but not live.
+   Operator note: Frank earlier said "St Patrick is on a Manus website, want to migrate
+   off… worry about where later." If Manus is already decommissioned, "later" is now —
+   St Patrick is down and its PII is in the at-risk DB.
+
+G3 — [P1] The Forge SDK (`server/_core/*`) is the decommissioned-runtime coupling; every
+   Forge-backed FEATURE is dead, not just hosting. [GROUNDED — consumer file lists]:
+   · Auth/login: `oauth.ts` + `sdk.ts` (Forge OAuth, OWNER_OPEN_ID) → users can't log in.
+   · LLM: `llm.ts` (OPENAI-compatible Forge proxy) → St Patrick parish assistant +
+     bulletin compose; astersports-web studio prompts.
+   · Image gen + masking: `imageGeneration.ts` + `masking/` → the ENTIRE Print Studio
+     AI engine ran through Forge.
+   · Storage: `storageProxy.ts` + `@aws-sdk/client-s3` → uploaded sacrament docs, homily
+     audio, studio images (a Manus-owned S3 bucket may be stranded).
+   · Notifications: `notification.ts` → email/push.
+   · Also: `voiceTranscription.ts`, `dataApi.ts`, `map.ts`, `heartbeat.ts`.
+   Migrating off = REPLACING the whole `_core` layer per app (this is exactly #103's
+   scope for astersports-web; there is NO equivalent effort for St Patrick).
+
+G4 — [P1] legacy-hoopers is the same Manus/Forge shape and can't deploy either — but
+   LOW urgency: it's the unshipped 2-day prototype; the live LH site is Squarespace, and
+   the LH youth-sports data is served by aster-sports (astersports.app), which is fine.
+   No live surface depends on this repo. (Disposition already: Frank's queued rebuild.)
+
+G5 — [P2] No CI gate on st-patrick OR legacy-hoopers. [GROUNDED — no .github/workflows].
+   Their tests/typecheck only run locally. (astersports-web HAS ci.yml; aster-sports has
+   two workflows.) Recommend a lint+typecheck+test workflow on St Patrick before/with its
+   off-Manus migration — it now carries real auth/security code (the #4 fixes).
+
+G6 — [P2] astersports-web's `template.json` is misclassified "web-static / no backend
+   server" while the repo runs a full tRPC + MySQL + Stripe backend. [GROUNDED]. The
+   Manus manifest is stale; may have contributed to deploy confusion. Cosmetic now (Manus
+   is gone) but note it when re-templating for the new host.
+
+G7 — [P1, process] Repo↔prod inversion: code merged today is NOT all live. [GROUNDED]:
+   · astersports-web #110 (audit + cleanup) → GitHub main, NOT deployed (no host).
+   · st-patrick #4 (security + dates) → GitHub main, NOT deployed (no host).
+   · aster-sports #1094 + #1095 → LIVE (Vercel from main + the edge-functions workflow).
+   So the half of today's cleanup that matters operationally (the St Patrick security
+   holes, the astersports-web AAU/auth fixes) is sitting in `main` un-deployed until the
+   off-Manus migration lands. They are NOT lost — they merge forward into the migrated
+   app — but they are not protecting anything until then.
+
+════════════════════════════════════════════════════════════════════════
+3. WHAT'S HEALTHY (so the blast radius is precise, not alarmist)
+════════════════════════════════════════════════════════════════════════
+· aster-sports / astersports.app [GROUNDED]: Vercel (auto-deploy from main) + Supabase
+  (Postgres + RLS + edge functions + app_secrets). `deploy-edge-functions.yml` deploys
+  changed functions on push to main; `ci.yml` gates PRs. Zero Manus dependency. The live
+  youth-sports app + Legacy Hoopers tenant data are FINE. Today's #1094/#1095 are live.
+· aster-weather [GROUNDED]: a published library (git-tag dependency), no deploy needed;
+  CI added this session. Fine.
+· Supabase project vrwwpsbfbnveawqwbdmj [GROUNDED earlier]: live, secrets set, edge fns
+  active. Unaffected by Manus.
+
+════════════════════════════════════════════════════════════════════════
+4. THE VERIFY LIST (what the fix lane should confirm first, in order)
+════════════════════════════════════════════════════════════════════════
+1. [G0] Is the Manus MySQL still reachable / has it been dumped? For BOTH astersports-web
+   (money ledger) and st-patrick (PII). If Manus-managed and not yet exported, this is a
+   recover-the-data race — do it before anything else. Check whether `DATABASE_URL`
+   pointed at Manus-managed MySQL vs an external provider that survives.
+2. [G0] Is the Manus/Forge S3 bucket (uploaded docs/images/audio) still reachable?
+3. [G2] Confirm St Patrick's current live state + that its off-Manus migration is even
+   started (astersports-web has #103; St Patrick has nothing in-repo).
+4. [G1] #103's money-path CAS port (studioDb.ts affectedRows→.returning()) must be
+   finished + re-proven before astersports-web's studio can go live on Railway.
+5. [G7] After each app re-deploys, confirm `main` actually serves (the check this audit
+   should have done originally).
+
+════════════════════════════════════════════════════════════════════════
+5. WHY THE ORIGINAL AUDIT MISSED THIS (the meta-gap, owned)
+════════════════════════════════════════════════════════════════════════
+The 2026-06-25 audit was scoped to CODE + the Supabase DB. It never asked, per repo,
+"does `main` deploy, and is the platform it deploys to alive?" The signals were all
+present and not connected: every Forge repo's `template.json` + `server/_core` Forge SDK;
+PR #103 literally titled "Migrate off Manus → Railway"; Frank's own "migrate St Patrick
+off Manus" note. The audit even named the exact pattern — X1 "repo↔prod drift" — but
+only checked the DATABASE side of "is prod running the code," never the HOSTING side.
+The discipline fix: an audit of "are the repos set up properly" MUST include a
+deployment-wiring pass — for each repo: deploy target, is it alive, does main serve,
+where's the DB, what platform dependencies are in the critical path. Added to the
+verify-before-claiming-clean checklist.
+
+— end —
