@@ -176,6 +176,45 @@ describe("repeatDetector", () => {
     });
   });
 
+  describe("all-over coverage path (scattered-print reframe)", () => {
+    // Deterministic tossed/scattered motifs (aperiodic) — the FFT path can't find a
+    // period, but coverage must accept it as all-over.
+    function scattered(n: number, r: number, seed: number): Buffer {
+      const b = Buffer.alloc(W * H * 4);
+      for (let i = 0; i < W * H; i++) { const p = i * 4; b[p] = 225; b[p + 1] = 220; b[p + 2] = 205; b[p + 3] = 255; }
+      let a = seed >>> 0; const rand = () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+      const pts: number[][] = []; let g = 0;
+      while (pts.length < n && g++ < n * 200) {
+        const cx = r + Math.floor(rand() * (W - 2 * r)), cy = r + Math.floor(rand() * (H - 2 * r));
+        if (pts.some(([x, y]) => (x - cx) ** 2 + (y - cy) ** 2 < (2.2 * r) ** 2)) continue;
+        pts.push([cx, cy]);
+        for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++)
+          if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const p = (y * W + x) * 4; b[p] = 60; b[p + 1] = 40; b[p + 2] = 46; }
+      }
+      return b;
+    }
+
+    it("accepts an aperiodic scattered print via the coverage path", () => {
+      const result = detectRepeat(scattered(50, 4, 7), W, H, fullMask());
+      expect(result.isAllover).toBe(true);
+      expect(result.classification).toBe("allover");
+      expect(result.acceptPath).toBe("coverage");
+      expect(result.coverage?.numMotifs).toBeGreaterThan(10);
+    });
+
+    it("still rejects a single placed graphic (coverage occupancy guard)", () => {
+      const result = detectRepeat(placementImage(), W, H, fullMask());
+      expect(result.isAllover).toBe(false);
+      expect(result.acceptPath ?? null).toBeNull();
+    });
+
+    it("rejects a smooth gradient (edge-energy guard — not a print)", () => {
+      const result = detectRepeat(uniformImage(), W, H, fullMask());
+      expect(result.isAllover).toBe(false);
+      expect(result.classification).toBe("placement");
+    });
+  });
+
   describe("threshold constants are exported for calibration", () => {
     it("exports all calibration thresholds", () => {
       expect(PEAK_RATIO_THRESHOLD).toBe(0.30);

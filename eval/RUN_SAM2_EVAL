@@ -1,0 +1,7 @@
+SAM2 count eval - run request
+run: 2
+requested: 2026-06-25
+
+Purpose: measure the real SAM2 production count accuracy on the hard conditions
+(overlap / multicolor / varied-ground / low-contrast) where the classical offline
+segmenter hit ~40%. Bump "run" to re-trigger the workflow.

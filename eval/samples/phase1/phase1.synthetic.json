@@ -1,0 +1,50 @@
+[
+  {
+    "id": "scat-sparse-30",
+    "scene": "eval/samples/phase1/scat-sparse-30-scene.png",
+    "raster": "eval/samples/phase1/scat-sparse-30-raster.png",
+    "instances": "eval/samples/phase1/scat-sparse-30-instances.png",
+    "trueCount": 30,
+    "requestedCount": 30,
+    "radius": 9,
+    "minDist": 46,
+    "scatter": true,
+    "note": "clean discrete, N=30, well separated"
+  },
+  {
+    "id": "scat-sparse-60",
+    "scene": "eval/samples/phase1/scat-sparse-60-scene.png",
+    "raster": "eval/samples/phase1/scat-sparse-60-raster.png",
+    "instances": "eval/samples/phase1/scat-sparse-60-instances.png",
+    "trueCount": 60,
+    "requestedCount": 60,
+    "radius": 8,
+    "minDist": 34,
+    "scatter": true,
+    "note": "clean discrete, N=60, well separated"
+  },
+  {
+    "id": "scat-sparse-90",
+    "scene": "eval/samples/phase1/scat-sparse-90-scene.png",
+    "raster": "eval/samples/phase1/scat-sparse-90-raster.png",
+    "instances": "eval/samples/phase1/scat-sparse-90-instances.png",
+    "trueCount": 90,
+    "requestedCount": 90,
+    "radius": 7,
+    "minDist": 26,
+    "scatter": true,
+    "note": "clean discrete, N=90, moderately dense"
+  },
+  {
+    "id": "scat-dense-120",
+    "scene": "eval/samples/phase1/scat-dense-120-scene.png",
+    "raster": "eval/samples/phase1/scat-dense-120-raster.png",
+    "instances": "eval/samples/phase1/scat-dense-120-instances.png",
+    "trueCount": 120,
+    "requestedCount": 120,
+    "radius": 8,
+    "minDist": 0,
+    "scatter": true,
+    "note": "dense/overlapping, N=120 — classical CC ceiling"
+  }
+]
