@@ -1,10 +1,17 @@
 import { useId } from "react";
+import { getWeatherInfo } from "@aster/weather";
 
 /**
  * Best-in-class animated weather icons — hand-built SVGs with CSS-driven motion
  * (rotating sun, drifting clouds, falling rain/snow, flashing bolts, twinkling
  * stars). Keyframes live in index.css under the `wx-*` namespace and respect
  * prefers-reduced-motion.
+ *
+ * Convergence (PR #106 → @aster/weather): the WMO code→text table that used to
+ * live here is gone — condition text now comes from the shared package's
+ * canonical WMO map (one source of truth, AP#42). The animated SVG rendering
+ * and the `weatherKind`/`weatherAccent` theming helpers stay local: they are
+ * this card's presentation, not shared logic.
  */
 
 export type WxKind =
@@ -19,39 +26,11 @@ export type WxKind =
   | "snow"
   | "thunder";
 
-const LABELS: Record<number, string> = {
-  0: "Clear sky",
-  1: "Mainly clear",
-  2: "Partly cloudy",
-  3: "Overcast",
-  45: "Fog",
-  48: "Rime fog",
-  51: "Light drizzle",
-  53: "Drizzle",
-  55: "Heavy drizzle",
-  56: "Freezing drizzle",
-  57: "Freezing drizzle",
-  61: "Light rain",
-  63: "Rain",
-  65: "Heavy rain",
-  66: "Freezing rain",
-  67: "Freezing rain",
-  71: "Light snow",
-  73: "Snow",
-  75: "Heavy snow",
-  77: "Snow grains",
-  80: "Light showers",
-  81: "Rain showers",
-  82: "Violent showers",
-  85: "Snow showers",
-  86: "Snow showers",
-  95: "Thunderstorm",
-  96: "Thunderstorm",
-  99: "Thunderstorm + hail",
-};
-
 export function describeWeather(code: number): string {
-  return LABELS[code] ?? "—";
+  // Canonical descriptions from @aster/weather; preserve the local "—" empty
+  // fallback for codes the shared map doesn't recognize.
+  const { description } = getWeatherInfo(code);
+  return description === "Unknown" ? "—" : description;
 }
 
 export function weatherKind(code: number): WxKind {
