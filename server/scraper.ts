@@ -11,7 +11,20 @@
 import type { Game, GameStatus } from '../shared/types';
 import { safeFetch } from './_core/net/safeFetch';
 
+// ─── Home weather hub ───
+// The team's home base (practice gyms are in Armonk / Bedford / Valhalla, NY).
+// Used as the default location for the AAU weather card when no game is within
+// the next 7 days.
+export const HOME_VENUE = {
+  name: 'Armonk, NY',
+  city: 'Armonk, NY',
+  latitude: 41.1265,
+  longitude: -73.714,
+} as const;
+
 // ─── Tournament Registry ───
+// `venue` carries best-effort host-city coordinates so the weather forecast can
+// resolve a location per tournament. Refine these if a venue address is known.
 export const TOURNAMENT_REGISTRY = [
   {
     name: 'ZG NY Hoop Festival',
@@ -20,6 +33,7 @@ export const TOURNAMENT_REGISTRY = [
     result: 'Champions',
     tournamentId: 'h202602231534241950edcf7493d244b',
     divisionId: 'h202606101618262527126b329099740',
+    venue: { name: 'White Plains, NY', city: 'White Plains, NY', latitude: 41.034, longitude: -73.7629 },
   },
   {
     name: 'ZG Girls National Finals',
@@ -28,6 +42,7 @@ export const TOURNAMENT_REGISTRY = [
     result: 'Final Four',
     tournamentId: 'h20260526140601851c836df307c9e44',
     divisionId: 'h202605270300452052df7ec3ccbdc47',
+    venue: { name: 'Providence, RI', city: 'Providence, RI', latitude: 41.824, longitude: -71.4128 },
   },
   {
     name: 'ZG Rumble for the Ring CT',
@@ -36,6 +51,7 @@ export const TOURNAMENT_REGISTRY = [
     result: 'Finalists',
     tournamentId: 'h202602201707185454debbe82de994b',
     divisionId: 'h2026051318153444911a7018c855a44',
+    venue: { name: 'Uncasville, CT', city: 'Uncasville, CT', latitude: 41.4907, longitude: -72.0909 },
   },
   {
     name: 'ZG NY Metro Showdown',
@@ -44,6 +60,7 @@ export const TOURNAMENT_REGISTRY = [
     result: '1–2',
     tournamentId: 'h2026021919164101401c8a60f40584c',
     divisionId: 'h202604151437169228f774d0fba4a4f',
+    venue: { name: 'New York, NY', city: 'New York, NY', latitude: 40.7128, longitude: -74.006 },
   },
   {
     name: 'ZG Chase for the Chain NY',
@@ -52,6 +69,7 @@ export const TOURNAMENT_REGISTRY = [
     result: 'Champions',
     tournamentId: 'h202602191530320243ffdc849100c4d',
     divisionId: 'h20260408001936980835160e0489147',
+    venue: { name: 'White Plains, NY', city: 'White Plains, NY', latitude: 41.034, longitude: -73.7629 },
   },
 ];
 

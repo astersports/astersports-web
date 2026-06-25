@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { ChevronDown, Clock, RefreshCw, Zap } from "lucide-react";
+import GameWeather from "./weather/GameWeather";
+
+interface Venue { latitude: number; longitude: number; name: string }
 
 interface Game {
   id: string;
@@ -161,6 +164,15 @@ export default function LiveScores() {
   const games: Game[] = useMemo(() => data?.games || [], [data]);
   const biggestWinId = useMemo(() => findBiggestWin(games), [games]);
 
+  // Venue coordinates per tournament (from the server registry) for forecasts.
+  const venuesByName = useMemo(() => {
+    const map = new Map<string, Venue>();
+    for (const t of data?.tournaments ?? []) {
+      if (t.venue) map.set(t.name, t.venue);
+    }
+    return map;
+  }, [data]);
+
   // Group games by tournament (using ID prefix pattern from scraper)
   const tournamentGroups = useMemo(() => {
     return TOURNAMENT_META.map(meta => {
@@ -181,9 +193,10 @@ export default function LiveScores() {
         losses,
         liveCount,
         totalGames: tournGames.length,
+        venue: venuesByName.get(meta.name),
       };
     }).filter(t => t.totalGames > 0);
-  }, [games]);
+  }, [games, venuesByName]);
 
   const liveCount = useMemo(() => games.filter(g => g.status === 'live').length, [games]);
 
@@ -341,6 +354,7 @@ export default function LiveScores() {
                         game={game}
                         isBiggestWin={game.id === biggestWinId}
                         staggerIndex={idx}
+                        venue={tournament.venue}
                       />
                     ))}
                   </div>
@@ -355,8 +369,8 @@ export default function LiveScores() {
 }
 
 /* ─── Game Row (broadcast game log pattern) ─── */
-function GameRow({ game, isBiggestWin, staggerIndex }: {
-  game: Game; isBiggestWin: boolean; staggerIndex: number;
+function GameRow({ game, isBiggestWin, staggerIndex, venue }: {
+  game: Game; isBiggestWin: boolean; staggerIndex: number; venue?: Venue;
 }) {
   const isLegacy = game.isLegacyHome;
   const legacyScore = isLegacy ? game.homeScore : game.awayScore;
@@ -509,6 +523,7 @@ function GameRow({ game, isBiggestWin, staggerIndex }: {
               {game.court}
             </span>
           )}
+          <GameWeather latitude={venue?.latitude} longitude={venue?.longitude} gameTime={game.gameTime} />
         </div>
       </div>
     </div>

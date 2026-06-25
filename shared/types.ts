@@ -67,3 +67,55 @@ export interface GameCheckNotification {
   message: string;
   timestamp: string;
 }
+
+// ─── Weather Types (Open-Meteo) ───
+
+/** A geocoded venue used to resolve a forecast. */
+export interface WeatherVenue {
+  name: string;
+  city: string;
+  latitude: number;
+  longitude: number;
+}
+
+export interface WeatherCurrent {
+  temperatureF: number;
+  apparentTemperatureF: number;
+  weatherCode: number; // WMO code
+  windSpeedMph: number;
+  windDirectionDeg: number;
+  humidityPct: number;
+  precipitationIn: number;
+  isDay: boolean;
+}
+
+export interface WeatherDay {
+  date: string; // YYYY-MM-DD (venue-local)
+  weatherCode: number;
+  tempMaxF: number;
+  tempMinF: number;
+  precipProbPct: number;
+  windMaxMph: number;
+  sunrise: string; // ISO (venue-local)
+  sunset: string; // ISO (venue-local)
+  uvIndexMax: number;
+}
+
+export interface WeatherHour {
+  time: string; // ISO (venue-local)
+  temperatureF: number;
+  weatherCode: number;
+  precipProbPct: number;
+  isDay: boolean;
+}
+
+export interface WeatherForecast {
+  latitude: number;
+  longitude: number;
+  timezone: string;
+  current: WeatherCurrent;
+  daily: WeatherDay[];
+  hourly: WeatherHour[];
+  fetchedAt: string; // ISO
+  cached: boolean;
+}
