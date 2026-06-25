@@ -22,9 +22,10 @@ describe("scale detector flip-gate accuracy", () => {
   });
 
   it("accepts genuine repeats at or above the calibration floor (raise as the detector is tuned)", () => {
-    // Acceptance is intentionally conservative pre-calibration. This floor prevents
-    // regression and should be raised toward acceptTotal once thresholds are tuned
-    // on a real labeled garment set. Current baseline: 4/6 synthetic.
-    expect(r.acceptPass).toBeGreaterThanOrEqual(4);
+    // Raised after the scattered-coverage reframe (Phase-1): the FFT path plus the
+    // all-over coverage path now accept periodic AND tossed/scattered prints. Floor
+    // locked at 8/9 (only the synthetic checkerboard stress case misses — real garment
+    // prints are not checkerboards). Anti-split safety (reject 5/5) is the test above.
+    expect(r.acceptPass).toBeGreaterThanOrEqual(8);
   });
 });

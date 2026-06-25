@@ -50,6 +50,34 @@ export const MIN_TILE_REPEATS = 2.5;
 /** Autocorrelation confirmation threshold for the FFT-proposed period. */
 export const AUTOCORR_CONFIRM_THRESHOLD = 0.25;
 
+// ─── All-over COVERAGE path (the scattered-print reframe) ────────────────────
+// Strategy §1/P2: a tossed/scattered print has NO strict period, so the FFT path
+// false-rejects it (~⅓ of genuine repeats). Scale should treat "all-over scattered
+// COVERAGE" as scalable (resize motifs, don't re-tile a period). This second
+// acceptance path classifies coverage from the SPATIAL DISTRIBUTION of motif blobs:
+// many small components, spread across the fabric in 2D = all-over → ACCEPT; a single
+// big blob (placement) or a few full-span strips (border) = REJECT. These are
+// calibration starting points, not frozen.
+
+/** Lab distance from estimated ground above which a pixel is "motif" (foreground). */
+export const ALLOVER_FG_TAU = 12;
+/** Foreground coverage band: below = empty/solid; above = a single near-full fill. */
+export const ALLOVER_FRAC_LO = 0.012;
+export const ALLOVER_FRAC_HI = 0.96;
+/** Minimum distinct motif components (rejects a single placed graphic). */
+export const ALLOVER_MIN_MOTIFS = 2;
+/** Minimum occupancy of a 5×5 grid over the fabric bbox (foreground spreads, not clusters). */
+export const ALLOVER_MIN_OCCUPANCY = 0.60;
+/** A grid cell counts as occupied when its foreground fraction exceeds this. */
+export const ALLOVER_CELL_EPS = 0.008;
+/** Mean L-gradient floor — a print has high-frequency motif EDGES; a smooth gradient
+ *  or solid does not. Rejects gradients/solids whose pixels drift far from the median
+ *  without any actual motif texture (the "gradient looks all-over" trap). */
+export const ALLOVER_EDGE_MIN = 0.4;
+/** All-over print must put foreground in ≥ (GRID−1) distinct grid rows AND columns (2D spread). */
+const ALLOVER_GRID = 5;
+export const ALLOVER_MIN_GRID_AXIS = ALLOVER_GRID - 1;
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface AxisDiagnostics {
@@ -83,6 +111,10 @@ export interface RepeatDetectorResult {
   axes: AxisDiagnostics[];
   /** Classification label for reporting. */
   classification: "allover" | "border" | "placement" | "insufficient_data";
+  /** Which path accepted: "periodic" (FFT) or "coverage" (scattered) or null if rejected. */
+  acceptPath?: "periodic" | "coverage" | null;
+  /** All-over coverage diagnostics (the scattered-print path). */
+  coverage?: AlloverCoverage;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -214,6 +246,132 @@ function autocorrelationAtLag(signal: number[], lag: number): number {
   return c / N / r0;
 }
 
+// ─── All-over coverage analysis (scattered-print acceptance) ────────────────
+
+export interface AlloverCoverage {
+  isAllover: boolean;
+  /** Foreground (motif) fraction within the fabric bbox. */
+  foregroundFrac: number;
+  /** Distinct motif components after noise filtering. */
+  numMotifs: number;
+  /** Occupied fraction of the 5×5 grid over the bbox. */
+  occupancy: number;
+  /** Median component span max(w,h)/bbox (small = compact motifs, large = strips). */
+  medianSpan: number;
+  /** Mean L-gradient over the bbox (texture/edge energy; smooth gradients ≈ 0). */
+  edgeEnergy: number;
+}
+
+/** Median of L,a,b over (sampled) masked pixels → estimated ground colour. */
+function groundLab(buf: Buffer, w: number, mask: Uint8Array, bb: BBox): [number, number, number] {
+  const Ls: number[] = [], As: number[] = [], Bs: number[] = [];
+  for (let y = bb.ymin; y <= bb.ymax; y++) for (let x = bb.xmin; x <= bb.xmax; x++) {
+    const i = y * w + x;
+    if (mask[i] <= 127 || (x + y) % 2) continue;
+    const lab = rgb255ToLab(buf[i * 4], buf[i * 4 + 1], buf[i * 4 + 2]);
+    Ls.push(lab.l); As.push(lab.a); Bs.push(lab.b);
+  }
+  const med = (a: number[]) => { if (!a.length) return 0; const s = [...a].sort((p, q) => p - q); return s[s.length >> 1]; };
+  return [med(Ls), med(As), med(Bs)];
+}
+
+/**
+ * Classify all-over scattered COVERAGE from motif blob distribution. 4-connectivity
+ * so corner-touching motifs (e.g. checkerboards, dense dots) stay distinct; a full
+ * fabric strip (border) stays one elongated component and is rejected by the span gate.
+ */
+function analyzeAllover(buf: Buffer, w: number, h: number, mask: Uint8Array, bb: BBox): AlloverCoverage {
+  const bw = bb.xmax - bb.xmin + 1, bh = bb.ymax - bb.ymin + 1;
+  const bboxArea = bw * bh;
+  const [gl, ga, gb] = groundLab(buf, w, mask, bb);
+
+  // Foreground = far-from-ground masked pixels; also accumulate L-gradient (edge energy)
+  // so a smooth gradient/solid — whose pixels can drift "far from median" without any
+  // motif texture — is rejected (it is not an all-over PRINT).
+  const fg = new Uint8Array(w * h);
+  let maskCount = 0, fgCount = 0, gradSum = 0, gradN = 0;
+  for (let y = bb.ymin; y <= bb.ymax; y++) for (let x = bb.xmin; x <= bb.xmax; x++) {
+    const i = y * w + x;
+    if (mask[i] <= 127) continue;
+    maskCount++;
+    const lab = rgb255ToLab(buf[i * 4], buf[i * 4 + 1], buf[i * 4 + 2]);
+    if (Math.hypot(lab.l - gl, lab.a - ga, lab.b - gb) > ALLOVER_FG_TAU) { fg[i] = 1; fgCount++; }
+    if (x < bb.xmax && y < bb.ymax && mask[i + 1] > 127 && mask[i + w] > 127) {
+      gradSum += Math.abs(lum(buf, i + 1) - lab.l) + Math.abs(lum(buf, i + w) - lab.l); gradN++;
+    }
+  }
+  const foregroundFrac = maskCount ? fgCount / maskCount : 0;
+  const edgeEnergy = gradN ? gradSum / gradN : 0;
+  const empty: AlloverCoverage = { isAllover: false, foregroundFrac, numMotifs: 0, occupancy: 0, medianSpan: 1, edgeEnergy };
+  if (foregroundFrac < ALLOVER_FRAC_LO || foregroundFrac > ALLOVER_FRAC_HI) return empty;
+  if (edgeEnergy < ALLOVER_EDGE_MIN) return empty; // smooth gradient / solid — not a print
+
+  // Connected components (4-conn), iterative flood fill, restricted to bbox.
+  const minCompPx = Math.max(4, Math.floor(0.00004 * bboxArea));
+  const labels = new Int32Array(w * h).fill(-1);
+  const comps: { area: number; minx: number; maxx: number; miny: number; maxy: number }[] = [];
+  const stack: number[] = [];
+  for (let y = bb.ymin; y <= bb.ymax; y++) for (let x = bb.xmin; x <= bb.xmax; x++) {
+    const s = y * w + x;
+    if (!fg[s] || labels[s] !== -1) continue;
+    labels[s] = comps.length; stack.length = 0; stack.push(s);
+    const c = { area: 0, minx: w, maxx: 0, miny: h, maxy: 0 };
+    while (stack.length) {
+      const p = stack.pop()!; const px = p % w, py = (p / w) | 0;
+      c.area++;
+      if (px < c.minx) c.minx = px; if (px > c.maxx) c.maxx = px;
+      if (py < c.miny) c.miny = py; if (py > c.maxy) c.maxy = py;
+      const nb = [p - 1, p + 1, p - w, p + w];
+      const nx = [px - 1, px + 1, px, px], ny = [py, py, py - 1, py + 1];
+      for (let k = 0; k < 4; k++) {
+        const X = nx[k], Y = ny[k];
+        if (X < bb.xmin || X > bb.xmax || Y < bb.ymin || Y > bb.ymax) continue;
+        const q = nb[k];
+        if (fg[q] && labels[q] === -1) { labels[q] = labels[s]; stack.push(q); }
+      }
+    }
+    comps.push(c);
+  }
+
+  const kept = comps.filter((c) => c.area >= minCompPx);
+  const numMotifs = kept.length;
+  if (numMotifs === 0) return { ...empty, numMotifs: 0 };
+
+  // Occupancy from FOREGROUND PIXELS over a 5×5 grid: a cell is occupied when its
+  // foreground fraction exceeds CELL_EPS. This generalizes across SPARSE scatter
+  // (a dot per cell) and DENSE all-over (most of every cell) — both fill the grid —
+  // while a localized placement blob lights only the central cells. Border strips are
+  // already caught by the FFT one-axis path (coverage runs only when 0 axes pass).
+  const cellFg = new Float64Array(ALLOVER_GRID * ALLOVER_GRID);
+  const cellTot = new Float64Array(ALLOVER_GRID * ALLOVER_GRID);
+  for (let y = bb.ymin; y <= bb.ymax; y++) for (let x = bb.xmin; x <= bb.xmax; x++) {
+    const i = y * w + x;
+    if (mask[i] <= 127) continue;
+    const gx = Math.min(ALLOVER_GRID - 1, Math.floor(((x - bb.xmin) / bw) * ALLOVER_GRID));
+    const gy = Math.min(ALLOVER_GRID - 1, Math.floor(((y - bb.ymin) / bh) * ALLOVER_GRID));
+    const gi = gy * ALLOVER_GRID + gx;
+    cellTot[gi]++; if (fg[i]) cellFg[gi]++;
+  }
+  const activeRows = new Set<number>(), activeCols = new Set<number>();
+  let occupied = 0, cells = 0;
+  for (let gy = 0; gy < ALLOVER_GRID; gy++) for (let gx = 0; gx < ALLOVER_GRID; gx++) {
+    const gi = gy * ALLOVER_GRID + gx;
+    if (cellTot[gi] <= 0) continue; // cell has no fabric (irregular mask) — ignore
+    cells++;
+    if (cellFg[gi] / cellTot[gi] > ALLOVER_CELL_EPS) { occupied++; activeRows.add(gy); activeCols.add(gx); }
+  }
+  const occupancy = cells ? occupied / cells : 0;
+  const medianSpan = 0; // (component span no longer gates; FFT handles borders)
+
+  const isAllover =
+    numMotifs >= ALLOVER_MIN_MOTIFS &&
+    occupancy >= ALLOVER_MIN_OCCUPANCY &&
+    activeRows.size >= ALLOVER_MIN_GRID_AXIS &&
+    activeCols.size >= ALLOVER_MIN_GRID_AXIS;
+
+  return { isAllover, foregroundFrac, numMotifs, occupancy, medianSpan, edgeEnergy };
+}
+
 // ─── Main detector ──────────────────────────────────────────────────────────
 
 /**
@@ -329,21 +487,35 @@ export function detectRepeat(
   const axes = [xResult, yResult];
   const passingAxes = axes.filter(a => a.passes);
 
+  // PATH 1 — periodic (FFT both axes): a strict geometric repeat → allover.
   if (passingAxes.length === 2) {
-    // Both axes pass → allover
     const confidence = Math.max(xResult.autocorrAtPeriod, yResult.autocorrAtPeriod);
-    return { isAllover: true, isBorder: false, confidence, axes, classification: "allover" };
+    return { isAllover: true, isBorder: false, confidence, axes, classification: "allover", acceptPath: "periodic" };
   }
 
+  // PATH 1.5 — periodic on exactly ONE axis → border print (rejected). The FFT is the
+  // reliable border guard (full-width/height strips), so we resolve borders here and do
+  // NOT let the coverage path override them.
   if (passingAxes.length === 1) {
-    // One axis only → border print (rejected by spec)
     const confidence = passingAxes[0].autocorrAtPeriod;
-    return { isAllover: false, isBorder: true, confidence, axes, classification: "border" };
+    const coverage = analyzeAllover(imageRgba, width, height, rasterData, bb); // diag only
+    return { isAllover: false, isBorder: true, confidence, axes, classification: "border", acceptPath: null, coverage };
   }
 
-  // Neither axis passes → placement/single
+  // PATH 2 — all-over scattered COVERAGE (the reframe). Reached only when the FFT found
+  // NO periodic axis — i.e. the cases the old detector blanket-rejected as "placement".
+  // A tossed/scattered print (no strict period) whose motifs spread across the fabric in
+  // 2D is scalable by motif-RESIZE (§1/P2); a single placed graphic is not. Coverage
+  // separates them by foreground grid-occupancy + 2D spread.
+  const coverage = analyzeAllover(imageRgba, width, height, rasterData, bb);
+  if (coverage.isAllover) {
+    const confidence = Math.max(coverage.occupancy, xResult.autocorrAtPeriod, yResult.autocorrAtPeriod);
+    return { isAllover: true, isBorder: false, confidence, axes, classification: "allover", acceptPath: "coverage", coverage };
+  }
+
+  // Neither path → placement/single (rejected).
   const confidence = Math.max(xResult.autocorrAtPeriod, yResult.autocorrAtPeriod);
-  return { isAllover: false, isBorder: false, confidence, axes, classification: "placement" };
+  return { isAllover: false, isBorder: false, confidence, axes, classification: "placement", acceptPath: null, coverage };
 }
 
 /**
