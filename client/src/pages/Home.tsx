@@ -152,10 +152,10 @@ function Header() {
       {/* Mobile menu dropdown */}
       <div
         className={`sm:hidden overflow-hidden transition-all duration-300 ease-out ${
-          mobileOpen ? "max-h-72 opacity-100" : "max-h-0 opacity-0"
+          mobileOpen ? "max-h-[34rem] opacity-100" : "max-h-0 opacity-0"
         }`}
       >
-        <nav className="container pb-6 flex flex-col gap-4 bg-[#0a0e1a]/95 backdrop-blur-xl">
+        <nav className="container pt-2 pb-6 flex flex-col gap-4 bg-[#0a0e1a] border-b border-white/10 shadow-2xl">
           {NAV_PRODUCTS.map((p) => (
             <a
               key={p.id}
@@ -362,7 +362,7 @@ function PlatformSection() {
         </div>
 
         <div
-          className={`mt-4 flex items-center gap-4 flex-wrap rounded-2xl border border-dashed border-white/14 px-5 py-4 text-slate-400 text-[13.5px] transition-all duration-700 delay-300 ${
+          className={`mt-4 flex items-center gap-4 flex-wrap rounded-2xl border border-white/10 bg-white/[0.02] px-5 py-4 text-slate-400 text-[13.5px] transition-all duration-700 delay-300 ${
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
           }`}
         >
