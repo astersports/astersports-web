@@ -1,0 +1,158 @@
+/**
+ * Aster Sports — service registry.
+ *
+ * Single source of truth for everything the platform offers. The landing page,
+ * header nav, and footer all render from this list, so bringing a new service
+ * online (or flipping its status) is a one-entry edit here — no page surgery.
+ *
+ * `kind: "product"` = a live destination users can open (Studio, the app, AAU).
+ * `kind: "service"` = an agency offering we sell as engagements (web, brand, etc.).
+ */
+
+import {
+  Shirt,
+  Smartphone,
+  Trophy,
+  Code,
+  Sparkles,
+  Globe,
+  Palette,
+  type LucideIcon,
+} from "lucide-react";
+
+export type ServiceStatus = "live" | "beta" | "members" | "soon";
+export type ServiceKind = "product" | "service";
+
+export interface ServiceEntry {
+  /** Stable id (also the anchor / key). */
+  id: string;
+  kind: ServiceKind;
+  name: string;
+  /** One-line hook shown under the name on a card. */
+  tagline: string;
+  /** Longer card body. */
+  description: string;
+  href: string;
+  /** True when the link leaves astersports.io (opens in a new tab). */
+  external?: boolean;
+  /** Products carry a status pill; services usually don't. */
+  status?: ServiceStatus;
+  icon: LucideIcon;
+  /** Accent hex used for the card glow + icon. */
+  accent: string;
+  /** Button label on the product card. */
+  cta?: string;
+  /** Show in the top nav / footer link rail. */
+  inNav?: boolean;
+}
+
+export const STATUS_META: Record<
+  ServiceStatus,
+  { label: string; color: string; bg: string }
+> = {
+  live: { label: "Live", color: "#34d399", bg: "rgba(52, 211, 153, 0.12)" },
+  beta: { label: "Beta", color: "#4a9fff", bg: "rgba(74, 159, 255, 0.12)" },
+  members: { label: "Members", color: "#a78bfa", bg: "rgba(167, 139, 250, 0.14)" },
+  soon: { label: "Coming soon", color: "#94a3b8", bg: "rgba(148, 163, 184, 0.12)" },
+};
+
+/** Live destinations — the things you can actually open today. */
+export const PRODUCTS: ServiceEntry[] = [
+  {
+    id: "studio",
+    kind: "product",
+    name: "Print Studio",
+    tagline: "AI print & pattern engineering",
+    description:
+      "Upload a garment, detect its print elements, then scale, recolor, and refine patterns in seconds. Built for fashion production, priced per generation.",
+    href: "/studio",
+    status: "live",
+    icon: Shirt,
+    accent: "#f5b731",
+    cta: "Open Studio",
+    inNav: true,
+  },
+  {
+    id: "app",
+    kind: "product",
+    name: "Sports Management App",
+    tagline: "One platform for youth sports orgs",
+    description:
+      "Schedules, rosters, RSVPs, messaging, and financials for youth sports organizations — replacing spreadsheets, group texts, and LeagueApps with one mobile-first app.",
+    href: "https://astersports.app",
+    external: true,
+    status: "beta",
+    icon: Smartphone,
+    accent: "#4a9fff",
+    cta: "Explore the App",
+    inNav: true,
+  },
+  {
+    id: "aau",
+    kind: "product",
+    name: "AAU Basketball",
+    tagline: "Aster 11U Girls · Zero Gravity AAU",
+    description:
+      "Live scores, tournament history, season records, film, and venues for the Aster AAU program — a working showcase of what the platform powers for a real team.",
+    href: "/aau",
+    status: "live",
+    icon: Trophy,
+    accent: "#a78bfa",
+    cta: "View the Program",
+    inNav: true,
+  },
+];
+
+/** Agency engagements — sold as projects, not self-serve products. */
+export const SERVICES: ServiceEntry[] = [
+  {
+    id: "print-design",
+    kind: "service",
+    name: "Print & Pattern Design",
+    tagline: "Textile & apparel print engineering",
+    description:
+      "AI-assisted print engineering for textiles and apparel — scale, recolor, and refine patterns with production-grade precision.",
+    href: "/studio",
+    icon: Palette,
+    accent: "#f5b731",
+  },
+  {
+    id: "web",
+    kind: "service",
+    name: "Web Development",
+    tagline: "Bespoke sites & web apps",
+    description:
+      "Custom websites and web applications built from the ground up — clean code, modern frameworks, pixel-perfect execution.",
+    href: "#contact",
+    icon: Code,
+    accent: "#4a9fff",
+  },
+  {
+    id: "brand",
+    kind: "service",
+    name: "Brand Identity",
+    tagline: "Identity systems & logos",
+    description:
+      "Visual identity systems, logo design, and brand guidelines that give sports and lifestyle brands a distinctive creative edge.",
+    href: "#contact",
+    icon: Sparkles,
+    accent: "#e67e22",
+  },
+  {
+    id: "strategy",
+    kind: "service",
+    name: "Digital Strategy",
+    tagline: "Hosting, performance & evolution",
+    description:
+      "End-to-end digital presence — hosting, performance, security, and the ongoing evolution of your online platform.",
+    href: "#contact",
+    icon: Globe,
+    accent: "#34d399",
+  },
+];
+
+/** Everything, for nav/footer rendering. */
+export const ALL_SERVICES: ServiceEntry[] = [...PRODUCTS, ...SERVICES];
+
+/** Products that should appear as links in the header + footer. */
+export const NAV_PRODUCTS = PRODUCTS.filter((p) => p.inNav);

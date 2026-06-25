@@ -6,8 +6,9 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Code, Globe, Wrench, Shield, Mail, ArrowRight, MapPin, Menu, X, ChevronDown, Send, Settings, Palette, Sparkles } from "lucide-react";
+import { Mail, ArrowRight, ArrowUpRight, MapPin, Menu, X, ChevronDown, Send, Settings } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { PRODUCTS, SERVICES, NAV_PRODUCTS, STATUS_META, type ServiceEntry } from "@/lib/services";
 
 const LOGO_URL = "/manus-storage/aster_sports_logo_high_res_2b537f86.png";
 const HERO_BG_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663756289268/4gGAtBP2vWCBU9FC7zDMWA/hero-bg-kP7SSTui5UuAzDmbnWb2NK.webp";
@@ -105,29 +106,29 @@ function Header() {
 
         {/* Desktop nav */}
         <nav className="hidden sm:flex items-center gap-6">
-          <a href="/studio" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
-            Print Studio
-          </a>
+          {NAV_PRODUCTS.map((p) => (
+            <a
+              key={p.id}
+              href={p.href}
+              {...(p.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+              className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              {p.name}
+            </a>
+          ))}
           <a href="#services" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
             Services
           </a>
           <a href="#about" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
             About
           </a>
-          <a href="#faq" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
-            FAQ
-          </a>
 
           {isOwner && (
-            <>
-              <a href="/aau" className="text-sm text-[#f5b731] hover:text-[#e67e22] transition-colors font-medium" style={{ fontFamily: "var(--font-display)" }}>
-                AAU Basketball
-              </a>
-              <a href="/admin/billing" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors flex items-center gap-1" style={{ fontFamily: "var(--font-display)" }}>
-                <Settings className="w-3.5 h-3.5" />
-                Billing
-              </a>
-            </>
+            <a href="/admin/billing" className="text-sm text-slate-300 hover:text-[#f5b731] transition-colors flex items-center gap-1" style={{ fontFamily: "var(--font-display)" }}>
+              <Settings className="w-3.5 h-3.5" />
+              Billing
+            </a>
           )}
           <a
             href="#contact"
@@ -156,29 +157,30 @@ function Header() {
         }`}
       >
         <nav className="container pb-6 flex flex-col gap-4 bg-[#0a0e1a]/95 backdrop-blur-xl">
-          <a href="/studio" className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
-            Print Studio
-          </a>
+          {NAV_PRODUCTS.map((p) => (
+            <a
+              key={p.id}
+              href={p.href}
+              {...(p.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+              className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2"
+              style={{ fontFamily: "var(--font-display)" }}
+              onClick={() => setMobileOpen(false)}
+            >
+              {p.name}
+            </a>
+          ))}
           <a href="#services" className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
             Services
           </a>
           <a href="#about" className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
             About
           </a>
-          <a href="#faq" className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
-            FAQ
-          </a>
 
           {isOwner && (
-            <>
-              <a href="/aau" className="text-base text-[#f5b731] hover:text-[#e67e22] transition-colors py-2 font-medium" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
-                AAU Basketball
-              </a>
-              <a href="/admin/billing" className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2 flex items-center gap-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
-                <Settings className="w-4 h-4" />
-                Billing
-              </a>
-            </>
+            <a href="/admin/billing" className="text-base text-slate-300 hover:text-[#f5b731] transition-colors py-2 flex items-center gap-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
+              <Settings className="w-4 h-4" />
+              Billing
+            </a>
           )}
           <a
             href="#contact"
@@ -224,7 +226,7 @@ function HeroSection() {
           >
             <StarAccent className="animate-pulse-glow" />
             <span className="text-sm font-medium text-[#f5b731] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
-              Design & Technology Studio
+              A platform of design & sports technology
             </span>
           </div>
 
@@ -248,7 +250,7 @@ function HeroSection() {
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
           >
-            From print design and pattern engineering to web development and brand identity — we bring creative vision and technical precision to sports, fashion, and lifestyle brands.
+            One studio, many products — AI print engineering, a youth-sports management app, and a live AAU program, alongside bespoke web and brand work. New services light up here as they come online.
           </p>
 
           <div
@@ -265,11 +267,11 @@ function HeroSection() {
               <ArrowRight className="w-4 h-4" />
             </a>
             <a
-              href="#services"
+              href="#platform"
               className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full border border-white/15 text-white font-medium text-base transition-all duration-200 hover:border-[#f5b731]/40 hover:text-[#f5b731]"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              Our Services
+              Explore the Platform
             </a>
           </div>
 
@@ -289,38 +291,122 @@ function HeroSection() {
   );
 }
 
-const services = [
-  {
-    icon: Palette,
-    title: "Print & Pattern Design",
-    description:
-      "AI-powered print engineering for textiles and apparel. Scale, recolor, and refine patterns with precision tools built for fashion production.",
-  },
-  {
-    icon: Code,
-    title: "Web Development",
-    description:
-      "Bespoke websites and web applications built from the ground up. Clean code, modern frameworks, pixel-perfect execution.",
-  },
-  {
-    icon: Sparkles,
-    title: "Brand Identity",
-    description:
-      "Visual identity systems, logo design, and brand guidelines that give sports and lifestyle brands a distinctive creative edge.",
-  },
-  {
-    icon: Globe,
-    title: "Digital Strategy",
-    description:
-      "End-to-end digital presence management — hosting, performance, security, and ongoing evolution of your online platform.",
-  },
-];
+function StatusPill({ status }: { status: NonNullable<ServiceEntry["status"]> }) {
+  const meta = STATUS_META[status];
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide"
+      style={{ color: meta.color, backgroundColor: meta.bg, fontFamily: "var(--font-display)" }}
+    >
+      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: meta.color }} />
+      {meta.label}
+    </span>
+  );
+}
+
+function ProductCard({ product, index, isVisible }: { product: ServiceEntry; index: number; isVisible: boolean }) {
+  const Icon = product.icon;
+  return (
+    <a
+      href={product.href}
+      {...(product.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+      className={`group relative flex flex-col p-6 md:p-7 rounded-2xl border border-white/5 bg-[#0a0e1a]/60 backdrop-blur-sm overflow-hidden transition-all duration-500 hover:-translate-y-1 ${
+        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+      }`}
+      style={{ transitionDelay: `${150 + index * 110}ms` }}
+    >
+      {/* accent glow */}
+      <div
+        className="absolute -top-16 -right-16 w-40 h-40 rounded-full blur-3xl opacity-20 group-hover:opacity-40 transition-opacity duration-300"
+        style={{ backgroundColor: product.accent }}
+      />
+      <div className="relative flex items-start justify-between mb-5">
+        <div
+          className="w-12 h-12 rounded-xl flex items-center justify-center border transition-all duration-200"
+          style={{
+            backgroundColor: `color-mix(in srgb, ${product.accent} 12%, transparent)`,
+            borderColor: `color-mix(in srgb, ${product.accent} 30%, transparent)`,
+          }}
+        >
+          <Icon className="w-6 h-6" style={{ color: product.accent }} />
+        </div>
+        {product.status && <StatusPill status={product.status} />}
+      </div>
+
+      <h3 className="relative text-xl font-semibold text-white mb-1" style={{ fontFamily: "var(--font-display)" }}>
+        {product.name}
+      </h3>
+      <p className="relative text-sm font-medium mb-3" style={{ color: product.accent }}>
+        {product.tagline}
+      </p>
+      <p className="relative text-slate-400 leading-relaxed text-[15px] flex-1">
+        {product.description}
+      </p>
+
+      <span
+        className="relative mt-6 inline-flex items-center gap-1.5 text-sm font-semibold transition-colors"
+        style={{ color: product.accent, fontFamily: "var(--font-display)" }}
+      >
+        {product.cta ?? "Learn more"}
+        {product.external ? (
+          <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+        ) : (
+          <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+        )}
+      </span>
+    </a>
+  );
+}
+
+function PlatformSection() {
+  const { ref, isVisible } = useScrollReveal();
+
+  return (
+    <section id="platform" className="relative py-16 md:py-24 bg-[#0a0e1a]">
+      <div className="container" ref={ref}>
+        <div className="max-w-2xl mb-12">
+          <div
+            className={`flex items-center gap-2 mb-4 transition-all duration-500 ${
+              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+            }`}
+          >
+            <StarAccent />
+            <span className="text-sm font-medium text-[#f5b731] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
+              The Platform
+            </span>
+          </div>
+          <h2
+            className={`text-3xl md:text-4xl font-bold text-white mb-4 tracking-tight transition-all duration-700 delay-100 ${
+              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+            }`}
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Products in the constellation.
+          </h2>
+          <p
+            className={`text-lg text-slate-400 leading-relaxed transition-all duration-700 delay-200 ${
+              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+            }`}
+          >
+            Each product runs on the same foundation. As new services come online, they appear here — no redesign required.
+          </p>
+        </div>
+
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {PRODUCTS.map((product, i) => (
+            <ProductCard key={product.id} product={product} index={i} isVisible={isVisible} />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function ServicesSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section id="services" className="relative py-16 md:py-20 bg-[#0a0e1a]">
+    <section id="services" className="relative py-16 md:py-20 bg-[#0d1220]">
       <div className="container" ref={ref}>
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           <div>
@@ -347,27 +433,36 @@ function ServicesSection() {
             </h2>
 
             <div className="space-y-8">
-              {services.map((service, i) => (
-                <div
-                  key={service.title}
-                  className={`flex gap-4 group transition-all duration-500 ${
-                    isVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-4"
-                  }`}
-                  style={{ transitionDelay: `${150 + i * 100}ms` }}
-                >
-                  <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-[#f5b731]/10 border border-[#f5b731]/20 flex items-center justify-center group-hover:bg-[#f5b731]/20 group-hover:border-[#f5b731]/40 transition-all duration-200">
-                    <service.icon className="w-5 h-5 text-[#f5b731]" />
+              {SERVICES.map((service, i) => {
+                const Icon = service.icon;
+                return (
+                  <div
+                    key={service.id}
+                    className={`flex gap-4 group transition-all duration-500 ${
+                      isVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-4"
+                    }`}
+                    style={{ transitionDelay: `${150 + i * 100}ms` }}
+                  >
+                    <div
+                      className="flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center border transition-all duration-200"
+                      style={{
+                        backgroundColor: `color-mix(in srgb, ${service.accent} 10%, transparent)`,
+                        borderColor: `color-mix(in srgb, ${service.accent} 22%, transparent)`,
+                      }}
+                    >
+                      <Icon className="w-5 h-5" style={{ color: service.accent }} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-1" style={{ fontFamily: "var(--font-display)" }}>
+                        {service.name}
+                      </h3>
+                      <p className="text-slate-400 leading-relaxed text-[15px]">
+                        {service.description}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-1" style={{ fontFamily: "var(--font-display)" }}>
-                      {service.title}
-                    </h3>
-                    <p className="text-slate-400 leading-relaxed text-[15px]">
-                      {service.description}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -382,7 +477,7 @@ function ServicesSection() {
                 alt="Network visualization"
                 className="w-full rounded-2xl opacity-80"
               />
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-[#0a0e1a] via-transparent to-transparent" />
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-[#0d1220] via-transparent to-transparent" />
             </div>
           </div>
         </div>
@@ -402,7 +497,7 @@ function ProcessSection() {
   ];
 
   return (
-    <section className="relative py-16 md:py-20 bg-[#0d1220]">
+    <section className="relative py-16 md:py-20 bg-[#0a0e1a]">
       <div className="container" ref={ref}>
         <div className="text-center mb-16">
           <div
@@ -429,7 +524,7 @@ function ProcessSection() {
           {steps.map((step, i) => (
             <div
               key={step.number}
-              className={`relative p-6 rounded-xl border border-white/5 bg-[#0a0e1a]/60 backdrop-blur-sm hover:border-[#f5b731]/20 hover:bg-[#0a0e1a]/80 transition-all duration-300 group ${
+              className={`relative p-6 rounded-xl border border-white/5 bg-[#0d1220]/70 backdrop-blur-sm hover:border-[#f5b731]/20 hover:bg-[#0d1220] transition-all duration-300 group ${
                 isVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-8 scale-95"
               }`}
               style={{
@@ -458,7 +553,7 @@ function AboutSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section id="about" className="relative py-16 md:py-20 bg-[#0a0e1a]">
+    <section id="about" className="relative py-16 md:py-20 bg-[#0d1220]">
       <div className="container" ref={ref}>
         <div className="max-w-3xl mx-auto">
           <div
@@ -520,8 +615,12 @@ function AboutSection() {
 
 const faqs = [
   {
-    question: "What services does Aster Sports offer?",
-    answer: "We offer AI-powered print and pattern design for textiles, custom web development, brand identity systems, and digital strategy. Our Print Studio tool lets fashion brands scale, recolor, and refine garment prints with precision.",
+    question: "What does Aster Sports offer?",
+    answer: "Aster Sports is a platform with several products: Print Studio (AI print & pattern engineering for apparel), a Sports Management App for youth sports organizations, and a live AAU basketball program. We also take on bespoke web development, brand identity, and digital strategy engagements.",
+  },
+  {
+    question: "What is the Sports Management App?",
+    answer: "It's a mobile-first platform for youth sports organizations — schedules, rosters, RSVPs, team messaging, and financials in one place, replacing spreadsheets, group texts, and LeagueApps. It's live in beta with our pilot program and available at astersports.app.",
   },
   {
     question: "How does the Print Studio work?",
@@ -550,7 +649,7 @@ function FAQSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <section id="faq" className="relative py-16 md:py-20 bg-[#0d1220]">
+    <section id="faq" className="relative py-16 md:py-20 bg-[#0a0e1a]">
       <div className="container" ref={ref}>
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-12">
@@ -579,7 +678,7 @@ function FAQSection() {
               <div
                 key={i}
                 className={`border border-white/5 rounded-xl overflow-hidden transition-all duration-500 ${
-                  openIndex === i ? "bg-[#0a0e1a]/80 border-[#f5b731]/15" : "bg-[#0a0e1a]/40 hover:border-white/10"
+                  openIndex === i ? "bg-[#0d1220]/90 border-[#f5b731]/15" : "bg-[#0d1220]/50 hover:border-white/10"
                 } ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
                 style={{ transitionDelay: `${200 + i * 60}ms` }}
               >
@@ -767,8 +866,6 @@ function ContactSection() {
 }
 
 function Footer() {
-  const { user } = useAuth();
-  const isOwner = user?.role === "admin" && user?.openId === import.meta.env.VITE_OWNER_OPEN_ID;
   return (
     <footer className="py-12 bg-[#070a12] border-t border-white/5">
       <div className="container">
@@ -782,15 +879,17 @@ function Footer() {
             </div>
 
             <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 text-sm text-slate-400">
-              <span>Design, Technology & Creative Services</span>
-              {isOwner && (
-                <a href="/aau" className="text-[#f5b731] hover:text-[#e67e22] transition-colors">
-                  AAU Basketball
+              <span>Design, Technology & Sports</span>
+              {NAV_PRODUCTS.map((p) => (
+                <a
+                  key={p.id}
+                  href={p.href}
+                  {...(p.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                  className="text-[#f5b731] hover:text-[#e67e22] transition-colors"
+                >
+                  {p.name}
                 </a>
-              )}
-              <a href="/studio" className="text-[#f5b731] hover:text-[#e67e22] transition-colors">
-                Print Studio
-              </a>
+              ))}
               <a href="mailto:frank@astersports.co" className="text-[#f5b731] hover:text-[#e67e22] transition-colors">
                 frank@astersports.co
               </a>
@@ -825,6 +924,7 @@ export default function Home() {
     <div className="min-h-screen bg-[#0a0e1a]">
       <Header />
       <HeroSection />
+      <PlatformSection />
       <ServicesSection />
       <ProcessSection />
       <AboutSection />

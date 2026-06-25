@@ -79,9 +79,12 @@ export const appRouter = router({
   // Invite Links (shareable signup/join links)
   inviteLinks: inviteLinksRouter,
 
-  // AAU Basketball endpoints (owner-only)
+  // AAU Basketball endpoints — public reads (the AAU section is a public showcase
+  // per owner product decision 2026-06-25). Reads expose only the scoreboard +
+  // schedule/venue data already surfaced on the page; the cache-invalidating
+  // `refresh` mutation stays owner-only so the public can't force scraper egress.
   games: router({
-    list: ownerProcedure.query(async () => {
+    list: publicProcedure.query(async () => {
       const result = await fetchAllGames();
       return {
         games: result.games,
@@ -91,7 +94,7 @@ export const appRouter = router({
       };
     }),
 
-    live: ownerProcedure.query(async () => {
+    live: publicProcedure.query(async () => {
       const result = await fetchAllGames();
       const liveGames = result.games.filter((g: Game) => g.status === 'live');
       return {
@@ -101,7 +104,7 @@ export const appRouter = router({
       };
     }),
 
-    completed: ownerProcedure.query(async () => {
+    completed: publicProcedure.query(async () => {
       const result = await fetchAllGames();
       const completedGames = result.games.filter((g: Game) => g.status === 'completed');
       return {
@@ -124,7 +127,7 @@ export const appRouter = router({
   adminLogs: adminLogsRouter,
 
   leaderboard: router({
-    get: ownerProcedure.query(async () => {
+    get: publicProcedure.query(async () => {
       const result = await fetchAllGames();
       const completedGames = result.games.filter((g: Game) => g.status === 'completed');
 
