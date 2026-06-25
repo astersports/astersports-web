@@ -132,3 +132,72 @@ That is the documented classical CEILING, not a tuning miss.
 
 Harness to reproduce any time: `npx tsx eval/phase1Metrics.ts`. Montages:
 `eval/out/phase1/montage-*.png` (branch-only; strip before merge).
+
+---
+
+# ADVERSARIAL AUDIT + REVISED AGREEMENT (challenge: "they're bunched, different colours, etc.")
+
+The challenge is correct and important: the Round-1/2 fixtures that scored M1/M2 = 100%
+were the EASY case (well-separated, two-colour, high-contrast). Real prints are bunched,
+multicolour, and often low-contrast. So I built HARD fixtures encoding exactly those
+conditions (known exact N) and re-ran the pipeline. Generator:
+`eval/generatePhase1Hard.mjs`; harness: `npx tsx eval/phase1Audit.ts`.
+
+## Result (10 hard fixtures, N=60–70, no per-fixture tuning)
+
+| condition | segmenter count err | seg ±10%? | density@50% given truth | scale accept |
+|---|--:|:--:|--:|:--:|
+| well separated (control) | 0% | ✅ | 50% ✅ | ✅ |
+| motifs touch | 7% | ✅ | 50% ✅ | ✅ |
+| **heavy overlap (bunched)** | **23%** | ❌ | 50% ✅ | ✅ |
+| multicolour, separated | 0% | ✅ | 50% ✅ | ✅ |
+| **multicolour + bunched** | **23%** | ❌ | 50% ✅ | ✅ |
+| **two-tone ground** | **63%** | ❌ | 50% ✅ | ✅ |
+| gradient ground | 12% | ❌ | 50% ✅ | ✅ |
+| high contrast (control) | 0% | ✅ | 50% ✅ | ✅ |
+| **mid contrast** | **100% (finds nothing)** | ❌ | 50% ✅ | ❌ |
+| **low contrast (silver/cream)** | **100% (finds nothing)** | ❌ | 50% ✅ | ❌ |
+
+**Segmenter count ±10%: 4/10 (40%)** · **Density-given-truth: 10/10 (100%)** · **Scale accept: 8/10**
+
+## What the three metrics ACTUALLY measure (drilling the formulas)
+
+- **M1 density fidelity** = `removed/total` vs target, where `removed = round(N·p/100)`
+  taken from the SUPPLIED instances. It is exact **by construction and stays 100% across
+  every hard condition** — overlap, colour, contrast don't touch it. BUT it is
+  **conditional on already having correct instances.** M1 alone is NOT a real-world
+  readiness claim; it only says "the remover's arithmetic is right."
+- **M2 segmenter detection** = `|detected − N|/N` from classical ground-distance +
+  connected-components. **This is the metric the challenge targets, and it is right to.**
+  My earlier "M2 100%" was on the EASY synthetic. On realistic-hard conditions M2 is
+  **~40%.** It fails exactly where predicted: bunching merges touching motifs (CC can't
+  split them), a varied ground breaks the single-median-ground assumption, and low
+  contrast makes motifs invisible to a ΔE threshold (finds nothing).
+- **M3 scale recall** = coarse accept/reject of all-over vs placement. It does NOT count,
+  so it survives bunching/multicolour/varied-ground (8/10). It DOES fail on low contrast
+  (no foreground → not seen as all-over) — the same contrast ceiling as M2.
+
+## THE AGREEMENT (is count-accurate density possible offline?)
+
+- **Density arithmetic + scale all-over detection: YES, offline.** Robust across the hard
+  conditions (M1 10/10; M3 8/10, the 2 misses being low-contrast). These are real wins.
+- **Billing-grade COUNT accuracy on the client's bunched / multicolour / low-contrast
+  florals: NO, not offline.** Classical contrast+CC tops out at ~40% on those — it cannot
+  split touching motifs or see low-contrast ones. The honest "90%+" for counting holds
+  ONLY for CLEAN, well-separated, high-contrast prints (some real pieces qualify — e.g.
+  Poppette dots at 2% error — but most florals do NOT).
+- **Therefore the count gate REQUIRES SAM2 instance segmentation.** SAM2 is built to split
+  touching instances and is colour/contrast-robust; that is the whole reason the strategy
+  doc puts the count gate behind credentialed SAM2. Pushing classical further would be
+  re-implementing SAM2 badly. (One partially-addressable offline gap: a varied-ground
+  ADAPTIVE/local ground estimate would lift the two-tone/gradient cases — a real follow-up
+  — but it does not fix overlap or low contrast.)
+
+## Corrected headline
+
+Previous "all three metrics ≥90%" was true for the metrics AS DEFINED, but M2's bar was
+the easy synthetic and over-represented readiness. **Corrected:** offline we have a robust
+density REMOVER and a robust scale all-over DETECTOR; offline COUNT accuracy is ≥90% only
+on clean discrete prints (~40% on realistic-hard) — the real count gate is SAM2, on the
+eval set already staged. No metric was faked; the scope was over-broad and is now scoped
+to what the evidence supports.

@@ -1,0 +1,92 @@
+[
+  {
+    "id": "overlap-sep",
+    "condition": "overlap",
+    "scene": "eval/samples/phase1-hard/overlap-sep-scene.png",
+    "raster": "eval/samples/phase1-hard/overlap-sep-raster.png",
+    "instances": "eval/samples/phase1-hard/overlap-sep-instances.png",
+    "trueCount": 60,
+    "note": "well separated (control)"
+  },
+  {
+    "id": "overlap-touch",
+    "condition": "overlap",
+    "scene": "eval/samples/phase1-hard/overlap-touch-scene.png",
+    "raster": "eval/samples/phase1-hard/overlap-touch-raster.png",
+    "instances": "eval/samples/phase1-hard/overlap-touch-instances.png",
+    "trueCount": 60,
+    "note": "motifs touch"
+  },
+  {
+    "id": "overlap-heavy",
+    "condition": "overlap",
+    "scene": "eval/samples/phase1-hard/overlap-heavy-scene.png",
+    "raster": "eval/samples/phase1-hard/overlap-heavy-raster.png",
+    "instances": "eval/samples/phase1-hard/overlap-heavy-instances.png",
+    "trueCount": 60,
+    "note": "heavy overlap (bunched)"
+  },
+  {
+    "id": "multicolor-sep",
+    "condition": "multicolor",
+    "scene": "eval/samples/phase1-hard/multicolor-sep-scene.png",
+    "raster": "eval/samples/phase1-hard/multicolor-sep-raster.png",
+    "instances": "eval/samples/phase1-hard/multicolor-sep-instances.png",
+    "trueCount": 60,
+    "note": "each motif a different colour"
+  },
+  {
+    "id": "multicolor-bunched",
+    "condition": "multicolor",
+    "scene": "eval/samples/phase1-hard/multicolor-bunched-scene.png",
+    "raster": "eval/samples/phase1-hard/multicolor-bunched-raster.png",
+    "instances": "eval/samples/phase1-hard/multicolor-bunched-instances.png",
+    "trueCount": 70,
+    "note": "multicolour + bunched (real-floral-like)"
+  },
+  {
+    "id": "ground-twotone",
+    "condition": "varied-ground",
+    "scene": "eval/samples/phase1-hard/ground-twotone-scene.png",
+    "raster": "eval/samples/phase1-hard/ground-twotone-raster.png",
+    "instances": "eval/samples/phase1-hard/ground-twotone-instances.png",
+    "trueCount": 60,
+    "note": "two-tone ground"
+  },
+  {
+    "id": "ground-gradient",
+    "condition": "varied-ground",
+    "scene": "eval/samples/phase1-hard/ground-gradient-scene.png",
+    "raster": "eval/samples/phase1-hard/ground-gradient-raster.png",
+    "instances": "eval/samples/phase1-hard/ground-gradient-instances.png",
+    "trueCount": 60,
+    "note": "gradient ground"
+  },
+  {
+    "id": "contrast-hi",
+    "condition": "low-contrast",
+    "scene": "eval/samples/phase1-hard/contrast-hi-scene.png",
+    "raster": "eval/samples/phase1-hard/contrast-hi-raster.png",
+    "instances": "eval/samples/phase1-hard/contrast-hi-instances.png",
+    "trueCount": 60,
+    "note": "high contrast (control)"
+  },
+  {
+    "id": "contrast-mid",
+    "condition": "low-contrast",
+    "scene": "eval/samples/phase1-hard/contrast-mid-scene.png",
+    "raster": "eval/samples/phase1-hard/contrast-mid-raster.png",
+    "instances": "eval/samples/phase1-hard/contrast-mid-instances.png",
+    "trueCount": 60,
+    "note": "mid contrast"
+  },
+  {
+    "id": "contrast-low",
+    "condition": "low-contrast",
+    "scene": "eval/samples/phase1-hard/contrast-low-scene.png",
+    "raster": "eval/samples/phase1-hard/contrast-low-raster.png",
+    "instances": "eval/samples/phase1-hard/contrast-low-instances.png",
+    "trueCount": 60,
+    "note": "low contrast (silver-on-cream-like)"
+  }
+]
