@@ -1,12 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
-import { Search, Link2, Trophy, ChevronRight, ChevronDown } from "lucide-react";
-import { getTournamentDirectory, type DirTournament, type DirDivision } from "@/lib/aster";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Search, Link2, Trophy, ChevronRight, ChevronDown, Loader2, Check, ArrowUpRight } from "lucide-react";
+import {
+  getTournamentDirectory,
+  submitTournament,
+  getIngestStatus,
+  type DirTournament,
+  type DirDivision,
+} from "@/lib/aster";
 
-// Find / Discovery — best-in-class render 01. Search the public tournament directory,
-// browse tournament → division, or jump to TourneyMachine. Public + free to browse;
-// picking a division sends the hub to Standings for it. Self-serve paste-a-link ingest
-// is a gated fast-follow — for now Find browses what's loaded. Tokens = best-in-class
-// palette (§1, do not eyeball). No invented data — every row is a real directory entry.
+// Find / Discovery — best-in-class render 01. Public + free to browse, and self-serve:
+// a parent pastes their TourneyMachine link and the hub ingests it itself (no operator in
+// the loop). Picking a division sends the hub to Standings. Tokens = best-in-class palette
+// (§1, do not eyeball). No invented data — every row is a real directory entry.
+type SubPhase = "idle" | "working" | "error" | "added";
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export default function FindDiscovery({
   onPick,
 }: {
@@ -15,11 +23,38 @@ export default function FindDiscovery({
   const [dir, setDir] = useState<DirTournament[] | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [q, setQ] = useState("");
-  // Accordion: tournaments are collapsed by default (each is a single header row);
-  // tapping a header expands its divisions. A live search auto-expands every match
-  // so results aren't hidden behind a closed header. Track only the manually-opened
-  // set — search-open is derived, not stored, so clearing the query re-collapses.
+  // Accordion: tournaments collapse to one header row; tapping expands divisions. A live
+  // search auto-expands matches; manual opens live in openIds.
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
+  // Paste-to-track state.
+  const [paste, setPaste] = useState("");
+  const [sub, setSub] = useState<{ phase: SubPhase; msg?: string }>({ phase: "idle" });
+  const [scrollToId, setScrollToId] = useState<string | null>(null);
+  const busy = sub.phase === "working";
+  const alive = useRef(true);
+
+  const loadDir = useCallback(async () => {
+    const d = await getTournamentDirectory();
+    if (alive.current) setDir(d);
+    return d;
+  }, []);
+
+  useEffect(() => {
+    alive.current = true;
+    loadDir().catch((e) => alive.current && setError(e as Error));
+    return () => {
+      alive.current = false;
+    };
+  }, [loadDir]);
+
+  // Smooth-scroll to a freshly-added tournament once it's in the rendered list.
+  useEffect(() => {
+    if (!scrollToId) return;
+    const el = document.getElementById(`tg-${scrollToId}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    setScrollToId(null);
+  }, [scrollToId, dir]);
+
   const toggle = (id: string) =>
     setOpenIds((prev) => {
       const next = new Set(prev);
@@ -27,15 +62,42 @@ export default function FindDiscovery({
       return next;
     });
 
-  useEffect(() => {
-    let active = true;
-    getTournamentDirectory()
-      .then((d) => active && setDir(d))
-      .catch((e) => active && setError(e as Error));
-    return () => {
-      active = false;
-    };
-  }, []);
+  async function finishAdd(id: string, name?: string | null) {
+    await loadDir();
+    if (!alive.current) return;
+    setOpenIds((prev) => new Set(prev).add(id));
+    setPaste("");
+    setScrollToId(id);
+    setSub({ phase: "added", msg: name ? `Added ${name}` : "Added — it's on the board" });
+  }
+
+  async function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault();
+    const url = paste.trim();
+    if (!url || busy) return;
+    setSub({ phase: "working", msg: "Pulling in your tournament…" });
+    const r = await submitTournament(url);
+    if (!alive.current) return;
+    if (!r.ok) return setSub({ phase: "error", msg: r.error });
+    if (r.status === "ready" && r.tournamentId) return finishAdd(r.tournamentId);
+    if (r.status === "ingesting" && r.submissionId) {
+      for (let i = 0; i < 24; i++) {
+        await sleep(2000);
+        if (!alive.current) return;
+        let st;
+        try {
+          st = await getIngestStatus(r.submissionId);
+        } catch {
+          continue;
+        }
+        if (st.status === "ok" && st.tournamentId) return finishAdd(st.tournamentId, st.tournamentName);
+        if (st.status === "error")
+          return setSub({ phase: "error", msg: "That tournament couldn't be imported. Double-check the link on TourneyMachine." });
+        if (st.tournamentName) setSub({ phase: "working", msg: `Pulling in ${st.tournamentName}…` });
+      }
+      setSub({ phase: "error", msg: "This is taking a while — it may still appear shortly. Pull to refresh." });
+    }
+  }
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -78,20 +140,62 @@ export default function FindDiscovery({
         />
       </div>
 
-      {/* paste / TourneyMachine */}
+      {/* paste-to-track */}
       <div className="mx-[18px] my-[13px] flex items-center gap-3 font-[var(--font-mono)] text-[10px] text-[#454e63]">
         <span className="h-px flex-1 bg-[rgba(255,255,255,0.055)]" />
-        OR
+        OR PASTE A LINK
         <span className="h-px flex-1 bg-[rgba(255,255,255,0.055)]" />
       </div>
+      <form
+        onSubmit={handleSubmit}
+        className="mx-[18px] flex items-center gap-[10px] rounded-[15px] border border-dashed border-[#2a3346] bg-[rgba(232,144,42,0.03)] px-[13px] py-[10px]"
+      >
+        <Link2 className="h-[17px] w-[17px] shrink-0 text-[#E8902A]" />
+        <input
+          value={paste}
+          onChange={(e) => {
+            setPaste(e.target.value);
+            if (sub.phase !== "working") setSub({ phase: "idle" });
+          }}
+          inputMode="url"
+          placeholder="Paste a TourneyMachine link to track it"
+          aria-label="Paste a TourneyMachine tournament link"
+          disabled={busy}
+          className="w-full bg-transparent text-[13px] text-[#f0f3fa] placeholder-[#5f6981] outline-none disabled:opacity-60"
+        />
+        <button
+          type="submit"
+          disabled={busy || !paste.trim()}
+          className="as-press flex shrink-0 items-center gap-1.5 rounded-[10px] bg-[linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)] px-[13px] py-[7px] text-[12px] font-bold text-[#1a1206] disabled:opacity-40"
+        >
+          {busy ? <Loader2 className="h-[13px] w-[13px] animate-spin" /> : null}
+          Track
+        </button>
+      </form>
+
+      {/* paste status line */}
+      {sub.phase === "working" && (
+        <div className="mx-[18px] mt-2 flex items-center gap-2 text-[12px] text-[#9aa4ba]" aria-live="polite">
+          <Loader2 className="h-[13px] w-[13px] animate-spin text-[#E8902A]" /> {sub.msg}
+        </div>
+      )}
+      {sub.phase === "added" && (
+        <div className="mx-[18px] mt-2 flex items-center gap-2 text-[12px] font-semibold text-[#5ecb8f]" aria-live="polite">
+          <Check className="h-[13px] w-[13px]" /> {sub.msg}
+        </div>
+      )}
+      {sub.phase === "error" && (
+        <div className="mx-[18px] mt-2 text-[12px] leading-[1.45] text-[#ff8a7e]" aria-live="polite">
+          {sub.msg}
+        </div>
+      )}
       <a
         href="https://tourneymachine.com/"
         target="_blank"
         rel="noopener noreferrer"
-        className="as-press mx-[18px] flex items-center gap-[11px] rounded-[15px] border border-dashed border-[#212939] bg-[rgba(232,144,42,0.03)] px-[15px] py-[14px]"
+        className="mx-[18px] mt-2 inline-flex items-center gap-1 font-[var(--font-mono)] text-[10.5px] text-[#5f6981]"
       >
-        <Link2 className="h-[17px] w-[17px] shrink-0 text-[#E8902A]" />
-        <span className="text-[13px] text-[#9aa4ba]">Find a tournament on TourneyMachine…</span>
+        Don't have the link? Search TourneyMachine <ArrowUpRight className="h-3 w-3" />
       </a>
 
       {/* directory */}
@@ -118,7 +222,7 @@ export default function FindDiscovery({
             {q ? "No match" : "No tournament on the board yet"}
           </div>
           <div className="mt-1 text-[12px] text-[#5f6981]">
-            {q ? "Try a different search." : "Tournaments appear here as links are uploaded."}
+            {q ? "Try a different search." : "Paste a TourneyMachine link above to add the first one."}
           </div>
         </div>
       )}
@@ -131,6 +235,7 @@ export default function FindDiscovery({
           return (
             <div
               key={t.id}
+              id={`tg-${t.id}`}
               className="overflow-hidden rounded-[15px] border border-[rgba(255,255,255,0.055)] bg-[linear-gradient(180deg,#151b29,#10141f)]"
             >
               {/* accordion header — one row per tournament, collapsed by default */}

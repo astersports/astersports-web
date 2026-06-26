@@ -59,3 +59,50 @@ export async function getTournamentDirectory(): Promise<DirTournament[]> {
   if (error) throw error;
   return (data as DirTournament[]) ?? [];
 }
+
+// ─── Self-serve paste-to-track (Screen 01) ───
+// A parent pastes a TourneyMachine link; the public aau-submit-tournament edge function
+// resolves it, scrapes server-side (the ingest_secret never leaves the server), and the
+// new tournament lands in the directory. The UI polls getIngestStatus until it's ready.
+const FUNCTIONS_BASE = `${SUPABASE_URL}/functions/v1`;
+
+export interface SubmitResult {
+  ok: boolean;
+  status?: "ingesting" | "ready"; // ingesting → poll submissionId; ready → already loaded
+  submissionId?: string;
+  tournamentId?: string;
+  error?: string; // kindness microcopy from the server on a miss
+}
+
+/** Hand a pasted TourneyMachine URL to the public submit function. Never throws on a
+ *  4xx/5xx — the friendly `error` string rides in the body so the UI can show it. */
+export async function submitTournament(url: string): Promise<SubmitResult> {
+  try {
+    const res = await fetch(`${FUNCTIONS_BASE}/aau-submit-tournament`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify({ url }),
+    });
+    const body = (await res.json().catch(() => ({}))) as SubmitResult;
+    return body?.ok ? body : { ok: false, error: body?.error || "Couldn't reach the importer. Try again in a moment." };
+  } catch {
+    return { ok: false, error: "Couldn't reach the importer. Check your connection and try again." };
+  }
+}
+
+export interface IngestStatus {
+  status: "pending" | "ok" | "error" | "duplicate" | null;
+  tournamentId: string | null;
+  tournamentName: string | null;
+  divisionCount: number;
+  error: string | null;
+}
+
+/** Poll a submission's progress. Returns a null-status object if the id is unknown. */
+export async function getIngestStatus(submissionId: string): Promise<IngestStatus> {
+  const { data, error } = await aster.rpc("get_aau_ingest_status", { p_id: submissionId });
+  if (error) throw error;
+  return (
+    (data as IngestStatus | null) ?? { status: null, tournamentId: null, tournamentName: null, divisionCount: 0, error: null }
+  );
+}
