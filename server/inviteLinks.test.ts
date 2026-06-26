@@ -192,9 +192,10 @@ describe("inviteLinks.redeem — rejections", () => {
       [],
       [], // not already a member
       [{ id: 7, seats: 5, allowedEmailDomain: "other.com" }],
+      [], // listTenantDomains: no multi-domain rows -> legacy single-domain fallback enforces other.com
     ];
     queues.update = [[{ id: 1 }] /* claim */, [{ id: 1 }] /* refund */];
-    await expect(caller({ user }).redeem({ token: "t" })).rejects.toThrow(/other\.com/);
+    await expect(caller({ user }).redeem({ token: "t" })).rejects.toThrow(/allowed domains/i);
     expect(studioDb.createMembership).not.toHaveBeenCalled();
     expect(queues.update).toHaveLength(0); // both claim + refund updates consumed
   });

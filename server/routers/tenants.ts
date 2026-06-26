@@ -241,7 +241,7 @@ export const tenantsRouter = router({
       if (!(await isEmailAllowedForTenant(ctx.tenant.id, input.email, ctx.tenant.allowedEmailDomain))) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "That email isn't on this organization's allowed domains. Ask the owner to add the domain, or invite a matching address.",
+          message: "That email isn't on this organization's allowed domains. Invite a matching address, or contact your administrator to add the domain.",
         });
       }
 

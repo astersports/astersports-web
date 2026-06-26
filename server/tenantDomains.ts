@@ -25,7 +25,8 @@ export async function listTenantDomains(tenantId: number): Promise<string[]> {
 
 /**
  * Add domains to a tenant's set (idempotent — skips dups via the unique index).
- * Inputs are normalized + de-duped; blanks dropped. Returns the count inserted.
+ * Inputs are normalized + de-duped; blanks dropped. Returns the number of rows
+ * ACTUALLY inserted (already-present domains are skipped and not counted).
  */
 export async function addTenantDomains(tenantId: number, domains: Array<string | null | undefined>): Promise<number> {
   const db = await getDb();
@@ -33,9 +34,10 @@ export async function addTenantDomains(tenantId: number, domains: Array<string |
   const clean = Array.from(new Set(domains.map(normalizeDomain).filter(Boolean)));
   if (clean.length === 0) return 0;
   const rows = clean.map((domain) => ({ tenantId, domain }));
-  // onConflictDoNothing on the (tenantId, domain) unique index makes re-adds a no-op.
-  await db.insert(tenantDomains).values(rows).onConflictDoNothing();
-  return clean.length;
+  // onConflictDoNothing on the (tenantId, domain) unique index makes re-adds a no-op;
+  // RETURNING yields only the rows genuinely inserted, so the count is accurate.
+  const inserted = await db.insert(tenantDomains).values(rows).onConflictDoNothing().returning({ id: tenantDomains.id });
+  return inserted.length;
 }
 
 /**

@@ -18,7 +18,7 @@ import {
   platformAdmins,
 } from "../../drizzle/schema";
 import { createTenant, createMembership, grantCredits, ensureCategory, countActiveMembers } from "../studioDb";
-import { emailAllowedForDomain } from "../../shared/domain";
+import { isEmailAllowedForTenant } from "../tenantDomains";
 import { TRIAL_CREDITS } from "../../shared/billing";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -447,13 +447,16 @@ export const inviteLinksRouter = router({
             throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
           }
 
-          if (tenant.allowedEmailDomain && ctx.user.email) {
-            if (!emailAllowedForDomain(ctx.user.email, tenant.allowedEmailDomain)) {
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: `This organization requires a @${tenant.allowedEmailDomain} email address`,
-              });
-            }
+          // Enforce the tenant's domain lock on the JOIN path too — the multi-domain
+          // set (with legacy single-domain fallback). isEmailAllowedForTenant returns
+          // true when the org has no lock at all, so this is a no-op for open orgs but
+          // closes the bypass where a tenant_domains-locked org (allowedEmailDomain
+          // null) would otherwise accept join-link signups from any domain.
+          if (!(await isEmailAllowedForTenant(link.tenantId, ctx.user.email, tenant.allowedEmailDomain))) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Your email isn't on this organization's allowed domains.",
+            });
           }
 
           // Seat limit (single authoritative count; replaces the old dead
