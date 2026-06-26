@@ -7,9 +7,9 @@
 // are encoded here directly. When those tournaments land in the backbone, the
 // kid view swaps to the public RPCs (same shape as the Standings hub).
 //
-// Per-child film stays empty until the real, consented, box-score-reconciled
-// pipeline lands (§C / Track 2). The per-jersey privacy model (a parent sees only
-// their own child) governs that pipeline when it ships.
+// Per-child film stays empty until a real, consented, box-score-reconciled film
+// pipeline is built (it is not yet). The per-jersey privacy model (a parent sees
+// only their own child) governs that pipeline when it ships.
 
 export interface KidPlay {
   time: string;
@@ -49,8 +49,8 @@ export interface PilotKid {
 }
 
 // Per-child film is GATED (verified-guardian + entitled + consent) and DERIVED from
-// real footage that reconciles to the box score — the §C / Track-2 pipeline. Until
-// that real, consented film exists, every kid shows "film coming soon" (reels: []).
+// real footage that reconciles to the box score. That pipeline is not built yet, so
+// until real consented film exists every kid shows "film coming soon" (reels: []).
 // No fabricated opponents or invented play-by-play ever ship — least of all about a
 // minor. (De-fabrication: the prior hardcoded reels invented opponent matchups the
 // kid never played; removed 2026-06-26.)
