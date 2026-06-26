@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { ArrowLeft, Search, Users, BarChart3, Film } from "lucide-react";
+import { ArrowLeft, Search, Users, BarChart3, Film, Check } from "lucide-react";
 import FindDiscovery from "../components/aau/FindDiscovery";
-import MyKids from "../components/aau/family/MyKids";
+import TrackTeams from "../components/aau/TrackTeams";
+import MyTeams from "../components/aau/MyTeams";
 import StandingsHub from "../components/aau/standings/StandingsHub";
-import DivisionStandings from "../components/aau/standings/DivisionStandings";
 import FilmHighlights from "../components/aau/FilmHighlights";
-import type { DirDivision } from "@/lib/aster";
+import type { DirTournament } from "@/lib/aster";
 
 // AAU hub shell — render set v2. Four parent jobs: Find (discovery) / My Teams
 // (the kid/team view) / Standings (+ predictor) / Film. No marketing pills, no global
@@ -21,7 +21,9 @@ type SectionId = (typeof NAV)[number]["id"];
 
 export default function AAUBasketball() {
   const [activeSection, setActiveSection] = useState<SectionId>("myteams");
-  const [picked, setPicked] = useState<{ div: DirDivision; tournamentName: string } | null>(null);
+  // Find → tap a tournament → Screen 02 Track (sub-screen of Find, not a nav tab).
+  const [trackTournament, setTrackTournament] = useState<DirTournament | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   // Aster AAU wears the house GOLD accent; override the team tokens at the root so
   // every sub-component inherits gold. Page bg is the repo's dark surface.
@@ -35,9 +37,10 @@ export default function AAUBasketball() {
     "--as-accent-soft": "rgba(232,144,42,0.12)",
   } as React.CSSProperties;
 
-  const pickDivision = (div: DirDivision, tournamentName: string) => {
-    setPicked({ div, tournamentName });
-    setActiveSection("standings");
+  const handleTracked = (count: number) => {
+    setTrackTournament(null);
+    setToast(`Tracking ${count} team${count === 1 ? "" : "s"}`);
+    window.setTimeout(() => setToast(null), 3200);
   };
 
   return (
@@ -86,24 +89,47 @@ export default function AAUBasketball() {
 
       {/* Section content */}
       <div className="container" style={{ paddingTop: 18, paddingBottom: 32 }}>
-        {activeSection === "find" && <FindDiscovery onPick={pickDivision} />}
-        {activeSection === "myteams" && <MyKids />}
-        {activeSection === "standings" &&
-          (picked ? (
-            <div>
-              <button
-                onClick={() => setPicked(null)}
-                className="mb-4 font-[var(--font-mono)] text-[11px] text-[#9aa3b6] hover:text-[#eef1f8]"
-              >
-                ‹ all divisions
-              </button>
-              <DivisionStandings divisionId={picked.div.id} divisionName={picked.div.name} />
-            </div>
+        {activeSection === "find" &&
+          (trackTournament ? (
+            <TrackTeams
+              tournamentId={trackTournament.id}
+              tournamentName={trackTournament.name}
+              onBack={() => setTrackTournament(null)}
+              onTracked={handleTracked}
+            />
           ) : (
-            <StandingsHub />
+            <FindDiscovery onOpenTournament={(t) => setTrackTournament(t)} />
           ))}
+        {activeSection === "myteams" && <MyTeams />}
+        {activeSection === "standings" && <StandingsHub />}
         {activeSection === "film" && <FilmHighlights />}
       </div>
+
+      {/* track-confirmation toast */}
+      {toast && (
+        <div
+          role="status"
+          style={{
+            position: "fixed",
+            left: "50%",
+            bottom: "calc(78px + env(safe-area-inset-bottom))",
+            transform: "translateX(-50%)",
+            zIndex: 50,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 16px",
+            borderRadius: 999,
+            background: "linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)",
+            color: "#1a1206",
+            fontSize: 13,
+            fontWeight: 700,
+            boxShadow: "0 12px 30px -12px rgba(224,99,28,0.6)",
+          }}
+        >
+          <Check style={{ width: 15, height: 15 }} /> {toast}
+        </div>
+      )}
 
       {/* 4-job bottom nav (render set v2) */}
       <nav
@@ -127,7 +153,10 @@ export default function AAUBasketball() {
           return (
             <button
               key={id}
-              onClick={() => setActiveSection(id)}
+              onClick={() => {
+                setActiveSection(id);
+                if (id === "find") setTrackTournament(null);
+              }}
               aria-label={label}
               aria-current={active ? "page" : undefined}
               className="as-press"
