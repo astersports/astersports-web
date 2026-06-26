@@ -226,10 +226,10 @@ function HeroSection() {
         className="aster-hero-logo hidden lg:block absolute right-4 xl:right-16 top-24 h-[300px] xl:h-[400px] w-auto opacity-90 pointer-events-none select-none"
       />
 
-      <div className="container relative z-10 pt-28 pb-12 md:pt-32 md:pb-20" ref={ref}>
+      <div className="container relative z-10 pt-24 pb-8 md:pt-28 md:pb-16" ref={ref}>
         <div className="max-w-2xl">
           <div
-            className={`mb-5 transition-all duration-500 ${
+            className={`mb-3 transition-all duration-500 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
           >
@@ -239,7 +239,7 @@ function HeroSection() {
           </div>
 
           <h1
-            className={`text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.02] tracking-tight text-white mb-6 transition-all duration-700 delay-100 ${
+            className={`text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.02] tracking-tight text-white mb-4 transition-all duration-700 delay-100 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
             style={{ fontFamily: "var(--font-display)" }}
@@ -250,7 +250,7 @@ function HeroSection() {
           </h1>
 
           <p
-            className={`text-lg md:text-xl text-slate-300 max-w-xl leading-relaxed mb-10 transition-all duration-700 delay-200 ${
+            className={`text-lg md:text-xl text-slate-300 max-w-xl leading-relaxed mb-6 transition-all duration-700 delay-200 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
           >
@@ -258,7 +258,7 @@ function HeroSection() {
           </p>
 
           <div
-            className={`flex flex-col sm:flex-row gap-4 mb-8 transition-all duration-700 delay-300 ${
+            className={`flex flex-col sm:flex-row gap-4 mb-6 transition-all duration-700 delay-300 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
           >
@@ -290,7 +290,7 @@ function HeroSection() {
         </div>
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#0a0e1a] to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-[#0a0e1a] to-transparent" />
     </section>
   );
 }
@@ -345,7 +345,7 @@ function PlatformSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section id="platform" className="relative py-12 md:py-24 bg-[#0a0e1a]">
+    <section id="platform" className="relative py-10 md:py-20 bg-[#0a0e1a]">
       <div className="container aster-constellation" ref={ref}>
         <h2
           className={`flex items-center gap-3 text-[13px] font-semibold tracking-[0.2em] uppercase text-slate-400 mb-6 transition-all duration-500 ${
@@ -389,7 +389,7 @@ function ServicesSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section id="services" className="relative py-12 md:py-20 bg-[#0d1220]">
+    <section id="services" className="relative py-10 md:py-16 bg-[#0d1220]">
       <div className="container" ref={ref}>
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           <div>
@@ -480,7 +480,7 @@ function ProcessSection() {
   ];
 
   return (
-    <section className="relative py-12 md:py-20 bg-[#0a0e1a]">
+    <section className="relative py-10 md:py-16 bg-[#0a0e1a]">
       <div className="container" ref={ref}>
         <div className="text-center mb-16">
           <div
@@ -536,7 +536,7 @@ function AboutSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section id="about" className="relative py-12 md:py-20 bg-[#0d1220]">
+    <section id="about" className="relative py-10 md:py-16 bg-[#0d1220]">
       <div className="container" ref={ref}>
         <div className="max-w-3xl mx-auto">
           <div
@@ -632,7 +632,7 @@ function FAQSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <section id="faq" className="relative py-12 md:py-20 bg-[#0a0e1a]">
+    <section id="faq" className="relative py-10 md:py-16 bg-[#0a0e1a]">
       <div className="container" ref={ref}>
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-12">
@@ -713,7 +713,7 @@ function ContactSection() {
   };
 
   return (
-    <section id="contact" className="relative py-12 md:py-20 overflow-hidden">
+    <section id="contact" className="relative py-10 md:py-16 overflow-hidden">
       {/* Background */}
       <div
         className="absolute inset-0"
