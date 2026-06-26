@@ -60,7 +60,7 @@ export default function FindDiscovery({
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search tournament, team, or circuit"
+          placeholder="Search tournament, division, or circuit"
           aria-label="Search tournaments"
           className="w-full bg-transparent text-[13px] text-[#eef1f8] placeholder-[#6b7488] outline-none"
         />
