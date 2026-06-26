@@ -210,7 +210,7 @@ function HeroSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section className="relative min-h-[100vh] flex items-center overflow-hidden">
+    <section className="relative flex items-center overflow-hidden md:min-h-[100svh]">
       <div className="aster-sky" />
       <div className="aster-stars absolute inset-0" aria-hidden="true">
         {STARS.map((s, i) => (
@@ -226,7 +226,7 @@ function HeroSection() {
         className="aster-hero-logo hidden lg:block absolute right-4 xl:right-16 top-24 h-[300px] xl:h-[400px] w-auto opacity-90 pointer-events-none select-none"
       />
 
-      <div className="container relative z-10 pt-32 pb-20" ref={ref}>
+      <div className="container relative z-10 pt-28 pb-12 md:pt-32 md:pb-20" ref={ref}>
         <div className="max-w-2xl">
           <div
             className={`mb-5 transition-all duration-500 ${
@@ -321,18 +321,18 @@ function ConstellationNode({ product, index, isVisible }: { product: ServiceEntr
     <a
       href={product.href}
       {...(product.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-      className={`aster-node group relative flex flex-col p-5 min-h-[160px] transition-all duration-500 ${
+      className={`aster-node group relative flex flex-col p-4 min-h-[124px] transition-all duration-500 ${
         isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
       }`}
       style={{ transitionDelay: `${120 + index * 100}ms` }}
     >
-      <div className={`aster-star ${lit ? "on" : ""} mb-4`}>
+      <div className={`aster-star ${lit ? "on" : ""} mb-2.5`}>
         <Icon className="w-5 h-5" />
       </div>
       <h3 className="text-base font-semibold text-white mb-1" style={{ fontFamily: "var(--font-display)" }}>
         {product.name}
       </h3>
-      <p className="text-[12.5px] text-slate-400 leading-snug mb-3">{product.tagline}</p>
+      <p className="text-[12.5px] text-slate-400 leading-snug mb-2.5">{product.tagline}</p>
       {product.status && <NodePill status={product.status} />}
       {product.external && (
         <ArrowUpRight className="absolute top-4 right-4 w-4 h-4 text-slate-500 group-hover:text-[#F6CC55] transition-colors" />
@@ -345,7 +345,7 @@ function PlatformSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section id="platform" className="relative py-16 md:py-24 bg-[#0a0e1a]">
+    <section id="platform" className="relative py-12 md:py-24 bg-[#0a0e1a]">
       <div className="container aster-constellation" ref={ref}>
         <h2
           className={`flex items-center gap-3 text-[13px] font-semibold tracking-[0.2em] uppercase text-slate-400 mb-6 transition-all duration-500 ${
@@ -389,7 +389,7 @@ function ServicesSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section id="services" className="relative py-16 md:py-20 bg-[#0d1220]">
+    <section id="services" className="relative py-12 md:py-20 bg-[#0d1220]">
       <div className="container" ref={ref}>
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           <div>
@@ -480,7 +480,7 @@ function ProcessSection() {
   ];
 
   return (
-    <section className="relative py-16 md:py-20 bg-[#0a0e1a]">
+    <section className="relative py-12 md:py-20 bg-[#0a0e1a]">
       <div className="container" ref={ref}>
         <div className="text-center mb-16">
           <div
@@ -536,7 +536,7 @@ function AboutSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section id="about" className="relative py-16 md:py-20 bg-[#0d1220]">
+    <section id="about" className="relative py-12 md:py-20 bg-[#0d1220]">
       <div className="container" ref={ref}>
         <div className="max-w-3xl mx-auto">
           <div
@@ -632,7 +632,7 @@ function FAQSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <section id="faq" className="relative py-16 md:py-20 bg-[#0a0e1a]">
+    <section id="faq" className="relative py-12 md:py-20 bg-[#0a0e1a]">
       <div className="container" ref={ref}>
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-12">
@@ -713,7 +713,7 @@ function ContactSection() {
   };
 
   return (
-    <section id="contact" className="relative py-16 md:py-20 overflow-hidden">
+    <section id="contact" className="relative py-12 md:py-20 overflow-hidden">
       {/* Background */}
       <div
         className="absolute inset-0"
@@ -904,7 +904,7 @@ function Footer() {
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-[#0a0e1a]">
+    <div className="min-h-screen bg-[#0a0e1a] overflow-x-hidden">
       <Header />
       <HeroSection />
       <PlatformSection />
