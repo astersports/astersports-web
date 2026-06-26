@@ -1,0 +1,216 @@
+AAU HUB — ARCHITECTURE BRIEF FOR THE ARCHITECT
+"The AAU section becomes the main hub that feeds the app + Legacy Hoopers with
+games, practices, and locations."
+Date: 2026-06-26 · Lane: CC (Claude Code), for Architect ratification, relayed by Frank
+Companion to: aster-sports PR #1100 (ARCHITECT_DECISION_REQUEST_2026-06-26.txt) — the
+tournament-link ingestion decision. This brief WIDENS that request per the operator's
+new directive: the hub is not just game scores, it's games + practices + locations, and
+the AAU section is named as the operator's hub surface.
+
+Format per §11.8: REQUEST / EVIDENCE (file:line, query) / OPTIONS+REQUIREMENTS / CC LEAN.
+Everything below tagged [GROUNDED] is verified this session (file read, live query, or
+runtime test); [VERIFY] is unconfirmed.
+
+================================================================================
+0. OPERATOR DIRECTIVE (Frank, 2026-06-26)
+================================================================================
+"Redesign the AAU section as our main AAU hub that feeds the app and Legacy Hoopers with
+information on games, practices, or locations. Dynamic and modern is the goal. We can use
+the AAU Basketball page as the main hub to upload the links that are distributed out."
+
+Earlier same-session framing that this widens:
+- "The game schedule will be set from the SE Tourney tournament site via a link… one
+  location to add the tournament weblink, which then updates the AAU website, the Sports
+  app, and the Legacy Hoopers website (when Legacy is the tenant)."
+- "Aster Sports App will have Legacy as a tenant where the PRACTICE schedule is set."
+
+Net target: ONE operator hub (the AAU section) where games, practices, and locations are
+managed, and all three public surfaces — AAU site, Aster Sports app, Legacy Hoopers site
+— render the same data, kept current. Multi-tenant: Legacy now, St. Patrick's of Armonk
+next, each filtered to its own teams.
+
+================================================================================
+1. THE THREE DATA TYPES IN SCOPE (this is the widening)
+================================================================================
+PR #1100 covered GAMES only. The directive adds PRACTICES and LOCATIONS. They have very
+different sources and lifecycles — the design must treat them separately:
+
+  GAMES      — two sub-sources (already split in #1100):
+               • AAU/Zero Gravity tournaments = dynamic weekend brackets, live scores →
+                 LIVE-SCRAPE from a TourneyMachine link (spike proven, §3).
+               • CYO/League Play = a SET season schedule w/ occasional edits → PASTE flow
+                 (existing parse-tournament-schedule), not scrape.
+  PRACTICES  — a recurring, operator-set schedule. [GROUNDED] Frank: "practice schedule is
+               set in the app." Lives in the platform as events (not yet confirmed which
+               event shape). NOT external, NOT scraped. The hub's job is to let the
+               operator set/edit them once and surface them on the public sites.
+  LOCATIONS  — gyms/venues with addresses for map deep-links (Apple/Google). [GROUNDED]
+               platform has a `locations` table: google_maps_url, lat/lon, address columns
+               (verified via information_schema query). Tournament venues also arrive in
+               the TM scrape (the "Complexes" block carries venue name + address, §3).
+
+================================================================================
+2. VERIFIED CURRENT STATE
+================================================================================
+2.1 The three surfaces today [GROUNDED]
+- AAU site (astersports-web, /aau = AAUBasketball.tsx): runs its OWN scraper
+  (server/scraper.ts) hitting tourneymachine.com with a spoofed UA, hardcoded
+  TOURNAMENT_REGISTRY, 45s in-memory cache, NO DB writes. tRPC games.list / leaderboard.get.
+- Legacy site (legacy-hoopers): REBUILT this session as a thin public consumer of the
+  aster-sports platform — reads get_public_team_records via the anon key (live records,
+  91 games). Has NO scraper anymore. This is the target consumer pattern.
+- Aster Sports app (aster-sports): the platform / source of truth. Already has the tables
+  (see 2.2). Practice + league schedules are set here.
+
+2.2 What the platform already has [GROUNDED — live query on vrwwpsbfbnveawqwbdmj]
+- tournaments.tourney_url (text) — the "location to add the link." Mostly NULL (1 of 8
+  set, an setourney.app link). Metadata only; nothing fetches it.
+- Schedule paste-import SHIPPED: /admin/import-schedule → edge fn parse-tournament-schedule
+  (paste TM text → Claude → events). Operator-reviewed commit.
+- Scores writer SHIPPED but UNWIRED: edge fn ingest-game-results (#1094) — accepts
+  {org_id, games[]}, idempotent upsert on (org_id, external_game_id); opponents
+  match-or-create; events match-ONLY (unmatched → review flag). NO caller produces games[].
+- Public reads: get_public_team_records(team_id) → played+published games only, gated by
+  org_is_public_listed. get_public_program / get_public_subscribe_info exist. There is NO
+  public read for UPCOMING/LIVE games or practices yet (gap → D5 below).
+- locations table: google_maps_url, lat/lon, address. Map-URL priority doctrine exists
+  (google_maps_url → coords → address → "Location TBD"; Apple needs coords/street, never
+  bare name).
+- tournament_pool_teams (live standings) EXISTS, 0 rows.
+
+2.3 Locked prior decisions (architect)
+- DR-A=A1 "one writer per concern": schedule path (→events) and scores path
+  (→game_results) are separate. TM parsed once, by the schedule path.
+- PASTE-ONLY, not URL-fetch — "TourneyMachine 403's WebFetch." THIS IS THE ONE TO REVISIT
+  (see §3).
+
+================================================================================
+3. THE D2 SPIKE — automated fetch IS feasible [GROUNDED, runtime test]
+================================================================================
+Read-only test against 6 operator-supplied real tournament links (no writes, no deploy):
+- Every Tournament.aspx + /R##### short link returned HTTP 200 with a real browser UA
+  (NO 403). The architect's 403 was against "WebFetch"; a real-UA server fetch works.
+- Short links (/R177423, /R178625 = CYO) REDIRECT to tourneymachine.com — so "SE Tourney"
+  and CYO are TourneyMachine too. One platform, not two.
+- Overview HTML exposes every Division.aspx link → divisions AUTO-DISCOVER; no hardcoded
+  IDs. One link is enough.
+- Full dry-run: 51 real Legacy games parsed across 5 AAU tournaments (teams, opponents,
+  scores, W/L, dates, venues). CYO (set-schedule league) = 0 via the bracket parser, as
+  expected — it uses standings rows, handled by paste.
+
+CAVEAT [VERIFY]: the spike fetch ran from THIS cloud runtime. The production scraper would
+run from Supabase Edge (Deno) or a Railway cron — different IPs; TM may rate-limit/deny
+datacenter ranges. A 1-call runtime fetch-test from the actual host must precede the build.
+
+================================================================================
+4. MULTI-TENANT — confirmed, and it shapes the hub [GROUNDED]
+================================================================================
+- Grade↔age key: 8U=2nd grade, 9U=3rd, 10U=4th, 11U=5th.
+- CYO aliases (verified on the WPCYO page): Legacy = "Legacy Hoopers 3AB"(9U)/"4AB"(10U);
+  St Patrick-Arm = "St Patrick-Arm 5AB"(11U)/"8AB"(8th)/"5G AB" etc.
+- ONE CYO league page carries BOTH tenants. So the team match CANNOT be a hardcoded
+  "legacy" string — it must be a per-tenant, per-tournament ALIAS. St. Patrick's is tenant
+  #2 and reuses the same hub + the same site template Legacy now uses.
+
+================================================================================
+5. THE CORE ARCHITECTURAL DECISION (this brief's main ask)
+================================================================================
+The directive says "use the AAU section as the hub that feeds the app + Legacy." There is
+a real seam to resolve: the AAU section lives in astersports-web (its own Supabase,
+eyitivulszubtdfpsbdx); the app + Legacy read from the aster-sports platform Supabase
+(vrwwpsbfbnveawqwbdmj). "Hub" can mean the UI surface OR the data source-of-truth — and
+those can live in different repos. They must be reconciled or the three surfaces drift.
+
+--------------------------------------------------------------------------------
+D-HUB — Where is the SOURCE OF TRUTH, and what is the AAU section's role?
+--------------------------------------------------------------------------------
+REQUEST: ratify the hub topology before any redesign code.
+EVIDENCE: §2.1 (AAU has its own scraper/Supabase; Legacy already reads the platform; app
+  IS the platform). §2.2 (platform already has tourney_url + writers + public reads).
+OPTIONS:
+  (A) PLATFORM is the source of truth; the AAU section is the OPERATOR HUB UI + a public
+      showcase, writing INTO the platform. The "upload a link / set a practice / pick a
+      location" controls live where org auth + admin roles already are (the aster-sports
+      app), and the AAU page surfaces + deep-links to them. AAU + Legacy both READ the
+      platform via public RPCs. Retire the astersports-web scraper.
+      REQUIRES: public read RPCs for upcoming games + practices (D5); the AAU page re-points
+      from its tRPC scraper to platform reads; a clear "where the operator clicks" answer
+      (app admin vs an AAU-embedded admin that calls a platform RPC).
+  (B) AAU SECTION (astersports-web) is the hub of record: operator manages games/practices/
+      locations there, astersports-web owns the ingestion + a DB, and it PUSHES to the app
+      + Legacy.
+      REQUIRES: astersports-web gains a cross-system writer into the aster-sports platform
+      (or the app/Legacy read astersports-web) — a second source of truth + a sync path;
+      duplicates tables the platform already has; re-introduces the drift #1100 set out to
+      kill.
+  (C) HYBRID: platform is the data source of truth (A), but the AAU section hosts an
+      embedded admin surface that writes to the platform via authenticated RPCs — so the
+      operator's "hub" experience is literally the AAU page, while the data stays single-
+      sourced in the platform.
+      REQUIRES: an auth bridge from astersports-web → aster-sports for the admin writes
+      (service path or user-JWT), plus the D5 public reads.
+CC LEAN: (A) for the DATA, optionally (C) for the UX. The platform already owns the tables,
+  the writers, the public-read gates, the org auth, and the multi-tenant model; Legacy
+  already consumes it cleanly. Making astersports-web a second source of truth (B) rebuilds
+  what exists and re-opens drift. "AAU as the hub" is best read as: the AAU page is the
+  operator's command surface + the flagship public showcase, but it reads/writes the
+  PLATFORM. Whether the admin controls are embedded in the AAU page (C) or kept in the app
+  admin (A) is a UX call for you/Frank — the data topology is the load-bearing decision.
+
+================================================================================
+6. DECISIONS (extends #1100's D1–D5)
+================================================================================
+Carry forward from #1100 (unchanged leans): D1 platform=hub; D2 spike-then-wire AAU
+scraper, keep paste for league; D3 per-tenant alias captured at the upload step; D4 defer
+tournament_pool_teams; D5 add a public schedule RPC. New/expanded below.
+
+D6 — PRACTICES on the public surfaces.
+  REQUEST: how do operator-set practices reach the AAU + Legacy sites?
+  EVIDENCE: practices are set in the app as events [GROUNDED operator]; no public read for
+    them today.
+  OPTIONS: (a) extend the D5 public RPC to return practices (type-tagged) alongside
+    upcoming games; (b) a separate get_public_team_practices RPC.
+  CC LEAN: (a) one get_public_team_schedule RPC returning upcoming items with a `kind`
+    (game | practice), org-gated — one contract, both surfaces thin.
+
+D7 — LOCATIONS on the public surfaces + map deep-links.
+  REQUEST: how do venues/addresses flow so every surface gets correct Apple/Google links?
+  EVIDENCE: locations table has google_maps_url/lat/lon/address; map-URL priority doctrine
+    exists; TM scrape yields venue name+address per game.
+  OPTIONS: (a) join location into the schedule RPC payload (preferred FK) + a public
+    locations read; (b) embed the resolved map URLs in the payload so sites stay dumb.
+  CC LEAN: (a) return the location FK + fields in the schedule payload; sites apply the
+    existing map-URL priority. Scraped tournament venues match-or-create into locations
+    (like opponents in ingest-game-results).
+
+D8 — The AAU section redesign scope (the build the operator named "next").
+  REQUEST: what does the redesigned /aau page become?
+  CC LEAN (pending D-HUB): a platform-reading hub showing, per team: live/upcoming GAMES
+    (scrape+paste), PRACTICES (app), LOCATIONS w/ maps, and final RECORDS — the same data
+    Legacy reads, presented as the flagship AAU showcase; operator admin either embedded
+    (C) or linked to the app. Retire server/scraper.ts once reads move to the platform.
+
+================================================================================
+7. RECOMMENDED SEQUENCE (once D-HUB + D2 ratified)
+================================================================================
+0. Runtime fetch-test from the real host (Supabase Edge or Railway cron) — settle the §3
+   [VERIFY] before committing the scraper there.
+1. get_public_team_schedule RPC (D5/D6/D7): upcoming games + practices + location, org-gated.
+2. Wire the proven scraper → ingest-game-results (D2), AAU bracket source first; paste stays
+   the league path.
+3. Re-point the AAU /aau page + the Legacy site to the platform reads; retire the
+   astersports-web scraper.
+4. Operator hub controls (D-HUB A vs C): link-shared tourney_url + practice + location
+   editors — placement per your ruling.
+5. St. Patrick's onboarding reuses the whole chain (per-tenant alias + the Legacy site
+   template).
+
+================================================================================
+8. OUT OF SCOPE / HELD
+================================================================================
+- No hub code is being written until you rule (operator-directed "wait for architect").
+- Money/RSVP/briefings untouched. tournament_pool_teams (live standings) deferred (D4).
+- A separate SE-Tourney parser is NOT needed (CYO resolves to TourneyMachine).
+
+END — awaiting ratification of D-HUB + D6/D7/D8 (and the held D1–D5 from #1100). CC will
+not write hub code, touch platform schema, or reopen the paste-only decision without sign-off.
