@@ -39,6 +39,7 @@ export default function AAUBasketball() {
 
   const handleTracked = (count: number) => {
     setTrackTournament(null);
+    setActiveSection("myteams"); // land on My Teams so the tracked teams are right there
     setToast(`Tracking ${count} team${count === 1 ? "" : "s"}`);
     window.setTimeout(() => setToast(null), 3200);
   };

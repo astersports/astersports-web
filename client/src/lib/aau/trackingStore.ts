@@ -30,11 +30,19 @@ function read(): TrackedTeam[] {
     return [];
   }
 }
+export const TRACKED_EVENT = "aau:tracked-changed";
+
 function write(list: TrackedTeam[]) {
   try {
     localStorage.setItem(KEY, JSON.stringify(list));
   } catch {
     /* private mode / quota — non-fatal; the UI still reflects the in-memory result */
+  }
+  // notify same-tab listeners (the storage event only fires in OTHER tabs)
+  try {
+    window.dispatchEvent(new CustomEvent(TRACKED_EVENT));
+  } catch {
+    /* SSR / no window — non-fatal */
   }
 }
 
