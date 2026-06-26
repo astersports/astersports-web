@@ -91,7 +91,7 @@ export async function submitTournament(url: string): Promise<SubmitResult> {
 }
 
 export interface IngestStatus {
-  status: "pending" | "ok" | "error" | "duplicate" | null;
+  status: "pending" | "ok" | "error" | "duplicate" | "missing" | null;
   tournamentId: string | null;
   tournamentName: string | null;
   divisionCount: number;

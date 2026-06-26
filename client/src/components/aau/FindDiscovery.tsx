@@ -91,7 +91,7 @@ export default function FindDiscovery({
           continue;
         }
         if (st.status === "ok" && st.tournamentId) return finishAdd(st.tournamentId, st.tournamentName);
-        if (st.status === "error")
+        if (st.status === "error" || st.status === "missing")
           return setSub({ phase: "error", msg: "That tournament couldn't be imported. Double-check the link on TourneyMachine." });
         if (st.tournamentName) setSub({ phase: "working", msg: `Pulling in ${st.tournamentName}…` });
       }
