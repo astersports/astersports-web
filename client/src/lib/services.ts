@@ -116,12 +116,13 @@ export const PRODUCTS: ServiceEntry[] = [
     name: "St. Patrick's of Armonk",
     tagline: "Parish website & digital forms",
     description:
-      "A full parish website — Mass times, bulletins, daily readings, calendar, and a digital forms suite for sacraments, CCD, and CYO registration. Rebuilt for the Armonk parish; launching to the public fall 2026.",
-    href: "#contact",
-    status: "soon",
+      "A full parish website — Mass times, bulletins, daily readings, calendar, and a digital forms suite for sacraments, CCD, and CYO registration. Rebuilt for the Armonk parish; preview live now, replacing the eCatholic site at cutover.",
+    href: "https://st-patricks-armonk-production.up.railway.app",
+    external: true,
+    status: "beta",
     icon: Church,
     accent: "#34d399",
-    cta: "Preview the Site",
+    cta: "Visit the Site",
   },
   {
     id: "legacy-hoopers",
