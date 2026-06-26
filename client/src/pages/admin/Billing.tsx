@@ -24,7 +24,7 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 
-const LOGO_URL = "/manus-storage/aster_sports_logo_high_res_2b537f86.png";
+const LOGO_URL = "/aster-mark.png";
 
 /**
  * Admin Billing Dashboard
@@ -99,8 +99,8 @@ function BillingContent() {
         <div className="max-w-5xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-3 min-w-0">
-              <a href="/" className="text-slate-400 hover:text-white transition-colors flex-shrink-0">
-                <ArrowLeft className="w-5 h-5" />
+              <a href="/" aria-label="Back to Aster Sports" className="inline-flex items-center gap-1 text-slate-400 hover:text-white transition-colors flex-shrink-0">
+                <ArrowLeft className="w-5 h-5" aria-hidden="true" /><span className="hidden sm:inline text-sm">Back to Aster Sports</span>
               </a>
               <img src={LOGO_URL} alt="Aster Sports" className="w-8 h-8 flex-shrink-0" />
               <div className="min-w-0">

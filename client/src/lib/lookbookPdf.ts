@@ -6,7 +6,7 @@
 
 import { jsPDF } from "jspdf";
 
-const LOGO_URL = "/manus-storage/aster_sports_logo_high_res_2b537f86.png";
+const LOGO_URL = "/aster-mark.png";
 
 // Brand colors
 const BRAND = {
