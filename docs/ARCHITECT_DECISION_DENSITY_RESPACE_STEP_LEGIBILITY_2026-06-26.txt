@@ -1,0 +1,147 @@
+================================================================================
+ARCHITECT DECISION REQUEST — DENSITY "EVEN RE-SPACE" STEP LEGIBILITY
+astersports-web · 2026-06-26 · CC → Architect (relayed by Frank)
+================================================================================
+
+STATUS: open decision. One fork, three options, CC's labeled lean at the end.
+SCOPE:  the deterministic density op's *visual contract* (how the slider % maps
+        to perceived sparsity in respace mode). Touches server/_core/studio/ops/
+        densityRedistribute.ts + the density UI. NOT money/credit/schema/auth.
+        Surfaced (not shipped) because changing what the percentage MEANS visually
+        is a product/design fork (§2.1 — evidence + lean, architect decides).
+
+--------------------------------------------------------------------------------
+0. THE REPORT (Frank, empirical — authoritative per §2.3)
+--------------------------------------------------------------------------------
+Testing Print Studio on a black ditsy-floral skirt: "30% and 50% density, Even
+re-space, look the same. The motifs stay within the garment but I don't see the
+difference." Two screenshots at 30%, two at 50% — all four read as the same
+slightly-thinned floral.
+
+--------------------------------------------------------------------------------
+1. REQUEST
+--------------------------------------------------------------------------------
+Decide how (whether) to make adjacent density steps perceptually distinct in the
+"Even re-space" (v2 densityRedistribute) layout mode. Pick Option A, B, or C
+below (or ratify "no change").
+
+--------------------------------------------------------------------------------
+2. CONTEXT / EVIDENCE (grounded — file:line + measured on the real op)
+--------------------------------------------------------------------------------
+[GROUNDED] It is NOT a plumbing bug. The percentage reaches the op, the UI mode
+reaches the op, and the count is reduced correctly:
+  - UI control: client/src/components/studio/ControlPanel.tsx:107-144 (percent +
+    respace/inplace toggle).
+  - mode plumbing: shared/controls.ts:38-44 resolveDensityRedistribute(mode, env)
+    → respace runs v2 only when mode==="respace" AND the redistribute flag is live;
+    server/routers/studio.ts:716 + server/routes/studioStream.ts:75 pass it through.
+  - op: server/_core/studio/ops/densityRedistribute.ts:269 removeN =
+    clamp(round(n*percent/100),0,n); survivors M = n - removeN.
+
+[GROUNDED] Mechanism. Respace removes p% of motifs then RELOCATES the survivors
+to an even blue-noise layout that fills the WHOLE garment
+(blueNoiseLayout.ts:314 rTarget = sqrt(2*fabricArea / (sqrt(3)*M))). So center
+spacing scales as 1/sqrt(M) ∝ 1/sqrt(1-p). The percentage becomes a uniform
+spacing change with NO bare patches — and the eye judges absolute even-coverage
+poorly (it needs a hole/edge reference, which respace deletes).
+
+[GROUNDED] Measured — real densityRedistribute on a 36-motif synthetic
+(scripts/density-respace-step-probe.ts, merged PR #126):
+  percent  kept  removed  coverage(rel)  mean-center-spacing
+   30%      25     11        0.69            17.3 px
+   50%      18     18        0.50            20.6 px
+  → 30%→50% widens the average gap only ~19% (17.3→20.6), field stays full.
+
+[GROUNDED] Mode contrast — montage on a 79-motif garment-like fixture
+(scripts/density-mode-montage.ts; image delivered in chat 2026-06-26): at the
+SAME removed-count per column, "Thin in place" (v1 densityThin) opens localized
+gaps that grow obviously with %, while "Even re-space" stays a uniform field
+whose steps are only legible side-by-side.
+
+[GROUNDED] Default mode is already "inplace" (shared/controls.ts:66), so the
+clear-stepping mode is the default; respace is the opt-in for repeating prints.
+
+--------------------------------------------------------------------------------
+3. OPTIONS
+--------------------------------------------------------------------------------
+OPTION A — No op change; fix it in the UI + guidance (cheapest, routine).
+  WHAT: (1) widen the respace step granularity the stepper offers (e.g. 0/25/50/
+        75 instead of 10-steps) so users land on perceptually-distinct levels;
+        (2) microcopy under respace: "Evens the spacing — for a bigger visible
+        change use larger steps or 'Thin in place'." Keep inplace as the density-
+        strength tool.
+  REQUIRES: client/src/components/studio/PercentStepper.tsx + ControlPanel.tsx
+        copy. No op/contract/billing change. Routine (auto-merge on green CI).
+  RISK: low. Doesn't change what % means; just helps users pick legible steps.
+  COST: ~½ day.
+
+OPTION B — Steeper spacing law in respace (changes the visual contract).
+  WHAT: keep the count/billing unchanged, but lay survivors out at a spacing that
+        grows ~linearly with p instead of 1/sqrt(1-p) — i.e. target an areal
+        density rho' = (1-p)^k * rho with k>1 (or relax the blueNoise radius by a
+        p-dependent factor). Makes 30 vs 50 obviously different in respace.
+  REQUIRES: densityRedistribute.ts planPlacements/blueNoiseLayout radius input +
+        redistributeMetrics evenness/coverage thresholds re-tuned + the eval
+        re-baselined. The op stays pure/deterministic; removed-count (hence the
+        flat 10-credit charge) is unchanged.
+  RISK: medium. Changes the meaning of the % (it would no longer equal "fraction
+        of motifs removed" perceptually). Architect-scoped: it's an algorithm
+        change to a deterministic studio op adjacent to the money path. Needs a
+        new eval baseline + a real-garment G3 check before any flip.
+  COST: ~2-3 days incl. eval re-baseline.
+
+OPTION C — Couple respace with a slight survivor down-scale at higher reductions.
+  WHAT: as density drops, also shrink survivors a touch so freed ground reads as
+        emptier (mimics a ditsy reduction).
+  REQUIRES: densityRedistribute.ts composite step (currently NO resize — scale is
+        a locked invariant: redistribute "SAME identity + SAME scale, NEW
+        position", file header :1-13). This BREAKS that invariant and overlaps the
+        Scale op's job. Eval scaleFidelity<=0.05 (redistributeMetrics) would have
+        to be removed/redefined.
+  RISK: high. Conflates Density with Scale; violates a locked op invariant. Listed
+        for completeness; CC does not recommend.
+  COST: ~3-4 days + invariant re-ratification.
+
+--------------------------------------------------------------------------------
+4. CC'S LABELED LEAN (§2.1 / AP#39 — committing to it; architect decides)
+--------------------------------------------------------------------------------
+LEAN: Option A now, and treat respace as a "spacing evener" rather than a
+density-strength dial. Reasons:
+  - The percentage is already faithful (coverage 0.69→0.50 at 30→50); the gap is
+    perceptual, and inplace (the default) already exposes density strength clearly.
+  - A is routine, reversible, ships this week, and needs no eval re-baseline or
+    flip ceremony.
+  - Option B is a real improvement IF we want respace itself to read as a strength
+    dial — but it redefines the % and demands a fresh eval + G3 real-garment pass,
+    which is exactly the kind of money-path-adjacent op change that should wait for
+    the density eval cycle, not ride a quick fix. Recommend B only as a deliberate
+    follow-up if A's guidance proves insufficient with real users.
+  - Option C is out (breaks the scale-preservation invariant; that's the Scale op).
+
+I'm flagging the position+hedge tell on myself (AP#39): if the real goal is "the
+respace slider must visibly bite on its own," then B is the truer answer and A is
+a stopgap. So the decision really hinges on ONE question for the architect:
+
+  Q: Is "Even re-space" meant to be a DENSITY-STRENGTH control (then → B), or a
+     SPACING-EVENNESS finisher with strength owned by "Thin in place" (then → A)?
+
+--------------------------------------------------------------------------------
+5. WHAT CC WILL DO ON EACH ANSWER
+--------------------------------------------------------------------------------
+  A  → open a routine UI PR (stepper granularity + microcopy). No flip.
+  B  → write a build spec + new eval baseline plan; implement behind the existing
+       STUDIO_DENSITY_REDISTRIBUTE flag; hold for G3 real-garment eval before any
+       posture change (Frank flips, never CC).
+  C  → declined unless the architect explicitly re-ratifies the scale invariant.
+  no-change → keep inplace as the strength tool; close with the montage as the
+       rationale artifact.
+
+--------------------------------------------------------------------------------
+ARTIFACTS
+--------------------------------------------------------------------------------
+  - scripts/density-respace-step-probe.ts  (merged PR #126 — the spacing table)
+  - scripts/density-mode-montage.ts         (this PR — the mode montage image)
+  - eval/out/density-mode-montage.png        (delivered in chat 2026-06-26)
+================================================================================
+END — CC surfaces evidence + lean; the architect rules on the Q in §4.
+================================================================================
