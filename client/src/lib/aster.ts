@@ -60,6 +60,27 @@ export async function getTournamentDirectory(): Promise<DirTournament[]> {
   return (data as DirTournament[]) ?? [];
 }
 
+// ─── Screen 02 "Track one or many": a tournament's teams by division ───
+export interface TrackTeam {
+  id: string; name: string; pool: string | null;
+  wins: number; losses: number; diff: number; isOurs: boolean;
+}
+export interface TrackDivision {
+  id: string; name: string; grade_label: string | null; gender: string | null;
+  advance_count: number; teams: TrackTeam[];
+}
+export interface TournamentTeams {
+  tournament: { id: string; name: string; circuit: string | null; start_date: string; end_date: string };
+  divisions: TrackDivision[];
+}
+
+/** Every division of a tournament with each team's pool + W–L. null if not public/found. */
+export async function getTournamentTeams(tournamentId: string): Promise<TournamentTeams | null> {
+  const { data, error } = await aster.rpc("get_public_tournament_teams", { p_tournament_id: tournamentId });
+  if (error) throw error;
+  return (data as TournamentTeams | null) ?? null;
+}
+
 // ─── Self-serve paste-to-track (Screen 01) ───
 // A parent pastes a TourneyMachine link; the public aau-submit-tournament edge function
 // resolves it, scrapes server-side (the ingest_secret never leaves the server), and the
