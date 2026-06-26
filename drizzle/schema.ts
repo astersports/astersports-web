@@ -339,6 +339,41 @@ export const platformAdmins = pgTable("platform_admins", {
 export type PlatformAdmin = typeof platformAdmins.$inferSelect;
 export type InsertPlatformAdmin = typeof platformAdmins.$inferInsert;
 
+/**
+ * Platform audit log — append-only, immutable record of every super-admin /
+ * platform action (org create/suspend, impersonation, domain-lock change, and —
+ * once the credit-admin RPCs land behind the H1 money-path sign-off — credit
+ * issue/revoke). This is the trail the two-plane redesign (§8) requires to make
+ * privileged actions safe to operate. Insert-only by construction: the app
+ * exposes a write helper + a read query and NO update/delete path. DB-level
+ * REVOKE UPDATE/DELETE hardening is a follow-up; the table is the foundation.
+ */
+export const platformAuditLog = pgTable("platform_audit_log", {
+  id: serial("id").primaryKey(),
+  /** The platform actor (super-admin user) who performed the action. */
+  actorUserId: integer("actorUserId").notNull(),
+  /** Stable action key, e.g. org_provisioned / impersonation_started /
+   *  credit_grant / credit_revoke / domain_lock_changed / org_suspended. varchar
+   *  (not an enum) to mirror credit_ledger.reason — new actions add no migration. */
+  action: varchar("action", { length: 64 }).notNull(),
+  /** Target org (nullable — some actions aren't org-scoped). */
+  targetTenantId: integer("targetTenantId"),
+  /** Target user, when the action concerns a specific user (nullable). */
+  targetUserId: integer("targetUserId"),
+  /** Human-readable one-line summary for the console audit strip. */
+  summary: varchar("summary", { length: 512 }).notNull(),
+  /** Structured detail (before/after balance, amount, reason, note, …). */
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({
+  targetTenantCreatedIdx: index("idx_platform_audit_target_tenant_created").on(t.targetTenantId, t.createdAt),
+  actorCreatedIdx: index("idx_platform_audit_actor_created").on(t.actorUserId, t.createdAt),
+  actionCreatedIdx: index("idx_platform_audit_action_created").on(t.action, t.createdAt),
+}));
+
+export type PlatformAuditLogEntry = typeof platformAuditLog.$inferSelect;
+export type InsertPlatformAuditLogEntry = typeof platformAuditLog.$inferInsert;
+
 /** Invite Links — shareable tokens for self-service signup. */
 export const inviteLinks = pgTable("invite_links", {
   id: serial("id").primaryKey(),

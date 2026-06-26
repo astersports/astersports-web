@@ -22,6 +22,13 @@
       "when": 1782252634556,
       "tag": "0002_trial_reminders_sent",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1782471229230,
+      "tag": "0003_rare_gargoyle",
+      "breakpoints": true
     }
   ]
 }
