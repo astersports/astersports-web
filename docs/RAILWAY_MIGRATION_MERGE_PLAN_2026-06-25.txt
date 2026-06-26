@@ -1,0 +1,221 @@
+RAILWAY + SUPABASE MIGRATION — #103 READINESS ASSESSMENT + MERGE PLAN
+=====================================================================
+Author: Claude Code.  Date: 2026-06-25.  Repo: astersports-web.
+Source of truth for every claim below: live GitHub state (PR #103 @ caa090f2,
+origin/main @ d602f54c) + a local merge-base diff, not the PR description.
+
+
+-----------------------------------------------------------------------------------------
+0. BOTTOM LINE
+-----------------------------------------------------------------------------------------
+- Production deploys #103 (branch claude/railway-supabase-migration), NOT main, because
+  main's backend still calls Manus (auth/storage/LLM/data) and would crash on Railway.
+  #103 is the only branch ported to Railway+Supabase that actually boots — Railway's
+  last deploy of it is GREEN ("Success - astersports.io").
+- #103's PR body is STALE. It claims "only P1 done, P2 pending." The commits + green CI
+  say otherwise: P1–P7 have all landed and the real-Postgres money-path integration
+  job passes. The migration is ~80% done in CODE; what remains is mostly OPERATOR steps.
+- The blocker is NOT migration completeness — it's DIVERGENCE. Since #103 branched
+  (merge-base 25b63f9, 2026-06-23), main gained the new IA redesign (#107), AAU/weather
+  (#106/#108), density-preview eval (#105), and authz/reliability fixes (#110). None of
+  those are on #103. So today: main = new design + dead Manus backend (won't deploy);
+  #103 = working Railway backend + pre-redesign frontend. Neither is independently
+  shippable.
+- RECOMMENDED PATH: do NOT git-merge the 39-commit #103 branch into main. Build a fresh
+  integration branch off CURRENT main and re-apply ONLY the migration layer (a
+  well-bounded set of backend-infra files main never touched, plus ~4 small
+  reconciliations). Rationale + step-by-step below. Effort: roughly half a day of
+  integration + a credentialed smoke, then an Architect sign-off on the two
+  §2.4 items (money-path CAS, auth identity), then a downtime cutover.
+
+
+-----------------------------------------------------------------------------------------
+1. WHAT IS ACTUALLY ON #103 (correcting the stale body) — phase status with evidence
+-----------------------------------------------------------------------------------------
+Per docs/RAILWAY_SUPABASE_MIGRATION_SCOPE.txt the plan is P0–P9. Actual state:
+
+  P0  Railway build/deploy skeleton ............ DONE (de facto). Railway builds + serves
+        #103 at astersports.io; deploy status GREEN. Build config is on the branch.
+  P1  Postgres schema + driver swap ............ DONE. drizzle/schema.ts ported to pgTable
+        / pgEnum / serial / jsonb; server/db.ts on postgres-js; drizzle.config.ts
+        dialect=postgresql; the 20 MySQL .sql files deleted and a fresh Postgres
+        migration chain (0000–0019 + updatedAt-trigger migration) regenerated.
+  P2  Money-path CAS re-port [§2.4] ............ DONE + PROVEN. The affectedRows→.returning()
+        rewrite landed (d051eb7d, 6af28fe1); CI job "money-path integration (real
+        Postgres)" is GREEN on the head SHA. creditLedger.integration.test.ts re-pointed
+        at Postgres. This was the single most dangerous item; it is green, but still
+        owes the Architect a §2.4 read of the diff before cutover (see §5).
+  P3  Storage → Supabase Storage ............... DONE. server/storage.ts + storageProxy.ts
+        rewritten onto Supabase Storage; deterministicKey option preserved (LaMa cache).
+  P4  Vision LLM → Anthropic .................... DONE. server/_core/llm.ts rewired off
+        forge.manus.im to the Anthropic SDK.
+  P5  Auth → Google OAuth [§2.4 AUTH] .......... DONE (code). Lower-risk than the scope
+        doc feared: sessions were ALREADY our own HS256 JWT (jose) — Manus was only the
+        identity provider. ca143483 swaps just that to Google: googleAuth.ts (JWKS verify,
+        issuer+audience checks), oauth.ts (CSRF state cookie, fail-closed, open-redirect
+        removed), openId = "google:<sub>". Tests added (googleAuth.test.ts, oauth.test.ts).
+        The dreaded openId FK-remap is MOOT under the "start fresh on Supabase" data plan
+        (§4) — no legacy rows to remap; Frank re-signs-in once.
+  P6  Crons → off Manus Heartbeat .............. DONE. In-process scheduler (a25587cb);
+        heartbeat.ts + dataApi.ts deleted (df189f21). Cron auth simplified to CRON_SECRET.
+  P7  Env wiring / boot guards ................. DONE (code) + operator checklist shipped
+        (docs/railway-env-checklist.txt). dataApi.ts dropped.
+  P8  Data migration .......................... NOT DONE (by design — start fresh, §4).
+  P9  Cutover (DNS + decommission Manus) ....... PARTIAL. Railway already serves
+        astersports.io for the #103 branch; the deliberate, verified cutover + Manus
+        decommission is still a pending operator step.
+
+Net: the CODE migration is essentially complete and green. P8/P9 are operator/ops.
+
+
+-----------------------------------------------------------------------------------------
+2. THE DIVERGENCE (why a branch flip or naive merge is wrong)
+-----------------------------------------------------------------------------------------
+Merge-base = 25b63f9 (2026-06-23). From there:
+  - main advanced 26 commits / 86 files. Net-new on main, ABSENT from #103:
+      #107  dynamic service registry + public AAU  <-- THE NEW IA DESIGN
+      #106  AAU Birdie Buckets reel + season close-out + event weather
+      #108  AAU weather → @aster/weather shared package
+      #105  density-preview eval set + count-accurate 10/20/50%
+      #110  authz + reliability fixes (weather→public, inviteLinks active-membership
+            guard, Map.tsx loader, useAuth effect, dead-code cleanup)
+      d602f54 .mcp.json for the Railway server
+  - #103 advanced 31 commits / 106 files: the migration layer + studio feature work.
+
+CRITICAL NUANCE: much of #103's *studio* work (the v2-redistribute series, SAM2-404
+fixes, governance retirement, the cpu-strand retry, results-header) was ALSO
+independently cherry-picked onto main as DIFFERENT SHAs. So a plain `git merge` collides
+the same logical change against itself — noisy, misleading conflicts on work that is
+actually identical. Proof: of the 24 files touched on BOTH sides, 10 are already
+BYTE-IDENTICAL at the two HEADs (full convergence, zero conflict). That is the signal to
+NOT merge the whole branch — re-apply only the genuinely-unique migration delta instead.
+
+
+-----------------------------------------------------------------------------------------
+3. CONFLICT SURFACE (grounded — git merge-base diff, not inference)
+-----------------------------------------------------------------------------------------
+A. Migration-unique files (#103 changed, main did NOT) — LAND CLEAN, no conflict:
+   drizzle/schema.ts, drizzle.config.ts, the entire regenerated migration chain
+   (drizzle/0000–0019 + meta/*, old MySQL .sql deleted), server/db.ts, server/storage.ts
+   + storage.test.ts, server/_core/storageProxy.ts(+test), server/_core/llm.ts(+test),
+   server/_core/googleAuth.ts(+test), server/_core/oauth.ts(+test), server/_core/cookies.ts,
+   server/_core/env.ts, server/_core/heartbeat.ts (DELETE), server/_core/dataApi.ts (DELETE),
+   server/creditLedger.integration.test.ts, server/drizzleEnumBug.test.ts,
+   .github/workflows/ci.yml (MySQL service → Postgres), docs/railway-env-checklist.txt.
+   This is the bulk of the migration value and it carries no merge risk.
+
+B. Overlap files that are already IDENTICAL on both HEADs — no action (10):
+   AIChatBox.tsx, studio/BeforeAfter.tsx, ui/chart.tsx (deleted both sides),
+   ComponentShowcase.tsx, masking/replicateSam2.ts, masking/sam2Provider.ts,
+   studio/ops/densityRedistribute.ts, studio/ops/garmentSilhouette.ts,
+   densityRedistribute.test.ts, garmentSilhouette.test.ts, replicateSam2Async.test.ts,
+   sam2.test.ts. (Studio work converged.)
+
+C. Overlap files that GENUINELY DIFFER — the real integration work (14, most tiny):
+   TRIVIAL (1–13 lines, mechanical): client/src/const.ts, studio/ControlPanel.tsx,
+     pages/studio/StudioEditor.tsx, routes/studioStream.ts, studioAsyncWorker.ts,
+     densityMode.test.ts, shared/controls.ts, routers/studio.ts.
+   NEEDS CARE:
+     - pnpm-lock.yaml / package.json: both lanes changed deps (#103 added postgres,
+       removed recharts/streamdown; main added @aster/weather). Resolve package.json by
+       hand (union of deps), then REGENERATE the lockfile with `pnpm install` — never
+       hand-merge the lock.
+     - server/routers.ts (main +11/-83 vs #103): main's #110 authz changes
+       (weather→publicProcedure, etc.) vs #103's auth-context/session wiring. Reconcile
+       so BOTH the new public procedures AND the Google-session context survive.
+     - server/routers/inviteLinks.ts: main's #110 active-membership guard vs #103's
+       affectedRows→.returning() port. KEEP BOTH — the guard AND the Postgres CAS shape.
+
+Estimated integration effort: ~half a day, dominated by routers.ts + the lockfile.
+
+
+-----------------------------------------------------------------------------------------
+4. RECOMMENDED MERGE PLAN (re-apply the migration layer onto current main)
+-----------------------------------------------------------------------------------------
+Do NOT open "#103 → main" as a 39-commit merge. Instead:
+
+  Step 1 — Integration branch off CURRENT main:
+     git checkout main && git pull
+     git checkout -b chore/railway-migration-integration
+
+  Step 2 — Bring the migration layer over. Two equivalent ways:
+     (a) Cherry-pick the migration-unique commits from #103 (schema/driver, CAS port,
+         migration-baseline+triggers, CI→Postgres, query-isms, LLM→Anthropic,
+         storage→Supabase, auth→Google, cron scheduler, env guards, dead-Manus deletion),
+         OR
+     (b) Checkout the §3.A migration-unique paths wholesale from #103
+         (`git checkout caa090f2 -- <paths>`), then hand-apply the §3.C reconciliations.
+     (b) is faster given §3.A lands clean and §3.B needs nothing; reserve cherry-pick for
+     files where main and #103 both moved (§3.C).
+
+  Step 3 — Resolve the §3.C files by hand (union semantics): keep main's IA/authz/weather
+     AND #103's Postgres/Google/Supabase wiring. Regenerate pnpm-lock via `pnpm install`.
+
+  Step 4 — Green the gates locally and in CI:
+     pnpm run check  (tsc)         -> clean
+     pnpm run test   (vitest)      -> full suite green
+     money-path integration (real Postgres) CI job -> green
+     pnpm run build  (client+server) -> clean, bundle within budget
+
+  Step 5 — Architect §2.4 sign-off (see §5) on the money-path CAS diff and the auth
+     identity model. These HOLD for review; they do not auto-merge.
+
+  Step 6 — Operator pre-cutover (see §6): Google OAuth redirect URIs, Railway env vars,
+     fresh Supabase seed, ledger-reconciliation check, full smoke.
+
+  Step 7 — Merge the integration branch to main. Now main carries BOTH the new design AND
+     the working Railway+Supabase backend. Point Railway at main; retire the #103 pin.
+
+  Step 8 — Cutover + decommission Manus (downtime cutover is acceptable pre-onboarding),
+     keep Manus briefly as rollback, then tear it down.
+
+WHY this beats merging the branch: it isolates the ~18-file migration delta from the
+30-odd duplicated studio commits, eliminating the spurious self-conflicts entirely, and
+it rebases the risky money-path/auth changes onto the freshest authz code (#110) so the
+two §2.4 reviews look at the final combined state, not a stale snapshot.
+
+
+-----------------------------------------------------------------------------------------
+5. ARCHITECT-SCOPED (§2.4) — HOLD FOR SIGN-OFF BEFORE CUTOVER
+-----------------------------------------------------------------------------------------
+1. Money-path CAS on Postgres. The atomic guards (deduct/grant, claim/complete/fail,
+   recoverStranded, reapStuck, inviteLinks redeem) were re-ported from mysql2 affectedRows
+   to .returning()+rowcount. CI is green on real Postgres — strong evidence — but the
+   ledger invariants (atomic conditional debit never oversells; (refId,reason)
+   idempotency; no deliver-AND-refund; reaper refunds exactly once) want an Architect read
+   of the diff + a ledger-reconciliation check on the seeded Supabase DB
+   (SUM(credit_ledger.delta) == tenants.creditBalance per tenant).
+2. Auth identity model. Google OAuth, openId = "google:<sub>", own-JWT session retained.
+   Confirm tenant isolation is intact and the "fresh DB, no legacy openId remap" plan is
+   the agreed call (it removes the only data-side risk the scope doc flagged).
+
+
+-----------------------------------------------------------------------------------------
+6. OPERATOR / NON-CODE GATES BEFORE THE CUTOVER IS REAL
+-----------------------------------------------------------------------------------------
+[ ] Google Cloud: register redirect URI https://astersports.io/api/oauth/callback (+ the
+    Railway test URL). Set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET.
+[ ] Railway env: walk docs/railway-env-checklist.txt — JWT_SECRET, DATABASE_URL (Supabase),
+    Supabase storage keys, REPLICATE_*, STRIPE_*, RESEND_API_KEY, CRON_SECRET,
+    ANTHROPIC_API_KEY (new), STUDIO_* flags, STUDIO_MASK_PROVIDER=sam2, and raise
+    STUDIO_WORKING_MEGAPIXELS to ~8–10 now that there's 4 GB.
+[ ] Supabase: seed fresh (category/tenant), confirm the schema chain applies, then run the
+    ledger-reconciliation check.
+[ ] Railway Cron services POST each /api/scheduled/* path with x-cron-secret on schedule.
+[ ] Smoke: login (Google) → a full-res density gen end-to-end → billing dry-run →
+    GET /api/studio/posture reads the intended flag state.
+[ ] DNS cutover astersports.io → Railway (deliberate), Manus kept as rollback then
+    decommissioned.
+
+
+-----------------------------------------------------------------------------------------
+7. RISKS / WATCH-ITEMS
+-----------------------------------------------------------------------------------------
+- The "updatedAt" Postgres BEFORE-UPDATE trigger (drizzle/0001_updatedat_triggers.sql)
+  must preserve the reaper's COALESCE(enqueuedAt,createdAt) + T1.5 stale-cpu semantics —
+  Postgres has no ON UPDATE. Verify the trigger fires on the job table the reaper reads.
+- Don't hand-merge pnpm-lock.yaml; regenerate it. A bad lock silently ships wrong deps.
+- routers.ts is the one file where authz (#110) and auth-session (#103) genuinely collide
+  — review the merged result line-by-line, both public procedures and Google context.
+- Keep the green real-Postgres money-path CI job as the gate on the integration branch;
+  it is the airtight-build proof for the ledger invariants under the new driver.
