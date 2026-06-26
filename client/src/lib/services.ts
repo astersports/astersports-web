@@ -130,9 +130,10 @@ export const PRODUCTS: ServiceEntry[] = [
     name: "Legacy Hoopers",
     tagline: "Program site · beyond LeagueApps",
     description:
-      "A public program site for Legacy Hoopers — live scores, tournament history, season records, and film — powered by the Aster platform in place of LeagueApps. Rebuild in progress.",
-    href: "#contact",
-    status: "soon",
+      "A public program site for Legacy Hoopers — live scores, tournament history, season records, and film — powered by the Aster platform in place of LeagueApps. Early preview live now.",
+    href: "https://legacy-hoopers-production.up.railway.app",
+    external: true,
+    status: "beta",
     icon: Medal,
     accent: "#E0631C",
     cta: "Follow the Team",
