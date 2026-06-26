@@ -1,0 +1,339 @@
+================================================================================
+AAU HUB — FAMILY VIEW : L99 ARCHITECT CHALLENGE / DECISION REQUEST
+================================================================================
+Date:        2026-06-26
+Author:      Claude Code (CC) — build lane
+For:         Architect (design lane), relayed by Frank
+Status:      DRAFT — no hub code, schema, or flips until the architect rules.
+Supersedes:  Extends astersports-web #125 (AAU HUB ARCHITECTURE BRIEF). #125 framed
+             "AAU section = the hub that feeds the app + Legacy Hoopers with games,
+             practices, locations." This doc DEEPENS that into the product Frank
+             specced on 2026-06-26: a FAMILY-CENTRIC tournament hub.
+Grounding:   Four parallel code readers over /home/user/aster-sports (the app) on
+             2026-06-26. Every [GROUNDED] claim carries a file:line. [VERIFY] =
+             inferred, needs a query/read to confirm.
+
+--------------------------------------------------------------------------------
+0. THE OPERATOR DIRECTIVE (Frank, 2026-06-26 — verbatim intent)
+--------------------------------------------------------------------------------
+"Make the AAU section of astersports web the MAIN HUB for basketball — for the
+PARENT. A family signs up, identifies their kids (my daughter is #5 on Legacy
+Hoopers' LeagueApps Chris Ward team; my son is on the 8th-grade boys team), and the
+hub pulls together ALL their kids' teams across every tournament we've uploaded.
+
+It should:
+  - Let a parent SELECT one or many teams to TRACK — picked from the inventory of
+    teams the tournament scrape already discovered. That selection IS how they
+    register their family to those teams.
+  - NOTIFY them when a schedule is uploaded or changes, when a score updates, and
+    when a game goes final.
+  - Show the STANDINGS / rankings for the division their kid is in.
+  - PREDICT the bracket: who's 1st/2nd, who advances to playoffs, where/when the
+    bracket games are, AND an AI predictor of their ODDS of making the bracket
+    based on that tournament's RULES (e.g. Zero Gravity: wins count only up to a
+    20-pt margin; 2-way tie = head-to-head; 3-way tie = point differential).
+  - Let parents UPLOAD their own film of a game; AI breaks it down into highlights
+    filtered to THEIR child's jersey number (like the film feature we built).
+  - Be FLEXIBLE but SIMPLE: pick 5th-grade-girls + 8th-grade-boys; or compare
+    5th-grade-girls A vs B vs C divisions side-by-side.
+
+This is a DIFFERENT VIEW from the app. The app is program-level (sign up, run a
+program, comms). This is a family's single source of truth for all their kids'
+teams — scheduling, rankings, standings, notifications, film. L99 collaboration."
+
+--------------------------------------------------------------------------------
+1. PRODUCT IN ONE PARAGRAPH
+--------------------------------------------------------------------------------
+A public, family-centric basketball hub. The organizing primitive is the FAMILY,
+not the org or the team. A parent lands on the AAU hub, claims their kids by
+pointing at the team(s) the scraper already discovered in a tournament, and gets a
+live, push-notified dashboard: every kid's games, scores, division standings,
+bracket-qualification math with AI odds, and their own uploaded film auto-clipped
+to their kid's number. One account → every kid → every game → everywhere they play
+(including across more than one program). This is the marketed selling point.
+
+--------------------------------------------------------------------------------
+2. GROUNDED REALITY — WHAT ALREADY EXISTS (better than expected)
+--------------------------------------------------------------------------------
+The four readers found the platform already carries most of the load-bearing
+substrate. The hub is mostly WIRING + a few net-new tracks, not a green field.
+
+2.1 TOURNAMENTS / TEAMS / RULES  [GROUNDED]
+  - tournaments table: name, circuit, dates, venue, status, schedule_status
+    (draft->preliminary->final->live->complete).  011_tournaments.sql:39-80
+  - tournament_teams: participation + final_record (W/L) + final_place.
+  - tournament_rosters: per-tournament eligibility (active/futures_callup/
+    unavailable), tournament_id->team_id->player_id.  011_tournaments.sql:157-201
+  - circuit_rules table: tiebreaker rules + point_differential_cap (free-form +
+    a real cap column). ZERO GRAVITY (cap=20) and League Play ALREADY SEEDED for
+    Legacy Hoopers.  -> Frank's exact tiebreaker example is half-modeled today.
+
+2.2 SCORES / RESULTS  [GROUNDED]
+  - game_results: our_score, opponent_score, result (W/L/T), and a computed
+    point_differential column. Draft->publish workflow (published_at).
+    external_game_id for scraper idempotency.  014_game_results_publishing_workflow.sql
+  - ingest-game-results edge function: upserts scraped scores idempotently on
+    (org_id, external_game_id); the AAU scraper (#1102, deployed DARK) already
+    produces this shape.
+
+2.3 RECORDS / STANDINGS MATH  [GROUNDED]
+  - src/lib/teamRecords.js computeSummary(): record, streak, last-5, points
+    for/against, win%, point_differential — from a game array.
+  - src/hooks/useOrgTeamRecords.js bulk-fetches.
+  - GAP: scope is SEASON-WIDE. No division/pool/tournament scoping. The tiebreaker
+    in StandingsTable.jsx is HARDCODED (winPct -> point_diff) and does NOT read
+    circuit_rules.
+
+2.4 SCHEDULE + RECORDS UX (the "look at the app" inspiration)  [GROUNDED]
+  - SchedulePage.jsx three-band "time-state spine" (live / next-7 / later +
+    collapsed past), FilterBar, ChildFilterChips (renders when 2+ kids),
+    WeekStrip, EventCard (one-status-pill rail card), GamesView (standings table
+    on top). All reusable for the hub with a different upstream grouping.
+  - RecordsPage.jsx: broadcast/ALL-CAPS standings, TeamAccordion (record + streak
+    + last-5 form guide), StatHeroBar, TournamentCard.
+  - TournamentDetailPage.jsx tabs: Overview | Games | Roster | Messages |
+    SCENARIOS. A "ScenariosTab — playoff scenario calculator / bracket simulator"
+    EXISTS as a tab [VERIFY — likely a stub or client-side; 2.5 says no bracket
+    schema, so confirm what it actually computes].
+  - GamesTab already buckets Pool Play / Playoffs / Bonus and reads bracket_label
+    + is_bracket_game + is_championship_final on game rows [VERIFY these columns].
+
+2.5 NOTIFICATIONS  [GROUNDED]
+  - Two streams (CLAUDE.md 16.5). Stream A event reminders (72h/24h/4h) AUTO-SEND
+    and ALREADY PUSH via send-push (VAPID web push) — proof the push path works.
+    briefing-auto-draft-tick/_reminders.ts + supabase/functions/send-push.
+  - briefing_triggers already has game_completed, schedule_changed,
+    tournament_approaching/completed, weekly_sunday, rsvp_low.
+    20260509234448_briefing_triggers_table.sql
+  - GAPS: (a) game_recap + schedule_change AUTO-DRAFT to an admin Radar — nothing
+    pushes them to families. (b) NO game_final / score_updated trigger. (c) push
+    is wired ONLY for Stream A, not the editorial/score path. (d) subscription is
+    ROSTER-ONLY: a parent can't subscribe to an arbitrary team/division — there's
+    no claim model.
+
+2.6 FAMILY / IDENTITY  [GROUNDED]
+  - players (org-scoped) + team_players.jersey_number (text, canonical;
+    003_core_data_model.sql:70) + guardians + player_guardians (relationship,
+    is_primary).
+  - claim_guardian_by_email() SECDEF RPC links a guardian to auth.uid() on a
+    confirmed email.  20260609024700_add_claim_guardian_by_email_secdef.sql
+  - parent_context_v view + current_user_child_team_ids() /
+    current_user_teammate_player_ids() scope a parent to THEIR kids' teams.
+  - HARD BLOCKER for the cross-program promise: SINGLE-ORG-PER-USER today.
+    AuthContext picks roleRows[0]; the multi-org router is a TODO
+    (AuthContext.jsx ~52-66). tournaments + parent_context_v are org-scoped. A
+    family with kids in two programs cannot be aggregated today.
+
+2.7 FILM  [GROUNDED]
+  - Only a 140-char text coach_highlight exists (game_results). NO storage bucket,
+    NO video tables, NO AI, NO per-jersey tagging. The parent-film feature is
+    NET-NEW end to end.
+
+--------------------------------------------------------------------------------
+3. THE DECISIONS (each: REQUEST / EVIDENCE / OPTIONS+REQUIREMENTS / CC LEAN)
+--------------------------------------------------------------------------------
+
+== D-FV1 : WHERE THE HUB LIVES (architectural fork) ==========================
+REQUEST: Is the family hub (a) a section of astersports-web (.io AAU), (b) a new
+  public "Family" view inside the aster-sports app, or (c) a standalone surface
+  reading the same Supabase?
+EVIDENCE: #125 placed "the hub" in the AAU/.io property. But ALL the data + 90% of
+  the reusable UX (spine, EventCard, standings, push) lives in aster-sports. The
+  app is already the system of record; astersports-web is a separate
+  Manus/Drizzle/MySQL app (different stack) — it does NOT share the Supabase the
+  scores/tournaments live in.
+OPTIONS:
+  (a) astersports-web .io section — marketing-aligned, but it would have to reach
+      ACROSS to Supabase (new data layer in a MySQL app) — high friction, two
+      sources of truth risk (Cat#30/AP#63).
+  (b) New public family view in aster-sports — sits on the data + reuses the spine,
+      EventCard, push, records math directly. Lives behind a public route
+      (anon/publishable key, like the legacy-hoopers schedule page already does).
+  (c) Standalone (new repo) reading Supabase — clean boundary, but re-implements
+      the whole component vocabulary.
+CC LEAN: (b) — build the family hub as a PUBLIC, family-scoped view in the
+  aster-sports app, served by anon-safe SECDEF public RPCs (the get_public_*
+  pattern we just shipped for legacy-hoopers). astersports-web .io links INTO it.
+  The data and the reusable UX are both already there; (a) duplicates the data
+  layer in the wrong stack. (Per AP#42: don't build a parallel system when the
+  app already IS the system.)
+
+== D-FV2 : THE FAMILY-CLAIM MODEL + CROSS-PROGRAM IDENTITY (load-bearing) =====
+REQUEST: How does a family claim teams from the scraped inventory, and do we
+  support a family whose kids span MORE THAN ONE program now or later?
+EVIDENCE: 2.6 — identity plumbing is solid but SINGLE-ORG. The scraper's DISCOVER
+  phase (#1102) already yields a per-division team inventory — the natural picker.
+  But "claim a team my kid is on" has no model; today a parent is inferred from
+  roster links inside one org.
+OPTIONS:
+  (1) Roster-tied only (MVP-safe): parent claims only teams where a roster link
+      already exists (their real org). Simple, no new RLS surface, but breaks the
+      "any tournament, any team, even cross-program" promise.
+  (2) New family_subscriptions table: (family/guardian_id, team_id or
+      tournament_team_id, claimed_at). A parent taps a scraped team -> a
+      subscription row -> drives the hub feed. Org-agnostic key; RLS lets a
+      guardian read public tournament data for any team they subscribed to.
+      Requires: the table + RLS + a public "claim" RPC + a verification stance
+      (open claim vs. prove-the-kid).
+  (3) Full multi-org parent routing now: remove roleRows[0], add active-org /
+      family-home, union parent_context_v across orgs. Biggest lift; unblocks the
+      cross-program story fully but touches auth for every user.
+CC LEAN: (2) as the spine, decoupled from org membership — the hub feed is driven
+  by SUBSCRIPTIONS to scraped teams, NOT by org roster. This delivers the
+  cross-program promise WITHOUT the full multi-org auth refactor (3), and isn't
+  capped by org like (1). Open question for the architect: claim verification —
+  open (anyone can track any public team, like following a sports team) vs.
+  gated (prove the kid, jersey match). CC sub-lean: OPEN for tracking/standings/
+  notifications (public data anyway); GATED only before anything family-private
+  (film, a child's name on a card) is exposed. Frank to confirm the privacy line.
+
+== D-FV3 : DIVISION / POOL / BRACKET SCHEMA (the missing standings substrate) =
+REQUEST: How do we model division, pool, seed, and bracket so standings can be
+  scoped to "this division in this tournament" and a bracket can be drawn?
+EVIDENCE: 2.3 — standings are season-wide; 2.4 — bracket_label exists on games but
+  there's no division/pool/seed/advancement schema. divisions table links to
+  programs, not tournaments [VERIFY].
+OPTIONS:
+  (A) jsonb on tournaments (pools/divisions/bracket as a blob) — fast, but not
+      queryable, weak RLS, repeats the dead-config trap (16.16).
+  (B) Junction tables: tournament_divisions, division_pools (or pool_teams), and
+      bracket_slots (round, seed, advancement rule). Queryable, RLS-safe,
+      standings join cleanly. More migration work up front.
+CC LEAN: (B) junction tables — this is the queryable spine the standings engine
+  (D-FV4) and predictor (D-FV5) both stand on. Architect-scoped (DB schema +
+  migration; CLAUDE.md 2.4) -> design-reviewed before code, owner applies. CC
+  drafts the migration; does NOT apply without sign-off.
+
+== D-FV4 : STANDINGS + TIEBREAKER ENGINE (rule-driven) =======================
+REQUEST: Build a real standings engine that reads circuit_rules and applies the
+  cap + tiebreakers, instead of the hardcoded winPct->point_diff in StandingsTable.
+EVIDENCE: 2.1 circuit_rules already stores rules + point_differential_cap with
+  Zero Gravity seeded; 2.3 nothing applies them. Tiebreakers Frank named: cap
+  margins at 20; 2-way = head-to-head; 3-way = point differential.
+OPTIONS:
+  (i) Keep hardcoded, special-case Zero Gravity — fast, but every new circuit is a
+      code change; can't go multi-tenant.
+  (ii) Rule-driven engine: a pure function standings(games, rules) -> ranked rows
+       with capped diff + head-to-head + N-way tiebreak, rules sourced from
+       circuit_rules. Runs where D-FV1 lands (client-side pure fn first; promote
+       to a SECDEF RPC if anon needs it server-side).
+CC LEAN: (ii) rule-driven from day one — the rules table already exists, the cost
+  delta is ~a day, and it's the only version that scales to other circuits/tenants
+  (St Patrick next). Pure function, fixture-tested (AP#27 pure-with-injected-IO).
+
+== D-FV5 : BRACKET-QUALIFICATION PREDICTOR + AI ODDS ========================
+REQUEST: Given current standings + remaining games + the tournament's advancement
+  rule (top-1/top-2 advance), show who's in, the clinch/elimination scenarios, and
+  an AI "odds of making the bracket" number.
+EVIDENCE: A ScenariosTab already exists (2.4) [VERIFY what it computes]. No bracket
+  schema yet (D-FV3 supplies it). circuit_rules supplies the tiebreaker logic.
+OPTIONS:
+  (P) Deterministic scenario engine: enumerate remaining-game outcomes (small N in
+      pool play), apply D-FV4 standings to each, count the fraction where the team
+      qualifies -> a TRUE odds % + "you're in if you win" / "you need X to lose."
+      Transparent, defensible, no hallucination.
+  (Q) LLM predictor: feed standings + rules to a model, ask for odds + narrative.
+      Fast to ship, but opaque and can be wrong on exactly the tiebreaker math
+      that matters.
+  (R) Hybrid: (P) computes the real number + clinch logic; an LLM writes the
+      plain-English "what has to happen" around (P)'s output (never the math).
+CC LEAN: (R) — deterministic math is the truth (pool-play outcome spaces are
+  small enough to enumerate exactly), the LLM only narrates. This is the honest
+  version of "AI predictor" and it won't embarrass us on a tiebreaker. Reuse
+  whatever ScenariosTab already has as the starting point.
+
+== D-FV6 : REAL-TIME NOTIFICATIONS TO PARENTS (push, not admin-draft) ========
+REQUEST: Push to a subscribed family on (a) schedule uploaded/changed, (b) score
+  update, (c) game final — without an admin in the loop.
+EVIDENCE: 2.5 — push works (Stream A), triggers exist for schedule_changed +
+  game_completed but they auto-DRAFT to Radar; there is no game_final/score_updated
+  trigger and no push on the editorial path.
+OPTIONS:
+  - Add score_updated + game_final triggers on game_results; on the scraper's
+    ingest, fan out send-push directly to the team's SUBSCRIBERS (D-FV2), bypassing
+    the admin Radar for these public, factual events. Schedule-change push reuses
+    the existing schedule_changed detection but routes to subscribers + push.
+  - Opt-in model: a per-subscription notify preference (score / schedule / final),
+    defaulting on for tracked teams.
+CC LEAN: Build a SUBSCRIBER fan-out path for the three factual events, push-first,
+  reusing send-push. Keep the admin-draft Radar for editorial comms (recaps with
+  prose) — those two paths stay separate. Money/PII none here; not money-path. The
+  trigger + a public-data push is routine once D-FV2/D-FV3 land.
+
+== D-FV7 : PARENT-UPLOADED FILM + AI HIGHLIGHTS BY JERSEY (net-new track) =====
+REQUEST: Parent uploads game film; AI clips highlights filtered to their child's
+  jersey number.
+EVIDENCE: 2.7 — entirely net-new: no storage bucket, no video schema, no AI, no
+  per-jersey tagging. team_players.jersey_number gives the number to target.
+OPTIONS:
+  - Phase it LAST as its own track: (1) Supabase Storage bucket (private, family-
+    scoped) + upload UI; (2) media schema (video -> tournament_game -> player);
+    (3) an AI clip/jersey-detection service (Replicate or similar — the studio
+    side already integrates Replicate, a reuse candidate); (4) per-child clip
+    filter UI. Privacy: minors' video is the most sensitive surface on the
+    platform — sub-processor + consent posture must be designed before any frame
+    is uploaded.
+CC LEAN: Carve film OFF the critical path as Track 2. It's the highest-effort,
+  highest-privacy-risk, lowest-dependency piece — the standings/predictor/
+  notification hub (Tracks 0-1) delivers the selling point without it, and film
+  lands on top once the family-claim + identity model (D-FV2) is solid.
+
+== D-FV8 : PUBLIC / ANON DATA EXPOSURE =====================================
+REQUEST: The hub is public-facing. What's anon-readable vs. gated?
+EVIDENCE: We already ship the get_public_team_schedule / get_public_team_records /
+  org_is_public_listed SECDEF pattern (gated, PII-stripped). Standings + brackets
+  are derived from the same published games.
+CC LEAN: Standings, schedule, scores, bracket math, AI odds = PUBLIC via SECDEF
+  RPCs (same gate as today). Family-private (a child's name pinned to a card,
+  uploaded film, notification targeting) = behind the claim/subscription + auth.
+  One clear line: public = the tournament's factual state; private = anything tied
+  to a specific child's identity.
+
+--------------------------------------------------------------------------------
+4. PROPOSED BUILD PHASING (for the architect to re-order/ratify)
+--------------------------------------------------------------------------------
+Track 0 — Standings spine (unblocks everything):
+  D-FV3 division/pool/bracket schema -> D-FV4 rule-driven standings engine ->
+  public standings RPC. Architect-scoped schema gate first.
+Track 1 — Family hub surface + live data:
+  D-FV1 (b) public family view -> D-FV2 family-claim/subscription model ->
+  D-FV5 bracket predictor + AI odds -> D-FV6 subscriber push.
+Track 2 — Film (parallel, independent):
+  D-FV7 storage + media schema + AI jersey clips + privacy posture.
+Each track ships behind public-safe RPCs; nothing touches the money path; *_LIVE
+flags untouched (none involved).
+
+--------------------------------------------------------------------------------
+5. OPEN QUESTIONS FOR FRANK (carried for the architect)
+--------------------------------------------------------------------------------
+Q1 (D-FV2): Claim verification — OPEN tracking of any public team, or GATED
+    (prove the kid) before family-private data? CC sub-lean: open for public data,
+    gated for film/child-identity.
+Q2 (D-FV2): Cross-program NOW or LATER? Is there a real second program for a
+    Legacy family today, or is single-program fine for v1 with the subscription
+    model built org-agnostic so cross-program "just works" later?
+Q3 (D-FV5): "Odds" presentation — a hard % (deterministic), a clinch/elim
+    statement ("win and you're in"), or both?
+Q4 (D-FV7): Film — confirm this is a later track, and that we design a minors'-
+    video consent/sub-processor posture before building it.
+Q5 (scope): Is the FIRST shippable milestone "track my kid's team + live scores +
+    standings + push" (Tracks 0-1 minus predictor), with predictor + film as
+    fast-follows? CC lean: yes — that's the demoable selling point.
+
+--------------------------------------------------------------------------------
+6. CC POSITION (one paragraph)
+--------------------------------------------------------------------------------
+The substrate is 70% there. The honest build is: (1) a queryable division/bracket
+schema, (2) a rule-driven standings engine reading the circuit_rules we already
+seeded, (3) a public family view in the app reusing the spine + EventCard + push
+we already ship, (4) an org-agnostic family-claim model driven off the scraper's
+team inventory, (5) a deterministic bracket predictor the AI only narrates, and
+(6) a subscriber push fan-out for score/schedule/final. Film is a separate, later,
+privacy-heavy track. The single load-bearing fork is D-FV2 (family identity /
+claim): get that contract right and everything else is wiring onto substrate that
+already exists. CC will draft the Track-0 schema migration for design review on
+the architect's go — and will not apply schema or flip anything without sign-off.
+
+================================================================================
+END — relayed in full in chat per CLAUDE.md 11.8. Committed as docs/*.txt.
+================================================================================
