@@ -10,7 +10,7 @@ import {
   History,
   CreditCard,
   Building2,
-  ChevronLeft,
+  ArrowLeft,
   Sparkles,
   AlertTriangle,
   BookOpen,
@@ -50,7 +50,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* Header */}
         <div className="p-4 border-b border-border">
           <Link href="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3">
-            <ChevronLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4" />
             Back to Aster Sports
           </Link>
           <div className="flex items-center gap-2">
@@ -134,7 +134,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           href="/"
           className="flex items-center gap-1.5 px-3 h-9 text-xs font-medium text-muted-foreground hover:text-foreground border-b border-border transition-colors"
         >
-          <ChevronLeft className="w-3.5 h-3.5" />
+          <ArrowLeft className="w-3.5 h-3.5" />
           Back to Aster Sports
         </Link>
         <div className="flex items-center gap-2 px-3 h-14">

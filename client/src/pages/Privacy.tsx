@@ -5,7 +5,7 @@
 
 import { ArrowLeft } from "lucide-react";
 
-const LOGO_URL = "/manus-storage/aster_sports_logo_high_res_2b537f86.png";
+const LOGO_URL = "/aster-mark.png";
 
 export default function Privacy() {
   return (
@@ -25,7 +25,7 @@ export default function Privacy() {
             style={{ fontFamily: "var(--font-display)" }}
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Home
+            Back to Aster Sports
           </a>
         </div>
       </header>
