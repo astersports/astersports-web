@@ -11,6 +11,7 @@ import { tenants, memberships, platformAdmins, users, creditLedger } from "../..
 import { grantCredits, createTenant, createMembership, escapeLike } from "../studioDb";
 import { TRIAL_DURATION_DAYS } from "../../shared/billing";
 import { signImpersonationToken, setImpersonationCookie, clearImpersonationCookie, getImpersonationFromRequest } from "../impersonation";
+import { writeAuditLog, listAuditLog } from "../auditLog";
 
 // ─── Super Admin Middleware ──────────────────────────────────────────────────
 
@@ -257,7 +258,7 @@ export const platformRouter = router({
         domainLock: z.string().max(255).optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -319,6 +320,22 @@ export const platformRouter = router({
         await grantCredits(tenant.id, input.initialCredits, "grant", undefined, undefined);
       }
 
+      // Audit the provisioning event (append-only; never blocks the action).
+      await writeAuditLog({
+        actorUserId: ctx.user.id,
+        action: "org_provisioned",
+        summary: `Provisioned firm "${tenant.name}" (${input.plan}, ${input.seats} seat${input.seats === 1 ? "" : "s"})`,
+        targetTenantId: tenant.id,
+        metadata: {
+          slug: tenant.slug,
+          plan: input.plan,
+          seats: input.seats,
+          initialCredits: input.initialCredits,
+          ownerEmail: input.ownerEmail ?? null,
+          domainLock: input.domainLock ?? null,
+        },
+      });
+
       return tenant;
     }),
 
@@ -330,7 +347,7 @@ export const platformRouter = router({
         initialCredits: z.number().int().min(0).default(50),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -383,6 +400,16 @@ export const platformRouter = router({
         await grantCredits(tenant.id, input.initialCredits, "grant", undefined, user?.id);
       }
 
+      // Audit the invite event (append-only; never blocks the action).
+      await writeAuditLog({
+        actorUserId: ctx.user.id,
+        action: "individual_invited",
+        summary: `Invited individual ${input.email} (${input.initialCredits} trial credits)`,
+        targetTenantId: tenant.id,
+        targetUserId: user?.id ?? null,
+        metadata: { email: input.email, initialCredits: input.initialCredits, userExists: !!user },
+      });
+
       return { ...tenant, userExists: !!user };
     }),
 
@@ -432,6 +459,15 @@ export const platformRouter = router({
         (ctx.req.headers["x-forwarded-proto"] as string)?.includes("https");
       setImpersonationCookie(ctx.res, token, isSecure);
 
+      // Audit the impersonation start (append-only; never blocks the action).
+      await writeAuditLog({
+        actorUserId: ctx.user.id,
+        action: "impersonation_started",
+        summary: `Started impersonating "${tenant.name}"`,
+        targetTenantId: tenant.id,
+        metadata: { tenantSlug: tenant.slug, type: tenant.type },
+      });
+
       return {
         tenantId: tenant.id,
         tenantName: tenant.name,
@@ -466,4 +502,17 @@ export const platformRouter = router({
   whoami: superAdminProcedure.query(async ({ ctx }) => {
     return { userId: ctx.user.id, name: ctx.user.name, isSuperAdmin: true };
   }),
+
+  /** Recent platform audit log for the console strip (newest first), optionally
+   *  scoped to one org. Read-only; super-admin gated. */
+  auditLog: superAdminProcedure
+    .input(
+      z.object({
+        tenantId: z.number().int().optional(),
+        limit: z.number().int().min(1).max(200).default(50),
+      })
+    )
+    .query(async ({ input }) => {
+      return listAuditLog({ targetTenantId: input.tenantId, limit: input.limit });
+    }),
 });
