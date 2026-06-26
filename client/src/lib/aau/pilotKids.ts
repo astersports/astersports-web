@@ -145,7 +145,7 @@ export const PILOT_KIDS: PilotKid[] = [
     gradeNext: "9th next year",
     accent: "var(--as-success)",
     teamName: "Chris Ward Basketball Green",
-    divisionLike: "%Boys%",
+    divisionLike: "%8th%",   // spring = 8th grade only (the team also appears in 9th divisions, not his spring team)
     tournament: {
       name: "ZG NY Hoop Festival",
       dates: "Jun 15–16, 2026",
