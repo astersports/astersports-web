@@ -42,3 +42,20 @@ export async function getTournamentStandings(divisionId: string): Promise<Public
   if (error) throw error;
   return (data as PublicStandingsBundle | null) ?? null;
 }
+
+// ─── Directory: public tournaments + their divisions (the hub's browse tree) ───
+export interface DirDivision {
+  id: string; name: string; grade_label: string | null; gender: "M" | "F" | "Coed" | null;
+  advance_count: number; team_count: number;
+}
+export interface DirTournament {
+  id: string; name: string; circuit: string | null; start_date: string; end_date: string;
+  divisions: DirDivision[];
+}
+
+/** Every public-listed tournament with its divisions. [] when nothing is public yet. */
+export async function getTournamentDirectory(): Promise<DirTournament[]> {
+  const { data, error } = await aster.rpc("get_public_tournament_directory");
+  if (error) throw error;
+  return (data as DirTournament[]) ?? [];
+}

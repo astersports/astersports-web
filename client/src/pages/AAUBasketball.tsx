@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { ArrowLeft, ArrowUpRight, Zap, Trophy, BarChart3, Film } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import LiveScores from "../components/aau/LiveScores";
+import StandingsHub from "../components/aau/standings/StandingsHub";
 import TournamentHistory from "../components/aau/TournamentHistory";
 import SeasonLeaderboard from "../components/aau/SeasonLeaderboard";
 import FilmHighlights from "../components/aau/FilmHighlights";
@@ -15,6 +16,7 @@ const LOGO_URL = "/aster-mark.png";
 
 const SECTIONS = [
   { id: "scores", label: "Live Scores", emoji: "⚡" },
+  { id: "standings", label: "Standings", emoji: "🏀" },
   { id: "history", label: "History", emoji: "🏆" },
   { id: "leaderboard", label: "Records", emoji: "📊" },
   { id: "film", label: "Film", emoji: "🎬" },
@@ -269,6 +271,11 @@ export default function AAUBasketball() {
             <WeatherCard />
             <LiveScores />
           </>
+        )}
+        {activeSection === "standings" && (
+          <div className="px-4 py-2">
+            <StandingsHub />
+          </div>
         )}
         {activeSection === "history" && <TournamentHistory />}
         {activeSection === "leaderboard" && <SeasonLeaderboard />}
