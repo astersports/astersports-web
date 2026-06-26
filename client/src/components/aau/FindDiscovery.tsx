@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Link2, Trophy, ChevronRight } from "lucide-react";
+import { Search, Link2, Trophy, ChevronRight, ChevronDown } from "lucide-react";
 import { getTournamentDirectory, type DirTournament, type DirDivision } from "@/lib/aster";
 
 // Find / Discovery — best-in-class render 01. Search the public tournament directory,
@@ -15,6 +15,17 @@ export default function FindDiscovery({
   const [dir, setDir] = useState<DirTournament[] | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [q, setQ] = useState("");
+  // Accordion: tournaments are collapsed by default (each is a single header row);
+  // tapping a header expands its divisions. A live search auto-expands every match
+  // so results aren't hidden behind a closed header. Track only the manually-opened
+  // set — search-open is derived, not stored, so clearing the query re-collapses.
+  const [openIds, setOpenIds] = useState<Set<string>>(new Set());
+  const toggle = (id: string) =>
+    setOpenIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
   useEffect(() => {
     let active = true;
@@ -112,36 +123,64 @@ export default function FindDiscovery({
         </div>
       )}
 
-      <div className="space-y-0">
-        {filtered.map((t) => (
-          <div key={t.id} className="mt-[18px] first:mt-0">
-            <div className="mb-1 flex items-baseline gap-2 px-[18px]">
-              <span className="font-[var(--font-display)] text-[14px] font-bold text-[#f0f3fa]">{t.name}</span>
-              {t.circuit && <span className="font-[var(--font-mono)] text-[10px] text-[#5f6981]">{t.circuit}</span>}
-            </div>
-            {t.divisions.map((d) => (
+      <div className="space-y-[10px] px-[18px]">
+        {filtered.map((t) => {
+          const searching = q.trim().length > 0;
+          const open = searching || openIds.has(t.id);
+          const empty = t.divisions.length === 0;
+          return (
+            <div
+              key={t.id}
+              className="overflow-hidden rounded-[15px] border border-[rgba(255,255,255,0.055)] bg-[linear-gradient(180deg,#151b29,#10141f)]"
+            >
+              {/* accordion header — one row per tournament, collapsed by default */}
               <button
-                key={d.id}
-                onClick={() => onPick(d, t.name)}
-                className="as-press mx-[18px] mt-[10px] flex w-[calc(100%-36px)] items-center gap-[13px] rounded-[15px] border border-[rgba(255,255,255,0.055)] bg-[linear-gradient(180deg,#151b29,#10141f)] px-[15px] py-[14px] text-left"
+                type="button"
+                onClick={() => !empty && toggle(t.id)}
+                disabled={empty}
+                aria-expanded={open}
+                className={`as-press flex w-full items-center gap-[13px] px-[15px] py-[14px] text-left ${empty ? "cursor-default" : ""}`}
               >
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-[radial-gradient(circle_at_35%_30%,rgba(232,144,42,0.22),rgba(232,144,42,0.06))] text-[#F6CC55]">
                   <Trophy className="h-[18px] w-[18px]" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13.5px] font-semibold text-[#f0f3fa]">{d.name}</div>
+                  <div className="truncate font-[var(--font-display)] text-[14px] font-bold text-[#f0f3fa]">{t.name}</div>
                   <div className="mt-0.5 font-[var(--font-mono)] text-[11px] text-[#5f6981]">
-                    {d.team_count} teams · top {d.advance_count} advance
+                    {t.circuit ? `${t.circuit} · ` : ""}
+                    {empty ? "loading divisions…" : `${t.divisions.length} division${t.divisions.length === 1 ? "" : "s"}`}
                   </div>
                 </div>
-                <ChevronRight className="h-[17px] w-[17px] shrink-0 text-[#454e63]" />
+                {!empty && (
+                  <ChevronDown
+                    className={`h-[18px] w-[18px] shrink-0 text-[#5f6981] transition-transform ${open ? "rotate-180" : ""}`}
+                  />
+                )}
               </button>
-            ))}
-            {t.divisions.length === 0 && (
-              <div className="px-[18px] pt-2 text-[12px] text-[#5f6981]">Divisions load as the tournament is scraped.</div>
-            )}
-          </div>
-        ))}
+
+              {open && !empty && (
+                <div className="border-t border-[rgba(255,255,255,0.055)] p-[10px] pt-2">
+                  {t.divisions.map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => onPick(d, t.name)}
+                      className="as-press flex w-full items-center gap-[12px] rounded-[12px] px-[12px] py-[11px] text-left hover:bg-[rgba(255,255,255,0.03)]"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[13.5px] font-semibold text-[#f0f3fa]">{d.name}</div>
+                        <div className="mt-0.5 font-[var(--font-mono)] text-[11px] text-[#5f6981]">
+                          {d.team_count} teams · top {d.advance_count} advance
+                        </div>
+                      </div>
+                      <ChevronRight className="h-[17px] w-[17px] shrink-0 text-[#454e63]" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div className="mt-5 px-[18px] text-center font-[var(--font-mono)] text-[11px] leading-[1.5] text-[#5f6981]">
