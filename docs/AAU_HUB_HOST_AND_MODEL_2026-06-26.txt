@@ -1,0 +1,69 @@
+================================================================================
+AAU HUB — HOST + PRODUCT MODEL (operator-locked, overrides architect D-FV1)
+astersports-web / aster-sports · 2026-06-26 · CC record (relayed by Frank) · L99
+================================================================================
+For the architect: the operator changed the hub's HOST and gave the clean product
+model. This records it. The architect's D-FV1(b) put the hub UI in the aster-sports
+app; the operator moved it to astersports.io/aau. Everything else the architect
+ratified (the schema, the engine, the trust model, the child-safety invariant)
+stands — only WHERE the UI is served changed.
+
+--------------------------------------------------------------------------------
+THE PRODUCT MODEL (operator, verbatim intent)
+--------------------------------------------------------------------------------
+- THE APP (astersports.app = aster-sports): PROGRAM MANAGEMENT + REGISTRATION,
+  per tenant (Legacy Hoopers, St Patrick, ...). Coaches/admins run their program;
+  parents of kids IN those programs.
+- THE WEB (astersports.io/aau = astersports-web): a PARENT HUB for MULTIPLE
+  programs, with multiple kids in DIFFERENT programs that are on the app OR NOT.
+  A parent organizes their whole AAU life + their CHILDREN'S PROFILES here.
+
+--------------------------------------------------------------------------------
+THE ARCHITECTURE (one backbone, three surfaces)
+--------------------------------------------------------------------------------
+ONE BACKBONE = the aster-sports Supabase (vrwwpsbfbnveawqwbdmj). It already:
+  - feeds legacy hoopers (the schedule page reads get_public_team_schedule),
+  - holds the standings schema + the family/guardianship data + the #1102 ingest,
+  - exposes anon public RPCs gated by org_is_public_listed + RLS.
+
+astersports.io/aau is a THIN PUBLIC CONSUMER of that backbone (same pattern legacy
+hoopers already uses — publishable anon key in the browser, no data clone). It is
+the PARENT-HUB presentation layer (the dark .io renders R1/R2/R3), reading:
+  - get_public_tournament_standings (standings + remaining games -> the engine),
+  - get_public_team_schedule / get_public_team_records (schedule + records),
+  - the family-claim path (verified guardianship from the aster-sports rosters).
+The pure engine (computeStandings + predictBracket) is PORTED into astersports-web
+(it's IO-free — same math, one source per AP #63).
+
+RETIRE (carefully, no live-score gap): astersports-web's standalone
+server/scraper.ts (the parallel TourneyMachine scraper, hardcoded 11U-Girls/"Legacy")
+-> superseded by the single aster-sports ingest (#1102) read via the public RPCs.
+This removes the two-scrapers / two-sources-of-truth state (AP #42 / #63).
+
+--------------------------------------------------------------------------------
+WHAT THIS CHANGES vs. THE ARCHITECT'S PLAN
+--------------------------------------------------------------------------------
+- D-FV1: host moves from the aster-sports app (Vercel) to astersports.io/aau
+  (astersports-web on Railway). The renders are ALREADY .io screens (dark Aster
+  gold), so the styling is native there, not an exception in the app's light system.
+- UNCHANGED: the schema (applied + live), the engine, the trust/child-safety model
+  (canAccessChildData = verifiedGuardian AND paidEntitlement, live re-check), the
+  public/contained data classification, the held items (Stripe webhook -> money-path
+  review; film -> §C). The CROSS-PROGRAM family-subscription model (org-agnostic,
+  follow any scraped team) is reinforced: a web-hub parent can have kids in programs
+  the app doesn't run -> public tracking for those; the VERIFIED child profile lights
+  up only for programs we run (where the roster/guardianship authority exists).
+
+--------------------------------------------------------------------------------
+BUILD ORDER ON astersports.io/aau
+--------------------------------------------------------------------------------
+1. Foundation (this commit): aster-sports public client (client/src/lib/aster.ts) +
+   ported engine (client/src/lib/standings/*).
+2. Hooks + the public hub (R1: track teams, standings, AI-narrated odds, push) and
+   division/bracket detail (R2), reading the public RPCs.
+3. The verified family-profile claim flow (R3) — verification-first, on the trust
+   schema; child profiles live here, verified against aster-sports rosters.
+4. Retire server/scraper.ts once the hub reads the aster-sports ingest end-to-end.
+HELD: Stripe webhook (money-path review); film (§C). FRANK: second-parent sub;
+past_due grace; pricing.
+================================================================================
