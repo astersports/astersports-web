@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AAU Tracking Hub — the 12 features, rendered</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#070a11; --s1:#10141f; --s2:#151b29; --s3:#1b2233;
+    --ink:#f0f3fa; --dim:#9aa4ba; --mut:#5f6981; --faint:#454e63;
+    --hair:rgba(255,255,255,.055); --hair2:rgba(255,255,255,.09); --line:#212939;
+    --g1:#E0631C; --g2:#E8902A; --g3:#F6CC55; --g4:#FBD56B;
+    --grad:linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B);
+    --live:#34e0a4; --pos:#5ecb8f; --trust:#5ec98e; --neg:#ff6b5e; --amber:#ffb648; --cobalt:#5fa0e6;
+    --apple:#e3e7ef; --google:#6ea2ff; --waze:#2fd0ff;
+    --disp:"Space Grotesk",system-ui,sans-serif; --body:"Inter",system-ui,sans-serif; --mono:"Space Mono",monospace;
+    --sh:0 30px 70px -30px rgba(0,0,0,.8), 0 50px 120px -60px rgba(224,99,28,.26);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#04060a;color:var(--ink);font-family:var(--body);line-height:1.5;-webkit-font-smoothing:antialiased;
+       background-image:radial-gradient(1100px 500px at 78% -8%,rgba(232,144,42,.07),transparent),radial-gradient(900px 600px at 8% 108%,rgba(95,160,230,.05),transparent)}
+  .wrap{max-width:1320px;margin:0 auto;padding:0 24px}
+  .grad-text{background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+  .phero{padding:54px 0 18px}
+  .phero .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--g3)}
+  .phero h1{font-family:var(--disp);font-weight:700;font-size:34px;letter-spacing:-.5px;margin:10px 0 0;line-height:1.1}
+  .phero p{font-size:15px;color:var(--dim);max-width:740px;margin:13px 0 0}
+
+  .band{display:flex;align-items:center;gap:12px;padding:34px 0 6px}
+  .band .dot{width:11px;height:11px;border-radius:50%}
+  .band h2{font-family:var(--disp);font-weight:700;font-size:19px;margin:0}
+  .band .sub{font-family:var(--mono);font-size:11px;color:var(--mut)}
+  .band .ln{height:1px;background:var(--hair);flex:1}
+
+  .gallery{display:flex;flex-wrap:wrap;gap:42px 36px;padding:22px 0 8px;align-items:flex-start;justify-content:flex-start}
+  .cell{flex:0 0 364px;max-width:364px}
+  .cap{margin:0 4px 14px}
+  .cap .row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+  .cap .n{font-family:var(--mono);font-size:11px;color:#1a1206;background:var(--grad);border-radius:7px;padding:3px 9px;font-weight:700}
+  .cap h3{font-family:var(--disp);font-weight:600;font-size:16px;margin:0}
+  .cap p{font-size:12px;color:var(--mut);margin:0;line-height:1.55}
+
+  .device{position:relative;border-radius:44px;padding:10px;background:linear-gradient(160deg,#23293a,#0d111a 60%);box-shadow:var(--sh)}
+  .device::before{content:"";position:absolute;inset:10px;border-radius:35px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.05);pointer-events:none;z-index:5}
+  .screen{position:relative;border-radius:35px;overflow:hidden;background:var(--bg);height:740px;display:flex;flex-direction:column}
+  .island{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:92px;height:25px;background:#000;border-radius:13px;z-index:20}
+  .stat{display:flex;align-items:center;justify-content:space-between;padding:14px 24px 6px;font-family:var(--mono);font-size:12px;color:var(--ink);font-weight:700}
+  .stat .r{font-size:11px}
+  .body{flex:1;overflow:hidden;position:relative}
+  .scr{padding-top:6px}
+  .center{flex:1;display:flex;flex-direction:column;justify-content:center}
+
+  .nav{display:flex;border-top:1px solid var(--hair);background:rgba(10,13,20,.9);backdrop-filter:blur(8px);padding-bottom:6px}
+  .nav a{flex:1;text-align:center;padding:10px 0 8px;text-decoration:none;color:var(--mut);font-size:9.5px;font-weight:500}
+  .nav a svg{width:21px;height:21px;display:block;margin:0 auto 3px;opacity:.85}
+  .nav a.on{color:var(--g3)}.nav a.on svg{opacity:1}
+
+  .px{padding:0 18px}
+  .eye{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#cdb98c}
+  .htitle{font-family:var(--disp);font-weight:700;font-size:22px;letter-spacing:-.3px;margin-top:4px}
+  .seclbl{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);margin:16px 18px 10px}
+  .seclbl .ln{height:1px;background:var(--hair);flex:1}
+  .card{border:1px solid var(--hair);border-top-color:var(--hair2);border-radius:16px;background:linear-gradient(180deg,var(--s2),var(--s1))}
+  .chip{font-family:var(--mono);font-size:10px;border:1px solid var(--line);border-radius:7px;padding:3px 9px;color:var(--dim)}
+  .pulse{width:8px;height:8px;border-radius:50%;background:var(--live);box-shadow:0 0 0 0 rgba(52,224,164,.5),0 0 10px rgba(52,224,164,.7);animation:p 1.7s infinite;display:inline-block}
+  @keyframes p{0%{box-shadow:0 0 0 0 rgba(52,224,164,.5),0 0 10px rgba(52,224,164,.7)}70%{box-shadow:0 0 0 9px rgba(52,224,164,0),0 0 10px rgba(52,224,164,.7)}100%{box-shadow:0 0 0 0 rgba(52,224,164,0),0 0 10px rgba(52,224,164,.7)}}
+  @media (prefers-reduced-motion:reduce){.pulse{animation:none}}
+  .prov{display:flex;align-items:center;gap:7px;font-size:10px;color:var(--mut);font-family:var(--mono);line-height:1.4}
+  .prov svg{width:11px;height:11px;color:var(--pos);flex:0 0 auto}
+  .foot{padding:11px 18px 16px;font-size:10.5px;color:var(--mut);text-align:center;font-family:var(--mono);line-height:1.5}
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:none;border-radius:13px;padding:13px;font-family:var(--disp);font-weight:600;font-size:13.5px;color:#1a1206;background:var(--grad);box-shadow:0 12px 28px -14px rgba(224,99,28,.6)}
+  .btn svg{width:16px;height:16px}
+  .btn.ghost{background:var(--s2);color:var(--ink);border:1px solid var(--line);box-shadow:none}
+
+  /* lock-screen push */
+  .lock{position:absolute;inset:0;background:radial-gradient(600px 380px at 50% 12%,rgba(232,144,42,.10),transparent),linear-gradient(180deg,#0a0e17,#05070c);z-index:30;display:flex;flex-direction:column;align-items:center;padding-top:64px}
+  .lock .time{font-family:var(--disp);font-weight:600;font-size:60px;letter-spacing:-1px}
+  .lock .date{font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:2px}
+  .push{margin:30px 14px 0;width:calc(100% - 28px);border-radius:18px;background:rgba(28,34,50,.82);backdrop-filter:blur(14px);border:1px solid var(--hair2);padding:13px 14px;display:flex;gap:11px;box-shadow:0 18px 40px -18px rgba(0,0,0,.7)}
+  .push .ai{width:34px;height:34px;border-radius:9px;background:var(--grad);display:grid;place-items:center;flex:0 0 auto}
+  .push .ai svg{width:18px;height:18px;color:#1a1206}
+  .push .pc .ph{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+  .push .pc .pt{font-weight:700;font-size:13px;margin-top:2px}
+  .push .pc .pb{font-size:12px;color:var(--dim);margin-top:2px;line-height:1.4}
+
+  /* schedule diff */
+  .alertcard{margin:11px 18px 0;border:1px solid rgba(255,182,72,.32);border-radius:16px;overflow:hidden;background:radial-gradient(240px 120px at 12% 0,rgba(255,182,72,.1),transparent),linear-gradient(180deg,var(--s2),var(--s1))}
+  .alertcard .ah{display:flex;align-items:center;gap:8px;padding:12px 15px;font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--hair)}
+  .alertcard .ah svg{width:14px;height:14px}
+  .alertcard .at{padding:13px 15px 4px;font-family:var(--disp);font-weight:700;font-size:16px}
+  .diff{padding:6px 15px 13px}
+  .drow{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13.5px}
+  .drow .dl{font-family:var(--mono);font-size:10px;color:var(--mut);width:52px;text-transform:uppercase;flex:0 0 auto}
+  .drow .old{color:var(--mut);text-decoration:line-through;font-family:var(--mono)}
+  .drow .arr{color:var(--faint)}.drow .arr svg{width:13px;height:13px;vertical-align:-2px}
+  .drow .new{font-weight:700;color:var(--amber);font-family:var(--mono)}
+  .moved{margin:0 15px 13px;font-size:11px;color:var(--dim);font-family:var(--mono)}
+
+  /* countdown / next game */
+  .ng{margin:14px 18px 0;border:1px solid var(--hair);border-top-color:var(--hair2);border-radius:20px;overflow:hidden;background:radial-gradient(280px 160px at 50% -10%,rgba(232,144,42,.12),transparent),linear-gradient(180deg,var(--s2),var(--s1));text-align:center;padding:18px 16px 16px}
+  .ng .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#cdb98c}
+  .ng .cd{font-family:var(--mono);font-weight:700;font-size:52px;letter-spacing:-2px;margin:6px 0 2px;line-height:1}
+  .ng .who{font-family:var(--disp);font-weight:600;font-size:15px}
+  .ng .vsx{color:var(--mut);font-weight:400}
+  .ng .wh{font-size:12px;color:var(--dim);font-family:var(--mono);margin-top:4px}
+  .ng .line{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:13px;padding-top:13px;border-top:1px solid var(--hair);font-size:13px}
+  .ng .leave{color:var(--amber);font-weight:600}
+  .ng .wx{font-size:11.5px;color:var(--dim);margin-top:9px;display:flex;align-items:center;justify-content:center;gap:6px}
+  .dirs{display:flex;gap:9px;padding:13px 18px 0}
+  .dbtn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);border-radius:11px;padding:9px 0;font-size:11.5px;font-weight:600;text-decoration:none;background:var(--s2)}
+  .dbtn svg{width:14px;height:14px}.dbtn.apple{color:var(--apple)}.dbtn.google{color:var(--google)}.dbtn.waze{color:var(--waze)}
+
+  /* timeline / conflict */
+  .tlhd{display:flex;gap:9px;padding:0 18px}
+  .tlk{display:flex;align-items:center;gap:7px;font-size:11px;font-family:var(--mono)}
+  .tlk .sw{width:11px;height:11px;border-radius:4px}
+  .timeline{margin:12px 18px 0;position:relative;border:1px solid var(--hair);border-radius:16px;background:linear-gradient(180deg,var(--s2),var(--s1));padding:12px 12px 12px 44px}
+  .thr{position:relative;height:30px;display:flex;align-items:center}
+  .thr .tt{position:absolute;left:-34px;font-family:var(--mono);font-size:9px;color:var(--mut);width:30px;text-align:right}
+  .thr .gl{position:absolute;left:0;right:0;height:1px;background:var(--hair)}
+  .blk{position:absolute;height:24px;border-radius:7px;display:flex;align-items:center;padding:0 9px;font-size:10.5px;font-weight:600;font-family:var(--mono);color:#0a0e17;white-space:nowrap}
+  .blk.c{background:linear-gradient(90deg,#5fa0e6,#7fb4ee)}
+  .blk.r{background:linear-gradient(90deg,#54c98a,#74d6a2)}
+  .ov{position:absolute;border:1.5px dashed var(--neg);border-radius:9px;background:rgba(255,107,94,.08)}
+  .conf{margin:13px 18px 0;border:1px solid rgba(255,107,94,.32);border-radius:15px;background:linear-gradient(180deg,rgba(255,107,94,.07),rgba(255,107,94,.01));padding:13px 14px}
+  .conf .ct{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--neg)}
+  .conf .ct svg{width:14px;height:14px}
+  .conf .cb{font-size:13px;margin-top:7px;line-height:1.5}.conf .cb b{font-weight:700}
+  .split{margin:11px 18px 0;border:1px solid var(--hair);border-radius:15px;background:linear-gradient(180deg,var(--s2),var(--s1));overflow:hidden}
+  .split .sh{padding:11px 14px;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#cdb98c;border-bottom:1px solid var(--hair)}
+  .split .sr{display:flex;align-items:center;gap:11px;padding:11px 14px;font-size:13px}
+  .split .sr+.sr{border-top:1px solid var(--hair)}
+  .split .av{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-family:var(--disp);font-weight:700;font-size:13px;flex:0 0 auto}
+  .split .av.c{background:rgba(95,160,230,.16);color:var(--cobalt);border:1px solid rgba(95,160,230,.3)}
+  .split .av.d{background:rgba(232,144,42,.14);color:var(--g3);border:1px solid #5a4a25}
+  .split .sd{flex:1}.split .sd b{font-weight:600}.split .sd small{display:block;color:var(--mut);font-family:var(--mono);font-size:10px;margin-top:1px}
+  .split .walk{font-family:var(--mono);font-size:10px;color:var(--dim);text-align:center;padding:7px;border-top:1px solid var(--hair);background:rgba(255,255,255,.015)}
+
+  /* bracket path */
+  .path{margin:13px 18px 0;position:relative;padding-left:8px}
+  .pstep{position:relative;padding:0 0 4px 30px;margin-bottom:10px}
+  .pstep::before{content:"";position:absolute;left:9px;top:22px;bottom:-12px;width:2px;background:var(--hair)}
+  .pstep:last-child::before{display:none}
+  .pdot{position:absolute;left:2px;top:4px;width:16px;height:16px;border-radius:50%;border:2px solid var(--line);background:var(--bg)}
+  .pstep.now .pdot{background:var(--grad);border-color:transparent;box-shadow:0 0 12px rgba(246,204,85,.5)}
+  .pstep.done .pdot{background:var(--pos);border-color:transparent}
+  .pcard2{border:1px solid var(--hair);border-radius:13px;background:linear-gradient(180deg,var(--s2),var(--s1));padding:11px 13px}
+  .pstep.now .pcard2{border-color:rgba(246,204,85,.4)}
+  .pcard2 .pw{font-family:var(--mono);font-size:9.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+  .pcard2 .pn{font-weight:600;font-size:13.5px;margin-top:3px}.pcard2 .pn .vsx{color:var(--mut);font-weight:400}
+  .pcard2 .pwhen{font-family:var(--mono);font-size:10.5px;color:var(--g3);margin-top:3px}
+
+  /* recap */
+  .recap{margin:14px 18px 0;border:1px solid var(--hair);border-top-color:var(--hair2);border-radius:20px;overflow:hidden;background:radial-gradient(260px 150px at 50% -10%,rgba(94,203,143,.12),transparent),linear-gradient(180deg,var(--s2),var(--s1));text-align:center;padding:16px}
+  .recap .fin{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--pos)}
+  .recap .rs{display:flex;align-items:center;justify-content:center;gap:14px;margin:10px 0 4px}
+  .recap .rt{flex:1;text-align:right}.recap .rt.l{text-align:left}
+  .recap .rt .nm{font-family:var(--disp);font-weight:600;font-size:14px}.recap .rt .nm.me{color:#bfe7d8}
+  .recap .rp{font-family:var(--mono);font-weight:700;font-size:34px;letter-spacing:-1px}.recap .rp.w{color:var(--g3)}
+  .recap .rd{color:var(--faint);font-family:var(--mono)}
+  .recap .clinch{display:inline-block;margin-top:6px;font-size:13px;font-weight:600;color:var(--g3)}
+  .recap .key{font-size:11.5px;color:var(--dim);margin-top:8px;font-family:var(--mono)}
+  .pushed{display:flex;align-items:center;justify-content:center;gap:7px;margin:12px 18px 0;font-family:var(--mono);font-size:10.5px;color:var(--mut)}
+  .pushed .avs{display:flex}.pushed .avs span{width:20px;height:20px;border-radius:50%;border:2px solid var(--bg);margin-left:-6px;background:var(--s3);display:grid;place-items:center;font-size:9px;color:var(--dim)}
+
+  /* calendar */
+  .calbtns{display:flex;gap:9px;padding:0 18px}
+  .agenda{margin:14px 18px 0;border:1px solid var(--hair);border-radius:16px;background:linear-gradient(180deg,var(--s2),var(--s1));overflow:hidden}
+  .agenda .ad{padding:10px 14px;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#cdb98c;border-bottom:1px solid var(--hair)}
+  .arow{display:flex;align-items:center;gap:11px;padding:11px 14px;font-size:12.5px}
+  .arow+.arow{border-top:1px solid var(--hair)}
+  .arow .tm{font-family:var(--mono);font-size:11px;color:var(--g3);width:48px;flex:0 0 auto}
+  .arow .bar{width:3px;align-self:stretch;border-radius:2px;background:var(--cobalt)}
+  .arow .ad2{flex:1}.arow .ad2 b{font-weight:600}.arow .ad2 small{display:block;color:var(--mut);font-family:var(--mono);font-size:10px;margin-top:1px}
+  .autoupd{display:flex;align-items:center;justify-content:center;gap:7px;margin:11px 18px 0;font-family:var(--mono);font-size:10px;color:var(--dim);background:rgba(246,204,85,.04);border:1px solid rgba(246,204,85,.16);border-radius:10px;padding:9px}
+  .autoupd svg{width:13px;height:13px;color:var(--g3)}
+
+  /* share family */
+  .linkbox{margin:14px 18px 0;display:flex;align-items:center;gap:10px;border:1px dashed var(--line);border-radius:13px;background:var(--s2);padding:13px 14px;font-family:var(--mono);font-size:12px;color:var(--dim)}
+  .linkbox svg{width:16px;height:16px;color:var(--g2);flex:0 0 auto}
+  .linkbox .cp{margin-left:auto;color:var(--g3);font-size:11px}
+  .following{margin:14px 18px 0;border:1px solid var(--hair);border-radius:15px;background:linear-gradient(180deg,var(--s2),var(--s1));padding:13px 14px}
+  .following .fl{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);margin-bottom:10px}
+  .frow{display:flex;align-items:center;gap:11px;padding:7px 0;font-size:13px}
+  .frow .fa{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-family:var(--disp);font-weight:700;font-size:13px;flex:0 0 auto}
+  .frow .fa.a{background:rgba(232,144,42,.14);color:var(--g3)}.frow .fa.b{background:rgba(95,160,230,.16);color:var(--cobalt)}.frow .fa.c{background:rgba(94,203,143,.14);color:var(--pos)}
+  .frow .fn{flex:1;font-weight:600}.frow .fn small{display:block;color:var(--mut);font-family:var(--mono);font-size:10px;font-weight:400}
+  .frow .role{font-family:var(--mono);font-size:9.5px;color:var(--dim);border:1px solid var(--line);border-radius:6px;padding:3px 7px}
+
+  /* watching now */
+  .lhero{margin:12px 18px 0;border-radius:18px;overflow:hidden;border:1px solid rgba(52,224,164,.28);background:radial-gradient(300px 120px at 20% 0%,rgba(52,224,164,.12),transparent),linear-gradient(180deg,var(--s3),var(--s1))}
+  .lhero .lt{display:flex;align-items:center;justify-content:space-between;padding:11px 15px;font-family:var(--mono);font-size:10px;color:var(--live);border-bottom:1px solid var(--hair)}
+  .lhero .sc{display:flex;align-items:center;justify-content:space-between;padding:14px 16px}
+  .lhero .nm{font-family:var(--disp);font-weight:600;font-size:15px}.lhero .nm.me{color:#bfe7d8}
+  .lhero .pts{font-family:var(--mono);font-weight:700;font-size:30px;letter-spacing:-1px}.lhero .pts.win{color:var(--g3)}
+  .lhero .vs{font-family:var(--mono);font-size:11px;color:var(--faint);padding:0 9px}
+  .watch{display:flex;align-items:center;gap:10px;margin:13px 18px 0;border:1px solid var(--hair);border-radius:14px;background:linear-gradient(180deg,var(--s2),var(--s1));padding:13px 15px}
+  .watch .wn{font-family:var(--disp);font-weight:700;font-size:20px}
+  .watch .wl{font-size:11.5px;color:var(--dim)}.watch .wl small{display:block;font-family:var(--mono);font-size:9.5px;color:var(--mut);margin-top:2px}
+  .watch .rx{margin-left:auto;display:flex;gap:6px;font-size:18px}
+  .watch .rx span{filter:saturate(1.1)}
+
+  /* kid card */
+  .kc{margin:auto 18px;border-radius:22px;overflow:hidden;border:1px solid var(--hair2);background:linear-gradient(165deg,#1a2740,#0c1320);position:relative;box-shadow:0 30px 60px -30px rgba(95,160,230,.5)}
+  .kc::before{content:"";position:absolute;inset:0;background:radial-gradient(220px 160px at 80% 10%,rgba(95,160,230,.25),transparent)}
+  .kc .top{position:relative;height:160px;display:grid;place-items:center;background:radial-gradient(120px 120px at 50% 45%,rgba(95,160,230,.3),transparent)}
+  .kc .jersey{font-family:var(--disp);font-weight:800;font-size:74px;color:rgba(255,255,255,.92);text-shadow:0 6px 30px rgba(95,160,230,.5)}
+  .kc .meta{position:relative;padding:16px 18px 18px;border-top:1px solid rgba(95,160,230,.25)}
+  .kc .nm{font-family:var(--disp);font-weight:700;font-size:26px;letter-spacing:-.5px}
+  .kc .tm{font-family:var(--mono);font-size:12px;color:#a9c6e8;margin-top:3px}
+  .kc .stats{display:flex;gap:18px;margin-top:14px}
+  .kc .st{}.kc .st .v{font-family:var(--disp);font-weight:700;font-size:18px}.kc .st .l{font-family:var(--mono);font-size:9px;color:#8fb0d6;text-transform:uppercase;margin-top:2px}
+  .kc .col{position:absolute;top:14px;right:16px;display:flex;gap:5px}
+  .kc .col i{width:9px;height:22px;border-radius:3px}
+
+  /* digest */
+  .digest{margin:14px 18px 0;border:1px solid var(--hair);border-top-color:var(--hair2);border-radius:18px;background:radial-gradient(240px 130px at 85% 0,rgba(232,144,42,.08),transparent),linear-gradient(180deg,var(--s2),var(--s1));padding:16px}
+  .digest .dh{display:flex;align-items:center;gap:9px;margin-bottom:13px}
+  .digest .di{width:30px;height:30px;border-radius:9px;background:var(--grad);display:grid;place-items:center;flex:0 0 auto}
+  .digest .di svg{width:16px;height:16px;color:#1a1206}
+  .digest .dt{font-family:var(--disp);font-weight:700;font-size:15px}.digest .dt small{display:block;font-family:var(--mono);font-size:9.5px;color:var(--mut);font-weight:400;margin-top:1px}
+  .dline{display:flex;align-items:flex-start;gap:11px;padding:8px 0;font-size:13.5px;line-height:1.45}
+  .dline .dn{font-family:var(--mono);font-size:11px;color:var(--g3);flex:0 0 auto;margin-top:2px}
+  .dline b{font-weight:600}
+
+  /* milestones */
+  .ms{margin:12px 18px 0;display:flex;align-items:center;gap:13px;border:1px solid var(--hair);border-radius:16px;background:linear-gradient(180deg,var(--s2),var(--s1));padding:14px}
+  .ms .badge{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;font-size:24px;flex:0 0 auto}
+  .ms.gold .badge{background:radial-gradient(circle at 40% 30%,rgba(246,204,85,.3),rgba(246,204,85,.08));border:1px solid #5a4a25}
+  .ms.fire .badge{background:radial-gradient(circle at 40% 30%,rgba(255,107,94,.25),rgba(255,107,94,.06));border:1px solid rgba(255,107,94,.3)}
+  .ms.blue .badge{background:radial-gradient(circle at 40% 30%,rgba(95,160,230,.25),rgba(95,160,230,.06));border:1px solid rgba(95,160,230,.3)}
+  .ms .mt{flex:1}.ms .mt .mn{font-family:var(--disp);font-weight:700;font-size:15px}.ms .mt .md{font-size:11.5px;color:var(--mut);font-family:var(--mono);margin-top:3px}
+  .ms .share{color:var(--mut)}.ms .share svg{width:17px;height:17px}
+
+  /* film gated */
+  .vid{margin:14px 18px 0;border-radius:16px;overflow:hidden;border:1px solid var(--line);background:#000;position:relative}
+  .vidf{position:relative;aspect-ratio:16/10;background:radial-gradient(160px 100px at 42% 42%,rgba(232,144,42,.14),transparent),linear-gradient(150deg,#1c2c47,#080d15);display:grid;place-items:center;filter:blur(1px)}
+  .vidf .court{position:absolute;left:16%;right:16%;top:32%;bottom:16%;border:1.5px solid rgba(246,204,85,.14);border-radius:46% 46% 5% 5%/60% 60% 5% 5%}
+  .vlock{position:absolute;inset:0;background:rgba(6,9,15,.66);backdrop-filter:blur(2px);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2;padding:20px;text-align:center}
+  .vlock .lk{width:46px;height:46px;border-radius:50%;background:rgba(246,204,85,.14);border:1px solid #5a4a25;display:grid;place-items:center;margin-bottom:11px}
+  .vlock .lk svg{width:22px;height:22px;color:var(--g3)}
+  .vlock .lt{font-family:var(--disp);font-weight:700;font-size:16px}
+  .vlock .ls{font-size:11.5px;color:var(--dim);margin-top:5px;max-width:230px;line-height:1.5}
+  .heldrow{display:flex;align-items:center;gap:9px;margin:13px 18px 0;padding:11px 14px;border:1px solid var(--hair);border-radius:13px;background:linear-gradient(180deg,var(--s2),var(--s1));font-size:12px;color:var(--dim)}
+  .heldrow .hi{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;flex:0 0 auto}
+  .heldrow .hi.t{background:rgba(94,201,142,.12);color:var(--trust)}.heldrow .hi.m{background:rgba(246,204,85,.1);color:var(--g3)}
+  .heldrow .hi svg{width:14px;height:14px}.heldrow b{color:var(--ink);font-weight:600}
+
+  footer{padding:34px 0 80px;text-align:center;color:var(--mut);font-size:12px;border-top:1px solid var(--hair);font-family:var(--mono);line-height:1.8;margin-top:30px}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="home" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7M6 10v9h12v-9" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="chart" viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="film" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M8 4v16M16 4v16" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="play" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z" fill="currentColor"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="M5 12l5 5L20 6" fill="none" stroke="currentColor" stroke-width="2.6"/></symbol>
+  <symbol id="x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6"/></symbol>
+  <symbol id="bell" viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 21h4" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="warn" viewBox="0 0 24 24"><path d="M12 4l9 16H3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4M12 17v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="pin" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.3" fill="currentColor"/></symbol>
+  <symbol id="navarr" viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z" fill="currentColor"/></symbol>
+  <symbol id="car" viewBox="0 0 24 24"><path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11M5 11h14v5H5zM5 16v2M19 16v2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="13.5" r="1" fill="currentColor"/><circle cx="16" cy="13.5" r="1" fill="currentColor"/></symbol>
+  <symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="trophy" viewBox="0 0 24 24"><path d="M7 4h10v4a5 5 0 0 1-10 0zM5 5H3v2a3 3 0 0 0 3 3M19 5h2v2a3 3 0 0 1-3 3M9 16h6M8 20h8M12 13v3" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="cal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14-4M4 5v3h3M4 13a8 8 0 0 0 14 4M20 19v-3h-3" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="link" viewBox="0 0 24 24"><path d="M9 15l6-6M10 6l1-1a4 4 0 0 1 6 6l-1 1M14 18l-1 1a4 4 0 0 1-6-6l1-1" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="6" cy="12" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="18" cy="19" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 12l2 2 4-4" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="spark" viewBox="0 0 24 24"><path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" fill="currentColor"/></symbol>
+</svg>
+
+<div class="wrap">
+  <div class="phero">
+    <div class="eyebrow">AAU Tracking Hub · the 12 features · premium build target · L99</div>
+    <h1>Twelve features. <span class="grad-text">One parent's weekend, solved.</span></h1>
+    <p>Every feature rendered as its hero moment, grouped by tier. The three killers get the most craft — they're the AAU-specific differentiators TeamSnap and LeagueApps don't touch. All content is placeholder; every value derives from the schedule-intelligence engine and binds to its RPC at runtime. Money, verification, and film stay flipped off.</p>
+  </div>
+</div>
+
+<!-- ================= KILLERS ================= -->
+<div class="wrap">
+  <div class="band"><span class="dot" style="background:var(--neg)"></span><h2>The killers</h2><span class="sub">never close the app</span><span class="ln"></span></div>
+  <div class="gallery">
+
+    <!-- 1 schedule change -->
+    <div class="cell">
+      <div class="cap"><div class="row"><span class="n">01</span><h3>Schedule-change alert</h3></div><p>Re-scrape → diff → "was X, now Y." The AAU pain nobody solves. Pushed the second it moves.</p></div>
+      <div class="device"><div class="island"></div><div class="screen">
+        <div class="lock">
+          <div class="time">12:32</div><div class="date">Saturday, June 27</div>
+          <div class="push"><span class="ai"><svg><use href="#warn"/></svg></span><span class="pc"><span class="ph"><span>Aster</span><span>now</span></span><span class="pt">Legacy 11U moved up ⚠️</span><span class="pb">Now 12:40 · Court 2 (was 1:30 · Court 4). Tap for directions.</span></span></div>
+          <div style="position:absolute;bottom:18px;left:0;right:0;text-align:center;font-family:var(--mono);font-size:10px;color:var(--mut)">in-app ↓</div>
+        </div>
+        <div class="stat"><span>9:41</span><span class="r">●●● ▮</span></div>
+        <div class="body"><div class="scr">
+          <div class="seclbl">Schedule update<span class="ln"></span></div>
+          <div class="alertcard"><div class="ah"><svg><use href="#warn"/></svg> Game moved up · re-seeded pool</div>
+            <div class="at">Legacy 11U Girls</div>
+            <div class="diff">
+              <div class="drow"><span class="dl">Time</span><span class="old">1:30 PM</span><span class="arr"><svg><use href="#arrow"/></svg></span><span class="new">12:40 PM</span></div>
+              <div class="drow"><span class="dl">Court</span><span class="old">Court 4</span><span class="arr"><svg><use href="#arrow"/></svg></span><span class="new">Court 2</span></div>
+            </div>
+            <div class="moved">Moved up 50 min · now 2h 8m away · same venue</div>
+          </div>
+          <div class="px" style="margin-top:13px"><button class="btn"><svg><use href="#navarr"/></svg> Updated directions</button></div>
+          <div class="foot">We diff every re-scrape — you hear about it before the gym announces it.</div>
+        </div></div>
+        <div class="nav"><a><svg><use href="#home"/></svg>My Teams</a><a><svg><use href="#chart"/></svg>Standings</a><a class="on"><svg><use href="#bell"/></svg>Alerts</a><a><svg><use href="#film"/></svg>Film</a></div>
+      </div></div>
+    </div>
+
+    <!-- 2 next game + travel -->
+    <div class="cell">
+      <div class="cap"><div class="row"><span class="n">02</span><h3>Next game + travel</h3></div><p>Live countdown, real drive time, and a "leave by" nudge so you never miss a tip. (+weather.)</p></div>
+      <div class="device"><div class="island"></div><div class="screen">
+        <div class="stat"><span>9:41</span><span class="r">●●● ▮</span></div>
+        <div class="body"><div class="scr">
+          <div class="px"><div class="eye">Up next · Charlie</div></div>
+          <div class="ng"><div class="lbl">Charlie plays in</div>
+            <div class="cd grad-text">1:12</div>
+            <div class="who">Legacy 11U <span class="vsx">vs</span> CT Hoops</div>
+            <div class="wh">Court 3 · Westchester County Center</div>
+            <div class="line"><svg width="15" height="15" style="color:var(--mut)"><use href="#car"/></svg> 18 min drive · <span class="leave">leave by 12:05</span></div>
+            <div class="wx"><svg width="13" height="13" style="color:var(--g3)"><use href="#sun"/></svg> 88°F &amp; sunny — bring water + shade</div>
+          </div>
+          <div class="dirs"><a class="dbtn apple"><svg><use href="#navarr"/></svg>Apple</a><a class="dbtn google"><svg><use href="#navarr"/></svg>Google</a><a class="dbtn waze"><svg><use href="#navarr"/></svg>Waze</a></div>
+          <div class="px" style="margin-top:11px"><button class="btn ghost"><svg style="color:var(--g3)"><use href="#bell"/></svg> Remind me to leave</button></div>
+          <div class="foot">Countdown + drive time from venue lat/lng. Weather via aster-weather.</div>
+        </div></div>
+        <div class="nav"><a class="on"><svg><use href="#home"/></svg>My Teams</a><a><svg><use href="#chart"/></svg>Standings</a><a><svg><use href="#bell"/></svg>Alerts</a><a><svg><use href="#film"/></svg>Film</a></div>
+      </div></div>
+    </div>
+
+    <!-- 3 conflict radar -->
+    <div class="cell">
+      <div class="cap"><div class="row"><span class="n">03</span><h3>Conflict radar + split-up</h3></div><p>Two kids, two courts, overlapping. We catch it — and tell you who covers whom.</p></div>
+      <div class="device"><div class="island"></div><div class="screen">
+        <div class="stat"><span>9:41</span><span class="r">●●● ▮</span></div>
+        <div class="body"><div class="scr">
+          <div class="px"><div class="eye">Saturday · your day</div><div class="htitle">2 games overlap</div></div>
+          <div class="tlhd" style="margin-top:10px"><span class="tlk"><span class="sw" style="background:#5fa0e6"></span>Charlie</span><span class="tlk"><span class="sw" style="background:#54c98a"></span>Rowan</span></div>
+          <div class="timeline">
+            <div class="thr" style="height:34px"><span class="tt">12:00</span><span class="gl"></span></div>
+            <div class="thr" style="height:34px"><span class="tt">12:40</span><span class="gl"></span></div>
+            <div class="thr" style="height:34px"><span class="tt">1:20</span><span class="gl"></span></div>
+            <div class="blk c" style="top:6px;left:0;width:54%">Charlie · Ct 3</div>
+            <div class="blk r" style="top:44px;left:18%;width:62%">Rowan · Ct 1</div>
+            <div class="ov" style="top:40px;left:16%;width:40%;height:24px"></div>
+          </div>
+          <div class="conf"><div class="ct"><svg><use href="#warn"/></svg> Overlap · 12:50–1:10</div>
+            <div class="cb"><b>Charlie</b> (Court 3, 12:40) and <b>Rowan</b> (Court 1, 12:50) run at the same time.</div></div>
+          <div class="split"><div class="sh">Split-up assist</div>
+            <div class="sr"><span class="av c">C</span><span class="sd"><b>You → Charlie</b><small>Court 3 · 12:40</small></span></div>
+            <div class="sr"><span class="av d">D</span><span class="sd"><b>Dad → Rowan</b><small>Court 1 · 12:50</small></span></div>
+            <div class="walk">Courts are a 4-min walk apart · each parent gets their kid's alerts</div></div>
+          <div class="foot">Only possible because you track both — TeamSnap can't see across teams.</div>
+        </div></div>
+        <div class="nav"><a class="on"><svg><use href="#home"/></svg>My Teams</a><a><svg><use href="#chart"/></svg>Standings</a><a><svg><use href="#bell"/></svg>Alerts</a><a><svg><use href="#film"/></svg>Film</a></div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ================= HIGH-VALUE ================= -->
+<div class="wrap">
+  <div class="band"><span class="dot" style="background:var(--amber)"></span><h2>High-value, simple</h2><span class="sub">the next wave</span><span class="ln"></span></div>
+  <div class="gallery">
+
+    <!-- 4 bracket path -->
+    <div class="cell">
+      <div class="cap"><div class="row"><span class="n">04</span><h3>Road to the chip</h3></div><p>Turns the exact predictor into a story — every step to the championship.</p></div>
+      <div class="device"><div class="island"></div><div class="screen">
+        <div class="stat"><span>9:41</span><span class="r">●●● ▮</span></div>
+        <div class="body"><div class="scr">
+          <div class="px"><div class="eye">Legacy 11U · road to the chip</div><div class="htitle">3 wins from the title</div></div>
+          <div class="path">
+            <div class="pstep done"><span class="pdot"></span><div class="pcard2"><div class="pw">Pool play · done</div><div class="pn">Pool A · 3–0</div><div class="pwhen">+38 differential · top seed in reach</div></div></div>
+            <div class="pstep now"><span class="pdot"></span><div class="pcard2"><div class="pw">Now · win to clinch</div><div class="pn">vs CT Hoops</div><div class="pwhen">Sat 5:30p · win → 1-seed</div></div></div>
+            <div class="pstep"><span class="pdot"></span><div class="pcard2"><div class="pw">Quarterfinal</div><div class="pn">vs <span class="vsx">winner of Pool B</span></div><div class="pwhen">Sun 9:00a · County Center</div></div></div>
+            <div class="pstep"><span class="pdot"></span><div class="pcard2"><div class="pw">Semifinal</div><div class="pn"><span class="vsx">TBD</span></div><div class="pwhen">Sun 11:30a</div></div></div>
+            <div class="pstep"><span class="pdot"></span><div class="pcard2" style="border-color:#5a4a25"><div class="pw" style="color:var(--g3)">🏆 Final</div><div class="pn"><span class="vsx">TBD</span></div><div class="pwhen">Sun 2:00p</div></div></div>
+          </div>
+          <div class="px" style="margin-top:8px"><span class="prov"><svg><use href="#check"/></svg>Path exact from the bracket · seeds fill as games resolve</span></div>
+        </div></div>
+        <div class="nav"><a><svg><use href="#home"/></svg>My Teams</a><a class="on"><svg><use href="#chart"/></svg>Standings</a><a><svg><use href="#bell"/></svg>Alerts</a><a><svg><use href="#film"/></svg>Film</a></div>
+      </div></div>
+    </div>
+
+    <!-- 5 recap -->
+    <div class="cell">
+      <div class="cap"><div class="row"><span class="n">05</span><h3>Auto game recap</h3></div><p>Final buzzer → a recap pushed to your phone and grandma's. Near-free on the final event.</p></div>
+      <div class="device"><div class="island"></div><div class="screen">
+        <div class="stat"><span>9:41</span><span class="r">●●● ▮</span></div>
+        <div class="body"><div class="scr">
+          <div class="seclbl">Just final<span class="ln"></span></div>
+          <div class="recap"><div class="fin">Final · Pool A</div>
+            <div class="rs"><div class="rt l"><div class="nm me">Legacy 11U</div></div><div class="rp w">52</div><div class="rd">–</div><div class="rp">47</div><div class="rt"><div class="nm">CT Hoops</div></div></div>
+            <div class="clinch">🎉 Clinched Pool A — top seed</div>
+            <div class="key">Charlie 12 pts · team-high 9 rebounds</div>
+          </div>
+          <div class="pushed"><span class="avs"><span>M</span><span>D</span><span>G</span><span>+1</span></span> pushed to 4 followers</div>
+          <div class="px" style="margin-top:13px"><button class="btn ghost"><svg style="color:var(--g3)"><use href="#share"/></svg> Share the recap</button></div>
+          <div class="foot">Fires on the game_final event · stats team-level until verification flips.</div>
+        </div></div>
+        <div class="nav"><a class="on"><svg><use href="#home"/></svg>My Teams</a><a><svg><use href="#chart"/></svg>Standings</a><a><svg><use href="#bell"/></svg>Alerts</a><a><svg><use href="#film"/></svg>Film</a></div>
+      </div></div>
+    </div>
+
+    <!-- 6 calendar -->
+    <div class="cell">
+      <div class="cap"><div class="row"><span class="n">06</span><h3>Weekend → calendar</h3></div><p>One tap to Apple/Google Calendar — and it auto-updates when the schedule moves.</p></div>
+      <div class="device"><div class="island"></div><div class="screen">
+        <div class="stat"><span>9:41</span><span class="r">●●● ▮</span></div>
+        <div class="body"><div class="scr">
+          <div class="px"><div class="eye">This weekend · 6 games</div><div class="htitle">Add to your calendar</div></div>
+          <div class="calbtns" style="margin-top:13px"><a class="dbtn apple" style="padding:11px 0"><svg><use href="#cal"/></svg>Apple</a><a class="dbtn google" style="padding:11px 0"><svg><use href="#cal"/></svg>Google</a></div>
+          <div class="agenda"><div class="ad">Saturday, Jun 27</div>
+            <div class="arow"><span class="tm">12:40p</span><span class="bar"></span><span class="ad2"><b>Legacy 11U vs CT Hoops</b><small>County Center · Court 2</small></span></div>
+            <div class="arow"><span class="tm">3:15p</span><span class="bar"></span><span class="ad2"><b>Legacy 11U — QF if seeded</b><small>County Center</small></span></div>
+            <div class="arow"><span class="tm">12:50p</span><span class="bar" style="background:#54c98a"></span><span class="ad2"><b>Rowan 8U vs Stars</b><small>Rippowam · Court 1</small></span></div>
+          </div>
+          <div class="autoupd"><svg><use href="#refresh"/></svg> Auto-updates in your calendar when a game moves</div>
+          <div class="foot">An auto-refreshing .ics feed — schedule changes flow straight in.</div>
+        </div></div>
+        <div class="nav"><a class="on"><svg><use href="#home"/></svg>My Teams</a><a><svg><use href="#chart"/></svg>Standings</a><a><svg><use href="#bell"/></svg>Alerts</a><a><svg><use href="#film"/></svg>Film</a></div>
+      </div></div>
+    </div>
+
+    <!-- 7 share family -->
+    <div class="cell">
+      <div class="cap"><div class="row"><span class="n">07</span><h3>Share to family</h3></div><p>Mom, Dad &amp; Grandma all see the same scores. One link onboards extended family — your viral lever.</p></div>
+      <div class="device"><div class="island"></div><div class="screen">
+        <div class="stat"><span>9:41</span><span class="r">●●● ▮</span></div>
+        <div class="body"><div class="scr">
+          <div class="px"><div class="eye">Bring the family</div><div class="htitle">Follow Charlie's team</div></div>
+          <div class="linkbox"><svg><use href="#link"/></svg> aster.io/t/legacy-11u <span class="cp">Copy</span></div>
+          <div class="following"><div class="fl">Following · 3</div>
+            <div class="frow"><span class="fa a">M</span><span class="fn">Mom<small>you</small></span><span class="role">guardian</span></div>
+            <div class="frow"><span class="fa b">D</span><span class="fn">Dad<small>joined via link</small></span><span class="role">guardian</span></div>
+            <div class="frow"><span class="fa c">G</span><span class="fn">Grandma<small>joined via link</small></span><span class="role">follower</span></div>
+          </div>
+          <div class="px" style="margin-top:13px"><button class="btn"><svg><use href="#share"/></svg> Share the link</button></div>
+          <div class="foot">Followers see scores &amp; schedule only — never private kid data.</div>
+        </div></div>
+        <div class="nav"><a class="on"><svg><use href="#home"/></svg>My Teams</a><a><svg><use href="#chart"/></svg>Standings</a><a><svg><use href="#bell"/></svg>Alerts</a><a><svg><use href="#film"/></svg>Film</a></div>
+      </div></div>
+    </div>
+
+    <!-- 8 watching now -->
+    <div class="cell">
+      <div class="cap"><div class="row"><span class="n">08</span><h3>Watching now</h3></div><p>The crowd feeling — "14 following 🔥" on a live game. Realtime presence, count only, never who.</p></div>
+      <div class="device"><div class="island"></div><div class="screen">
+        <div class="stat"><span>9:41</span><span class="r">●●● ▮</span></div>
+        <div class="body"><div class="scr">
+          <div class="px" style="padding-top:8px"><div class="eye">Live now</div></div>
+          <div class="lhero"><div class="lt"><span><span class="pulse"></span> LIVE · Q3 2:14</span><span>Pool A</span></div>
+            <div class="sc"><div><div class="nm me">Legacy 11U</div></div><div class="pts win">41</div><div class="vs">–</div><div class="pts">38</div><div style="text-align:right"><div class="nm">Gravity</div></div></div></div>
+          <div class="watch"><div><div class="wn grad-text">14</div></div><div class="wl">following this game right now<small>count only · we never show who</small></div><div class="rx"><span>🔥</span><span>👏</span><span>🙌</span></div></div>
+          <div class="px" style="margin-top:13px"><button class="btn ghost"><span style="font-size:16px">🔥</span> React</button></div>
+          <div class="foot">Realtime presence ping — the family crowd in your pocket.</div>
+        </div></div>
+        <div class="nav"><a class="on"><svg><use href="#home"/></svg>My Teams</a><a><svg><use href="#chart"/></svg>Standings</a><a><svg><use href="#bell"/></svg>Alerts</a><a><svg><use href="#film"/></svg>Film</a></div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ================= KID / FAMILY ================= -->
+<div class="wrap">
+  <div class="band"><span class="dot" style="background:var(--pos)"></span><h2>The kid / family layer</h2><span class="sub">emotional core · some gated</span><span class="ln"></span></div>
+  <div class="gallery">
+
+    <!-- 9 kid card -->
+    <div class="cell">
+      <div class="cap"><div class="row"><span class="n">09</span><h3>Kid card</h3></div><p>Their identity in the app — name, jersey #, team colors. The emotional anchor.</p></div>
+      <div class="device"><div class="island"></div><div class="screen">
+        <div class="stat"><span>9:41</span><span class="r">●●● ▮</span></div>
+        <div class="body" style="display:flex;flex-direction:column">
+          <div class="center">
+            <div class="kc"><div class="col"><i style="background:#5fa0e6"></i><i style="background:#fff"></i></div>
+              <div class="top"><div class="jersey">5</div></div>
+              <div class="meta"><div class="nm">Charlie</div><div class="tm">Legacy Hoopers · 11U Girls</div>
+                <div class="stats"><div class="st"><div class="v grad-text">3–0</div><div class="l">pool A</div></div><div class="st"><div class="v">1st</div><div class="l">seed</div></div><div class="st"><div class="v">🔥</div><div class="l">on a roll</div></div></div>
+              </div>
+            </div>
+            <div class="foot" style="margin-top:18px">Team-level until verification + $20 unlock her private stats.</div>
+          </div>
+        </div>
+        <div class="nav"><a class="on"><svg><use href="#home"/></svg>My Teams</a><a><svg><use href="#chart"/></svg>Standings</a><a><svg><use href="#bell"/></svg>Alerts</a><a><svg><use href="#film"/></svg>Film</a></div>
+      </div></div>
+    </div>
+
+    <!-- 10 digest -->
+    <div class="cell">
+      <div class="cap"><div class="row"><span class="n">10</span><h3>AI weekend digest</h3></div><p>"Your Saturday in 3 lines." Grounded on real results — the brief that reopens the app.</p></div>
+      <div class="device"><div class="island"></div><div class="screen">
+        <div class="stat"><span>9:41</span><span class="r">●●● ▮</span></div>
+        <div class="body"><div class="scr">
+          <div class="px"><div class="eye">Saturday evening brief</div></div>
+          <div class="digest"><div class="dh"><span class="di"><svg><use href="#spark"/></svg></span><span class="dt">Your Saturday in 3 lines<small>grounded on real results</small></span></div>
+            <div class="dline"><span class="dn">1</span><div><b>Charlie's team went 2–0</b> — beat Westchester and CT Hoops.</div></div>
+            <div class="dline"><span class="dn">2</span><div><b>Clinched Pool A</b> as the 1-seed (+38 differential).</div></div>
+            <div class="dline"><span class="dn">3</span><div><b>Quarterfinal Sunday 9:00a</b> at County Center vs winner of Pool B.</div></div>
+          </div>
+          <div class="px" style="margin-top:13px"><button class="btn ghost"><svg style="color:var(--g3)"><use href="#share"/></svg> Send to the family</button></div>
+          <div class="foot">Morning &amp; evening brief · every line traces to a real game.</div>
+        </div></div>
+        <div class="nav"><a class="on"><svg><use href="#home"/></svg>My Teams</a><a><svg><use href="#chart"/></svg>Standings</a><a><svg><use href="#bell"/></svg>Alerts</a><a><svg><use href="#film"/></svg>Film</a></div>
+      </div></div>
+    </div>
+
+    <!-- 11 milestones -->
+    <div class="cell">
+      <div class="cap"><div class="row"><span class="n">11</span><h3>Season milestones</h3></div><p>Shareable moments — streaks, first titles, pool crowns. Team-level, engagement gold.</p></div>
+      <div class="device"><div class="island"></div><div class="screen">
+        <div class="stat"><span>9:41</span><span class="r">●●● ▮</span></div>
+        <div class="body"><div class="scr">
+          <div class="px"><div class="eye">Legacy 11U · this season</div><div class="htitle">Milestones</div></div>
+          <div class="ms fire"><span class="badge">🔥</span><span class="mt"><span class="mn">10-game win streak</span><span class="md">longest in program history</span></span><span class="share"><svg><use href="#share"/></svg></span></div>
+          <div class="ms gold"><span class="badge">🏆</span><span class="mt"><span class="mn">Pool A champions</span><span class="md">ZG NY Hoop Festival</span></span><span class="share"><svg><use href="#share"/></svg></span></div>
+          <div class="ms blue"><span class="badge">⭐</span><span class="mt"><span class="mn">100 points as a team</span><span class="md">across the weekend</span></span><span class="share"><svg><use href="#share"/></svg></span></div>
+          <div class="foot">Derived from real results · team-level · per-kid milestones held.</div>
+        </div></div>
+        <div class="nav"><a class="on"><svg><use href="#home"/></svg>My Teams</a><a><svg><use href="#chart"/></svg>Standings</a><a><svg><use href="#bell"/></svg>Alerts</a><a><svg><use href="#film"/></svg>Film</a></div>
+      </div></div>
+    </div>
+
+    <!-- 12 film -->
+    <div class="cell">
+      <div class="cap"><div class="row"><span class="n">12</span><h3>Film <span style="font-weight:400;color:var(--mut);font-size:12px">· held</span></h3></div><p>Per-kid HLS clips + AI breakdown grounded on the box score. Behind verification + money flips.</p></div>
+      <div class="device"><div class="island"></div><div class="screen">
+        <div class="stat"><span>9:41</span><span class="r">●●● ▮</span></div>
+        <div class="body"><div class="scr">
+          <div class="px"><div class="eye">Charlie's film · #5</div><div class="htitle">Coming soon</div></div>
+          <div class="vid"><div class="vidf"><div class="court"></div></div>
+            <div class="vlock"><span class="lk"><svg><use href="#lock"/></svg></span><span class="lt">Per-kid film + AI breakdown</span><span class="ls">Unlocks with verified guardianship and the $20 account — grounded on the box score, jersey-only, no face recognition.</span></div>
+          </div>
+          <div class="heldrow"><span class="hi t"><svg><use href="#shield"/></svg></span><span>Requires <b>verified guardianship</b> — proves it's your kid</span></div>
+          <div class="heldrow"><span class="hi m"><svg><use href="#lock"/></svg></span><span>Requires the <b>$20 account</b> + your consent sign-off</span></div>
+          <div class="foot">Two independent locks · built on a real video model + platform, bench-gated.</div>
+        </div></div>
+        <div class="nav"><a><svg><use href="#home"/></svg>My Teams</a><a><svg><use href="#chart"/></svg>Standings</a><a><svg><use href="#bell"/></svg>Alerts</a><a class="on"><svg><use href="#film"/></svg>Film</a></div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+
+<footer><div class="wrap">
+  The 12 features · AAU tracking hub · premium build target for CC.<br>
+  Killers (01–03) are the AAU-specific moat — all fall out of one schedule-intelligence engine (re-scrape → diff → derive). High-value (04–08) is the next wave. Kid/family (09–12) is the emotional core; per-kid stats &amp; film (12) stay behind verification + money flips.<br>
+  All content placeholder · every value derives from the engine + binds to RPCs at runtime · nothing wired to Stripe or a minor's data.
+</div></footer>
+</body>
+</html>

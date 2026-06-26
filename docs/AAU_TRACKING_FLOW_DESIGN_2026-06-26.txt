@@ -198,6 +198,43 @@ DATA HIERARCHY (matches Frank's words):
   messages, concession/parking intel, opponent scouting from scraped record. Parked as
   candidates, not committed.
 
+  BUILD TARGET for these 12: docs/AAU_TRACKING_HUB_12_FEATURES_RENDER.html (architect,
+  2026-06-26). Each feature rendered as its hero moment. Note its nav shows
+  My Teams / Standings / Alerts / Film — "Alerts" surfaces here as the schedule-change /
+  recap stream; reconcile against the spine's Find/My Teams/Standings/Film when Alerts lands
+  (open: 4 tabs with Find folded into My Teams, or 5 tabs).
+
+================================================================================
+7c. THE PREDICTOR IS MATH (operator-clarified 2026-06-26 — "the projector is really just math")
+================================================================================
+Frank: "What team beat what team by how much points; you're playing that team; that team is
+gonna play another team — that's how you predict the odds." The predictor is transitive
+margin math, transparent and exact — NOT a black box. Two layers, composed:
+
+  (A) RESULTS → RATINGS. From every final game we have (who beat whom, by how many points).
+      Each team gets a strength rating from its scoring margins, with the margin CAPPED per
+      circuit (e.g. Zero Gravity +20, from circuit_rules) so a blowout can't over-inflate.
+      Opponent-adjusted (a win over a strong team counts more) — a simple iterated power
+      rating (Massey/Colley-style), recomputed as games resolve. Source: get_public_
+      tournament_standings games[] + the circuit cap already in the bundle.
+
+  (B) RATINGS → MATCHUP ODDS. A future/hypothetical game's odds = f(ratingA − ratingB):
+      expected margin = ratingA − ratingB; win probability via a logistic on that gap. This
+      is the head-to-head "odds to beat CT Hoops."
+
+  COMPOSED into the two predictor surfaces:
+   • Standings predictor (Screen 05, BUILT): "% to advance" = EXACT enumeration of remaining
+     pool outcomes (already shipped) — answers "in how many remaining-game combinations do I
+     advance." The margin-rating (B) adds the per-matchup win-probability the render shows
+     ("In control · 82%") and the plain-English conditions ("Beat CT Hoops → clinched").
+   • Road to the chip (feature 04): chain it down the bracket — you play B; B's slot feeds the
+     winner of Pool C; project each slot by ratings; multiply the path to "odds to reach/win
+     the final." Seeds fill in as real games resolve; every step traces to a real result.
+
+  PROVENANCE (locked, per render): "Odds enumerated exactly · wording AI" and "Path exact from
+  the bracket · seeds fill as games resolve." The math is exact and shown; only the sentence
+  wording is AI. No fabricated probabilities — if inputs are missing, the surface says so.
+
 ================================================================================
 8. BUILD ORDER (phased; nothing starts until Frank says go)
 ================================================================================
