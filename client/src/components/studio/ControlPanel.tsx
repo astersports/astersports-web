@@ -111,6 +111,14 @@ export default function ControlPanel({
               onChange={(percent) => update({ density: { ...controls.density, percent } })}
               min={DENSITY_MIN}
               max={DENSITY_MAX}
+              // Even re-space re-spreads survivors over the whole garment, so its
+              // perceived sparsity changes only as 1/sqrt(1-p) — adjacent 10% steps
+              // are visually indistinguishable. Offer coarser 25% steps (0/25/50/75)
+              // so each pick is perceptibly different. Thin in place keeps 10% steps
+              // (it opens localized gaps, so fine steps read clearly). See the
+              // architect ruling: respace is a spacing-evenness finisher, not a
+              // density-strength dial.
+              step={(controls.density.mode ?? "inplace") === "respace" ? 25 : 10}
             />
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Survivor layout</Label>
@@ -138,8 +146,8 @@ export default function ControlPanel({
               </div>
               <p className="text-xs text-muted-foreground">
                 {(controls.density.mode ?? "inplace") === "inplace"
-                  ? "Keeps every surviving motif in its original spot — best for placed or couture designs (preserves the composition)."
-                  : "Spreads the surviving motifs evenly — best for repeating all-over prints."}
+                  ? "Keeps each surviving motif in place and removes the rest — this is the control for how sparse the print looks. Also best for placed or couture designs (preserves the composition)."
+                  : "Evens out the spacing of the motifs that remain — a finisher for repeating all-over prints, not a strength dial. For a bigger visible change, raise the % or switch to Thin in place."}
               </p>
             </div>
           </div>
