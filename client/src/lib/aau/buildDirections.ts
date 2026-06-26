@@ -52,7 +52,7 @@ export function buildDirections(venue: Venue | null | undefined): DirectionUrls 
   if (addr) {
     const enc = encodeURIComponent(addr);
     return {
-      apple: `https://maps.apple.com/?daddr=${enc}`,
+      apple: `https://maps.apple.com/?daddr=${enc}&dirflg=d`,
       google: `https://www.google.com/maps/dir/?api=1&destination=${enc}&travelmode=driving`,
       waze: `https://waze.com/ul?q=${enc}&navigate=yes`,
       label,

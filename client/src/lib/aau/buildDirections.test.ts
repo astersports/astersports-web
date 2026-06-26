@@ -23,6 +23,7 @@ describe("buildDirections (AAU hub §4.1)", () => {
     expect(d!.google).toContain(`destination=${enc}`);
     expect(d!.waze).toContain(`q=${enc}`);
     expect(d!.apple).toContain(`daddr=${enc}`);
+    expect(d!.apple).toContain("dirflg=d"); // driving mode forced in both branches
   });
 
   it("returns null for a venue with no name, address, or coords (Venue TBD)", () => {

@@ -76,7 +76,7 @@ export default function DirectionsControl({ venue }: { venue: Venue }) {
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => remember(p.key)}
-            aria-label={`Open ${p.label} Maps directions to ${dirs.label}`}
+            aria-label={`Open ${p.label} directions to ${dirs.label}`}
             className="as-press"
             style={{
               flex: 1,
