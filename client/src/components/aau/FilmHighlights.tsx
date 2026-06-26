@@ -23,12 +23,11 @@ interface Player {
   color: string;
 }
 
+// Per-jersey film is family-private: a parent's film view shows only their own
+// child, never another family's kid. Charlie's full reels live in the My Kids
+// tab; this team-level strip is filtered to her too (operator-directed 2026-06-26).
 const PLAYERS: Player[] = [
   { number: '#5', name: 'Charlie', role: 'Floor General', color: 'var(--as-team-primary)' },
-  { number: '#24', name: 'Sophia', role: 'Playmaker / Scorer', color: 'var(--as-accent)' },
-  { number: '#14', name: 'Karina', role: 'Volume Scorer', color: 'var(--as-success)' },
-  { number: '#15', name: 'Bianca', role: 'Inside Presence', color: '#f59e0b' },
-  { number: '#4', name: 'Olivia', role: 'Cutter / Finisher', color: '#ec4899' },
 ];
 
 const TOURNAMENT_INFO = {

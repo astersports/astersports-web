@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { ArrowLeft, ArrowUpRight, Zap, Trophy, BarChart3, Film } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Zap, BarChart3, Film, Users } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import MyKids from "../components/aau/family/MyKids";
 import LiveScores from "../components/aau/LiveScores";
 import StandingsHub from "../components/aau/standings/StandingsHub";
 import TournamentHistory from "../components/aau/TournamentHistory";
@@ -15,6 +16,7 @@ import { APP_URL } from "@/const";
 const LOGO_URL = "/aster-mark.png";
 
 const SECTIONS = [
+  { id: "mykids", label: "My Kids", emoji: "🧒" },
   { id: "scores", label: "Live Scores", emoji: "⚡" },
   { id: "standings", label: "Standings", emoji: "🏀" },
   { id: "history", label: "History", emoji: "🏆" },
@@ -28,14 +30,14 @@ type SectionId = typeof SECTIONS[number]["id"];
 
 // Primary destinations for the persistent mobile bottom-nav (app-like surface).
 const BOTTOM_NAV: { id: SectionId; label: string; Icon: typeof Zap }[] = [
+  { id: "mykids", label: "My Kids", Icon: Users },
   { id: "scores", label: "Scores", Icon: Zap },
-  { id: "history", label: "History", Icon: Trophy },
-  { id: "leaderboard", label: "Records", Icon: BarChart3 },
+  { id: "standings", label: "Standings", Icon: BarChart3 },
   { id: "film", label: "Film", Icon: Film },
 ];
 
 export default function AAUBasketball() {
-  const [activeSection, setActiveSection] = useState<SectionId>("scores");
+  const [activeSection, setActiveSection] = useState<SectionId>("mykids");
   const tabsRef = useRef<HTMLDivElement>(null);
 
   // Public showcase (owner product decision 2026-06-25): no auth gate. Reads run
@@ -266,6 +268,7 @@ export default function AAUBasketball() {
 
       {/* Section Content */}
       <div className="container" style={{ paddingTop: 24, paddingBottom: 48 }}>
+        {activeSection === "mykids" && <MyKids />}
         {activeSection === "scores" && (
           <>
             <WeatherCard />
