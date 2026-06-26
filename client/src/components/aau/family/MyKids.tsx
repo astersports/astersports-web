@@ -1,7 +1,9 @@
-import { useState } from "react";
-import { Trophy, Film, Clock, ChevronRight, Play } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Trophy, Film, Clock, ChevronRight, Play, ChevronLeft } from "lucide-react";
 import SectionHeading from "../SectionHeading";
+import DivisionStandings from "../standings/DivisionStandings";
 import { PILOT_KIDS, type PilotKid, type KidReel } from "@/lib/aau/pilotKids";
+import { getTeamSeason, type TeamSeasonRow } from "@/lib/aster";
 
 /**
  * My Kids — the AAU family hub's kid view (pilot, operator-directed 2026-06-26).
@@ -19,6 +21,20 @@ export default function MyKids() {
   const [activeId, setActiveId] = useState<string>(PILOT_KIDS[0].id);
   const kid = PILOT_KIDS.find((k) => k.id === activeId) ?? PILOT_KIDS[0];
 
+  // Real spring season for the selected kid's team (the kid is the lens).
+  const [season, setSeason] = useState<TeamSeasonRow[] | null>(null);
+  const [drill, setDrill] = useState<TeamSeasonRow | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setSeason(null);
+    setDrill(null);
+    getTeamSeason(kid.teamName, kid.divisionLike)
+      .then((rows) => { if (active) setSeason(rows); })
+      .catch(() => { if (active) setSeason([]); });
+    return () => { active = false; };
+  }, [kid.teamName, kid.divisionLike]);
+
   return (
     <div className="as-fade-in">
       <SectionHeading eyebrow="Family" title="My Kids" ghostText="FAMILY" />
@@ -30,11 +46,89 @@ export default function MyKids() {
         ))}
       </div>
 
-      {/* Selected kid */}
       <KidHeader kid={kid} />
-      <TournamentCard kid={kid} />
-      <FilmStrip kid={kid} />
+
+      {drill ? (
+        <div>
+          <button
+            onClick={() => setDrill(null)}
+            className="as-press"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 4, marginBottom: 12, cursor: "pointer",
+              fontSize: 12, fontWeight: 600, color: "var(--as-text-secondary)",
+              background: "var(--as-bg-card)", border: "1px solid var(--as-border-default)",
+              borderRadius: 8, padding: "6px 12px", fontFamily: "inherit", minHeight: 36,
+            }}
+          >
+            <ChevronLeft size={14} /> {kid.name}'s season
+          </button>
+          <DivisionStandings divisionId={drill.divisionId} divisionName={`${drill.tournament} · ${drill.division}`} focusKey={drill.teamKey} />
+        </div>
+      ) : (
+        <>
+          <SeasonList kid={kid} season={season} onPick={setDrill} />
+          <FilmStrip kid={kid} />
+        </>
+      )}
     </div>
+  );
+}
+
+function SeasonList({ kid, season, onPick }: { kid: PilotKid; season: TeamSeasonRow[] | null; onPick: (r: TeamSeasonRow) => void }) {
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <h3 className="font-display" style={{ fontSize: 14, color: "var(--as-text-secondary)", margin: "0 0 12px 2px", display: "flex", alignItems: "center", gap: 6 }}>
+        <Trophy size={14} style={{ color: kid.accent }} /> {kid.name.toUpperCase()}'S SPRING SEASON
+      </h3>
+      {season === null ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {[0, 1, 2].map((i) => <div key={i} className="as-skeleton" style={{ height: 56, borderRadius: 12, backgroundColor: "var(--as-bg-tertiary)" }} />)}
+        </div>
+      ) : season.length === 0 ? (
+        <div style={{ padding: "16px", borderRadius: 12, textAlign: "center", backgroundColor: "var(--as-bg-card)", border: "1px solid var(--as-border-default)", fontSize: 12, color: "var(--as-text-tertiary)" }}>
+          {kid.name}'s tournaments will appear here as they're scraped.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {season.map((r) => <SeasonRow key={r.divisionId} row={r} accent={kid.accent} onPick={() => onPick(r)} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SeasonRow({ row, accent, onPick }: { row: TeamSeasonRow; accent: string; onPick: () => void }) {
+  const played = row.gamesPlayed > 0;
+  const diffStr = row.diff > 0 ? `+${row.diff}` : `${row.diff}`;
+  const winning = row.wins > row.losses;
+  return (
+    <button
+      onClick={onPick}
+      className="as-press"
+      style={{
+        width: "100%", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", textAlign: "left",
+        padding: "12px 14px", borderRadius: 12, fontFamily: "inherit",
+        backgroundColor: "var(--as-bg-card)", border: "1px solid var(--as-border-default)",
+      }}
+    >
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block", fontSize: 13.5, fontWeight: 700, color: "var(--as-text-primary)" }}>{row.tournament}</span>
+        <span style={{ display: "block", fontSize: 11, color: "var(--as-text-tertiary)" }}>
+          {row.division} · {row.teamCount} teams{row.circuit ? ` · ${row.circuit}` : ""}
+        </span>
+      </span>
+      {played ? (
+        <span style={{ textAlign: "right", flexShrink: 0 }}>
+          <span style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 15, fontWeight: 800, color: winning ? "var(--as-success)" : "var(--as-text-primary)" }}>
+            {row.wins}–{row.losses}
+          </span>
+          <span style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--as-text-tertiary)" }}>{diffStr} diff</span>
+        </span>
+      ) : (
+        <span style={{ fontSize: 10, fontWeight: 600, color: "var(--as-text-tertiary)", flexShrink: 0 }}>upcoming</span>
+      )}
+      <ChevronRight size={16} style={{ color: accent, flexShrink: 0 }} />
+    </button>
   );
 }
 
@@ -88,35 +182,6 @@ function KidHeader({ kid }: { kid: PilotKid }) {
           {kid.program} {kid.team} · {kid.gradeNow} → {kid.gradeNext}
         </div>
       </div>
-    </div>
-  );
-}
-
-function TournamentCard({ kid }: { kid: PilotKid }) {
-  const t = kid.tournament;
-  return (
-    <div style={{
-      marginBottom: 24, padding: "14px 16px", borderRadius: 12,
-      backgroundColor: "var(--as-bg-card)",
-      border: `1px solid ${t.champion ? "var(--as-gold-soft)" : "var(--as-border-default)"}`,
-      boxShadow: t.champion ? "0 0 0 1px var(--as-gold-soft) inset" : undefined,
-    }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--as-text-primary)" }}>{t.name}</div>
-          <div style={{ fontSize: 11, color: "var(--as-text-tertiary)" }}>{t.dates}</div>
-        </div>
-        <span style={{
-          display: "inline-flex", alignItems: "center", gap: 5,
-          fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 999,
-          backgroundColor: t.champion ? "var(--as-gold-soft)" : "var(--as-bg-tertiary)",
-          color: t.champion ? "#FFD700" : "var(--as-text-secondary)",
-        }}>
-          {t.champion && <Trophy size={12} />}
-          {t.result}
-        </span>
-      </div>
-      <p style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--as-text-secondary)", margin: 0 }}>{t.blurb}</p>
     </div>
   );
 }

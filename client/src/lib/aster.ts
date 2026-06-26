@@ -59,3 +59,28 @@ export async function getTournamentDirectory(): Promise<DirTournament[]> {
   if (error) throw error;
   return (data as DirTournament[]) ?? [];
 }
+
+// ─── A team's season across tournaments (powers the real-data kid view) ───
+// The public-listed org that hosts the cross-program hub directory (the pilot
+// tenant; the RPC is org-gated so this is safe to ship in the browser).
+export const HUB_ORG_ID = "e3e95e21-3571-4e9a-985a-d5d01480d4a6";
+
+export interface TeamSeasonRow {
+  tournament: string; startDate: string; endDate: string;
+  division: string; divisionId: string; circuit: string | null;
+  teamKey: string; teamCount: number;
+  wins: number; losses: number; diff: number; gamesPlayed: number;
+}
+
+/**
+ * Public read of a team's per-tournament record across the season. `teamName` is an
+ * ILIKE; `divisionLike` narrows by division (e.g. '%Girls%') for clubs that field
+ * multiple teams under one name. Records are per-game-capped per the circuit's rule.
+ */
+export async function getTeamSeason(teamName: string, divisionLike: string | null = null): Promise<TeamSeasonRow[]> {
+  const { data, error } = await aster.rpc("get_public_team_season", {
+    p_org_id: HUB_ORG_ID, p_team_name: teamName, p_division_like: divisionLike,
+  });
+  if (error) throw error;
+  return (data as TeamSeasonRow[]) ?? [];
+}

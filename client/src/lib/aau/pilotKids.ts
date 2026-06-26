@@ -37,6 +37,11 @@ export interface PilotKid {
   gradeNow: string;
   gradeNext: string;
   accent: string;         // kid card accent (kept distinct per child)
+  // Match keys into the backbone (get_public_team_season): the team's display_name
+  // as it appears in TourneyMachine + a division ILIKE narrowing to this kid's team
+  // (a club fields several teams under one name — Legacy Hoopers has boys + girls).
+  teamName: string;
+  divisionLike: string | null;
   tournament: {
     name: string;
     dates: string;
@@ -119,6 +124,8 @@ export const PILOT_KIDS: PilotKid[] = [
     gradeNow: "5th Grade",
     gradeNext: "6th in the fall",
     accent: "var(--as-team-primary)",
+    teamName: "Legacy Hoopers",
+    divisionLike: "%Girls%",
     tournament: {
       name: "ZG NY Hoop Festival",
       dates: "Jun 15–16, 2026",
@@ -137,6 +144,8 @@ export const PILOT_KIDS: PilotKid[] = [
     gradeNow: "8th Grade",
     gradeNext: "9th next year",
     accent: "var(--as-success)",
+    teamName: "Chris Ward Basketball Green",
+    divisionLike: "%Boys%",
     tournament: {
       name: "ZG NY Hoop Festival",
       dates: "Jun 15–16, 2026",

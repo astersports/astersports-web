@@ -8,11 +8,11 @@ import BracketOdds from "./BracketOdds";
  * focus team. Tap a team to see its odds. All public data, read from the aster-sports
  * backbone; the engine applies the cap + tiebreakers and the predictor enumerates odds.
  */
-interface Props { divisionId: string; divisionName: string }
+interface Props { divisionId: string; divisionName: string; focusKey?: string }
 
-export default function DivisionStandings({ divisionId, divisionName }: Props) {
+export default function DivisionStandings({ divisionId, divisionName, focusKey }: Props) {
   const { loading, error, bundle, standings, advanceCount, predictFor } = useAauStandings(divisionId);
-  const [focusId, setFocusId] = useState<string | null>(null);
+  const [focusId, setFocusId] = useState<string | null>(focusKey ?? null);
 
   const effectiveFocus = focusId ?? standings[0]?.id ?? null;
   const cap = bundle?.rules?.pointDiffCap ?? null;
