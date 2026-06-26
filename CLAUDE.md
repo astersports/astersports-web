@@ -100,28 +100,41 @@ report (authoritative — reframe, don't defend), 3) installed source/types/migr
 - **Money-path boundary:** the guard is **backend** credit/ledger/Stripe logic +
   credentials/flips. **Cosmetic billing UI** (pricing copy, layout) is routine.
 
-### 2.5 Manus is the platform runtime, not a builder lane
-Code authoring is **CC-only**. Manus does not author commits, open PRs, or run the
-build toolchain — the Architect designs/reviews and Frank oversees, but neither writes
-code, and no agent but CC writes to the repo. This closes the incident-#61 vector (an
-agent flipping a `*_LIVE` flag as a side effect of a checkpoint commit): with CC the
-sole author and §3 barring any agent from flipping, a flag can no longer ride in on a
-builder checkpoint.
+### 2.5 Code authoring is CC-only; the runtime is Railway + Supabase (Manus decommissioned)
+Code authoring is **CC-only**. No lane but CC writes to the repo — the Architect
+designs/reviews and Frank oversees, but neither writes code, and no agent but CC commits.
+This closes the incident-#61 vector (an agent flipping a `*_LIVE` flag as a side effect of
+a checkpoint commit): with CC the sole author and §3 barring any agent from flipping, a
+flag can no longer ride in on a builder checkpoint. **This principle is permanent and
+host-independent — it survived the platform migration unchanged.**
 
-Manus is retained ONLY as the deploy + runtime platform the app is built on — these are
-load-bearing infrastructure, not agent permissions:
-- **Auth / identity** — OAuth/WebDev session service (`server/_core/sdk.ts`).
-- **Storage** — Forge presigned-URL uploads, served as `/manus-storage/{key}`
-  (`server/storage.ts`).
-- **Crons** — Forge HeartbeatJob scheduler driving `poll-predictions` + the reaper
-  (`server/_core/heartbeat.ts`).
-- **Data API** — `callDataApi` Forge passthrough (`server/_core/dataApi.ts`).
-- **DB + deploy** — Autoscale MySQL/TiDB; auto-publish from `main`.
+**The platform migrated off Manus to Railway + Supabase in #103 (Manus register M1).**
+Manus is no longer the runtime — it is **fully decommissioned for this repo**. The runtime
+services are now [GROUNDED against `main`, 2026-06-26]:
+- **Host / deploy** — **Railway**, auto-deploy from `main` (was Manus Autoscale).
+- **DB** — **Supabase Postgres** via Drizzle (`postgres` driver; `drizzle.config.ts`
+  dialect `postgresql`) — was Autoscale MySQL/TiDB.
+- **Auth / identity** — **Google OAuth → own JWT** (`server/_core/sdk.ts`, jose-signed
+  over the app DB). The dead Manus OAuth/WebDev code was removed in #117 (was Manus
+  OAuth/WebDev session service).
+- **Storage** — **Supabase Storage** (private `media` bucket; `server/storage.ts` +
+  `server/_core/supabaseStorage.ts`). The public `/manus-storage/{key}` serving path is
+  kept by `server/_core/storageProxy.ts` so DB-persisted keys stay valid — the route name
+  is legacy, the backend is Supabase (was Forge presigned-URL S3). The `@aws-sdk/*`
+  packages still in `package.json` are residual and can be pruned separately.
+- **Crons** — **in-process scheduler** (`server/_core/scheduler.ts`, gated by
+  `ENABLE_SCHEDULER`; Bearer-auth via `CRON_SECRET` / `server/_core/cronAuth.ts`) driving
+  `poll-predictions` + the stranded-job reaper. `server/_core/heartbeat.ts` was removed
+  (was Forge HeartbeatJob). **Onboarding gate (charter Gate B): prove the scheduler +
+  reaper on Railway — a stranded job recovers and refunds exactly once — before any
+  onboarding.**
+- **Data API** — removed; `callDataApi` / `server/_core/dataApi.ts` no longer exist.
 
-The Manus **Agent API** client (programmatic `task.create`/`task.list`) is **retired** —
-it shipped dark and nothing in the app used it. AI-model connections (SAM2, LaMa) are
-**Replicate**, not Manus, and are unaffected. Replacing the platform services above is
-the deferred host migration — out of scope until after the first client is stable.
+AI-model connections (SAM2, LaMa) are **Replicate**, unchanged by the migration. The Manus
+**Agent API** client was already retired (shipped dark, unused). The only Manus clock
+remaining platform-wide is the St Patrick file-bucket export (register M3) — a different
+repo. Replacing the platform services above is no longer a "deferred host migration"; it
+is **done** for astersports-web (#103, register M1).
 
 ---
 
