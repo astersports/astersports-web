@@ -345,7 +345,7 @@ function PlatformSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section id="platform" className="relative py-16 md:py-24 bg-[#0a0e1a]">
+    <section id="platform" className="relative py-12 md:py-24 bg-[#0a0e1a]">
       <div className="container aster-constellation" ref={ref}>
         <h2
           className={`flex items-center gap-3 text-[13px] font-semibold tracking-[0.2em] uppercase text-slate-400 mb-6 transition-all duration-500 ${
@@ -389,7 +389,7 @@ function ServicesSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section id="services" className="relative py-16 md:py-20 bg-[#0d1220]">
+    <section id="services" className="relative py-12 md:py-20 bg-[#0d1220]">
       <div className="container" ref={ref}>
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           <div>
@@ -480,7 +480,7 @@ function ProcessSection() {
   ];
 
   return (
-    <section className="relative py-16 md:py-20 bg-[#0a0e1a]">
+    <section className="relative py-12 md:py-20 bg-[#0a0e1a]">
       <div className="container" ref={ref}>
         <div className="text-center mb-16">
           <div
@@ -536,7 +536,7 @@ function AboutSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section id="about" className="relative py-16 md:py-20 bg-[#0d1220]">
+    <section id="about" className="relative py-12 md:py-20 bg-[#0d1220]">
       <div className="container" ref={ref}>
         <div className="max-w-3xl mx-auto">
           <div
@@ -632,7 +632,7 @@ function FAQSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <section id="faq" className="relative py-16 md:py-20 bg-[#0a0e1a]">
+    <section id="faq" className="relative py-12 md:py-20 bg-[#0a0e1a]">
       <div className="container" ref={ref}>
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-12">
@@ -713,7 +713,7 @@ function ContactSection() {
   };
 
   return (
-    <section id="contact" className="relative py-16 md:py-20 overflow-hidden">
+    <section id="contact" className="relative py-12 md:py-20 overflow-hidden">
       {/* Background */}
       <div
         className="absolute inset-0"
@@ -904,7 +904,7 @@ function Footer() {
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-[#0a0e1a]">
+    <div className="min-h-screen bg-[#0a0e1a] overflow-x-hidden">
       <Header />
       <HeroSection />
       <PlatformSection />
