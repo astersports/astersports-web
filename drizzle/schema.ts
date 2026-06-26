@@ -366,6 +366,10 @@ export const platformAuditLog = pgTable("platform_audit_log", {
   metadata: jsonb("metadata"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (t) => ({
+  // Global newest-first audit strip (the unfiltered platform.auditLog read).
+  // (createdAt, id) supports ORDER BY createdAt DESC, id DESC without a sort/scan
+  // and pairs with the deterministic tie-broken order in listAuditLog.
+  createdIdx: index("idx_platform_audit_created").on(t.createdAt, t.id),
   targetTenantCreatedIdx: index("idx_platform_audit_target_tenant_created").on(t.targetTenantId, t.createdAt),
   actorCreatedIdx: index("idx_platform_audit_actor_created").on(t.actorUserId, t.createdAt),
   actionCreatedIdx: index("idx_platform_audit_action_created").on(t.action, t.createdAt),

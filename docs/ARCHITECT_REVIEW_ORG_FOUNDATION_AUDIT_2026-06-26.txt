@@ -1,0 +1,164 @@
+================================================================================
+ARCHITECT REVIEW — ORG-STRUCTURE FOUNDATION, STEP 2 (PLATFORM AUDIT LOG)
+astersports-web · 2026-06-26 · CC → Architect (relayed by Frank) · PR #129
+================================================================================
+
+STATUS: HELD for architect sign-off. PR #129 is opened ready-for-review with
+        auto-merge DELIBERATELY NOT armed. Architect-scoped per CLAUDE.md §2.4
+        (DB schema + migration + super-admin path). No *_LIVE / money flag touched.
+ASK:    (1) ratify the grounding correction in §1, (2) sign off PR #129 as the
+        step-2 foundation, (3) confirm the re-scoped sequence in §4, (4) answer
+        the open decisions in §6 so steps 4+ can proceed.
+
+--------------------------------------------------------------------------------
+1. GROUNDING CORRECTION — THE SPEC IS AHEAD OF WHERE IT THOUGHT (read first)
+--------------------------------------------------------------------------------
+The redesign spec was written from screenshots ("I can't see code", spec line 7).
+CC verified against the live tree (CLAUDE.md §2.3 source hierarchy — installed
+source beats screenshot inference). Material finding: MUCH OF THE FOUNDATION IS
+ALREADY BUILT.
+
+[GROUNDED] Step 1 — super-admin identity + server-side gate — ALREADY EXISTS:
+  - `platform_admins` table: drizzle/schema.ts:333 — (id, userId UNIQUE, createdAt).
+  - `superAdminProcedure`: server/routers/platform.ts:17 — a tRPC middleware that
+    SELECTs platform_admins by ctx.user.id and throws FORBIDDEN if absent. This is
+    SERVER-ENFORCED on a DB grant, NOT a hardcoded email — exactly the de-hardcoded
+    design spec §3 asks for. (Seeding frank@astersports.co is a data row, not code.)
+  - `platform.whoami` (platform.ts:466) already lets the client gate the "Platform"
+    tab render on a server-confirmed super-admin claim (spec §3 last bullet).
+
+[GROUNDED] The money-safe ledger spec §5 describes — ALREADY EXISTS:
+  - `credit_ledger`: drizzle/schema.ts:174 — append-only (delta, balanceAfter,
+    reason, refId, note), with a UNIQUE(refId, reason) backstop (schema.ts:192).
+  - `grantCredits` (server/studioDb.ts) is idempotent on (refId, reason) and writes
+    the balance + ledger row in one tx — the "balance is DERIVED, never a direct
+    write" invariant is already the shipped contract.
+
+[GROUNDED] Also already built: impersonation w/ signed JWT cookie (platform.ts:413,
+  server/impersonation.ts); self-serve org-create DARK behind STUDIO_CREATE_ORG_LIVE
+  + per-user lifetime/burst rate limits (server/routers/tenants.ts:79-157); domain
+  restriction on invite (tenants.ts:231, shared/domain.emailAllowedForDomain).
+
+[GROUNDED] The genuine GAPS vs the spec:
+  - NO immutable audit trail (spec §8). ← this PR builds it.
+  - NO credit REVOKE (only grant; platform.ts:390 uses reason "grant", not the
+    spec §5 taxonomy admin_grant/admin_revoke/trial_grant).
+  - domain lock is a SINGLE varchar (tenants.allowedEmailDomain, schema.ts:140) —
+    not the multi-domain SET + auto-set-from-owner + public-domain denylist of §4.
+  - NO cross-org isolation CI test (spec §7 gate before Jaya).
+
+Implication: the architect can re-plan against code reality — step 1 is done, so
+the critical path is audit (this PR) → credit revoke+taxonomy+audit (H1-held) →
+multi-domain lock → console UI → isolation test.
+
+--------------------------------------------------------------------------------
+2. WHAT PR #129 BUILDS (step 2 — the append-only audit trail, spec §8)
+--------------------------------------------------------------------------------
+SCHEMA (drizzle/schema.ts `platformAuditLog` + migration 0003_aberrant_santa_claus.sql):
+  table platform_audit_log:
+    id serial PK · actorUserId int NOT NULL (the super-admin) · action varchar(64)
+    NOT NULL · targetTenantId int NULL · targetUserId int NULL · summary varchar(512)
+    NOT NULL · metadata jsonb NULL · createdAt timestamptz default now() NOT NULL.
+  indexes: (createdAt,id) for the global newest-first strip · (targetTenantId,
+    createdAt) · (actorUserId,createdAt) · (action,createdAt).
+  - action is varchar (NOT an enum) to mirror credit_ledger.reason — a new action
+    needs no migration.
+  - Insert-only BY CONSTRUCTION: the app exposes a writer + a reader and NO
+    update/delete path. (DB-level REVOKE UPDATE/DELETE on the table is a deliberate
+    FOLLOW-UP, see §5 — flagged, not silently skipped.)
+
+WRITER/READER (server/auditLog.ts):
+  - writeAuditLog(entry): append one row. BEST-EFFORT — it NEVER throws into its
+    caller. Rationale: an audit-write failure must not roll back or block a
+    legitimate super-admin action; we prefer "action succeeds + logged audit gap"
+    over "action fails because logging failed." Failures go to the server logger.
+    Returns true/false.
+  - listAuditLog({targetTenantId?, limit}): newest-first read for the console strip.
+  - AuditAction union: org_provisioned | individual_invited | impersonation_started
+    | domain_lock_changed | org_suspended | ownership_transferred | credit_grant |
+    credit_revoke. (The last four are defined now but only emitted as their features
+    land.)
+
+WIRING (server/routers/platform.ts):
+  - Audits the THREE existing super-admin write actions as EVENTS: provisionFirm →
+    org_provisioned; inviteIndividual → individual_invited; impersonate →
+    impersonation_started. Each is a pure additive insert AFTER the existing
+    operation; NO credit/ledger logic was changed.
+  - Adds `platform.auditLog` read query (superAdminProcedure-gated) for the console
+    audit strip (renderings Scene 1).
+
+TEST (server/auditLog.test.ts): locks the load-bearing invariant — writeAuditLog
+  returns false and does NOT throw when the DB is unavailable OR the insert rejects;
+  returns true + inserts the expected row shape on success.
+
+VERIFICATION: `pnpm run check` (tsc) clean; full server vitest 596 passed / 20
+  skipped locally. CI on the PR: typecheck+tests + money-path integration.
+
+--------------------------------------------------------------------------------
+3. WHY THIS IS SAFE TO LAND AHEAD OF H1 (money-path boundary)
+--------------------------------------------------------------------------------
+This PR changes NO credit/ledger logic. The audit rows on provision/invite record
+the EVENT (who provisioned what, with what initial-credit parameter) — they do not
+add, move, or gate a single credit. The dedicated credit ISSUE/REVOKE RPCs and
+their audit rows (reason taxonomy admin_grant/admin_revoke/trial_grant, clamp-at-0,
+override) remain HELD for the H1 credit-ledger sign-off (spec §5 prerequisite).
+So #129 is auth/observability substrate, not a money-path change — but it is still
+DB-schema + super-admin path, hence Architect-scoped and held for your sign-off,
+not auto-merged.
+
+--------------------------------------------------------------------------------
+4. RE-SCOPED BUILD SEQUENCE (spec §10, reconciled to code reality)
+--------------------------------------------------------------------------------
+  Step 1  super-admin gate (platform_admins + superAdminProcedure) ...... DONE (pre-existing)
+  Step 2  append-only audit table + writer + console read ............... THIS PR #129 (held)
+  Step 3  credit issue/REVOKE RPCs + taxonomy + audit-on-credit ......... HELD for H1
+  Step 4  multi-domain lock: set column, auto-set-from-owner, public-     READY to build
+          domain denylist, join enforcement on the accept-invite path     (non-money; needs
+          (extends emailAllowedForDomain to a SET) ...................     Jaya domain set, §6)
+  Step 5  Platform console UI (super-admin-gated render; Scenes 1-3) .... after 3/4
+  Step 6  org-view refinements (Scene 2) ............................... after 5
+  Step 7  cross-org isolation CI test → gate Jaya live (spec §7) ....... before 2nd org
+  Step 8  self-serve org creation stays OFF ............................ unchanged (already dark)
+
+--------------------------------------------------------------------------------
+5. KNOWN FOLLOW-UPS / DELIBERATE OMISSIONS (not silently skipped)
+--------------------------------------------------------------------------------
+- DB-level immutability: platform_audit_log is insert-only by construction (no
+  update/delete in code) but NOT yet enforced at the DB grant level. Follow-up:
+  REVOKE UPDATE, DELETE ON platform_audit_log FROM the app role (+ from PUBLIC per
+  the Postgres default-grant lesson). Cheap, additive, can ride step 3 or its own PR.
+- Audit retention/pagination: listAuditLog caps at 200 rows, newest-first. A
+  cursor/time-window page is a later UI concern, not foundation.
+- credit_grant/credit_revoke audit actions are DEFINED but not yet EMITTED — they
+  emit when the step-3 credit RPCs land (so the enum is stable for the architect to
+  review the full action vocabulary now).
+
+--------------------------------------------------------------------------------
+6. OPEN DECISIONS (architect / Frank) — needed for steps 3-4
+--------------------------------------------------------------------------------
+From spec §11, with CC's labeled leans (AP-style commit; you decide):
+  D1 Negative balance on revoke → LEAN: clamp at 0; negative requires explicit
+     override + reason. (Gates step 3 revoke semantics.)
+  D2 Org ADMINS invite members? → LEAN: admins invite members, owner manages
+     admins. (Today invite is tenantAdminProcedure — already admin+owner; confirm
+     this matches intent.)
+  D3 Jaya domain set → Frank's call: confirm exact domains (jaya.com / cinqasept.nyc
+     / likely.nyc). GATES step 4 build.
+  D4 Platform-staff roles now? → LEAN: keep platform_admins as the single
+     super-admin grant now; add a platform_role column only when staff tiers exist.
+     (Note: current table has no role column — adding one is the §3 "design for
+     future staff" hook if you want it now.)
+  D5 Trial size/length + per-plan grants → Frank's commercial call. GATES step-3
+     trial_grant defaults.
+
+--------------------------------------------------------------------------------
+7. ARTIFACTS
+--------------------------------------------------------------------------------
+  PR #129  (held) — drizzle/schema.ts, drizzle/0003_aberrant_santa_claus.sql,
+           server/auditLog.ts, server/auditLog.test.ts, server/routers/platform.ts
+  This doc — docs/ARCHITECT_REVIEW_ORG_FOUNDATION_AUDIT_2026-06-26.txt (on the PR
+           branch, travels with the code).
+================================================================================
+END — CC built step 2 against verified code, surfaced the step-1-already-done
+grounding, and holds #129 for your sign-off. Steps 3 wait on H1; step 4 waits on D3.
+================================================================================

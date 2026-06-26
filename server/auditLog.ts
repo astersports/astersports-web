@@ -86,7 +86,9 @@ export async function listAuditLog(opts: { targetTenantId?: number; limit?: numb
     .select()
     .from(platformAuditLog)
     .where(where)
-    .orderBy(desc(platformAuditLog.createdAt))
+    // Stable, deterministic newest-first: createdAt then id as a tie-breaker so
+    // same-timestamp rows never reorder (no console flicker; safe for paging).
+    .orderBy(desc(platformAuditLog.createdAt), desc(platformAuditLog.id))
     .limit(limit);
   return { entries };
 }

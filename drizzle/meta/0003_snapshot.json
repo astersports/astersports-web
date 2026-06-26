@@ -1,5 +1,5 @@
 {
-  "id": "ed8dfe55-c16a-42a8-a3ad-dc043b066ce4",
+  "id": "ff26d3f2-fa34-453c-a414-e5f59386955c",
   "prevId": "32f40873-0ce9-49eb-ad4a-491370776eaa",
   "version": "7",
   "dialect": "postgresql",
@@ -991,6 +991,27 @@
         }
       },
       "indexes": {
+        "idx_platform_audit_created": {
+          "name": "idx_platform_audit_created",
+          "columns": [
+            {
+              "expression": "createdAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "idx_platform_audit_target_tenant_created": {
           "name": "idx_platform_audit_target_tenant_created",
           "columns": [

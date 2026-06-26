@@ -9,6 +9,7 @@ CREATE TABLE "platform_audit_log" (
 	"createdAt" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE INDEX "idx_platform_audit_created" ON "platform_audit_log" USING btree ("createdAt","id");--> statement-breakpoint
 CREATE INDEX "idx_platform_audit_target_tenant_created" ON "platform_audit_log" USING btree ("targetTenantId","createdAt");--> statement-breakpoint
 CREATE INDEX "idx_platform_audit_actor_created" ON "platform_audit_log" USING btree ("actorUserId","createdAt");--> statement-breakpoint
 CREATE INDEX "idx_platform_audit_action_created" ON "platform_audit_log" USING btree ("action","createdAt");
