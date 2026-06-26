@@ -334,6 +334,82 @@ claim): get that contract right and everything else is wiring onto substrate tha
 already exists. CC will draft the Track-0 schema migration for design review on
 the architect's go — and will not apply schema or flip anything without sign-off.
 
+--------------------------------------------------------------------------------
+7. OPERATOR REFINEMENT (Frank, 2026-06-26, post-draft) — PAID PROFILE + CONTAINMENT
+--------------------------------------------------------------------------------
+Verbatim intent: "Team yes — and in that team, under their PAID profile, they can
+add their kids and upload their own highlights, so it's CONTAINED."
+
+This refines the model in two load-bearing ways and adds one new decision:
+
+7.1 THE HUB IS A PAID PRODUCT (new money-path surface).
+  A parent holds a PAID family PROFILE scoped to a team. The paid profile is the
+  container for that family's kids + their uploaded highlights. This is a
+  SUBSCRIPTION -> Stripe -> MONEY PATH. Per CLAUDE.md 2.4 this is Architect-scoped
+  AND a Frank confirm (the money path is Frank's to set). Stripe is now wired
+  (live-mode keys + webhook set up this session), so the billing rail exists; what
+  it gates (entitlement to the paid profile) is the new design.
+
+7.2 "CONTAINED" RESOLVES THE PRIVACY LINE (answers Q1 + Q4).
+  Kids and parent-uploaded highlights live INSIDE the paid family profile, scoped
+  to the team — PRIVATE to that family, not public. This settles the boundary that
+  was open in D-FV2/D-FV8:
+    PUBLIC (anon SECDEF RPCs):  the tournament's factual state — schedule, scores,
+       standings, bracket math, AI odds. No child identity.
+    CONTAINED (paid profile + auth):  the family's kids, their roster pin to a
+       team, their uploaded film/highlights, and notification targeting. Visible
+       only inside that family's paid profile.
+  So D-FV2's "claim verification" question is now answered by the PAYWALL: tracking
+  public team data can stay open/free; ADDING KIDS + UPLOADING FILM happens only
+  inside a paid, authenticated, team-scoped profile. The paid profile IS the gate.
+
+7.3 CONTAINMENT SHAPE (structure implication).
+  profile = (paying guardian) -> scoped to a TEAM -> holds that family's kids
+  (added by the parent) -> holds highlights the parent uploads (per kid, by jersey).
+  A family with kids on two teams holds two team-scoped slices under one paid
+  account (or one profile spanning their teams — see D-FV9 below). Film never
+  leaves the profile; D-FV7's storage bucket is private + profile-scoped, which
+  also shrinks the minors'-video exposure surface (highlights are seen by the
+  uploading family, not broadcast).
+
+== D-FV9 : MONETIZATION / PAID-PROFILE ENTITLEMENT (NEW — money-path) =========
+REQUEST: What does the paid profile entitle, and how is the subscription scoped —
+  per team, per family, or per platform?
+EVIDENCE: 7.1 — Stripe is wired this session (live keys + webhook). The app's
+  money path (credits/Stripe) is Architect-scoped (CLAUDE.md 2.4) and Frank-set.
+  No paid-profile entitlement model exists yet.
+OPTIONS:
+  (a) Per-team profile: a parent pays per team they add a kid to. Simple mental
+      model ("pay for the team you follow"), but a 2-kid family pays twice.
+  (b) Per-family account: one subscription unlocks adding ALL the family's kids +
+      film across every team they're on. Cleaner family story; matches "one account
+      -> every kid." Entitlement = the account, scope = all their claimed teams.
+  (c) Freemium: public tracking + standings + odds are FREE (drives signups +
+      marketing reach); ADDING KIDS + FILM + push targeting require the paid
+      profile. Paywall sits exactly on the public/contained line from 7.2.
+CC LEAN: (c) layered over (b) — free public hub for reach, ONE paid family account
+  that unlocks kids + film + private notifications across all their teams. This
+  matches the "single source of truth for all their kids" pitch and puts the
+  paywall precisely on the containment boundary. Money-path: CC PREPARES the
+  Stripe product/price + entitlement check; Frank SETS it; Architect reviews the
+  entitlement/credit logic before any code merges (2.4 + the section-1 ledger
+  invariants). CC does not wire billing logic without that sign-off.
+
+7.4 OPEN QUESTIONS UPDATED:
+  - Q1 (claim verification): ANSWERED by 7.2 — the paywall is the gate; public
+    tracking free, kids+film behind the paid profile.
+  - Q4 (film containment): ANSWERED by 7.1/7.3 — film is contained in the paid,
+    team-scoped family profile; private bucket; not broadcast.
+  - NEW Q6 (D-FV9): subscription scope — per-team (a), per-family (b), or freemium
+    over per-family (c)? CC lean: (c)/(b). Frank to set price + tier; architect to
+    review entitlement logic.
+  - NEW Q7: does the paid profile REPLACE or COEXIST with the existing app's
+    parent role? (The app already has free parent accounts inside an org. Is the
+    paid hub profile a separate consumer product, or an upsell on the same
+    identity? CC lean: same identity, paid hub is an entitlement ON TOP — avoids a
+    second identity system, AP#42.)
+
 ================================================================================
 END — relayed in full in chat per CLAUDE.md 11.8. Committed as docs/*.txt.
+Section 7 added 2026-06-26 per Frank's paid-profile/containment refinement.
 ================================================================================
