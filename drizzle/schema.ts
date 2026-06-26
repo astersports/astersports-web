@@ -170,6 +170,29 @@ export const memberships = pgTable("memberships", {
 export type Membership = typeof memberships.$inferSelect;
 export type InsertMembership = typeof memberships.$inferInsert;
 
+/**
+ * Multi-domain lock (org-redesign step 4): the SET of email domains allowed to
+ * join a tenant. Empty set = no domain lock (invite-only; explicit per-email
+ * invites still govern who is added). Supersedes the legacy single
+ * tenants.allowedEmailDomain, which is kept for back-compat + as the fallback
+ * when a tenant has no tenant_domains rows yet.
+ */
+export const tenantDomains = pgTable("tenant_domains", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  domain: varchar("domain", { length: 255 }).notNull(),
+  /** Set when the domain's ownership is verified (future verified-domain flow);
+   *  null = unverified (auto-seeded from the owner's email, super-admin added). */
+  verifiedAt: timestamp("verifiedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({
+  tenantDomainUniq: uniqueIndex("uniq_tenant_domains_tenant_domain").on(t.tenantId, t.domain),
+  tenantIdx: index("idx_tenant_domains_tenant").on(t.tenantId),
+}));
+
+export type TenantDomain = typeof tenantDomains.$inferSelect;
+export type InsertTenantDomain = typeof tenantDomains.$inferInsert;
+
 /** Append-only credit ledger for tenant wallets. */
 export const creditLedger = pgTable("credit_ledger", {
   id: serial("id").primaryKey(),

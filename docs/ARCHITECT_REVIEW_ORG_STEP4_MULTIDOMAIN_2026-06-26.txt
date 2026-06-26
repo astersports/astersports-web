@@ -1,0 +1,95 @@
+================================================================================
+ARCHITECT REVIEW — ORG STEP 4: MULTI-DOMAIN LOCK MECHANISM
+astersports-web · 2026-06-26 · CC → Architect (relayed by Frank)
+================================================================================
+STATUS: HELD for architect sign-off (DB schema + tenant-isolation path; §2.4).
+        Auto-merge NOT armed. Builds the MECHANISM; the VALUES wait on Frank's D3.
+ASK:    (1) ratify the storage fork in §2 (normalized table — my lean, built),
+        (2) sign off the mechanism, (3) Frank: D3 (domains + same-org-or-not) to
+        populate, D5 (trial numbers) for step 3.
+
+--------------------------------------------------------------------------------
+1. WHAT THIS BUILDS (spec §4; architect sign-off refinements applied)
+--------------------------------------------------------------------------------
+Multi-domain lock: an org's allowed-domain lock is now a SET, auto-seeded from the
+owner's email at provisioning, super-admin-extendable, public-domain-guarded, and
+enforced server-side on the invite path. Plus the D2 ruling (role ceiling).
+
+- shared/domain.ts (PURE, fully unit-tested — server/domain.test.ts, 14 cases):
+    · PUBLIC_EMAIL_DOMAINS denylist + isPublicEmailDomain — the load-bearing guard.
+    · autoDomainLockForOwnerEmail(email) → the owner's domain, or NULL if public
+      (→ no auto lock; invite-only). NEVER auto-locks gmail/outlook/icloud/…
+    · emailAllowedForDomains(email, set) — set-aware membership; empty set = allow
+      all (explicit per-email invites still govern), parity with the legacy null.
+    · normalizeDomain (accepts "@d"/"d"/"a@d"); emailAllowedForDomain kept for
+      back-compat.
+- drizzle: new tenant_domains table (id, tenantId, domain, verifiedAt NULL,
+  createdAt) + UNIQUE(tenantId,domain) + tenant index. Migration 0004.
+- server/tenantDomains.ts: listTenantDomains / addTenantDomains (idempotent via
+  onConflictDoNothing) / isEmailAllowedForTenant (set when present, else legacy
+  single-column fallback — existing orgs keep working until migrated).
+- WIRING:
+    · platform.provisionFirm auto-seeds the set from the explicit domainLock + the
+      owner's email domain (public-guarded). (Audit metadata already records it.)
+    · tenants.invite now enforces the SET (isEmailAllowedForTenant) AND the D2 role
+      ceiling: an admin cannot invite an admin — FORBIDDEN; only the owner grants
+      the admin role. Members can still be invited by admins.
+
+--------------------------------------------------------------------------------
+2. STORAGE FORK — normalized table (CC lean, built; architect please ratify)
+--------------------------------------------------------------------------------
+Two shapes for "a set of domains per org":
+  A. NORMALIZED tenant_domains table (one row per (tenantId, domain)) — BUILT.
+     + clean join/exists enforcement; + natural home for the future per-domain
+     verifiedAt (verified-domain flow the sign-off mentions); + UNIQUE index gives
+     idempotent adds; − one more table.
+  B. jsonb/text[] array column on tenants.
+     + no new table; − no per-domain verified_at without nesting; − array-contains
+     enforcement is clumsier; − re-introduces the "config on the row" pattern.
+CC LEAN: A. The verifiedAt column + clean enforcement + idempotent adds make the
+table the more durable choice, and it isolates cleanly under RLS. Legacy
+tenants.allowedEmailDomain is RETAINED as the fallback (no data migration in this
+PR; existing single-domain orgs keep working). If you prefer B, say so — it's a
+contained swap of tenantDomains.ts + the migration.
+
+--------------------------------------------------------------------------------
+3. SEMANTICS (so the enforcement contract is explicit)
+--------------------------------------------------------------------------------
+- Tenant with a NON-EMPTY domain set: invite/join allowed iff the email's domain
+  ∈ set. (Explicit per-email invite is still the admin action; there's no public
+  self-join surface live yet.)
+- Tenant with an EMPTY set AND no legacy domain: any email may be invited (admin-
+  gated). This is the "invite-only, no domain auto-join" state a public-domain
+  owner lands in (autoDomainLockForOwnerEmail returned null).
+- Public-domain owner at provisioning → NO auto lock (guarded). A super-admin may
+  still explicitly pass a domainLock; explicit super-admin input is NOT public-
+  guarded (only AUTO-set is), matching "super admin edits any org's domains".
+
+--------------------------------------------------------------------------------
+4. DEFERRED / NEXT (named, not silently skipped)
+--------------------------------------------------------------------------------
+- CROSS-ORG ISOLATION TEST (sign-off §3 tweak — pull earlier): NEXT PR. It needs
+  the real-Postgres CI job + two seeded orgs; it's substantial enough to stand
+  alone and will be authored right after this lands, as a standing guard through
+  steps 4-6 (gating Jaya live). Flagged so it isn't mistaken as done.
+- SELF-SERVE create auto-set (tenants.create): that path is DARK behind
+  STUDIO_CREATE_ORG_LIVE; auto-seeding its domain set is a one-line follow-up when
+  that path is exercised — left out here to keep the dark path untouched.
+- OWNER-side "add a verified domain later" flow: verifiedAt column exists; the flow
+  is optional/not-v1 per spec §4.
+- D3 (Frank): the actual Jaya domains AND whether cinqasept.nyc / likely.nyc are
+  the SAME org (one pool, multi-domain) or SEPARATE orgs (isolated pools). The
+  mechanism is ready either way; only the seed values wait.
+
+--------------------------------------------------------------------------------
+5. VERIFICATION
+--------------------------------------------------------------------------------
+`pnpm run check` clean; full server vitest 607 passed / 20 skipped (incl. 14 new
+domain-helper cases). No money/ledger logic touched. No *_LIVE / money flag.
+
+ARTIFACTS: PR (held) — drizzle/schema.ts, drizzle/0004_polite_blue_blade.sql,
+  shared/domain.ts, server/tenantDomains.ts, server/domain.test.ts,
+  server/routers/{platform,tenants}.ts. This doc on the PR branch.
+================================================================================
+END — mechanism built + held; storage fork awaits your ratify; values await D3.
+================================================================================
