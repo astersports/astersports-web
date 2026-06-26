@@ -11,7 +11,6 @@ import {
   CreditCard,
   Building2,
   ArrowLeft,
-  Sparkles,
   AlertTriangle,
   BookOpen,
   Shield,
@@ -54,7 +53,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             Back to Aster Sports
           </Link>
           <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
+            <img src="/aster-mark.png" alt="" className="w-5 h-5" />
             <span className="font-semibold text-lg">Print Studio</span>
           </div>
         </div>
@@ -138,7 +137,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           Back to Aster Sports
         </Link>
         <div className="flex items-center gap-2 px-3 h-14">
-          <Sparkles className="w-4 h-4 shrink-0 text-primary" />
+          <img src="/aster-mark.png" alt="" className="w-4 h-4 shrink-0" />
           {tenant ? (
             <div className="min-w-0 flex-1">
               <OrgSwitcher />

@@ -8,7 +8,7 @@ import { TenantProvider, useTenant } from "@/contexts/TenantContext";
 import AppShell from "@/components/studio/AppShell";
 import ImpersonationBanner from "@/components/studio/ImpersonationBanner";
 import { Button } from "@/components/ui/button";
-import { Loader2, Lock, LogIn } from "lucide-react";
+import { Loader2, Lock, LogIn, ArrowLeft } from "lucide-react";
 import { getLoginUrl } from "@/const";
 import { Link } from "wouter";
 
@@ -40,8 +40,8 @@ function AccessGate({ children }: { children: React.ReactNode }) {
             Sign In
           </a>
         </Button>
-        <Link href="/" className="text-sm text-muted-foreground hover:text-foreground mt-2">
-          ← Back to Aster Sports
+        <Link href="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mt-2">
+          <ArrowLeft className="w-4 h-4" /> Back to Aster Sports
         </Link>
       </div>
     );
@@ -68,8 +68,8 @@ function AccessGate({ children }: { children: React.ReactNode }) {
         <p className="text-xs text-muted-foreground">
           Signed in as {user?.email}
         </p>
-        <Link href="/" className="text-sm text-muted-foreground hover:text-foreground mt-2">
-          ← Back to Aster Sports
+        <Link href="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mt-2">
+          <ArrowLeft className="w-4 h-4" /> Back to Aster Sports
         </Link>
       </div>
     );
