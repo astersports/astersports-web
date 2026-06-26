@@ -133,8 +133,15 @@ services are now [GROUNDED against `main`, 2026-06-26]:
 AI-model connections (SAM2, LaMa) are **Replicate**, unchanged by the migration. The Manus
 **Agent API** client was already retired (shipped dark, unused). The only Manus clock
 remaining platform-wide is the St Patrick file-bucket export (register M3) — a different
-repo. Replacing the platform services above is no longer a "deferred host migration"; it
-is **done** for astersports-web (#103, register M1).
+repo.
+
+Replacing the platform **host/infra** services above is **done** for astersports-web (#103,
+register M1) — Railway + Supabase are the runtime, and the money-path CAS port (credit-ledger
+`affectedRows`→`.returning()`, `server/studioDb.ts`) landed on `main` with it. **Not yet
+blessed**, though: the architect sign-off on that money path (H1/H2), the Gate B
+scheduler/reaper proof (a stranded job recovers + refunds exactly once on Railway), and the
+per-tenant ledger reconciliation (§6). Those are the gates before onboarding — until they
+clear, production is the pre-onboarding test bed (§0) and every `*_LIVE` flag stays dark (§3).
 
 ---
 
