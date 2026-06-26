@@ -1,4 +1,4 @@
-import { Check, X } from "lucide-react";
+import { Check, X, Minus } from "lucide-react";
 import type { Prediction } from "@/lib/standings/predictBracket";
 
 /**
@@ -61,14 +61,25 @@ export default function BracketOdds({ teamName, prediction: p }: Props) {
 
       {p.scenarios && p.scenarios.length > 0 && (
         <div className="border-t border-[rgba(255,255,255,0.055)] px-4 py-2">
-          {p.scenarios.map((s, i) => (
-            <div key={i} className="flex items-start gap-2.5 py-2 text-[12.5px] text-[#f0f3fa]">
-              <span className={`mt-px grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[6px] ${s.kind === "out" ? "bg-[rgba(255,107,94,0.14)] text-[#ff6b5e]" : "bg-[rgba(94,203,143,0.16)] text-[#5ecb8f]"}`}>
-                {s.kind === "out" ? <X className="h-[11px] w-[11px]" /> : <Check className="h-[11px] w-[11px]" />}
-              </span>
-              <div>{s.text}</div>
-            </div>
-          ))}
+          {p.scenarios.map((s, i) => {
+            // Honest 3-state: in = green check, out = red x, maybe = neutral gold
+            // dash (conditional — NOT a guaranteed-in green check). The predictor
+            // doesn't flatter.
+            const tone =
+              s.kind === "out"
+                ? { cls: "bg-[rgba(255,107,94,0.14)] text-[#ff6b5e]", Icon: X }
+                : s.kind === "maybe"
+                  ? { cls: "bg-[rgba(246,204,85,0.14)] text-[#F6CC55]", Icon: Minus }
+                  : { cls: "bg-[rgba(94,203,143,0.16)] text-[#5ecb8f]", Icon: Check };
+            return (
+              <div key={i} className="flex items-start gap-2.5 py-2 text-[12.5px] text-[#f0f3fa]">
+                <span className={`mt-px grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[6px] ${tone.cls}`}>
+                  <tone.Icon className="h-[11px] w-[11px]" />
+                </span>
+                <div>{s.text}</div>
+              </div>
+            );
+          })}
         </div>
       )}
 
