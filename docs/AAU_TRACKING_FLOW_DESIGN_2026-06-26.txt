@@ -64,11 +64,23 @@ DATA HIERARCHY (matches Frank's words):
 01 DISCOVERY (public): paste/search a tournament → tap a tournament row → Screen 02.
 
 02 TRACK ONE OR MANY (public browse, the multi-select that creates tracking):
-   • eyebrow = tournament name; title = grade + gender; Girls/Boys toggle.
-   • Bulk card: "Track all of <Program> · N teams across this event · + All"  ← director/LeagueApps move.
-   • Team rows = checkbox + team name + "Pool A · 3–0" (multi-select).
-   • Sticky CTA: "+ Track N selected teams" → writes the selection to the account's tracked set.
-   • A team can be tracked with NO kid (fan/coach/director) — assignment is a SEPARATE, later step.
+   SEARCH-FIRST, filters assist (RATIFIED — supersedes render-literal gender→grade drill-down):
+   • A single search box: "Search a team or club." Type "Legacy" → every Legacy Hoopers
+     team across all divisions, each with grade/gender/pool/record. Zero drilling for the
+     parent who knows their team (the people who pay).
+   • Gender + Grade chips below it are OPTIONAL filters that NARROW, never gate. "Girl
+     teams" = tap Girls; "just teams" = type the name. Neither forces the other.
+   • Results grouped by CLUB; each club carries an inline "+ All <Club>" bulk-track
+     (director/LeagueApps one-tap). Team rows = checkbox + name + "Pool A · 3–0" + a LIVE
+     score badge if on the court now.
+   • Sticky CTA: "+ Track N selected teams" → writes to the account's tracked set, then a
+     skippable "assign to a kid?" nudge + "alert me on tip-off & final?" opt-in.
+   • A team can be tracked with NO kid (fan/coach/director) — assignment is a SEPARATE axis.
+
+   TEAM-AS-THE-UNIT (RATIFIED — the spine underneath everything):
+   • You track the TEAM, not the tournament. Once tracked, the team FOLLOWS you across
+     every tournament it enters — automatically, no re-adding. The unit a parent cares
+     about is their kid's team, not a weekend's bracket. Set once, always know where/when.
 
 03 MY TEAMS (account, live command center):
    • Tracked teams grouped BY PROGRAM (Legacy Hoopers · today · 9 games).
@@ -150,16 +162,66 @@ DATA HIERARCHY (matches Frank's words):
         club_id later if/when we control team identity.
 
 ================================================================================
-8. PROPOSED BUILD ORDER (ONLY after ratification — nothing starts until then)
+7b. THE PRODUCT MODEL — 12 ENHANCEMENTS (RATIFIED 2026-06-26 — "this is the model going forward")
 ================================================================================
-  1. Converge Screen 01 to render 01 (flat rows, team in search, live sub-line, tap → 02). Small.
-  2. get_public_tournament_teams RPC + program-grouping key (D3).
-  3. Screen 02 Track (grade+gender toggle, multi-select, "+ All", "Track N selected").
-  4. Account/identity (D1) + tracked-teams store + free-form kid labels (D5).
-  5. Screen 03 My Teams (grouped-by-program, live).
-  6. Screen 04 Today + navigation (reuses the venue/directions work already done).
-  7. 05 Standings — already built; re-point its default to the tracked division.
-  8. 06 install sheet · 07 Film · 08 $20 — held (07/08 behind verification + money flip).
+  All 12 are IN. They are the model, not a someday list. Each tagged with where it lives
+  and data feasibility (we already scrape schedules, scores, venues, brackets).
+
+  KILLERS (AAU-specific; LeagueApps/TeamSnap don't do these):
+   1. SCHEDULE-CHANGE ALERTS — periodic re-scrape + diff → "Legacy 11U moved up: 12:40
+      Court 2 (was 1:30 Court 4)." Backend (re-scrape+diff+notify). THE headline feature.
+   2. NEXT GAME + TRAVEL TIME — countdown + real drive time (venue lat/lng + Google) +
+      a "Leave by 12:05" nudge. Today/My Teams.
+   3. MULTI-KID / MULTI-TEAM CONFLICT RADAR — overlapping games across tracked teams on a
+      day-timeline so a family can split up. Pure logic over tracked schedule. Today/My Teams.
+
+  HIGH-VALUE:
+   4. BRACKET PATH / "road to the chip" — predictor + bracket tree → "Win Sat → 1-seed;
+      QF vs winner of Pool B, Sun 9am." Standings/predictor (bracket parse may need work).
+   5. AUTO GAME RECAP — final buzzer → "Legacy 11U 52–47, clinched Pool A." Push + My Teams.
+   6. ONE-TAP WEEKEND TO CALENDAR — tracked games → Apple/Google Calendar (ICS), auto-updates
+      when the schedule moves (ties #1). Easy.
+   7. SHARE-TO-FAMILY / MULTI-GUARDIAN — mom+dad+grandma see the same kids/scores; a
+      "Follow Charlie's team" link one-tap onboards extended family. Account layer.
+   8. "WATCHING NOW" + REACTIONS — Realtime presence ping ("14 following · fire") on a live
+      game. Supabase Realtime. Simple.
+
+  KID / FAMILY LAYER (emotional core; some gated):
+   9. KID CARD — name, jersey #, team color: the kid's identity in the app. Free-form (D5).
+   10. AI WEEKEND DIGEST — "Your Saturday in 3 lines…" grounded on real results. Backend + LLM.
+   11. SEASON MILESTONES — "10-game win streak," "first championship." Team-level engagement
+       only (per-kid game stats stay locked); shareable.
+   12. FILM (HELD) — per-kid HLS clips + AI breakdown grounded on the box score. Behind
+       money flip + guardian verification (screens 07/08).
+
+  STRETCH (Frank flagged "push further"): live win-probability tick, coach broadcast
+  messages, concession/parking intel, opponent scouting from scraped record. Parked as
+  candidates, not committed.
+
+================================================================================
+8. BUILD ORDER (phased; nothing starts until Frank says go)
+================================================================================
+  PHASE A — the spine + the data:
+   A1. Converge Screen 01 to render 01 (flat rows, team in search, live sub-line, tap → 02).
+   A2. get_public_tournament_teams RPC + team SEARCH + program-grouping key (D3).
+   A3. Screen 02 Track — search-first, gender/grade assist-chips, club-grouped, "+ All",
+       multi-select, "Track N selected," team-as-the-unit write.
+   A4. Account/identity: Google sign-in + super-admin-free / paid entitlement gate (Stripe
+       charge HELD) + tracked-teams store + free-form kid labels + #9 kid card.
+   A5. Screen 03 My Teams (grouped-by-program, live) + Screen 04 Today (venue/directions reuse).
+
+  PHASE B — the killers:
+   B1. #1 Schedule-change alerts (re-scrape+diff+notify) — the headline.
+   B2. #2 Next-game + travel time + leave-by · #3 conflict radar.
+   B3. #6 calendar export · #5 auto recap.
+
+  PHASE C — depth + family:
+   C1. #4 bracket path · #10 AI weekend digest.
+   C2. #7 share / multi-guardian · #8 watching-now + reactions · #11 milestones.
+   C3. 05 Standings re-point to tracked division · 06 install sheet.
+
+  PHASE D — held: 07 Film · 08 $20 (behind guardian verification + Frank's money flip).
+       Stretch candidates revisited here.
 
 ================================================================================
 9. WHAT'S TRUE RIGHT NOW (so we test from reality)
