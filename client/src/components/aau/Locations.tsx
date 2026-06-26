@@ -1,4 +1,5 @@
-import { MapPin, Clock, Navigation } from "lucide-react";
+import { MapPin, Clock } from "lucide-react";
+import DirectionsControl from "./DirectionsControl";
 
 interface Location {
   name: string;
@@ -50,72 +51,66 @@ export default function Locations() {
       {/* Location cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {LOCATIONS.map((location, idx) => (
-          <a
+          <div
             key={location.name}
-            href={`https://maps.google.com/?q=${encodeURIComponent(location.address)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`as-card-hover as-press as-fade-in as-stagger-${idx + 1}`}
+            className={`as-fade-in as-stagger-${idx + 1}`}
             style={{
-              display: 'flex', alignItems: 'stretch', gap: 0,
               borderRadius: 12, overflow: 'hidden',
               backgroundColor: 'var(--as-bg-card)',
               border: '1px solid var(--as-border-default)',
               borderLeft: `4px solid ${location.color}`,
-              textDecoration: 'none', color: 'inherit',
             }}
           >
-            {/* Icon column */}
-            <div style={{
-              flexShrink: 0, width: 56, display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center',
-              backgroundColor: 'rgba(0,0,0,0.1)',
-            }}>
-              <MapPin size={20} strokeWidth={2} style={{ color: location.color }} />
-            </div>
+            <div style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
+              {/* Icon column */}
+              <div style={{
+                flexShrink: 0, width: 56, display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center',
+                backgroundColor: 'rgba(0,0,0,0.1)',
+              }}>
+                <MapPin size={20} strokeWidth={2} style={{ color: location.color }} />
+              </div>
 
-            {/* Content */}
-            <div style={{ flex: 1, padding: '14px 16px', minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--as-text-primary)' }}>
-                  {location.name}
-                </span>
-                {location.note && (
-                  <span style={{
-                    fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
-                    padding: '2px 7px', borderRadius: 999,
-                    backgroundColor: `color-mix(in srgb, ${location.color} 15%, transparent)`,
-                    color: location.color,
-                  }}>
-                    {location.note.toUpperCase()}
+              {/* Content */}
+              <div style={{ flex: 1, padding: '14px 16px', minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--as-text-primary)' }}>
+                    {location.name}
                   </span>
-                )}
-              </div>
-              <p style={{ fontSize: 13, color: 'var(--as-text-secondary)', margin: '3px 0 0' }}>
-                {location.address}
-              </p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
-                <Clock size={12} strokeWidth={2} style={{ color: 'var(--as-text-tertiary)' }} />
-                <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--as-text-secondary)' }}>
-                  {location.day} · {location.time}
-                </span>
+                  {location.note && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
+                      padding: '2px 7px', borderRadius: 999,
+                      backgroundColor: `color-mix(in srgb, ${location.color} 15%, transparent)`,
+                      color: location.color,
+                    }}>
+                      {location.note.toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <p style={{ fontSize: 13, color: 'var(--as-text-secondary)', margin: '3px 0 0' }}>
+                  {location.address}
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                  <Clock size={12} strokeWidth={2} style={{ color: 'var(--as-text-tertiary)' }} />
+                  <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--as-text-secondary)' }}>
+                    {location.day} · {location.time}
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Nav arrow */}
-            <div style={{
-              flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              padding: '0 14px',
-            }}>
-              <Navigation size={14} strokeWidth={2} style={{ color: 'var(--as-text-tertiary)' }} />
+            {/* Directions — Apple / Google / Waze (C4 · §4.2) */}
+            <div style={{ padding: '0 16px 14px' }}>
+              <DirectionsControl venue={{ name: location.name, address: location.address }} />
             </div>
-          </a>
+          </div>
         ))}
       </div>
 
       {/* Footer note */}
       <p style={{ fontSize: 11, color: 'var(--as-text-tertiary)', marginTop: 16, padding: '0 4px' }}>
-        Tap a location to open in Google Maps. Schedules subject to change.
+        Open directions in Apple Maps, Google Maps, or Waze. Schedules subject to change.
       </p>
     </div>
   );
