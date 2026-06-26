@@ -1,0 +1,154 @@
+================================================================================
+ARCHITECT SIGN-OFF — ORG FOUNDATION STEP 2 (PLATFORM AUDIT LOG) · PR #129
+astersports-web · 2026-06-26 · Architect → CC (relayed by Frank) · Tag: L99
+In reply to: ARCHITECT_REVIEW_ORG_FOUNDATION_AUDIT_2026-06-26 (CC)
+================================================================================
+VERDICT: PR #129 SIGNED OFF — cleared to merge. Four forward refinements below
+         (none block #129). Sequence §4 confirmed with one tweak. D1/D2/D4 ruled;
+         D3/D5 are Frank's calls (I won't invent his domains or pricing).
+
+--------------------------------------------------------------------------------
+1. GROUNDING CORRECTION (§1) — RATIFIED, and this is the discipline working
+--------------------------------------------------------------------------------
+Ratified. My redesign spec was written from screenshots (I flagged "I can't see
+code" at spec line 7); CC verified against the live tree and correctly applied the
+source hierarchy (installed source beats screenshot inference). The finding that
+step 1 is already built — platform_admins + superAdminProcedure (server-enforced on
+a DB grant, not a hardcoded email) + platform.whoami, and the append-only
+credit_ledger with UNIQUE(refId,reason) + idempotent grantCredits writing balance
++ row in one tx — means my spec was describing a foundation that largely exists.
+That's exactly the right move: re-plan against code reality, not my inference. The
+gaps you name (no audit trail, no revoke/taxonomy, single-varchar domain lock, no
+isolation test) are the real remaining work. Good grounding; accepted in full.
+
+--------------------------------------------------------------------------------
+2. PR #129 — APPROVED TO MERGE
+--------------------------------------------------------------------------------
+WHAT'S RIGHT (approve as-is):
+  - Schema is well-formed: varchar action mirroring credit_ledger.reason (no
+    migration for a new action) is the right consistency call; nullable
+    targetTenantId/targetUserId is correct (actions target an org, a user, or both);
+    metadata jsonb gives action-specific detail without schema churn; the four
+    indexes cover the real query patterns (global strip, per-tenant, per-actor,
+    per-action).
+  - The best-effort writer (never throws into its caller) is the CORRECT call for
+    the three events this PR wires — provision / invite / impersonate are
+    observability, and a logging hiccup must not roll back a legitimate super-admin
+    action. And each leaves residual DB state anyway (the org/invite/cookie exists),
+    so a missed audit row is a narrative gap, not a lost fact.
+  - The test locks the load-bearing invariant (returns false + does not throw on DB
+    failure; true + correct row on success). That's the right thing to pin.
+  - Holding it (not auto-merging) was correct — DB schema + super-admin path is
+    architect-scoped per §2.4, even though no money flag is touched.
+
+FOUR FORWARD REFINEMENTS (none block #129; fold forward as noted):
+  (a) DB-LEVEL IMMUTABILITY — PIN IT TO ≤ STEP 3, don't let it drift. "Insert-only
+      by construction" is fine for foundation, but an audit log's whole value is
+      tamper-evidence, and a future code path (or a compromised app role) could
+      UPDATE/DELETE. The REVOKE UPDATE, DELETE ON platform_audit_log FROM the app
+      role (+ FROM PUBLIC, per the Postgres default-grant lesson you already cite)
+      must land no later than step 3 — because that's when money actions
+      (credit_grant/revoke) start being audited, and the immutability of THAT trail
+      is part of the real guarantee. Track it; don't leave it open-ended.
+  (b) AUDIT THE FULL IMPERSONATION WINDOW. impersonation is the single most
+      sensitive capability (acting as another user). The PR logs
+      impersonation_started; add impersonation_ended (or capture session duration)
+      so the trail shows the WINDOW during which a super-admin was acting as someone
+      else, not just its start. Strong recommendation, near-term follow-up.
+  (c) STEP-3 CREDIT AUDIT IN-TX. When the credit grant/revoke RPCs land, prefer
+      writing their audit row in the SAME transaction as the ledger entry, so for
+      MONEY the narrative is atomic (no credit moves without its audit row). This is
+      a tightening of (d), specific to money — best-effort is fine for events, but
+      money deserves all-or-nothing.
+  (d) CLARIFICATION (affirms your design): credit_ledger is the AUTHORITATIVE,
+      transactional money record; platform_audit_log is the human-readable
+      super-admin NARRATIVE. Best-effort is acceptable for the narrative precisely
+      BECAUSE the ledger is the non-best-effort money truth. State this in the PR so
+      no one later mistakes the audit log for the money source of record — it isn't;
+      the ledger is.
+  Minor: when credit audit lands, make a TRIAL grant distinguishable from an admin
+  top-up in the audit (distinct action or metadata.kind) — "why did this org get
+  credits" (trial vs comp vs purchase) matters for the narrative.
+
+--------------------------------------------------------------------------------
+3. RE-SCOPED SEQUENCE (§4) — CONFIRMED, with one tweak
+--------------------------------------------------------------------------------
+Confirmed: 1 done · 2 = #129 · 3 credit revoke+taxonomy+audit HELD for H1 · 4
+multi-domain lock READY (needs D3) · 5 console UI · 6 org-view · 7 isolation test ·
+8 self-serve stays off.
+TWEAK — PULL STEP 7 EARLIER. The cross-org isolation CI test doesn't depend on the
+console UI (5) or org-view (6); it tests RLS, which exists now. Write it alongside/
+right after step 4 so it's a STANDING GUARD through steps 4–6, not a last-minute
+gate before Jaya. It's cheap, high-value, and protects every step in between. It
+still GATES the 2nd org going live — just author it sooner.
+NOTE on H1: your grounding shows the ledger invariant (idempotent grant, balance in
+one tx, UNIQUE(refId,reason)) already shipped — so H1's remaining scope narrows to
+(i) confirming SUM(delta)==balance reconciliation + no-deliver-and-refund hold under
+test, and (ii) the NEW revoke semantics (D1). Revoke is the genuinely new money
+surface; that's where the H1 lens matters most.
+
+--------------------------------------------------------------------------------
+4. OPEN DECISIONS — RULINGS
+--------------------------------------------------------------------------------
+D1  NEGATIVE BALANCE ON REVOKE → RULED: clamp floor at 0, and make it EXPLICIT, not
+    silent. Precise semantics:
+      · requested ≤ balance → revoke.
+      · requested > balance, NO override → REJECT with a clear message ("balance is
+        60; revoke up to 60, or use override to go negative"). Do NOT silently
+        truncate — silent truncation surprises the admin (asked 100, removed 60).
+      · requested > balance, override flag + mandatory reason → go negative, audited.
+    Negative balance is a confusing state (does the org owe? does the next purchase
+    backfill the hole first?), so it's override-only with a reason on the record.
+
+D2  ORG ADMINS INVITE MEMBERS → RULED: yes, agree. Admins invite/manage MEMBERS;
+    only the OWNER manages ADMINS (promote/demote/remove) and transfers ownership.
+    The current tenantAdminProcedure (admin+owner can invite) matches this. ADD the
+    role-ceiling detail: an admin's invite role selector must NOT offer "admin" — an
+    admin cannot mint another admin; only the owner grants the admin role. Gate the
+    invite-role options by the inviter's role.
+
+D4  PLATFORM-STAFF ROLE COLUMN NOW → RULED: DEFER — agree with your lean, and I'm
+    revising my earlier spec position. The platform_admins userId grant is enough
+    for one super-admin (you). Adding a platform_role column now is speculative; the
+    right tiers (support / billing / read-only) will be shaped by real need, and the
+    migration to add a nullable column later (default super_admin) is cheap and
+    additive. Don't pre-build the wrong taxonomy. When staff arrive, make the tiers
+    distinct CAPABILITIES (e.g., support can impersonate but not issue credits;
+    billing can issue but not impersonate) — future work, not now.
+
+D3  JAYA DOMAIN SET → YOUR CALL, Frank — I won't invent domains. But here's the
+    architect framing the decision needs: the question isn't only "which domains,"
+    it's "is this ONE org or SEVERAL?" If cinqasept.nyc and likely.nyc are brands of
+    the SAME legal org as jaya.com, they're a multi-domain lock on one org (one
+    credit pool, one ledger). If they're DIFFERENT clients, they're SEPARATE orgs
+    (each its own pool, RLS-isolated) — not multi-domains of Jaya. Tell CC (1) the
+    exact domains and (2) which belong to the same org. Step 4 builds the
+    multi-domain MECHANISM regardless; only the values wait on you.
+
+D5  TRIAL SIZE / LENGTH / PER-PLAN GRANTS → YOUR CALL (commercial) — I can't set the
+    numbers. The architectural requirements around whatever you choose: the
+    trial_grant goes through the ledger (reason=trial_grant) + audit; it's
+    ONE-TRIAL-ENFORCED per org (re-triggering can't mint more credits); and the
+    amount/length live in CONFIG, not hardcoded, so you can tune without a deploy.
+    Give CC the numbers; the mechanism honors them.
+
+--------------------------------------------------------------------------------
+5. HOLDS (unchanged)
+--------------------------------------------------------------------------------
+- Step 3 (credit issue/revoke RPCs + taxonomy + credit audit) stays HELD for the H1
+  money-path sign-off — lands on my review against the green PR, with (a) and (c)
+  folded in and D1's revoke semantics.
+- Self-serve org creation stays OFF (dark behind STUDIO_CREATE_ORG_LIVE) until its
+  abuse controls — unchanged.
+- The cross-org isolation test GATES Jaya going live (now authored earlier, per §3).
+- No agent flips a *_LIVE / money flag; Frank flips.
+
+--------------------------------------------------------------------------------
+6. FILING
+--------------------------------------------------------------------------------
+This sign-off travels on the PR branch (docs/) alongside CC's review doc + into
+_platform-wide. #129 cleared to merge. Steps 3 (H1) and 4 (D3) proceed per above.
+================================================================================
+END — #129 signed off w/ four forward refinements; sequence confirmed (step 7
+earlier); D1/D2/D4 ruled; D3/D5 await Frank's domains + pricing.
+================================================================================
