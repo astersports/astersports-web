@@ -1,35 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Search, Link2, Trophy, ChevronRight, ChevronDown, Loader2, Check, ArrowUpRight } from "lucide-react";
+import { Search, Link2, Trophy, ChevronRight, Loader2, Check, ArrowUpRight } from "lucide-react";
 import {
   getTournamentDirectory,
   submitTournament,
   getIngestStatus,
   type DirTournament,
-  type DirDivision,
 } from "@/lib/aster";
 
-// Find / Discovery — best-in-class render 01. Public + free to browse, and self-serve:
-// a parent pastes their TourneyMachine link and the hub ingests it itself (no operator in
-// the loop). Picking a division sends the hub to Standings. Tokens = best-in-class palette
-// (§1, do not eyeball). No invented data — every row is a real directory entry.
+// Screen 01 Discovery — best-in-class render 01. Public + free to browse, and self-serve:
+// a parent pastes their TourneyMachine link and the hub ingests it itself. FLAT tournament
+// rows (no inline accordion); tapping a tournament opens Screen 02 "Track one or many".
+// No invented data — every row is a real directory entry. Tokens = best-in-class palette.
 type SubPhase = "idle" | "working" | "error" | "added";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export default function FindDiscovery({
-  onPick,
-}: {
-  onPick: (div: DirDivision, tournamentName: string) => void;
-}) {
+export default function FindDiscovery({ onOpenTournament }: { onOpenTournament: (t: DirTournament) => void }) {
   const [dir, setDir] = useState<DirTournament[] | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [q, setQ] = useState("");
-  // Accordion: tournaments collapse to one header row; tapping expands divisions. A live
-  // search auto-expands matches; manual opens live in openIds.
-  const [openIds, setOpenIds] = useState<Set<string>>(new Set());
-  // Paste-to-track state.
   const [paste, setPaste] = useState("");
   const [sub, setSub] = useState<{ phase: SubPhase; msg?: string }>({ phase: "idle" });
-  const [scrollToId, setScrollToId] = useState<string | null>(null);
+  const [flashId, setFlashId] = useState<string | null>(null);
   const busy = sub.phase === "working";
   const alive = useRef(true);
 
@@ -47,27 +38,20 @@ export default function FindDiscovery({
     };
   }, [loadDir]);
 
-  // Smooth-scroll to a freshly-added tournament once it's in the rendered list.
+  // scroll to + flash a freshly-added tournament once it's in the list
   useEffect(() => {
-    if (!scrollToId) return;
-    const el = document.getElementById(`tg-${scrollToId}`);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-    setScrollToId(null);
-  }, [scrollToId, dir]);
-
-  const toggle = (id: string) =>
-    setOpenIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+    if (!flashId) return;
+    const el = document.getElementById(`tg-${flashId}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    const t = setTimeout(() => setFlashId(null), 2200);
+    return () => clearTimeout(t);
+  }, [flashId, dir]);
 
   async function finishAdd(id: string, name?: string | null) {
     await loadDir();
     if (!alive.current) return;
-    setOpenIds((prev) => new Set(prev).add(id));
     setPaste("");
-    setScrollToId(id);
+    setFlashId(id);
     setSub({ phase: "added", msg: name ? `Added ${name}` : "Added — it's on the board" });
   }
 
@@ -103,18 +87,12 @@ export default function FindDiscovery({
     const term = q.trim().toLowerCase();
     if (!dir) return [];
     if (!term) return dir;
-    return dir
-      .map((t) => {
-        const tMatch =
-          t.name.toLowerCase().includes(term) || (t.circuit ?? "").toLowerCase().includes(term);
-        return tMatch ? t : { ...t, divisions: t.divisions.filter((d) => d.name.toLowerCase().includes(term)) };
-      })
-      .filter(
-        (t) =>
-          t.name.toLowerCase().includes(term) ||
-          (t.circuit ?? "").toLowerCase().includes(term) ||
-          t.divisions.length > 0,
-      );
+    return dir.filter(
+      (t) =>
+        t.name.toLowerCase().includes(term) ||
+        (t.circuit ?? "").toLowerCase().includes(term) ||
+        t.divisions.some((d) => d.name.toLowerCase().includes(term)),
+    );
   }, [dir, q]);
 
   return (
@@ -134,7 +112,7 @@ export default function FindDiscovery({
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search tournament, division, or circuit"
+          placeholder="Search tournament or circuit"
           aria-label="Search tournaments"
           className="w-full bg-transparent text-[13.5px] text-[#f0f3fa] placeholder-[#5f6981] outline-none"
         />
@@ -173,7 +151,6 @@ export default function FindDiscovery({
         </button>
       </form>
 
-      {/* paste status line */}
       {sub.phase === "working" && (
         <div className="mx-[18px] mt-2 flex items-center gap-2 text-[12px] text-[#9aa4ba]" aria-live="polite">
           <Loader2 className="h-[13px] w-[13px] animate-spin text-[#E8902A]" /> {sub.msg}
@@ -218,72 +195,43 @@ export default function FindDiscovery({
       {dir && filtered.length === 0 && (
         <div className="mx-[18px] rounded-[15px] border border-[rgba(255,255,255,0.055)] bg-[linear-gradient(180deg,#151b29,#10141f)] p-8 text-center">
           <Trophy className="mx-auto mb-3 h-7 w-7 text-[#5f6981]" />
-          <div className="text-[14px] font-semibold text-[#f0f3fa]">
-            {q ? "No match" : "No tournament on the board yet"}
-          </div>
+          <div className="text-[14px] font-semibold text-[#f0f3fa]">{q ? "No match" : "No tournament on the board yet"}</div>
           <div className="mt-1 text-[12px] text-[#5f6981]">
             {q ? "Try a different search." : "Paste a TourneyMachine link above to add the first one."}
           </div>
         </div>
       )}
 
+      {/* flat tournament rows — tap opens Screen 02 Track */}
       <div className="space-y-[10px] px-[18px]">
         {filtered.map((t) => {
-          const searching = q.trim().length > 0;
-          const open = searching || openIds.has(t.id);
-          const empty = t.divisions.length === 0;
+          const teamCount = t.divisions.reduce((s, d) => s + (d.team_count ?? 0), 0);
+          const flash = flashId === t.id;
           return (
-            <div
+            <button
               key={t.id}
               id={`tg-${t.id}`}
-              className="overflow-hidden rounded-[15px] border border-[rgba(255,255,255,0.055)] bg-[linear-gradient(180deg,#151b29,#10141f)]"
+              type="button"
+              onClick={() => onOpenTournament(t)}
+              className={`as-press flex w-full items-center gap-[13px] rounded-[15px] border px-[15px] py-[14px] text-left transition-colors ${
+                flash
+                  ? "border-[rgba(94,203,143,0.5)] bg-[rgba(94,203,143,0.06)]"
+                  : "border-[rgba(255,255,255,0.055)] bg-[linear-gradient(180deg,#151b29,#10141f)]"
+              }`}
             >
-              {/* accordion header — one row per tournament, collapsed by default */}
-              <button
-                type="button"
-                onClick={() => !empty && toggle(t.id)}
-                disabled={empty}
-                aria-expanded={open}
-                className={`as-press flex w-full items-center gap-[13px] px-[15px] py-[14px] text-left ${empty ? "cursor-default" : ""}`}
-              >
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-[radial-gradient(circle_at_35%_30%,rgba(232,144,42,0.22),rgba(232,144,42,0.06))] text-[#F6CC55]">
-                  <Trophy className="h-[18px] w-[18px]" />
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-[radial-gradient(circle_at_35%_30%,rgba(232,144,42,0.22),rgba(232,144,42,0.06))] text-[#F6CC55]">
+                <Trophy className="h-[18px] w-[18px]" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-[var(--font-display)] text-[14px] font-bold text-[#f0f3fa]">{t.name}</span>
+                <span className="mt-0.5 block font-[var(--font-mono)] text-[11px] text-[#5f6981]">
+                  {t.circuit ? `${t.circuit} · ` : ""}
+                  {t.divisions.length} division{t.divisions.length === 1 ? "" : "s"}
+                  {teamCount ? ` · ${teamCount} teams` : ""}
                 </span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-[var(--font-display)] text-[14px] font-bold text-[#f0f3fa]">{t.name}</div>
-                  <div className="mt-0.5 font-[var(--font-mono)] text-[11px] text-[#5f6981]">
-                    {t.circuit ? `${t.circuit} · ` : ""}
-                    {empty ? "loading divisions…" : `${t.divisions.length} division${t.divisions.length === 1 ? "" : "s"}`}
-                  </div>
-                </div>
-                {!empty && (
-                  <ChevronDown
-                    className={`h-[18px] w-[18px] shrink-0 text-[#5f6981] transition-transform ${open ? "rotate-180" : ""}`}
-                  />
-                )}
-              </button>
-
-              {open && !empty && (
-                <div className="border-t border-[rgba(255,255,255,0.055)] p-[10px] pt-2">
-                  {t.divisions.map((d) => (
-                    <button
-                      key={d.id}
-                      type="button"
-                      onClick={() => onPick(d, t.name)}
-                      className="as-press flex w-full items-center gap-[12px] rounded-[12px] px-[12px] py-[11px] text-left hover:bg-[rgba(255,255,255,0.03)]"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-[13.5px] font-semibold text-[#f0f3fa]">{d.name}</div>
-                        <div className="mt-0.5 font-[var(--font-mono)] text-[11px] text-[#5f6981]">
-                          {d.team_count} teams · top {d.advance_count} advance
-                        </div>
-                      </div>
-                      <ChevronRight className="h-[17px] w-[17px] shrink-0 text-[#454e63]" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+              </span>
+              <ChevronRight className="h-[17px] w-[17px] shrink-0 text-[#454e63]" />
+            </button>
           );
         })}
       </div>
