@@ -1,0 +1,146 @@
+ARCHITECT REVIEW — astersports-web CLAUDE.md §2.5 (Manus → Railway+Supabase) + session handoff
+From: Claude Code (build lane) · For: the Architect, via Frank · Date: 2026-06-26
+Holds for: §2.4 / §11.8 architect ratification — this doctrine change does NOT auto-merge.
+
+═══════════════════════════════════════════════════════════════════════
+PART 1 — DECISION REQUEST: ratify the §2.5 doctrine rewrite
+═══════════════════════════════════════════════════════════════════════
+REQUEST
+  Replace astersports-web CLAUDE.md §2.5, which still calls Manus "the platform runtime,"
+  with the post-#103 truth (Railway + Supabase; Manus decommissioned). §2.5 is the repo's
+  operating canon; a stale canon misleads the next CC session. You flagged this as
+  architect-scoped (doctrine), dedicated PR, holds for your review — this IS that artifact.
+
+WHY ARCHITECT-SCOPED
+  It's doctrine (the repo's operating agreement), not code. Per §2.4 / §11.8 CC produces
+  the rewrite + evidence + a labeled lean; you ratify the wording.
+
+EVIDENCE (all [GROUNDED] against current main, 2026-06-26)
+  - Host/deploy: Railway. git log: "Migrate off Manus → Railway + Supabase + Anthropic +
+    Google OAuth (#103)". Was Manus Autoscale.
+  - DB: drizzle.config.ts dialect = "postgresql" → Supabase Postgres. Was MySQL/TiDB.
+  - Auth: server/_core/sdk.ts now jose-signs an own-JWT over the app DB; #117 removed the
+    dead Manus OAuth/WebDev code. Was Manus OAuth/WebDev session service.
+  - Storage: server/storage.ts header — "Migrated from the Manus Forge presigned-URL/S3
+    path to Supabase Storage (private `media` bucket)"; the /manus-storage/{key} route is
+    kept as a legacy-named proxy (storageProxy.ts) over Supabase. @aws-sdk/* now residual.
+  - Crons: server/_core/heartbeat.ts REMOVED; in-process server/_core/scheduler.ts
+    (ENABLE_SCHEDULER + cronAuth.ts) now runs poll-predictions + the reaper.
+  - Data API: server/_core/dataApi.ts REMOVED; callDataApi gone.
+  - Replicate (SAM2/LaMa) unchanged. Manus Agent API client already retired.
+
+WHAT CHANGES (semantically)
+  - The §2.5 HEADING flips from "Manus is the platform runtime" → "the runtime is Railway +
+    Supabase (Manus decommissioned)."
+  - The CC-only-authoring + incident-#61 principle is PRESERVED in intent and explicitly
+    marked permanent / host-independent (it never depended on Manus).
+  - The five "Manus is retained as runtime" bullets are rewritten to the actual services.
+  - Adds the charter Gate B onboarding gate (scheduler+reaper proven on Railway) inline.
+  - States Manus is fully decommissioned for this repo (register M1); only M3 (St Patrick
+    file export) remains platform-wide.
+
+CC'S LABELED LEAN (AP#39 — committing to it)
+  Ratify as written. The change is pure truth-reconciliation grounded in main; it loses no
+  live rule (the CC-only / incident-#61 doctrine is preserved and strengthened). The only
+  real judgment call is heading wording — I lean to the explicit "Manus decommissioned" so
+  the next session can't misread the runtime. Open to your wording.
+
+DELIVERY
+  - Held draft PR: astersports-web, branch docs/claude-md-railway-runtime — the actual
+    CLAUDE.md diff + this doc. Does NOT auto-merge; merge on your ratification.
+  - The full proposed §2.5 text is in PART 3 below for line review.
+
+═══════════════════════════════════════════════════════════════════════
+PART 2 — SESSION HANDOFF (2026-06-26) — what shipped / state
+═══════════════════════════════════════════════════════════════════════
+SHIPPED (merged to main):
+  R1 — READMEs (charter R1), all 4 with your review corrections applied:
+    • aster-sports #1099 — React 18→19 / Vite 8 / 171→275 migrations corrections.
+    • legacy-hoopers #2 — throwaway-prototype + M4 thin-API-consumer + youth-data hygiene.
+    • st-patricks #6 — three-host picture + target-stack line + ARCHITECTURE.md host fix.
+    • astersports-web #119 — Storage row corrected to Supabase Storage (your blocking flag,
+      verified against server/storage.ts), env names filled from env.ts, Gate A inline.
+  HUB (astersports.io) display fixes #118 — hero anchor (100vh→ anchored on mobile),
+    horizontal-overflow clamp, mobile scroll reduction, weather temp sizing, tile sizing,
+    removed the wrong "Champions" badge on the 1-2 ZG NY Hoop Festival; added St. Patrick's
+    + Legacy Hoopers "Coming soon" constellation tiles.
+  HUB/admin consistency #120 (merging on green) — fixed the broken brand logo (Billing,
+    Privacy, Terms, lookbookPdf all pointed at the dead /manus-storage/aster_sports_logo
+    path → repointed to /aster-mark.png) + unified the back button (ArrowLeft + "Back to
+    Aster Sports") + a11y aria-label fix (Copilot review).
+  BACKLOG cleared — merged the ratified governance plan (#1098, now canon) + cross-org
+    super-admin decision (#1097) + Railway merge plan (#111); CLOSED as superseded the
+    Railway review packet (#113) + master recap (#116); cleared 4 Dependabot bumps
+    (st-patricks #3 self-rebasing).
+
+HELD FOR YOU (architect ratification):
+  • §2.5 doctrine rewrite (PART 1) — held draft PR.
+  • H1/H2 (#103 money-path CAS + auth identity) — unchanged; land on a fresh review against
+    the R3 integration branch when it is green (charter Part 4; #113 closed pointing here).
+  • #1097 cross-org super-admin — your lean (Option A) recorded; build at the 2nd-org
+    cutover behind the cross-org isolation-test gate.
+
+NEXT (per charter R-sequence):
+  • R2 — STRUCTURE.md → current truth + move to the neutral canon repo (Q6).
+  • R3 — Railway #103 integration: fresh branch off current main; re-apply ONLY the
+    migration delta (do not merge the 39-commit branch); routers.ts line-by-line; regen
+    pnpm-lock → then H1/H2 to you. Gates: DATABASE_URL = Supabase session pooler 5432;
+    scheduler+reaper proven before onboarding.
+
+OPEN QUESTIONS FOR YOU:
+  1. §2.5 heading wording — explicit "Manus decommissioned" (my lean) or softer?
+  2. R2 neutral canon repo — create the org `platform` (or `.github`) repo now, or defer
+     to alongside R3?
+  3. Hub tile status — St. Patrick's + Legacy Hoopers are "Coming soon"/#contact; wire live
+     URLs when each ships (operator action).
+
+═══════════════════════════════════════════════════════════════════════
+PART 3 — FULL PROPOSED §2.5 TEXT (for your line review)
+═══════════════════════════════════════════════════════════════════════
+### 2.5 Code authoring is CC-only; the runtime is Railway + Supabase (Manus decommissioned)
+Code authoring is **CC-only**. No lane but CC writes to the repo — the Architect
+designs/reviews and Frank oversees, but neither writes code, and no agent but CC commits.
+This closes the incident-#61 vector (an agent flipping a `*_LIVE` flag as a side effect of
+a checkpoint commit): with CC the sole author and §3 barring any agent from flipping, a
+flag can no longer ride in on a builder checkpoint. **This principle is permanent and
+host-independent — it survived the platform migration unchanged.**
+
+**The platform migrated off Manus to Railway + Supabase in #103 (Manus register M1).**
+Manus is no longer the runtime — it is **fully decommissioned for this repo**. The runtime
+services are now [GROUNDED against `main`, 2026-06-26]:
+- **Host / deploy** — **Railway**, auto-deploy from `main` (was Manus Autoscale).
+- **DB** — **Supabase Postgres** via Drizzle (`postgres` driver; `drizzle.config.ts`
+  dialect `postgresql`) — was Autoscale MySQL/TiDB.
+- **Auth / identity** — **Google OAuth → own JWT** (`server/_core/sdk.ts`, jose-signed
+  over the app DB). The dead Manus OAuth/WebDev code was removed in #117 (was Manus
+  OAuth/WebDev session service).
+- **Storage** — **Supabase Storage** (private `media` bucket; `server/storage.ts` +
+  `server/_core/supabaseStorage.ts`). The public `/manus-storage/{key}` serving path is
+  kept by `server/_core/storageProxy.ts` so DB-persisted keys stay valid — the route name
+  is legacy, the backend is Supabase (was Forge presigned-URL S3). The `@aws-sdk/*`
+  packages still in `package.json` are residual and can be pruned separately.
+- **Crons** — **in-process scheduler** (`server/_core/scheduler.ts`, gated by
+  `ENABLE_SCHEDULER`; Bearer-auth via `CRON_SECRET` / `server/_core/cronAuth.ts`) driving
+  `poll-predictions` + the stranded-job reaper. `server/_core/heartbeat.ts` was removed
+  (was Forge HeartbeatJob). **Onboarding gate (charter Gate B): prove the scheduler +
+  reaper on Railway — a stranded job recovers and refunds exactly once — before any
+  onboarding.**
+- **Data API** — removed; `callDataApi` / `server/_core/dataApi.ts` no longer exist.
+
+AI-model connections (SAM2, LaMa) are **Replicate**, unchanged by the migration. The Manus
+**Agent API** client was already retired (shipped dark, unused). The only Manus clock
+remaining platform-wide is the St Patrick file-bucket export (register M3) — a different
+repo.
+
+Replacing the platform **host/infra** services above is **done** for astersports-web (#103,
+register M1) — Railway + Supabase are the runtime, and the money-path CAS port (credit-ledger
+`affectedRows`→`.returning()`, `server/studioDb.ts`) landed on `main` with it. **Not yet
+blessed**, though: the architect sign-off on that money path (H1/H2), the Gate B
+scheduler/reaper proof (a stranded job recovers + refunds exactly once on Railway), and the
+per-tenant ledger reconciliation (§6). Those are the gates before onboarding — until they
+clear, production is the pre-onboarding test bed (§0) and every `*_LIVE` flag stays dark (§3).
+
+[VERIFY-RESOLVED 2026-06-26] CC's answer to the architect's open question: the money-path CAS
+IS on main now (case b). server/studioDb.ts:294-302 is the postgres `.returning()` conditional
+debit; server/db.ts uses postgres-js; commit 778b210 "(#103)" is in main's history. So H1's
+clock has started — H1 + ledger reconciliation are urgent-next, not "whenever R3 is green."
