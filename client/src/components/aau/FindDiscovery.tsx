@@ -201,7 +201,8 @@ export default function FindDiscovery({ user, onOpenTournament }: { user: HubUse
 
   // Uploading a tournament is a Plus feature ("anyone who pays $20/mo can upload"). Entitled
   // accounts reach the paste/ingest flow; everyone else gets the Plus gate. Enforcement source is
-  // is_entitled (owner-applied billing) — until wired, isPlusEntitled() is false, so this gates.
+  // is_entitled (owner-applied billing) — until billing is wired, isPlusEntitled(user) is false for
+  // every account EXCEPT the super-admin, so this still gates normal accounts.
   const openUpload = useCallback(() => {
     if (isPlusEntitled(user)) setMode("paste");
     else window.dispatchEvent(new Event(GO_PLUS_EVENT));

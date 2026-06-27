@@ -9,7 +9,7 @@ import type { HubUser } from "@/lib/aster";
 // Email match is case-insensitive. (Move to a server-side role claim when auth roles are wired.)
 const SUPER_ADMIN_EMAILS = ["frank@astersports.co"];
 function isSuperAdmin(user?: HubUser | null): boolean {
-  const email = user?.email?.trim().toLowerCase();
+  const email = user?.email?.trim()?.toLowerCase(); // ?. before toLowerCase: don't throw on null email
   return email != null && SUPER_ADMIN_EMAILS.includes(email);
 }
 
