@@ -33,7 +33,8 @@ export default function BrowseLiveStrip() {
       </div>
       <div className="space-y-[8px] px-[18px]">
         {games.map((g) => {
-          const homeWon = g.homeScore != null && g.awayScore != null && g.homeScore > g.awayScore;
+          const lit = g.homeScore != null && g.awayScore != null;
+          const homeWon = lit && (g.homeScore ?? 0) > (g.awayScore ?? 0);
           return (
             <div key={g.gameId} className="flex items-center gap-[10px] rounded-[12px] px-[11px] py-[9px]" style={{ border: "1px solid rgba(52,224,164,.22)", background: "rgba(52,224,164,.04)" }}>
               <span className="as-pulse inline-block h-[6px] w-[6px] shrink-0 rounded-full" style={{ background: C.live }} aria-hidden />
@@ -45,11 +46,16 @@ export default function BrowseLiveStrip() {
                   {[g.divisionLabel, g.tournamentName].filter(Boolean).join(" · ")}
                 </span>
               </span>
-              <span className="shrink-0 font-[var(--font-mono)] text-[14px] font-bold" style={{ color: C.live }}>
-                <span style={{ opacity: homeWon ? 0.6 : 1 }}>{g.awayScore ?? "—"}</span>
-                <span style={{ color: C.mut }}>–</span>
-                <span style={{ opacity: g.homeScore != null && g.awayScore != null && !homeWon ? 0.6 : 1 }}>{g.homeScore ?? "—"}</span>
-              </span>
+              {/* live but no score yet → "score pending", never bare dashes that read as broken */}
+              {lit ? (
+                <span className="shrink-0 font-[var(--font-mono)] text-[14px] font-bold" style={{ color: C.live }}>
+                  <span style={{ opacity: homeWon ? 0.6 : 1 }}>{g.awayScore}</span>
+                  <span style={{ color: C.mut }}>–</span>
+                  <span style={{ opacity: !homeWon ? 0.6 : 1 }}>{g.homeScore}</span>
+                </span>
+              ) : (
+                <span className="shrink-0 font-[var(--font-mono)] text-[9px] uppercase tracking-[0.04em]" style={{ color: C.live }}>score<br />pending</span>
+              )}
             </div>
           );
         })}

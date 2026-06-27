@@ -26,6 +26,7 @@ function LiveRow({ g }: { g: LiveNowGame }) {
   const lit = g.homeScore != null && g.awayScore != null;
   const homeWon = lit && (g.homeScore ?? 0) > (g.awayScore ?? 0);
   const awayWon = lit && (g.awayScore ?? 0) > (g.homeScore ?? 0);
+  // live but no score posted yet → say so, rather than show bare dashes that read as broken
   const side = (name: string, score: number | null, won: boolean) => (
     <div className="flex items-center justify-between gap-2 py-[3px]">
       <span className="truncate font-[var(--font-display)] text-[13.5px]" style={{ color: won ? C.ink : C.dim, fontWeight: 600 }}>{name}</span>
@@ -38,6 +39,7 @@ function LiveRow({ g }: { g: LiveNowGame }) {
         <span className="inline-flex items-center gap-[6px] font-[var(--font-mono)] text-[10px] font-bold tracking-[0.06em]" style={{ color: C.live }}>
           <span className="as-pulse inline-block h-[6px] w-[6px] rounded-full" style={{ background: C.live, boxShadow: `0 0 6px ${C.live}` }} aria-hidden /> LIVE
           {g.startAt && <span style={{ color: C.mut }}>· {timeET(g.startAt)}</span>}
+          {!lit && <span style={{ color: C.mut }}>· score pending</span>}
         </span>
         <span className="shrink-0 truncate font-[var(--font-mono)] text-[9.5px]" style={{ color: C.mut, border: `1px solid ${C.hair}`, background: "rgba(255,255,255,.04)", padding: "2px 7px", borderRadius: 6 }}>
           {[g.divisionLabel, g.tournamentName].filter(Boolean).join(" · ")}
