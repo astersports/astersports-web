@@ -15,9 +15,13 @@ import DivisionStandings from "./standings/DivisionStandings";
 // FORWARD FLAG (architect §2 "display by name, navigate by key"): rows render display_name (a
 // scoreboard renders discrete game rows and never aggregates by team identity, so display_name is
 // safe here). Making a row TAPPABLE into Team Detail crosses into identity and MUST resolve on
-// external_team_key — which the RPC does not yet return. That additive field + the tap is the next
-// increment, STAGED and held for the owner's apply-go (build-go ≠ apply-go). Until then: no dead
-// tap affordance.
+// external_team_key — PER SIDE: a game row is team-vs-team, so each row needs BOTH
+// home_external_team_key AND away_external_team_key, or half the rows get a dead tap. The games RPC
+// does not return them yet; adding them is a body-only CREATE OR REPLACE (the fn RETURNS jsonb, so
+// it's two new jsonb keys, not a RETURNS TABLE column drop+create). Owner-applied regardless of the
+// apply-gate standing rule (a replace, not a brand-new read fn). That field-pair + the tap is the
+// next increment — STAGED and held for the owner's apply-go (build-go ≠ apply-go). Until then: no
+// dead tap affordance ships (render-minus-tap is the diff baseline for this increment).
 
 const ET = "America/New_York";
 const dayKeyET = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-CA", { timeZone: ET }) : "tbd");
