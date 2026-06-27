@@ -205,7 +205,7 @@ DATA HIERARCHY (matches Frank's words):
   (open: 4 tabs with Find folded into My Teams, or 5 tabs).
 
 ================================================================================
-7c. THE PREDICTOR IS MATH (operator-clarified 2026-06-26 — "the projector is really just math")
+7c. THE PREDICTOR IS MATH (operator-clarified 2026-06-26 — "the predictor is really just math")
 ================================================================================
 Frank: "What team beat what team by how much points; you're playing that team; that team is
 gonna play another team — that's how you predict the odds." The predictor is transitive
