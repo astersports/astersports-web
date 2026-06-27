@@ -5,6 +5,7 @@ import { getTrackedTeamSchedule, getTournamentStandings, type TeamGame } from "@
 import { buildMyTeamsModel, type MyTeamsModel } from "@/lib/aau/myTeamsModel";
 import { predictBracket } from "@/lib/standings/predictBracket";
 import ConflictRadar from "./ConflictRadar";
+import NextGame from "./NextGame";
 
 // Screen 03 "My Teams · command center" — render-faithful. Header + "updating live" (only
 // when a tracked team is in progress), a live score hero, three glance stats (to-advance %
@@ -47,19 +48,30 @@ export default function MyTeams() {
     return list.length === 1 ? list[0] : list.length > 1 ? `${list.length} programs` : "";
   }, [teams]);
 
+  // Featured team for the "to advance" stat: the live team if one is in progress, else the
+  // team playing soonest, else the first tracked. Always ONE definite team — never a blend
+  // of the tracked set (the % belongs to a single team's division bracket).
+  const nextUpKey = useMemo(() => {
+    const up = games
+      .filter((g) => g.status !== "final" && g.startAt)
+      .sort((a, b) => +new Date(a.startAt!) - +new Date(b.startAt!));
+    return up[0]?.trackedTeamId ?? null;
+  }, [games]);
+  const featured = useMemo(() => {
+    const key = model.hero?.teamKey ?? nextUpKey ?? teams[0]?.teamKey ?? null;
+    return key ? teams.find((t) => t.teamKey === key) ?? null : null;
+  }, [model.hero, nextUpKey, teams]);
+
   // to-advance % for the featured team — predictor over its division standings (real,
-  // enumerated). focus matched by name (standings ids are resolved keys).
-  const focus = model.hero
-    ? teams.find((t) => t.teamKey === model.hero!.teamKey)
-    : teams.find((t) => model.groups[0]?.teams.some((s) => s.teamKey === t.teamKey));
+  // enumerated). Team matched by name (standings ids are resolved keys).
   useEffect(() => {
     setAdvancePct(null);
-    if (!focus?.divisionId) return;
+    if (!featured?.divisionId) return;
     let live = true;
-    getTournamentStandings(focus.divisionId)
+    getTournamentStandings(featured.divisionId)
       .then((b) => {
         if (!live || !b) return;
-        const me = b.teams.find((t) => norm(t.name) === norm(focus.name));
+        const me = b.teams.find((t) => norm(t.name) === norm(featured.name));
         if (!me) return;
         const p = predictBracket({
           teams: b.teams, games: b.games, remaining: b.remaining,
@@ -69,7 +81,7 @@ export default function MyTeams() {
       })
       .catch(() => {});
     return () => { live = false; };
-  }, [focus?.divisionId, focus?.name]);
+  }, [featured?.divisionId, featured?.name]);
 
   const drop = (key: string) => setTeams(untrack(key));
   const liveActive = model.glance.liveNow > 0;
@@ -119,16 +131,29 @@ export default function MyTeams() {
 
       {/* glance stats */}
       {teams.length > 0 && (
-        <div className="flex gap-[10px] px-[18px] pt-3">
-          <GlanceCard value={advancePct == null ? "—" : `${advancePct}%`} label="to advance" grad />
-          <GlanceCard value={String(model.glance.liveNow)} label="live now" />
-          <GlanceCard value={String(model.glance.today)} label="today" />
-        </div>
+        <>
+          <div className="flex gap-[10px] px-[18px] pt-3">
+            <GlanceCard value={advancePct == null ? "—" : `${advancePct}%`} label="to advance" grad />
+            <GlanceCard value={String(model.glance.liveNow)} label="live now" />
+            <GlanceCard value={String(model.glance.today)} label="today" />
+          </div>
+          {/* name the team the odds belong to — one number, never a blend of the tracked set */}
+          {teams.length > 1 && advancePct != null && featured && (
+            <div className="px-[18px] pt-1.5 text-center font-[var(--font-mono)] text-[9.5px] text-[#5f6981]">
+              advance odds for <span className="text-[#9aa4ba]">{featured.name}</span>
+            </div>
+          )}
+        </>
       )}
+
+      {/* next game + travel (killer #2) — countdown, venue, drive + weather, directions. self-hides */}
+      <div className="mt-3">
+        <NextGame games={games} />
+      </div>
 
       {/* conflict radar (killer #3) — self-hides */}
       <div className="mt-3">
-        <ConflictRadar tracked={teams} />
+        <ConflictRadar tracked={teams} games={games} />
       </div>
 
       {/* empty state */}

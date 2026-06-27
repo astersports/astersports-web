@@ -2,11 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Car } from "lucide-react";
 import { ColorfulWeatherIcon } from "@aster/weather/icons";
 import { getWeatherForEvent, type EventWeather } from "@aster/weather";
-import { getTrackedTeamSchedule, type TeamGame } from "@/lib/aster";
+import { type TeamGame } from "@/lib/aster";
 import { buildDirections } from "@/lib/aau/buildDirections";
 import { pickNextGame, countdownLabel } from "@/lib/aau/nextGame";
 import { getOrigin, estimateDrive, leaveByLabel } from "@/lib/aau/driveTime";
-import type { TrackedTeam } from "@/lib/aau/trackingStore";
 
 // Killer #2 — "Next game + travel". The soonest upcoming game across the tracked teams,
 // with a live countdown, the venue, an honest (no-traffic) drive estimate + "leave by",
@@ -29,28 +28,12 @@ function timeLabel(ms: number): string {
   });
 }
 
-export default function NextGame({ tracked }: { tracked: TrackedTeam[] }) {
-  const [game, setGame] = useState<TeamGame | null>(null);
+export default function NextGame({ games }: { games: TeamGame[] }) {
   const [tick, setTick] = useState(Date.now());
   const [weather, setWeather] = useState<EventWeather | null>(null);
   const [driveMin, setDriveMin] = useState<number | null>(null);
 
-  const kidByTeam = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const t of tracked) if (t.kid) m.set(t.teamKey, t.kid);
-    return m;
-  }, [tracked]);
-
-  // load schedule → next game
-  useEffect(() => {
-    const ids = tracked.map((t) => t.teamKey);
-    if (!ids.length) { setGame(null); return; }
-    let live = true;
-    getTrackedTeamSchedule(ids)
-      .then((games) => live && setGame(pickNextGame(games)))
-      .catch(() => live && setGame(null));
-    return () => { live = false; };
-  }, [tracked]);
+  const game = useMemo(() => pickNextGame(games), [games]);
 
   // live countdown — minute granularity is enough
   useEffect(() => {
@@ -79,7 +62,7 @@ export default function NextGame({ tracked }: { tracked: TrackedTeam[] }) {
   if (!game || !game.startAt) return null;
   const startMs = new Date(game.startAt).getTime();
   const cd = countdownLabel(startMs, tick);
-  const who = kidByTeam.get(game.trackedTeamId) || game.trackedTeamName;
+  const who = game.trackedTeamName;
   const dirs = buildDirections(venue ?? null);
   const venueLine = [game.court, venue?.name].filter(Boolean).join(" · ");
 
