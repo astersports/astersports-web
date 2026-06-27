@@ -37,7 +37,7 @@ export default function HubAccount({ user }: { user: HubUser | null }) {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-9 z-50 w-48 overflow-hidden rounded-[12px] border border-[rgba(255,255,255,0.08)] bg-[#FFFFFF] p-1 shadow-[0_12px_30px_-12px_rgba(0,0,0,0.7)]">
+          <div className="absolute right-0 top-9 z-50 w-48 overflow-hidden rounded-[12px] border border-[#E2E8F0] bg-[#FFFFFF] p-1 shadow-[0_12px_30px_-12px_rgba(0,0,0,0.18)]">
             <div className="px-3 py-2">
               <div className="truncate text-[12px] font-semibold text-[#1A1D23]">{user.name ?? "Signed in"}</div>
               {user.email && <div className="truncate text-[10px] text-[#6B7280]">{user.email}</div>}

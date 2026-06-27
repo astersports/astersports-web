@@ -34,7 +34,7 @@ function LiveRow({ g }: { g: LiveNowGame }) {
     </div>
   );
   return (
-    <div className="mb-[9px] rounded-[14px] p-[11px_12px]" style={{ border: "1px solid rgba(52,224,164,.28)", background: "linear-gradient(160deg,rgba(52,224,164,.05),#FFFFFF)" }}>
+    <div className="mb-[9px] rounded-[14px] p-[11px_12px]" style={{ border: "1px solid rgba(22,163,74,.28)", background: "linear-gradient(160deg,rgba(22,163,74,.05),#FFFFFF)" }}>
       <div className="mb-[9px] flex items-center justify-between gap-2">
         <span className="inline-flex items-center gap-[6px] font-[var(--font-mono)] text-[10px] font-bold tracking-[0.06em]" style={{ color: C.live }}>
           <span className="as-pulse inline-block h-[6px] w-[6px] rounded-full" style={{ background: C.live, boxShadow: `0 0 6px ${C.live}` }} aria-hidden /> LIVE

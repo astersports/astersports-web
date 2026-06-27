@@ -106,7 +106,7 @@ export default function FrontDoor({ dir, onOpen, onBrowseAll, onAddTournament }:
                   {t.name}
                 </span>
                 {state === "live" && (
-                  <span className="inline-flex shrink-0 items-center gap-[5px] rounded-[6px] px-[6px] py-[2px] font-[var(--font-mono)] text-[9px] font-bold" style={{ color: C.live, border: "1px solid rgba(52,224,164,.35)", background: "rgba(52,224,164,.08)" }}>
+                  <span className="inline-flex shrink-0 items-center gap-[5px] rounded-[6px] px-[6px] py-[2px] font-[var(--font-mono)] text-[9px] font-bold" style={{ color: C.live, border: "1px solid rgba(22,163,74,.35)", background: "rgba(22,163,74,.08)" }}>
                     <span className="as-pulse inline-block h-[5px] w-[5px] rounded-full" style={{ background: C.live }} aria-hidden /> LIVE
                   </span>
                 )}

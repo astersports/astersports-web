@@ -49,7 +49,7 @@ function GameCard({ g, multiDay }: { g: TournamentGame; multiDay: boolean }) {
   );
 
   return (
-    <div className="mb-[9px] rounded-[14px] p-[11px_12px]" style={{ border: `1px solid ${live ? "rgba(52,224,164,.28)" : C.hair}`, background: live ? "linear-gradient(160deg,rgba(52,224,164,.05),#FFFFFF)" : "#FFFFFF" }}>
+    <div className="mb-[9px] rounded-[14px] p-[11px_12px]" style={{ border: `1px solid ${live ? "rgba(22,163,74,.28)" : C.hair}`, background: live ? "linear-gradient(160deg,rgba(22,163,74,.05),#FFFFFF)" : "#FFFFFF" }}>
       <div className="mb-[9px] flex items-center justify-between gap-2">
         <span className="inline-flex items-center gap-[6px] font-[var(--font-mono)] text-[10px] font-bold tracking-[0.06em]" style={{ color: live ? C.live : final ? C.mut : "#ffb648" }}>
           {live && <span className="as-pulse inline-block h-[6px] w-[6px] rounded-full" style={{ background: C.live, boxShadow: `0 0 6px ${C.live}` }} aria-hidden />}
@@ -135,7 +135,7 @@ export default function TournamentDetail({ tournament, onBack, onTrack }: { tour
         <h2 className="mt-[2px] font-[var(--font-display)] text-[21px] font-bold tracking-[-0.01em]" style={{ color: C.ink }}>{tournament.name}</h2>
         <div className="mt-[9px] flex flex-wrap items-center gap-[7px]">
           {anyLive && (
-            <span className="inline-flex items-center gap-[6px] rounded-[7px] px-2 py-[3px] text-[10.5px] font-semibold" style={{ color: C.live, border: "1px solid rgba(52,224,164,.4)", background: "rgba(52,224,164,.08)" }}>
+            <span className="inline-flex items-center gap-[6px] rounded-[7px] px-2 py-[3px] text-[10.5px] font-semibold" style={{ color: C.live, border: "1px solid rgba(22,163,74,.4)", background: "rgba(22,163,74,.08)" }}>
               <span className="as-pulse inline-block h-[6px] w-[6px] rounded-full" style={{ background: C.live }} aria-hidden /> Live now
             </span>
           )}
@@ -208,7 +208,7 @@ export default function TournamentDetail({ tournament, onBack, onTrack }: { tour
                 </span>
               </span>
               {liveDivisions.has(d.id) && (
-                <span className="shrink-0 rounded-[5px] px-[6px] py-[2px] font-[var(--font-mono)] text-[9px]" style={{ color: C.live, background: "rgba(52,224,164,.08)", border: "1px solid rgba(52,224,164,.3)" }}>live</span>
+                <span className="shrink-0 rounded-[5px] px-[6px] py-[2px] font-[var(--font-mono)] text-[9px]" style={{ color: C.live, background: "rgba(22,163,74,.08)", border: "1px solid rgba(22,163,74,.3)" }}>live</span>
               )}
               <ChevronRight className="h-4 w-4 shrink-0" style={{ color: C.mut }} />
             </button>
