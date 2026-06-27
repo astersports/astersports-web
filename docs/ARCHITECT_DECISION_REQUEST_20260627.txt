@@ -1,0 +1,202 @@
+================================================================================
+ARCHITECT DECISION REQUEST — AAU HUB: ALL OPEN FORKS (one piece)
+2026-06-27 · CC → Architect (relayed by Frank)
+================================================================================
+
+WHY THIS DOC
+  The rolled-up North Star hub is built and on main. This batches EVERY open
+  decision, owner-gate, and FYI into one artifact so the architect can rule on all
+  of it in a single pass. Section A = decisions for the architect (request /
+  evidence / options / CC's labeled lean). Section B = owner-applied gates awaiting
+  Frank's go (listed for completeness, not architect rulings). Section C = CC
+  backlog (no decision needed).
+
+----------------------------------------------------------------------------------
+0 · WHAT SHIPPED THIS SESSION (context for the questions)
+  - #156  Tournament Detail page (live scoreboard + divisions→standings + Track).
+  - #157  The rolled-up North Star hub: 3 tabs (Home · Browse · Film); Live a
+          strip/section not a tab; Standings dissolved into Home + Division Detail;
+          every gated capability in honest pre-gate state.
+  - #158  Upload "Add a tournament" gated behind Aster Plus (entitlement seam).
+  - #159  Build-review punch list: per-team odds SUPPRESSED to "—"; child film
+          gated AND child PII (named minor + Drive reel URL) removed from the
+          bundle; live-no-score → "score pending"; weather descriptor dedup.
+
+  DATA AUDIT (grounded against prod vrwwpsbfbnveawqwbdmj, 2026-06-27):
+  - Finals: 100% scored across ~8,000 final games (every final has a score).
+  - Live-score poll cron: jobid 6, */10 ET game-hours, last run succeeded (10/10).
+  - resolved_key COLLIDES: tournament_division_teams has 3,086 rows, only 1,799
+    distinct resolved_key (1,287 collisions); external_team_key is 3,017 distinct /
+    3,086 (clean, 100% populated). The standings/predictor RPCs ride resolved_key.
+
+----------------------------------------------------------------------------------
+A · DECISIONS FOR THE ARCHITECT
+----------------------------------------------------------------------------------
+
+A1 — APPLY-GATE STANDING RULE (narrow exception, or stage-and-hold for all?)
+  REQUEST: Ratify whether "build it now" auto-authorizes CC to apply clean Tier-1
+    Plane-A ADDITIVE READ RPCs (brand-new read functions; no replace/RLS/money/
+    child), or whether stage-and-hold stays for everything.
+  EVIDENCE: migration 20260627203636 (get_public_tournament_games) was applied by
+    CC under "build it now," then reconciled ACCEPT-AS-APPLIED. You leaned toward a
+    narrow exception with a new-function-vs-column/body-replace distinction.
+  OPTIONS:
+    (1) NARROW EXCEPTION — only brand-new additive read FUNCTIONS auto-apply. Any
+        CREATE OR REPLACE that changes an existing function's output (e.g. adding
+        jsonb keys / columns) stays stage-and-hold. [requires: a one-paragraph
+        written rule CC can mechanically apply.]
+    (2) STAGE-AND-HOLD FOR EVERYTHING — no exception; every migration waits for
+        Frank's explicit apply-go. [requires: nothing.]
+  CC LEAN: (1). It matches the lowest-risk class, and it correctly keeps the
+    per-side key field (B2, a replace) held. Maximum-gate-integrity (2) is also
+    defensible — Frank's gate, Frank's call; I want it written either way.
+
+A2 — STANDINGS RE-GRAIN (the integrity fix that makes the odds real)
+  REQUEST: Ratify the re-grain (resolved_key → external_team_key) approach + scope:
+    re-grain the standings/predictor RPCs to external_team_key, drop the unfiltered
+    cross-tournament rating scan, and apply an R-CAP.
+  EVIDENCE: resolved_key collides 1,287/3,086 (above). get_public_tournament_
+    standings + the predictor (predictBracket/effectiveRatings) key on resolved_key,
+    so distinct teams collapse → wrong W-L and wrong odds. This is the root cause of
+    the P1 trust bug; #159 suppressed the user-facing % but the DATA is still wrong.
+  OPTIONS:
+    (1) FULL RE-GRAIN — re-grain the RPCs to external_team_key + drop the cross-
+        tournament rating source + R-CAP. [requires: an Architect-scoped migration,
+        owner-applied; RPC updates; re-test against known divisions.]
+    (2) KEY-ONLY — re-grain the key, keep the rating source. [requires: smaller
+        migration; leaves cross-tournament rating contamination.]
+  CC LEAN: (1). It's the "fix the grain once, every surface inherits it" item
+    (Home standings, Division Detail, the future scenario engine). (2) leaves the
+    contamination the constitution warns about.
+
+A3 — §2.B BRACKET DATA + THE EXACT TO-ADVANCE TAXONOMY
+  REQUEST: Ratify the exact to-advance status taxonomy (clinched / in the cut / on
+    the bubble / out) and the §2.B bracket-data approach (bracket_slots.event_id FK
+    fix) that powers it, so Home's "—" can become exact status (no model).
+  EVIDENCE: Home rows now show "—" for to-advance (#159). Exact status needs bracket
+    /placement data + advancement rules (top-N + tiebreaks). The build contract
+    names §2.B as a held migration (event_id FK fix, owner-applied).
+  OPTIONS:
+    (1) BUILD THE CLINCH/SCENARIO ENGINE over §2.B once the FK fix lands → exact
+        clinch + if/then CONDITIONS ship with NO model (the most valuable half).
+        [requires: the §2.B migration (B4) + the deterministic engine; depends on
+        A2 re-grain for clean identity.]
+    (2) DEFER exact status; keep "—" until F1.
+  CC LEAN: (1). Exact clinch/if-then is certainty and ships without F1. Confirm the
+    status labels + the advancement-rule source per circuit.
+
+A4 — F1 CALIBRATION: THE BENCH ACCEPTANCE BAR
+  REQUEST: Define the F1 calibration acceptance bar (Brier / log-loss threshold) +
+    the harness + who owns running it, so the projection % can ever light up.
+  EVIDENCE: the render shows "Brier 0.18" illustratively; the % is suppressed to
+    "—" everywhere until calibrated. No harness exists. The constitution: the % only
+    shows once it earns it on real finishes, labeled, within-graph.
+  OPTIONS:
+    (1) ARCHITECT sets the metric + threshold; CC builds the calibration harness
+        over real tournament finishes; the % stays dark until a run passes.
+    (2) DEFER F1 entirely — ship exact-only (A3), never show a %.
+  CC LEAN: (1) but sequenced AFTER A3 (exact-first). I need the threshold from you;
+    until a run passes it, the % stays "—".
+
+A5 — FILM: GATED BACKEND + GUARDIAN VERIFICATION (Plane-C)
+  REQUEST: Ratify the gated film architecture + the guardian-verification mechanism
+    before any child film returns to the client.
+  EVIDENCE: Film now carries ZERO child data (#159) — verified film must load from a
+    gated per-child SERVER source (not built). Contract: can_access_child =
+    is_entitled AND verified_guardian; consent + one-tap deletion; jersey-not-face;
+    TECH-2 video model + Mux/Cloudflare HLS.
+  OPTIONS:
+    (1) DESIGN + BUILD the gated film backend + verification now.
+    (2) KEEP Film locked (honest pre-content) until onboarding; design later.
+  CC LEAN: (2) for now — do not rebuild child exposure speculatively; child-data is
+    owner-applied and auto mode never opens it. When you're ready, I need your
+    verification design (how a guardian proves guardianship) + consent/deletion flow
+    before any reel returns.
+
+A6 — BILLING / is_entitled (the money path)
+  REQUEST: Ratify the billing approach (Stripe + is_entitled webhook) and confirm
+    the entitlement seam + pricing.
+  EVIDENCE: PlusGate is cosmetic, checkout inert; isPlusEntitled() and
+    canAccessChild() return false from one place (lib/aau/entitlement.ts) — a single
+    source flip when billing lands. Pricing: $20/mo PER ACCOUNT, annual $200
+    (operator-approved this session).
+  OPTIONS:
+    (1) STRIPE CHECKOUT + a webhook that writes is_entitled per account; the two
+        entitlement helpers read it. [Architect-scoped + owner-applied money path.]
+    (2) other model.
+  CC LEAN: (1). The seam is already in place; ratify the design, Frank applies the
+    money path (never CC).
+
+A7 — LIVE-NOW INGEST HYGIENE CONTRACT
+  REQUEST: Define the live-status ingest contract — does a reconciliation pass need
+    to age-out stale status='live' → 'final' and/or populate live scores, or is the
+    10-min poll + the frontend "score pending" sufficient?
+  EVIDENCE: 5 Grand Finale games were genuinely live (~1h in) but SCORELESS
+    (TourneyMachine hadn't posted); #159 now shows "score pending" instead of bare
+    dashes. The poll re-ingests but live-no-score persists upstream. Finals are 100%
+    scored, so the final transition is healthy.
+  OPTIONS:
+    (1) ADD INGEST RECONCILIATION — age-out a 'live' row with no score after N hours
+        to 'final'/'unknown'; trust the source for in-progress scores.
+    (2) FRONTEND "score pending" + poll only (current state).
+  CC LEAN: (2) is honest and sufficient today. Add (1) only if stale-live persists
+    after an event ends. Confirm the contract so I know whether to build (1).
+
+A8 — CANONICAL SPEC CONFIRMATION
+  REQUEST: Confirm the rolled-up North Star (aau-hub-northstar-render.html + the
+    rollup doc) is now the SINGLE binding contract, superseding the full weekend-hub
+    build contract and the scattered vision/full renders.
+  EVIDENCE: the rollup says "supersedes the scattered North Star renders… where
+    earlier renders disagree, THIS one wins." I never delivered the grounded review
+    of the earlier full build contract (now likely moot).
+  OPTIONS:
+    (1) ROLLUP IS CANONICAL; the others are reference. [I treat the full build
+        contract as deep reference and DON'T owe the superseded review.]
+    (2) STILL WANT the full-build-contract review delivered.
+  CC LEAN: (1). Confirm so the superseded review is formally closed.
+
+A9 — UPLOAD = PLUS (operator-decided; your free-funnel flag)
+  REQUEST: Frank decided upload = Plus ("anyone who pays $20/mo can upload"); you
+    flagged a free-funnel risk (gating the only ingestion path can starve discovery)
+    and suggested paste-link free / Plus for file/by-hand/bulk. Confirm or press.
+  EVIDENCE: #158 routes all upload entry points (panel + no-results CTAs) through
+    the Plus gate via isPlusEntitled (false until billing). Browse + public pages
+    stay free.
+  OPTIONS:
+    (1) UPLOAD FULLY PLUS (operator's current call).
+    (2) PASTE-LINK / "request a tournament" FREE; Plus for file/by-hand/bulk.
+  CC LEAN: Operator's call — Frank was explicit on (1). Architecturally (2) is the
+    healthier funnel; I'm surfacing it for your weigh-in, but Frank rules.
+
+----------------------------------------------------------------------------------
+B · OWNER-APPLIED GATES AWAITING FRANK'S GO (not architect rulings — for completeness)
+----------------------------------------------------------------------------------
+  B1 — CONFIRM migration 20260627203636 (get_public_tournament_games) for the ledger
+       (accept-as-applied; one-line confirm owed).
+  B2 — APPLY-GO: per-side external_team_key field on the games RPC (home_/away_
+       external_team_key) so scoreboard rows can navigate by key. Body-only CREATE
+       OR REPLACE (RETURNS jsonb); a REPLACE → held regardless of A1.
+  B3 — APPLY-GO: the standings re-grain migration (pending A2 ratification).
+  B4 — APPLY-GO: the §2.B bracket migration / event_id FK fix (pending A3).
+  B5 — APPLY: Stripe + is_entitled money path (pending A6).
+  B6 — APPLY: guardian verification + the gated film backend (pending A5).
+
+----------------------------------------------------------------------------------
+C · CC BACKLOG (no decision needed — FYI)
+----------------------------------------------------------------------------------
+  C1 — P3 polish: conflict "court TBD" → "leave-by pending venue"; tighten heavy
+       truncation on team/tournament rows.
+  C2 — Retire MyKids.tsx — orphaned dead code (mounted nowhere), names minors only
+       in a build-stripped comment; remove it.
+  C3 — Sentinels for when the gates clear: when A2/B3 land, replace the Home
+       to-advance "—" with EXACT status (A3); when A4 passes, the calibrated % lights
+       up; when B2 lands, wire the scoreboard tap on external_team_key.
+
+----------------------------------------------------------------------------------
+ONE LINE: the hub is shipped and honest; the open forks are the apply-gate rule
+(A1), the standings re-grain that makes the odds real (A2) and the exact-status /
+§2.B engine on top (A3), the F1 BENCH bar (A4), the Film + billing + child gates
+(A5/A6), the ingest-hygiene contract (A7), the canonical-spec confirm (A8), and the
+upload=Plus weigh-in (A9) — with the owner apply-gos (B) and CC backlog (C) listed
+so nothing is lost.
+================================================================================
