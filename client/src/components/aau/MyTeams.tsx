@@ -186,11 +186,13 @@ export default function MyTeams() {
 
       {/* empty state */}
       {teams.length === 0 && (
-        <div className="mx-[18px] mt-4 rounded-[16px] border border-[rgba(255,255,255,0.055)] bg-[linear-gradient(180deg,#151b29,#10141f)] p-8 text-center">
-          <Trophy className="mx-auto mb-3 h-7 w-7 text-[#5f6981]" />
-          <div className="text-[14px] font-semibold text-[#f0f3fa]">No teams tracked yet</div>
-          <div className="mt-1 text-[12px] leading-[1.5] text-[#5f6981]">
-            Head to <span className="text-[#9aa4ba]">Find</span>, open a tournament, and track your team — it'll live here and follow you to every tournament it plays.
+        <div className="mx-[18px] mt-4 overflow-hidden rounded-[16px] border border-[rgba(255,255,255,0.055)] border-t-[rgba(255,255,255,0.09)] bg-[radial-gradient(240px_130px_at_50%_-10%,rgba(232,144,42,0.10),transparent),linear-gradient(180deg,#151b29,#10141f)] px-6 py-9 text-center">
+          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full border border-[#5a4a25] bg-[rgba(246,204,85,0.10)]">
+            <Trophy className="h-6 w-6 text-[#F6CC55]" />
+          </div>
+          <div className="font-[var(--font-display)] text-[16px] font-bold text-[#f0f3fa]">No teams tracked yet</div>
+          <div className="mx-auto mt-1.5 max-w-[280px] text-[12.5px] leading-[1.55] text-[#9aa4ba]">
+            Head to <span className="font-semibold text-[#f0f3fa]">Find</span>, open a tournament, and track your team — it'll live here and follow you to every tournament it plays.
           </div>
         </div>
       )}

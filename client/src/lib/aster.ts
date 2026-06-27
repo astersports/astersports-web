@@ -36,11 +36,16 @@ function mapUser(u: { id: string; email?: string | null; user_metadata?: Record<
   };
 }
 
-/** Start the Google OAuth redirect; the user returns to `redirectTo` (default: this URL). */
+/** Start the Google OAuth redirect; the user returns to `redirectTo` (default: the hub).
+ *  Pin the return to a CLEAN, fixed hub URL (`<origin>/aau`) rather than the live
+ *  `window.location.href`: the live href can carry query/hash that won't exact-match the
+ *  Supabase redirect allowlist, and an unmatched redirectTo silently falls back to the
+ *  project Site URL (astersports.app) — so the hub never receives the session and the user
+ *  looks "signed out." A single stable URL is also the one allowlist entry to maintain. */
 export async function signInWithGoogle(redirectTo?: string): Promise<void> {
   const { error } = await aster.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: redirectTo ?? window.location.href },
+    options: { redirectTo: redirectTo ?? `${window.location.origin}/aau` },
   });
   if (error) throw error;
 }

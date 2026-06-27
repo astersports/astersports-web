@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, CalendarClock } from "lucide-react";
 import { type TeamGame } from "@/lib/aster";
 import type { TrackedTeam } from "@/lib/aau/trackingStore";
 import { buildDirections } from "@/lib/aau/buildDirections";
@@ -100,8 +100,17 @@ export default function TeamDetail({ team, games, onBack }: { team: TrackedTeam;
       {results.length > 0 && <Section title="Results" count={results.length}>{results.map((g) => <GameRow key={g.gameId} g={g} />)}</Section>}
 
       {mine.length === 0 && (
-        <div className="mx-[18px] mt-4 rounded-[16px] border border-[rgba(255,255,255,0.055)] bg-[linear-gradient(180deg,#151b29,#10141f)] p-6 text-center text-[12px] leading-[1.5] text-[#5f6981]">
-          No games scheduled yet for this team — they'll appear here the moment the bracket posts.
+        <div className="mx-[18px] mt-4 overflow-hidden rounded-[16px] border border-[rgba(255,255,255,0.055)] border-t-[rgba(255,255,255,0.09)] bg-[radial-gradient(240px_130px_at_50%_-10%,rgba(232,144,42,0.10),transparent),linear-gradient(180deg,#151b29,#10141f)] px-6 py-9 text-center">
+          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full border border-[#5a4a25] bg-[rgba(246,204,85,0.10)]">
+            <CalendarClock className="h-6 w-6 text-[#F6CC55]" />
+          </div>
+          <div className="font-[var(--font-display)] text-[16px] font-bold text-[#f0f3fa]">Bracket hasn't posted yet</div>
+          <div className="mx-auto mt-1.5 max-w-[280px] text-[12.5px] leading-[1.55] text-[#9aa4ba]">
+            The moment {team.tournamentName || "the tournament"} posts the bracket, every game lands here — with venue, one-tap directions, and a live countdown to tip.
+          </div>
+          <div className="mx-auto mt-4 max-w-[260px] font-[var(--font-mono)] text-[10px] uppercase tracking-[0.06em] leading-[1.5] text-[#5f6981]">
+            Standings &amp; the predictor are live now under the Standings tab
+          </div>
         </div>
       )}
     </div>
