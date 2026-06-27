@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Search, Users, BarChart3, Film, Check } from "lucide-react";
+import { ArrowLeft, Search, Radio, Users, Film, Check } from "lucide-react";
 import FindDiscovery from "../components/aau/FindDiscovery";
 import TournamentDetail from "../components/aau/TournamentDetail";
 import TrackTeams from "../components/aau/TrackTeams";
+import LiveScores from "../components/aau/LiveScores";
 import MyTeams from "../components/aau/MyTeams";
-import StandingsHub from "../components/aau/standings/StandingsHub";
 import FilmHighlights from "../components/aau/FilmHighlights";
 import HubAccount from "../components/aau/HubAccount";
 import { useHubAuth } from "@/lib/aau/useHubAuth";
@@ -15,8 +15,8 @@ import type { DirTournament } from "@/lib/aster";
 // hero — each screen carries its own header, exactly like the renderings.
 const NAV = [
   { id: "find", label: "Find", Icon: Search },
+  { id: "live", label: "Live", Icon: Radio },
   { id: "myteams", label: "My Teams", Icon: Users },
-  { id: "standings", label: "Standings", Icon: BarChart3 },
   { id: "film", label: "Film", Icon: Film },
 ] as const;
 
@@ -151,8 +151,8 @@ export default function AAUBasketball() {
               }}
             />
           ))}
+        {activeSection === "live" && <LiveScores />}
         {activeSection === "myteams" && <MyTeams />}
-        {activeSection === "standings" && <StandingsHub />}
         {activeSection === "film" && <FilmHighlights />}
       </div>
 
