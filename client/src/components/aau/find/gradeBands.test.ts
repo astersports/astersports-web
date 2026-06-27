@@ -1,46 +1,57 @@
 import { describe, it, expect } from "vitest";
-import { bandOf, gradeOrder, GRADE_BANDS } from "./gradeBands";
+import { bandOf, gradeOrder, expandGrade, GRADE_BANDS } from "./gradeBands";
 
 // The grade band is a declared map over the REAL grade_label column values (no name-parsing).
-// These lock the bucketing for the 18 values grounded in the directory 2026-06-27, the
-// younger-grade rule for split grades, and the honest "other" fallback for new values.
+// Split grades expand to individual grades (operator-directed 2026-06-27): "5th/6th" → [5th,6th],
+// each bucketed independently, so a combined division filters under either component.
 
-describe("bandOf", () => {
-  it("buckets lower grades (2nd–4th, incl. 4th/5th by younger grade)", () => {
-    for (const g of ["2nd", "2nd/3rd", "3rd", "3rd/4th", "4th", "4th/5th"]) {
-      expect(bandOf(g)).toBe("lower");
-    }
+describe("expandGrade", () => {
+  it("splits a combined grade into its individual grades", () => {
+    expect(expandGrade("5th/6th")).toEqual(["5th", "6th"]);
+    expect(expandGrade("2nd/3rd")).toEqual(["2nd", "3rd"]);
+    expect(expandGrade("8th/9th")).toEqual(["8th", "9th"]);
+    expect(expandGrade("9th/10th")).toEqual(["9th", "10th"]);
   });
 
-  it("buckets middle grades (5th–8th, incl. 8th/9th by younger grade)", () => {
-    for (const g of ["5th", "5th/6th", "6th", "6th/7th", "7th", "8th", "8th/9th"]) {
-      expect(bandOf(g)).toBe("middle");
-    }
+  it("returns a singleton for a non-split grade", () => {
+    expect(expandGrade("8th")).toEqual(["8th"]);
+    expect(expandGrade("High School")).toEqual(["High School"]);
+    expect(expandGrade("Varsity")).toEqual(["Varsity"]);
   });
 
-  it("buckets high-school grades (9th+, incl. 9th/10th, Varsity)", () => {
-    for (const g of ["9th", "9th/10th", "10th", "High School", "Varsity"]) {
-      expect(bandOf(g)).toBe("hs");
-    }
+  it("returns [] for empty/null", () => {
+    expect(expandGrade(null)).toEqual([]);
+    expect(expandGrade(undefined)).toEqual([]);
+    expect(expandGrade("")).toEqual([]);
+  });
+});
+
+describe("bandOf (individual grades)", () => {
+  it("buckets lower grades (2nd–4th)", () => {
+    for (const g of ["2nd", "3rd", "4th"]) expect(bandOf(g)).toBe("lower");
   });
 
-  it("falls back to 'other' for unknown/new values and null — honest, never fabricated", () => {
+  it("buckets middle grades (5th–8th)", () => {
+    for (const g of ["5th", "6th", "7th", "8th"]) expect(bandOf(g)).toBe("middle");
+  });
+
+  it("buckets high-school grades (9th, 10th, High School, Varsity)", () => {
+    for (const g of ["9th", "10th", "High School", "Varsity"]) expect(bandOf(g)).toBe("hs");
+  });
+
+  it("a combined grade's components straddle bands (8th=middle, 9th=hs)", () => {
+    const [a, b] = expandGrade("8th/9th");
+    expect(bandOf(a)).toBe("middle");
+    expect(bandOf(b)).toBe("hs");
+  });
+
+  it("falls back to 'other' for unknown values and null — honest, never fabricated", () => {
     expect(bandOf("11th")).toBe("other");
     expect(bandOf("College")).toBe("other");
     expect(bandOf(null)).toBe("other");
-    expect(bandOf(undefined)).toBe("other");
     expect(bandOf("")).toBe("other");
-  });
-
-  it("covers every grounded grade_label (no value silently uncatalogued in known bands)", () => {
-    const grounded = [
-      "2nd", "2nd/3rd", "3rd", "3rd/4th", "4th", "4th/5th",
-      "5th", "5th/6th", "6th", "6th/7th", "7th", "8th", "8th/9th",
-      "9th", "9th/10th", "10th", "High School", "Varsity",
-    ];
-    for (const g of grounded) {
-      expect(bandOf(g)).not.toBe("other");
-    }
+    // a combined chip is never a known individual grade — picker shows components, not the combo
+    expect(bandOf("5th/6th")).toBe("other");
   });
 });
 
