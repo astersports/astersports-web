@@ -3,7 +3,7 @@ import { ChevronDown } from "lucide-react";
 import type { DirTournament } from "@/lib/aster";
 import { fmtRange } from "@/lib/aau/dates";
 import { seasonOf, C } from "./findUi";
-import { gradeOrder } from "./gradeBands";
+import { gradeOrder, expandGrade } from "./gradeBands";
 import GradeBandPicker from "./GradeBandPicker";
 
 // Render state 03 "Browse" — collapsible circuit accordions over the directory
@@ -104,7 +104,8 @@ export default function BrowseTree({ dir, onOpen }: { dir: DirTournament[]; onOp
       if (!Number.isNaN(d.getTime())) years.add(String(d.getFullYear()));
       if (t.states.length === 0) anyUnknownState = true;
       t.states.forEach((s) => states.add(s));
-      t.divisions.forEach((dv) => dv.grade_label && gradeSet.add(dv.grade_label));
+      // individual grades only — a "5th/6th" division contributes both 5th and 6th chips
+      t.divisions.forEach((dv) => expandGrade(dv.grade_label).forEach((g) => gradeSet.add(g)));
     });
     return {
       years: Array.from(years).sort((a, b) => Number(b) - Number(a)),
@@ -131,7 +132,7 @@ export default function BrowseTree({ dir, onOpen }: { dir: DirTournament[]; onOp
         const d = new Date(`${t.start_date}T00:00:00`);
         if (Number.isNaN(d.getTime()) || String(d.getFullYear()) !== year) return false;
       }
-      if (grades.size > 0 && !t.divisions.some((dv) => dv.grade_label && grades.has(dv.grade_label))) return false;
+      if (grades.size > 0 && !t.divisions.some((dv) => expandGrade(dv.grade_label).some((g) => grades.has(g)))) return false;
       if (stateSel === "__unknown__" && t.states.length !== 0) return false;
       if (stateSel && stateSel !== "__unknown__" && !t.states.includes(stateSel)) return false;
       return true;

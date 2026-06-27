@@ -18,13 +18,29 @@ function timeLabel(g: LiveNowGame): string {
   return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
+// "Live right now" must actually be NOW. The scrape marks games status='live' and can leave them
+// stale — started hours ago, score never advanced to final. A youth game runs ~90 min, so a game
+// that tipped more than LIVE_WINDOW_MS ago isn't live; drop it rather than show a 4-hours-ago
+// "live" card (operator-flagged 2026-06-27). Small future tolerance allows a game flagged live
+// right at its scheduled tip. No fabrication — this only HIDES stale rows; the durable fix is the
+// ingest/RPC transitioning stale 'live' games to final (prepared separately).
+export const LIVE_WINDOW_MS = 3 * 60 * 60 * 1000; // 3h back-stop
+export const FUTURE_TOL_MS = 30 * 60 * 1000; // 30m future tolerance
+
+export function isPlausiblyLive(g: LiveNowGame, nowMs: number): boolean {
+  if (!g.startAt) return true; // no start time → trust the live flag, can't recency-check
+  const t = new Date(g.startAt).getTime();
+  if (Number.isNaN(t)) return true;
+  return t >= nowMs - LIVE_WINDOW_MS && t <= nowMs + FUTURE_TOL_MS;
+}
+
 export default function LiveStrip() {
   const [games, setGames] = useState<LiveNowGame[] | null>(null);
 
   useEffect(() => {
     let live = true;
     getPublicLiveNow(12)
-      .then((g) => live && setGames(g))
+      .then((g) => live && setGames((g ?? []).filter((x) => isPlausiblyLive(x, Date.now()))))
       .catch(() => live && setGames([]));
     return () => {
       live = false;
