@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Users, X, Trophy } from "lucide-react";
 import { getTracked, untrack, TRACKED_EVENT, type TrackedTeam } from "@/lib/aau/trackingStore";
+import NextGame from "./NextGame";
 import ConflictRadar from "./ConflictRadar";
 
 // Screen 03 "My Teams" — foundation. Renders the REAL tracked set (trackingStore),
@@ -48,10 +49,13 @@ export default function MyTeams() {
         <Users className="h-5 w-5 text-[#5f6981]" />
       </div>
 
-      {/* Killer #3 — conflict radar (self-hides when no overlap) */}
+      {/* Killer #2 — next game + travel (self-hides when nothing upcoming) */}
       <div className="mt-4">
-        <ConflictRadar tracked={teams} />
+        <NextGame tracked={teams} />
       </div>
+
+      {/* Killer #3 — conflict radar (self-hides when no overlap) */}
+      <ConflictRadar tracked={teams} />
 
       {teams.length === 0 && (
         <div className="mx-[18px] mt-4 rounded-[16px] border border-[rgba(255,255,255,0.055)] bg-[linear-gradient(180deg,#151b29,#10141f)] p-8 text-center">
