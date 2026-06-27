@@ -1,14 +1,15 @@
-import { Trophy, Grid3x3 } from "lucide-react";
+import { Trophy, Grid3x3, Link2, FileUp, PencilLine } from "lucide-react";
 import type { DirTournament } from "@/lib/aster";
 import { fmtRange, etTodayISO, tournamentTimeState } from "@/lib/aau/dates";
 import { initials, C } from "./findUi";
+import BrowseLiveStrip from "./BrowseLiveStrip";
 
-// Render state 01 "Front door" body (below the search box, which the orchestrator owns so it
-// stays mounted across modes). The main page is LIVE + UPCOMING tournaments only (operator-directed
-// 2026-06-27 — the live-game-score strip moved to the Tournament Detail page; Find is discovery
-// only), then a "Browse all" entry into the full directory. No fabricated rows.
+// Browse front door (below the search box, which the orchestrator owns so it stays mounted across
+// modes). North Star: Browse discovers/tracks AND uploads. A LIVE-now section rides at the top
+// (Live is a section in Browse, not a tab), then LIVE + UPCOMING tournaments (past ones under Browse
+// all), then the "Add a tournament" upload panel. No fabricated rows.
 
-export default function FrontDoor({ dir, onOpen, onBrowseAll }: { dir: DirTournament[] | null; onOpen: (t: DirTournament) => void; onBrowseAll: () => void }) {
+export default function FrontDoor({ dir, onOpen, onBrowseAll, onAddTournament }: { dir: DirTournament[] | null; onOpen: (t: DirTournament) => void; onBrowseAll: () => void; onAddTournament: () => void }) {
   const today = etTodayISO();
   // live first (in progress), then upcoming by soonest start; past tournaments live under Browse all.
   const liveUpcoming = (dir ?? [])
@@ -30,8 +31,37 @@ export default function FrontDoor({ dir, onOpen, onBrowseAll }: { dir: DirTourna
     </button>
   );
 
+  // "Add a tournament" — events not yet in the system. Paste routes through the SAME ingest +
+  // normalize path as the scraper (external_team_key, circuit classification, geocode) — no side
+  // door (North Star §5). File-upload / enter-by-hand are honest pre-gate (not wired) — they say so
+  // rather than pretend; the paste path is the working ingress today.
+  const addTournament = (
+    <div className="mx-[18px] mt-[16px] rounded-[14px] p-[13px]" style={{ border: `1px dashed ${C.hair2}`, background: "linear-gradient(160deg,rgba(224,99,28,.05),#121a2e)" }}>
+      <div className="font-[var(--font-display)] text-[13.5px] font-bold" style={{ color: C.ink }}>Don&apos;t see your tournament?</div>
+      <div className="mt-[4px] text-[11px] leading-[1.45]" style={{ color: C.mut }}>Point us at it and we&apos;ll ingest the schedule, divisions, and teams — through the same pipeline the scraper uses.</div>
+      <div className="mt-[11px] flex gap-[7px]">
+        <button type="button" onClick={onAddTournament} className="as-press flex flex-1 flex-col items-center gap-[4px] rounded-[10px] px-[6px] py-[9px] text-[10.5px] font-semibold" style={{ border: `1px solid ${C.line}`, background: "rgba(0,0,0,.2)", color: C.dim }}>
+          <Link2 className="h-[16px] w-[16px]" style={{ color: C.g2 }} /> Paste link
+        </button>
+        <div className="flex flex-1 flex-col items-center gap-[4px] rounded-[10px] px-[6px] py-[9px] text-[10.5px] font-semibold" style={{ border: `1px solid ${C.hair}`, background: "rgba(0,0,0,.12)", color: C.faint }} aria-disabled>
+          <FileUp className="h-[16px] w-[16px]" style={{ color: C.faint }} /> Upload file
+          <span className="font-[var(--font-mono)] text-[8px]" style={{ color: C.faint }}>soon</span>
+        </div>
+        <div className="flex flex-1 flex-col items-center gap-[4px] rounded-[10px] px-[6px] py-[9px] text-[10.5px] font-semibold" style={{ border: `1px solid ${C.hair}`, background: "rgba(0,0,0,.12)", color: C.faint }} aria-disabled>
+          <PencilLine className="h-[16px] w-[16px]" style={{ color: C.faint }} /> By hand
+          <span className="font-[var(--font-mono)] text-[8px]" style={{ color: C.faint }}>soon</span>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="as-fade-in">
+      {/* Live games ride at the top of Browse (Live is a section here, not a tab); self-hides */}
+      <div className="mt-[14px]">
+        <BrowseLiveStrip />
+      </div>
+
       <div
         className="mx-[18px] mb-[9px] mt-[18px] flex items-center gap-[9px] font-[var(--font-mono)] text-[10px] uppercase tracking-[0.1em]"
         style={{ color: C.mut }}
@@ -90,6 +120,7 @@ export default function FrontDoor({ dir, onOpen, onBrowseAll }: { dir: DirTourna
       )}
 
       {browseAll}
+      {addTournament}
     </div>
   );
 }

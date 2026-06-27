@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Search, Link2 } from "lucide-react";
+import { Search } from "lucide-react";
 import {
   getTournamentDirectory,
   submitTournament,
@@ -242,21 +242,6 @@ export default function FindDiscovery({ onOpenTournament }: { onOpenTournament: 
         </div>
       )}
 
-      {/* upload path — only on the bare front door (Find = find + upload of tournaments). Browse-all
-          lives at the end of the live-&-upcoming list inside FrontDoor (operator IA 2026-06-27). */}
-      {mode === "search" && term.length < 2 && (
-        <div className="flex gap-[9px] px-[18px] pt-[11px]">
-          <button
-            type="button"
-            onClick={() => setMode("paste")}
-            className="as-press flex min-h-[44px] flex-1 items-center justify-center gap-[7px] rounded-[12px] text-[12px] font-semibold"
-            style={{ border: `1px solid ${C.line}`, background: C.s2, color: C.dim }}
-          >
-            <Link2 className="h-[15px] w-[15px]" style={{ color: C.g2 }} /> Paste a link to add a tournament
-          </button>
-        </div>
-      )}
-
       {/* back affordance for the secondary modes */}
       {mode !== "search" && (
         <button
@@ -289,7 +274,7 @@ export default function FindDiscovery({ onOpenTournament }: { onOpenTournament: 
 
       {mode === "paste" && <PastePanel url={paste} onUrl={(v) => { setPaste(v); if (pasteUi.kind !== "working") setPasteUi({ kind: "idle" }); }} onSubmit={handlePaste} ui={pasteUi} disabled={pasteBusy} />}
 
-      {mode === "search" && term.length < 2 && <FrontDoor dir={dir} onOpen={onOpenTournament} onBrowseAll={() => setMode("browse")} />}
+      {mode === "search" && term.length < 2 && <FrontDoor dir={dir} onOpen={onOpenTournament} onBrowseAll={() => setMode("browse")} onAddTournament={() => setMode("paste")} />}
 
       {isSearchMode && searching && !results && (
         <div className="space-y-[10px] px-[18px] pt-4" aria-live="polite">

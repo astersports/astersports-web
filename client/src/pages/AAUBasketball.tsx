@@ -1,38 +1,48 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Search, Radio, Users, Film, Check } from "lucide-react";
+import { ArrowLeft, Home as HomeIcon, Compass, Film, Check } from "lucide-react";
 import FindDiscovery from "../components/aau/FindDiscovery";
 import TournamentDetail from "../components/aau/TournamentDetail";
 import TrackTeams from "../components/aau/TrackTeams";
-import LiveScores from "../components/aau/LiveScores";
 import MyTeams from "../components/aau/MyTeams";
 import FilmHighlights from "../components/aau/FilmHighlights";
+import PlusGate, { GO_PLUS_EVENT } from "../components/aau/PlusGate";
 import HubAccount from "../components/aau/HubAccount";
 import { useHubAuth } from "@/lib/aau/useHubAuth";
 import type { DirTournament } from "@/lib/aster";
 
-// AAU hub shell — render set v2. Four parent jobs: Find (discovery) / My Teams
-// (the kid/team view) / Standings (+ predictor) / Film. No marketing pills, no global
-// hero — each screen carries its own header, exactly like the renderings.
+// AAU hub shell — the rolled-up North Star IA (aau-hub-northstar-render.html, ratified l99
+// 2026-06-27): THREE tabs, nothing spare. HOME (the logistics command center — up-next, leave-by,
+// what-changed, live, tracked standings + the predictive model) · BROWSE (discover/track + upload
+// a tournament; Live rides here as a section) · FILM (kids' highlights + AI review). Standings
+// dissolved into Home + Division Detail; Live is a strip/section, not a tab; Plus is a gate, not a
+// destination. Each screen carries its own header.
 const NAV = [
-  { id: "find", label: "Find", Icon: Search },
-  { id: "live", label: "Live", Icon: Radio },
-  { id: "myteams", label: "My Teams", Icon: Users },
+  { id: "home", label: "Home", Icon: HomeIcon },
+  { id: "browse", label: "Browse", Icon: Compass },
   { id: "film", label: "Film", Icon: Film },
 ] as const;
 
 type SectionId = (typeof NAV)[number]["id"];
 
 export default function AAUBasketball() {
-  // Default landing: a new/anonymous visitor opens on FIND (the front door — they have no
-  // teams yet); a signed-in user opens on MY TEAMS (their teams are the point). useHubAuth
-  // resolves async, so default to "find" and land once on "myteams" the first time a user
-  // is known — unless the visitor has already navigated (don't yank them mid-tap).
-  const [activeSection, setActiveSection] = useState<SectionId>("find");
-  // Find → tap a tournament → its detail page (live scoreboard + divisions + standings),
-  // and FROM there → Screen 02 Track. Both are sub-screens of Find, not nav tabs.
+  // Default landing: a new/anonymous visitor opens on BROWSE (the free front door — they have no
+  // teams yet); a signed-in user opens on HOME (their weekend is the point). useHubAuth resolves
+  // async, so default to "browse" and land once on "home" the first time a user is known — unless
+  // the visitor has already navigated (don't yank them mid-tap).
+  const [activeSection, setActiveSection] = useState<SectionId>("browse");
+  // Browse → tap a tournament → its detail page (live scoreboard + divisions + standings),
+  // and FROM there → Screen 02 Track. Both are sub-screens of Browse, not nav tabs.
   const [detailTournament, setDetailTournament] = useState<DirTournament | null>(null);
   const [trackTournament, setTrackTournament] = useState<DirTournament | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // Aster Plus gate — opened from any paid action via the GO_PLUS_EVENT window event (Plus is a
+  // gate, not a tab). Cosmetic; checkout stays owner-applied.
+  const [showPlus, setShowPlus] = useState(false);
+  useEffect(() => {
+    const open = () => setShowPlus(true);
+    window.addEventListener(GO_PLUS_EVENT, open);
+    return () => window.removeEventListener(GO_PLUS_EVENT, open);
+  }, []);
   // Drives the tracking store's account/anon mode + provides the user for the sign-in UI.
   const user = useHubAuth();
   const landed = useRef(false);
@@ -41,7 +51,7 @@ export default function AAUBasketball() {
     if (landed.current || navigated.current) return;
     if (user) {
       landed.current = true;
-      setActiveSection("myteams");
+      setActiveSection("home");
     }
   }, [user]);
 
@@ -60,7 +70,7 @@ export default function AAUBasketball() {
   const handleTracked = (count: number) => {
     setTrackTournament(null);
     setDetailTournament(null);
-    setActiveSection("myteams"); // land on My Teams so the tracked teams are right there
+    setActiveSection("home"); // land on Home so the tracked teams are right there
     setToast(`Tracking ${count} team${count === 1 ? "" : "s"}`);
     window.setTimeout(() => setToast(null), 3200);
   };
@@ -125,7 +135,8 @@ export default function AAUBasketball() {
 
       {/* Section content */}
       <div className="container" style={{ paddingTop: 18, paddingBottom: 32 }}>
-        {activeSection === "find" &&
+        {activeSection === "home" && <MyTeams />}
+        {activeSection === "browse" &&
           (trackTournament ? (
             // Track flow opens FROM the tournament detail page; back lands on detail again
             // (detailTournament is still set) rather than the front door.
@@ -151,8 +162,6 @@ export default function AAUBasketball() {
               }}
             />
           ))}
-        {activeSection === "live" && <LiveScores />}
-        {activeSection === "myteams" && <MyTeams />}
         {activeSection === "film" && <FilmHighlights />}
       </div>
 
@@ -182,7 +191,10 @@ export default function AAUBasketball() {
         </div>
       )}
 
-      {/* 4-job bottom nav (render set v2) */}
+      {/* Aster Plus gate overlay */}
+      {showPlus && <PlusGate onClose={() => setShowPlus(false)} />}
+
+      {/* 3-tab bottom nav (North Star: Home · Browse · Film) */}
       <nav
         aria-label="Sections"
         style={{
@@ -207,7 +219,7 @@ export default function AAUBasketball() {
               onClick={() => {
                 navigated.current = true;
                 setActiveSection(id);
-                if (id === "find") {
+                if (id === "browse") {
                   setTrackTournament(null);
                   setDetailTournament(null);
                 }

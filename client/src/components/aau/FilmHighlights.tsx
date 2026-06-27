@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Film, Play, Trophy, Clock, Maximize2, X } from "lucide-react";
 import SectionHeading from "./SectionHeading";
+import FilmAiReviewGate from "./FilmAiReviewGate";
 
 // ─── Featured Video ──────────────────────────────────────────────────────────
 // "Birdie Buckets" — Finals highlight reel (video/mp4, ~126 MB). Streamed from
@@ -49,6 +50,9 @@ export default function FilmHighlights() {
         title="ZG NY Hoop Festival"
         ghostText="FILM"
       />
+
+      {/* North Star pre-gate framing: jersey-not-face + grounded AI review, gated on guardian verify */}
+      <FilmAiReviewGate />
 
       {/* Tournament context bar */}
       <div className="as-fade-in as-stagger-1" style={{
