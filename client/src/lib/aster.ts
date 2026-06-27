@@ -19,7 +19,13 @@ export const aster = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 // ─── Shapes returned by get_public_tournament_standings (jsonb bundle) ───
-export interface StandingsTeam { id: string; name: string; isOurs: boolean }
+export interface StandingsTeam {
+  id: string; name: string; isOurs: boolean;
+  /** cross-tournament opponent-adjusted margin rating; null when the team has no finals */
+  rating?: number | null;
+  /** completed games behind the rating (0 = no history) */
+  gp?: number;
+}
 export interface StandingsGame { aId: string; bId: string; aScore: number; bScore: number }
 export interface RemainingGame { aId: string; bId: string }
 export interface StandingsRules { pointDiffCap: number | null; tiebreakers: string[] }

@@ -4,6 +4,7 @@ import { getTracked, untrack, TRACKED_EVENT, type TrackedTeam } from "@/lib/aau/
 import { getTrackedTeamSchedule, getTournamentStandings, type TeamGame } from "@/lib/aster";
 import { buildMyTeamsModel, type MyTeamsModel } from "@/lib/aau/myTeamsModel";
 import { predictBracket } from "@/lib/standings/predictBracket";
+import { effectiveRatings } from "@/lib/aau/gradePrior";
 import ConflictRadar from "./ConflictRadar";
 import NextGame from "./NextGame";
 
@@ -76,8 +77,11 @@ export default function MyTeams() {
         const p = predictBracket({
           teams: b.teams, games: b.games, remaining: b.remaining,
           rules: b.rules, advanceCount: b.division.advance_count, focusId: me.id,
+          eff: effectiveRatings(b.teams, b.division.name),
         });
-        if (p.available) setAdvancePct(p.oddsPct ?? null);
+        // gate: show a number only when there's a basis (results, or a strength/grade
+        // signal) — never a uniform coin-flip dressed up as odds.
+        if (p.available && p.basis !== "even") setAdvancePct(p.oddsPct ?? null);
       })
       .catch(() => {});
     return () => { live = false; };
