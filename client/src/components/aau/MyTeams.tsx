@@ -8,6 +8,7 @@ import { effectiveRatings } from "@/lib/aau/gradePrior";
 import ConflictRadar from "./ConflictRadar";
 import NextGame from "./NextGame";
 import TeamDetail from "./TeamDetail";
+import HomeGatedSections from "./HomeGatedSections";
 
 // Screen 03 "My Teams · command center" — render-faithful. Header + "updating live" (only
 // when a tracked team is in progress), a live score hero, three glance stats (to-advance %
@@ -119,9 +120,9 @@ export default function MyTeams() {
       {/* page header */}
       <div className="flex items-center justify-between px-[18px] pb-1 pt-[14px]">
         <div>
-          <h2 className="font-[var(--font-display)] text-[21px] font-bold text-[#f0f3fa]">My Teams</h2>
+          <h2 className="font-[var(--font-display)] text-[21px] font-bold text-[#f0f3fa]">Home</h2>
           <div className="mt-0.5 font-[var(--font-mono)] text-[10.5px] text-[#5f6981]">
-            {teams.length} tracked{programLabel ? ` · ${programLabel}` : ""}
+            {teams.length ? `${teams.length} tracked${programLabel ? ` · ${programLabel}` : ""}` : "your weekend, handled"}
           </div>
         </div>
         {liveActive ? (
@@ -192,7 +193,7 @@ export default function MyTeams() {
           </div>
           <div className="font-[var(--font-display)] text-[16px] font-bold text-[#f0f3fa]">No teams tracked yet</div>
           <div className="mx-auto mt-1.5 max-w-[280px] text-[12.5px] leading-[1.55] text-[#9aa4ba]">
-            Head to <span className="font-semibold text-[#f0f3fa]">Find</span>, open a tournament, and track your team — it'll live here and follow you to every tournament it plays.
+            Head to <span className="font-semibold text-[#f0f3fa]">Browse</span>, open a tournament, and track your team — it'll live here and follow you to every tournament it plays.
           </div>
         </div>
       )}
@@ -232,6 +233,9 @@ export default function MyTeams() {
           </div>
         ))}
       </div>
+
+      {/* gated capabilities (Saturday-night model + schedule-change watch) in honest pre-gate state */}
+      <HomeGatedSections teamCount={teams.length} />
     </div>
   );
 }

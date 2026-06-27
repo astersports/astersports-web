@@ -207,7 +207,8 @@ export async function searchPublicAau(query: string): Promise<AauSearchResult> {
   return (data as AauSearchResult) ?? EMPTY_SEARCH;
 }
 
-// ─── Live-now strip (front door). Realtime tick is TECH-1 (deferred); this reads on load. ───
+// ─── Live scores feed (the "Live" tab). Realtime tick is TECH-1 (deferred); this reads on load
+// and the section polls. Currently-live public games across all public tournaments. ───
 export interface LiveNowGame {
   gameId: string; startAt: string | null;
   homeName: string; awayName: string;
@@ -215,7 +216,7 @@ export interface LiveNowGame {
   divisionLabel: string | null; tournamentName: string;
 }
 /** Currently-live public games (most-recent first). [] when nothing is live. */
-export async function getPublicLiveNow(limit = 12): Promise<LiveNowGame[]> {
+export async function getPublicLiveNow(limit = 40): Promise<LiveNowGame[]> {
   const { data, error } = await aster.rpc("get_public_live_now", { p_limit: limit });
   if (error) throw error;
   return (data as LiveNowGame[]) ?? [];
