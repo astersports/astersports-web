@@ -5,6 +5,8 @@ import TrackTeams from "../components/aau/TrackTeams";
 import MyTeams from "../components/aau/MyTeams";
 import StandingsHub from "../components/aau/standings/StandingsHub";
 import FilmHighlights from "../components/aau/FilmHighlights";
+import HubAccount from "../components/aau/HubAccount";
+import { useHubAuth } from "@/lib/aau/useHubAuth";
 import type { DirTournament } from "@/lib/aster";
 
 // AAU hub shell — render set v2. Four parent jobs: Find (discovery) / My Teams
@@ -24,6 +26,8 @@ export default function AAUBasketball() {
   // Find → tap a tournament → Screen 02 Track (sub-screen of Find, not a nav tab).
   const [trackTournament, setTrackTournament] = useState<DirTournament | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // Drives the tracking store's account/anon mode + provides the user for the sign-in UI.
+  const user = useHubAuth();
 
   // Aster AAU wears the house GOLD accent; override the team tokens at the root so
   // every sub-component inherits gold. Page bg is the repo's dark surface.
@@ -74,17 +78,20 @@ export default function AAUBasketball() {
             <ArrowLeft style={{ width: 15, height: 15 }} />
             Aster Sports
           </a>
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: "0.08em",
-              color: "var(--as-team-primary)",
-              textTransform: "uppercase",
-            }}
-          >
-            AAU Basketball
-          </span>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 12 }}>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                color: "var(--as-team-primary)",
+                textTransform: "uppercase",
+              }}
+            >
+              AAU Basketball
+            </span>
+            <HubAccount user={user} />
+          </div>
         </div>
       </div>
 

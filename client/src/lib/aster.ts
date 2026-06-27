@@ -14,9 +14,80 @@ import { createClient } from "@supabase/supabase-js";
 const SUPABASE_URL = "https://vrwwpsbfbnveawqwbdmj.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_8semOyZSkr_QGr2hwmjDdQ_-U8KRtw4";
 
+// persistSession + detectSessionInUrl: the hub supports Google sign-in for account-synced
+// tracking (the session lives in the browser, parsed from the OAuth redirect). Public reads
+// keep working anonymously when signed out — the publishable key gates to org_is_public_listed
+// data either way.
 export const aster = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
 });
+
+// ─── Auth (Google sign-in) — account-synced tracking ───
+export interface HubUser { id: string; email: string | null; name: string | null; avatar: string | null }
+
+function mapUser(u: { id: string; email?: string | null; user_metadata?: Record<string, unknown> } | null | undefined): HubUser | null {
+  if (!u) return null;
+  const meta = u.user_metadata ?? {};
+  return {
+    id: u.id,
+    email: u.email ?? null,
+    name: (meta.full_name as string) ?? (meta.name as string) ?? null,
+    avatar: (meta.avatar_url as string) ?? (meta.picture as string) ?? null,
+  };
+}
+
+/** Start the Google OAuth redirect; the user returns to `redirectTo` (default: this URL). */
+export async function signInWithGoogle(redirectTo?: string): Promise<void> {
+  const { error } = await aster.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: redirectTo ?? window.location.href },
+  });
+  if (error) throw error;
+}
+
+export async function signOutHub(): Promise<void> {
+  await aster.auth.signOut();
+}
+
+export async function getHubUser(): Promise<HubUser | null> {
+  const { data } = await aster.auth.getSession();
+  return mapUser(data.session?.user);
+}
+
+/** Subscribe to auth changes; returns an unsubscribe fn. */
+export function onHubAuth(cb: (u: HubUser | null) => void): () => void {
+  const { data } = aster.auth.onAuthStateChange((_e, session) => cb(mapUser(session?.user)));
+  return () => data.subscription.unsubscribe();
+}
+
+// ─── tracked_teams (account store; owner-only RLS on the backbone) ───
+export interface TrackedRow {
+  team_key: string; name: string; program: string | null; pool: string | null;
+  tournament_id: string | null; tournament_name: string | null;
+  division_id: string | null; division_name: string | null; kid: string | null;
+}
+
+export async function fetchTrackedTeams(): Promise<TrackedRow[]> {
+  const { data, error } = await aster
+    .from("tracked_teams")
+    .select("team_key,name,program,pool,tournament_id,tournament_name,division_id,division_name,kid")
+    .order("created_at");
+  if (error) throw error;
+  return (data as TrackedRow[]) ?? [];
+}
+
+export async function upsertTrackedTeams(userId: string, rows: TrackedRow[]): Promise<void> {
+  if (!rows.length) return;
+  const { error } = await aster
+    .from("tracked_teams")
+    .upsert(rows.map((r) => ({ ...r, user_id: userId })), { onConflict: "user_id,team_key" });
+  if (error) throw error;
+}
+
+export async function deleteTrackedTeamRow(teamKey: string): Promise<void> {
+  const { error } = await aster.from("tracked_teams").delete().eq("team_key", teamKey);
+  if (error) throw error;
+}
 
 // ─── Shapes returned by get_public_tournament_standings (jsonb bundle) ───
 export interface StandingsTeam {
