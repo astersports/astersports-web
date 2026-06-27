@@ -70,6 +70,9 @@ export default function ConflictRadar({ tracked, games }: Props) {
                 {" — "}
                 {o.a.label} ({o.a.court ?? "court TBD"}, {o.a.timeLabel}) and {o.b.label} ({o.b.court ?? "court TBD"},{" "}
                 {o.b.timeLabel}) run at the same time. Split up?
+                {(!o.a.court || !o.b.court) && (
+                  <span className="text-[#9aa4ba]"> Leave-by pending venue — the drive plan firms up once courts post.</span>
+                )}
               </div>
             </div>
           ))}
