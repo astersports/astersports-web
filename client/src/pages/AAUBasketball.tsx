@@ -63,8 +63,19 @@ export default function AAUBasketball() {
 
   return (
     <div style={goldTheme}>
-      {/* Thin top bar (back + wordmark) */}
-      <div style={{ borderBottom: "1px solid var(--as-border-default)" }}>
+      {/* Thin top bar (back + wordmark). Sticky + safe-area-inset-top so it pins BELOW the
+          iPhone status bar / camera island instead of sliding up under it on scroll. */}
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 30,
+          paddingTop: "env(safe-area-inset-top)",
+          background: "rgba(8,11,20,0.95)",
+          backdropFilter: "blur(12px)",
+          borderBottom: "1px solid var(--as-border-default)",
+        }}
+      >
         <div style={{ height: 4, width: "100%", background: "var(--brand-grad)" }} />
         <div
           className="container"
