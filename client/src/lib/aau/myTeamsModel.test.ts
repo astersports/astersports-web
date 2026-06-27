@@ -32,7 +32,7 @@ describe("buildMyTeamsModel", () => {
     expect(m.hero).toBeNull();
   });
 
-  it("surfaces a live game as the hero + a final pill with W/L", () => {
+  it("surfaces a live game as the hero and counts it in liveNow", () => {
     const teams = [team({})];
     const games = [
       game({ gameId: "live", status: "live", myScore: 41, oppScore: 38, opponent: "Gravity Force", startAt: "2026-06-27T11:30:00-04:00" }),

@@ -42,7 +42,10 @@ export default function MyTeams() {
   }, [teams]);
 
   const model: MyTeamsModel = useMemo(() => buildMyTeamsModel(teams, games), [teams, games]);
-  const program = teams[0]?.program ?? "";
+  const programLabel = useMemo(() => {
+    const list = Array.from(new Set(teams.map((t) => t.program).filter(Boolean)));
+    return list.length === 1 ? list[0] : list.length > 1 ? `${list.length} programs` : "";
+  }, [teams]);
 
   // to-advance % for the featured team — predictor over its division standings (real,
   // enumerated). focus matched by name (standings ids are resolved keys).
@@ -78,7 +81,7 @@ export default function MyTeams() {
         <div>
           <h2 className="font-[var(--font-display)] text-[21px] font-bold text-[#f0f3fa]">My Teams</h2>
           <div className="mt-0.5 font-[var(--font-mono)] text-[10.5px] text-[#5f6981]">
-            {teams.length} tracked{program ? ` · ${program}` : ""}
+            {teams.length} tracked{programLabel ? ` · ${programLabel}` : ""}
           </div>
         </div>
         {liveActive ? (
@@ -153,14 +156,13 @@ export default function MyTeams() {
                 {(t.record.w > 0 || t.record.l > 0) && (
                   <span className="font-[var(--font-mono)] text-[11px] text-[#9aa4ba]">{t.record.w}–{t.record.l}</span>
                 )}
-                {t.todayPill ? (
+                {t.todayPill && (
                   <span className={`font-[var(--font-mono)] text-[10px] rounded-[6px] px-2 py-[3px] ${t.todayPill.won ? "bg-[rgba(94,203,143,0.08)] text-[#5ecb8f]" : "bg-[rgba(246,204,85,0.08)] text-[#F6CC55]"}`}>{t.todayPill.text}</span>
-                ) : (
-                  <button type="button" onClick={() => drop(t.teamKey)} aria-label={`Stop tracking ${t.name}`}
-                    className="as-press grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#212939] text-[#5f6981] hover:text-[#ff8a7e]">
-                    <X className="h-[13px] w-[13px]" />
-                  </button>
                 )}
+                <button type="button" onClick={() => drop(t.teamKey)} aria-label={`Stop tracking ${t.name}`}
+                  className="as-press grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#212939] text-[#5f6981] hover:text-[#ff8a7e]">
+                  <X className="h-[13px] w-[13px]" />
+                </button>
               </div>
             ))}
           </div>
@@ -170,7 +172,8 @@ export default function MyTeams() {
   );
 }
 
-/** Momentum bar fill: the leader's share of total points (50% when tied). */
+/** Momentum bar fill: the tracked team's share of total points — fills toward them as
+ *  they pull ahead (50% when even, <50% when trailing). */
 function heroBar(a: number, b: number): number {
   const t = a + b;
   if (t <= 0) return 50;
