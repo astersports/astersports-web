@@ -60,6 +60,23 @@ export async function getTournamentDirectory(): Promise<DirTournament[]> {
   return (data as DirTournament[]) ?? [];
 }
 
+// ─── Global team search (Screen 01): find a team by name across ALL tournaments ───
+export interface TeamHit {
+  teamKey: string; name: string;
+  tournamentId: string; tournamentName: string;
+  startDate: string; endDate: string;
+  divisionId: string; divisionName: string;
+  gradeLabel: string | null; gender: string | null;
+}
+
+/** Search teams by name across every public tournament (deduped). [] for a blank query. */
+export async function searchPublicTeams(query: string): Promise<TeamHit[]> {
+  if (!query.trim()) return [];
+  const { data, error } = await aster.rpc("search_public_teams", { p_query: query });
+  if (error) throw error;
+  return (data as TeamHit[]) ?? [];
+}
+
 // ─── Screen 02 "Track one or many": a tournament's teams by division ───
 export interface TrackTeam {
   id: string; name: string; pool: string | null;
