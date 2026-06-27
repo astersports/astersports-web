@@ -56,7 +56,13 @@ function buildTree(dir: DirTournament[]): CircuitGroup[] {
       });
       seasonList.push({ season, tournaments });
     });
-    seasonList.sort((a, b) => (a.season < b.season ? 1 : -1)); // year desc
+    seasonList.sort((a, b) => {
+      // real years sort desc; the "Undated" null-date sentinel always sinks to the end.
+      if (a.season === b.season) return 0;
+      if (a.season === "Undated") return 1;
+      if (b.season === "Undated") return -1;
+      return a.season < b.season ? 1 : -1;
+    });
     out.push({ circuit, newest, seasons: seasonList });
   });
   // recency: the circuit holding the newest tournament first; "Other" sinks to the bottom.
