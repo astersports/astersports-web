@@ -1,3 +1,4 @@
+import type { HubUser } from "@/lib/aster";
 import SectionHeading from "./SectionHeading";
 import FilmAiReviewGate from "./FilmAiReviewGate";
 import { canAccessChild } from "@/lib/aau/entitlement";
@@ -15,8 +16,8 @@ import { C } from "./find/findUi";
 // never from constants in the bundle. canAccessChild() is owner-applied (false until verification +
 // entitlement land).
 
-export default function FilmHighlights() {
-  if (!canAccessChild()) {
+export default function FilmHighlights({ user }: { user: HubUser | null }) {
+  if (!canAccessChild(user)) {
     return (
       <div className="as-fade-in">
         <SectionHeading eyebrow="Film Room" title="Film" ghostText="FILM" />
