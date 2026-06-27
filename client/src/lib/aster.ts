@@ -132,6 +132,7 @@ export interface DirDivision {
 }
 export interface DirTournament {
   id: string; name: string; circuit: string | null; start_date: string; end_date: string;
+  states: string[]; // A6: DISTINCT venue states (geocoded), [] when unknown — null-honest
   divisions: DirDivision[];
 }
 

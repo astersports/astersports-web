@@ -69,11 +69,13 @@ export default function SearchResults({
   result,
   isTracked,
   onToggleTeam,
+  onTrackAll,
   onOpenTournament,
 }: {
   result: AauSearchResult;
   isTracked: (key: string) => boolean;
   onToggleTeam: (v: AauTeamVariant) => void;
+  onTrackAll: (vs: AauTeamVariant[]) => void;
   onOpenTournament: (tournamentId: string) => void;
 }) {
   const total = result.teams.length + result.tournaments.length + result.divisions.length;
@@ -83,7 +85,7 @@ export default function SearchResults({
         {total} result{total === 1 ? "" : "s"} found
       </p>
 
-      <TeamsResults teams={result.teams} isTracked={isTracked} onToggle={onToggleTeam} />
+      <TeamsResults teams={result.teams} isTracked={isTracked} onToggle={onToggleTeam} onTrackAll={onTrackAll} />
 
       {result.tournaments.length > 0 && (
         <section className="mt-[6px]" aria-label="Tournament results">

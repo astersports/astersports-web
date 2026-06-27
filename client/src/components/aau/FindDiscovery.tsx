@@ -123,6 +123,25 @@ export default function FindDiscovery({ onOpenTournament }: { onOpenTournament: 
     setTrackedKeys(new Set(getTracked().map((t) => t.teamKey)));
   }, []);
 
+  // "Track all of [club]" — track every NOT-yet-tracked variant in the program group in one write.
+  // Presentation-only grouping; tracking stays per-team on each variant's key (spec §R1/§6).
+  const trackAll = useCallback((vs: AauTeamVariant[]) => {
+    const toAdd = vs.filter((v) => !storeIsTracked(v.teamKey));
+    if (toAdd.length === 0) return;
+    track(
+      toAdd.map((v) => ({
+        teamKey: v.teamKey,
+        name: v.name,
+        pool: null,
+        tournamentId: v.tournamentId,
+        tournamentName: v.tournamentName,
+        divisionId: v.divisionId,
+        divisionName: v.divisionName,
+      })),
+    );
+    setTrackedKeys(new Set(getTracked().map((t) => t.teamKey)));
+  }, []);
+
   // Resolve a tournament hit (search/browse uses an id) to a DirTournament so the existing
   // onOpenTournament(DirTournament) prop contract holds. If the directory hasn't loaded the
   // hit yet, refetch once; if still absent, no-op (never fabricate a DirTournament).
@@ -288,7 +307,7 @@ export default function FindDiscovery({ onOpenTournament }: { onOpenTournament: 
       )}
 
       {isSearchMode && results && !noResults && (
-        <SearchResults result={results} isTracked={isTracked} onToggleTeam={toggleTeam} onOpenTournament={openTournamentById} />
+        <SearchResults result={results} isTracked={isTracked} onToggleTeam={toggleTeam} onTrackAll={trackAll} onOpenTournament={openTournamentById} />
       )}
 
       {noResults && (

@@ -1,6 +1,7 @@
+import { Plus } from "lucide-react";
 import type { AauTeamVariant } from "@/lib/aster";
 import { groupByProgram, hasProgramHeader, type ProgramGroup } from "@/lib/aau/programGroups";
-import { initials, C } from "./findUi";
+import { C } from "./findUi";
 import VariantRow from "./VariantRow";
 
 // Render state 02 Teams section — the §2.E "one High Rise, not five rows" win. Flat variant
@@ -12,32 +13,42 @@ function GroupBlock({
   g,
   isTracked,
   onToggle,
+  onTrackAll,
 }: {
   g: ProgramGroup;
   isTracked: (key: string) => boolean;
   onToggle: (v: AauTeamVariant) => void;
+  onTrackAll: (vs: AauTeamVariant[]) => void;
 }) {
   if (hasProgramHeader(g)) {
     // first variant carries the program's location-ish context (tournament/division name)
     const head = g.variants[0];
+    const allTracked = g.variants.every((v) => isTracked(v.teamKey));
     return (
       <div style={{ borderTop: `1px solid ${C.hair}` }}>
-        <div className="flex items-center gap-[12px] px-[18px] pb-[7px] pt-[11px]">
-          <span
-            className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-[11px] font-[var(--font-display)] text-[15px] font-bold"
-            style={{ background: "rgba(95,160,230,.14)", color: C.cobalt, border: "1px solid rgba(95,160,230,.28)" }}
-            aria-hidden
-          >
-            {initials(g.program)}
-          </span>
-          <span>
-            <span className="block font-[var(--font-display)] text-[15px] font-bold" style={{ color: C.ink }}>
+        {/* pinned program header (render .proghead) — "Track all of [club]" bulk action */}
+        <div
+          className="mx-[18px] mt-[10px] flex items-center justify-between rounded-[13px] px-[13px] py-[11px]"
+          style={{ border: "1px solid rgba(246,204,85,.34)", background: "radial-gradient(160px 70px at 12% 0,rgba(246,204,85,.08),transparent),linear-gradient(180deg,#151b29,#10141f)" }}
+        >
+          <span className="min-w-0">
+            <span className="block truncate font-[var(--font-display)] text-[14px] font-bold" style={{ color: C.ink }}>
               {g.program}
             </span>
-            <span className="mt-[2px] block font-[var(--font-mono)] text-[10.5px]" style={{ color: C.mut }}>
-              program · {head.tournamentName} · {g.variants.length} teams
+            <span className="mt-[2px] block font-[var(--font-mono)] text-[10px]" style={{ color: C.mut }}>
+              club · {g.variants.length} team{g.variants.length === 1 ? "" : "s"} match
             </span>
           </span>
+          <button
+            type="button"
+            onClick={() => onTrackAll(g.variants)}
+            disabled={allTracked}
+            aria-label={`Track all ${g.variants.length} ${g.program} teams`}
+            className="as-press flex min-h-[44px] shrink-0 items-center gap-[5px] font-[var(--font-mono)] text-[11px] font-bold"
+            style={{ color: allTracked ? C.mut : C.g3 }}
+          >
+            <Plus className="h-[11px] w-[11px]" /> {allTracked ? "All tracked" : "Track all"}
+          </button>
         </div>
         {g.variants.map((v) => (
           <VariantRow key={`${v.teamKey}:${v.divisionId}`} v={v} tracked={isTracked(v.teamKey)} onToggle={onToggle} nested />
@@ -58,10 +69,12 @@ export default function TeamsResults({
   teams,
   isTracked,
   onToggle,
+  onTrackAll,
 }: {
   teams: AauTeamVariant[];
   isTracked: (key: string) => boolean;
   onToggle: (v: AauTeamVariant) => void;
+  onTrackAll: (vs: AauTeamVariant[]) => void;
 }) {
   if (teams.length === 0) return null;
   const groups = groupByProgram(teams);
@@ -81,7 +94,7 @@ export default function TeamsResults({
         <span style={{ color: C.mut }}>{countLabel}</span>
       </div>
       {groups.map((g) => (
-        <GroupBlock key={g.key} g={g} isTracked={isTracked} onToggle={onToggle} />
+        <GroupBlock key={g.key} g={g} isTracked={isTracked} onToggle={onToggle} onTrackAll={onTrackAll} />
       ))}
     </section>
   );
