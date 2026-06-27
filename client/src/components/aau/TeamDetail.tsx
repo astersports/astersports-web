@@ -76,7 +76,16 @@ function Section({ title, count, children }: { title: string; count: number; chi
 }
 
 export default function TeamDetail({ team, games, onBack }: { team: TrackedTeam; games: TeamGame[]; onBack: () => void }) {
-  const mine = games.filter((g) => g.trackedTeamId === team.teamKey);
+  // team.teamKey is the STABLE resolved_key (a normalized-name slug) the schedule RPC keys
+  // on; the RPC echoes the team as trackedTeamName (display_name) + trackedTeamId (the
+  // volatile division-team uuid). Match on the same basis the RPC did — normalized name ==
+  // resolved_key — so the combined My-Teams schedule splits back to this team. (The old
+  // `trackedTeamId === teamKey` compared a uuid to a slug and silently matched nothing once
+  // the RPC was re-keyed onto resolved_key — every detail page read "no games".)
+  const key = team.teamKey.trim().toLowerCase();
+  const mine = games.filter(
+    (g) => g.trackedTeamName.trim().toLowerCase() === key || g.trackedTeamId === team.teamKey,
+  );
   const next = pickNextGame(mine);
   // the next game is the travel hero, so keep it out of the Upcoming list to avoid a repeat
   const upcoming = mine.filter((g) => g.status !== "final" && g.gameId !== next?.gameId).sort((a, b) => ms(a) - ms(b));
