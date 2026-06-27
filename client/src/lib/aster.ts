@@ -70,10 +70,13 @@ export interface TeamHit {
   gradeLabel: string | null; gender: string | null;
 }
 
-/** Search teams by name across every public tournament (deduped). [] for a blank query. */
+/** Search teams by name across every public tournament (deduped). [] for queries
+ *  under 2 chars. Normalizes (trim) once here so every caller hits the RPC with the
+ *  same key and 1-char queries never reach the backend. */
 export async function searchPublicTeams(query: string): Promise<TeamHit[]> {
-  if (!query.trim()) return [];
-  const { data, error } = await aster.rpc("search_public_teams", { p_query: query });
+  const q = query.trim();
+  if (q.length < 2) return [];
+  const { data, error } = await aster.rpc("search_public_teams", { p_query: q });
   if (error) throw error;
   return (data as TeamHit[]) ?? [];
 }

@@ -8,7 +8,7 @@ import {
   type DirTournament,
   type TeamHit,
 } from "@/lib/aster";
-import { track, untrack, isTracked, getTracked } from "@/lib/aau/trackingStore";
+import { track, untrack, isTracked, getTracked, TRACKED_EVENT } from "@/lib/aau/trackingStore";
 import { fmtRange } from "@/lib/aau/dates";
 
 // Screen 01 Discovery — best-in-class render 01. Public + free to browse, and self-serve:
@@ -66,6 +66,20 @@ export default function FindDiscovery({ onOpenTournament }: { onOpenTournament: 
       ]);
     setTrackedKeys(new Set(getTracked().map((t) => t.teamKey)));
   };
+
+  // keep the Track/Tracked toggle fresh — same-tab track changes, cross-tab
+  // storage writes, and tab focus (mirrors MyTeams) so it never reads stale.
+  useEffect(() => {
+    const refresh = () => setTrackedKeys(new Set(getTracked().map((t) => t.teamKey)));
+    window.addEventListener(TRACKED_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.removeEventListener(TRACKED_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
 
   const loadDir = useCallback(async () => {
     const d = await getTournamentDirectory();
