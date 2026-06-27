@@ -334,10 +334,15 @@ export default function FindDiscovery({ onOpenTournament }: { onOpenTournament: 
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-[var(--font-display)] text-[14px] font-bold text-[#f0f3fa]">{t.name}</span>
-                <span className="mt-0.5 block font-[var(--font-mono)] text-[11px] text-[#5f6981]">
-                  {t.circuit ? `${t.circuit} · ` : ""}
-                  {t.divisions.length} division{t.divisions.length === 1 ? "" : "s"}
-                  {teamCount ? ` · ${teamCount} teams` : ""}
+                <span className="mt-0.5 block truncate font-[var(--font-mono)] text-[11px] text-[#5f6981]">
+                  {[
+                    t.circuit,
+                    fmtRange(t.start_date, t.end_date),
+                    `${t.divisions.length} division${t.divisions.length === 1 ? "" : "s"}`,
+                    teamCount ? `${teamCount} teams` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </span>
               </span>
               <ChevronRight className="h-[17px] w-[17px] shrink-0 text-[#454e63]" />

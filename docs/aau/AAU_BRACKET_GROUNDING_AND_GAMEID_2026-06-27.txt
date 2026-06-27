@@ -1,0 +1,204 @@
+================================================================================
+§2.B BRACKET GROUNDING + the data-gameid FINDING (stable game identity input)
+aster-sports backbone (Supabase vrwwpsbfbnveawqwbdmj) · 2026-06-27 · CC -> Architect + Frank
+L99 · follow-up to ARCHITECT_RULING_STABLE_GAME_IDENTITY_20260627
+================================================================================
+
+WHY THIS DOC
+  The architect green-lit §2.B (bracket/placement ingest) as the next foundation step
+  AND ruled that CC "holds the live structure and determines the [stable-game-key]
+  composition under the test, back to me for L99." This is that grounding. I scraped
+  the real TourneyMachine (TM) bracket HTML (live, desktop-UA, two divisions: one
+  upcoming/unseeded, one completed/24-game) and read the current ingest parser line by
+  line. One finding materially changes the stable-key composition the ruling assumed,
+  so it goes back to you before any schema/index lands. Nothing below is applied. No
+  migration, no ingest change, no index — design + proof only, per the HOLD.
+
+--------------------------------------------------------------------------------
+TL;DR (the headline)
+--------------------------------------------------------------------------------
+  TourneyMachine already assigns every game a DURABLE, STABLE game id — and our ingest
+  throws it away. Each game row carries `data-gameid='h<created-ts><hex>'` (e.g.
+  `data-gameid='h202606241711543177362cfa753c648'`). The parser never reads it; it
+  keys on `cells[0]`, the POSITIONAL P#/B#/G# slot label instead (_parse.ts:271). The
+  slot label is the "disease" the ruling named; the data-gameid is the medicine TM was
+  handing us the whole time.
+
+  This does NOT overturn the ruling — it gives Option C a better primary key. Instead
+  of a hash WE synthesize, the stored game identity becomes TM's own durable id
+  (data-gameid), with the architect's canonical matchup+structure key as the SEMANTIC
+  identity / re-seed-tail reconciler. The two layers compose exactly as ruled (C
+  primary + A's matcher as the bounded tail) — only the "C" is now TM-native, which is
+  strictly stronger.
+
+--------------------------------------------------------------------------------
+PART 1 — WHAT THE TM BRACKET HTML ACTUALLY CONTAINS (grounded, verbatim)
+--------------------------------------------------------------------------------
+Source: Division.aspx (desktop UA), server-rendered HTML. Two representations of the
+same games on one page:
+
+(1) SCHEDULE TABLE — one `<tr class='schedule_row ...' data-gameid='...' data-seuuid=''>`
+    per game. Cells, in order:
+      - cells[0]  = slot label: P1 P2 P3 P4 (pool) / B1 B2 (bracket) / G# (generic).
+                    [GROUNDED] one division had exactly P1-P4 + B1-B2.
+      - time      = "12:20 PM" (+ hidden date "Sun 06/28/26")
+      - venue cell carries `data-facilityid='h2026...'`  (a STABLE TM venue id)
+      - team1 cell: `data-teamid='' data-seuuid=''` + visible text
+      - score1, score2 cells (id'd `<gameid>_1`, `<gameid>_2`)
+      - team2 cell: `data-teamid='' ...` + visible text
+    For an UNSEEDED bracket slot the team cell text is a SEED-SOURCE PLACEHOLDER and
+    data-teamid is empty. For a resolved slot the cell text is the real team name and
+    data-teamid is populated.
+
+(2) BRACKET TREE — absolutely-positioned `<div class="game selectable">` /
+    `<div class="final selectable">` blocks (left/top px encode round depth + position).
+    The "final" block carries the "CHAMPION" label. Each game div repeats the matchup
+    and a title attr: `title='B2 - Sun 6/28 12:20PM 2 - House of Sports - Court 3'`.
+
+SEED-SOURCE TAXONOMY (verbatim strings observed; this is the structural discriminator):
+  - "Bracket Winner B<n>"          -> winner-of edge   (advancement)
+  - "Bracket Loser B<n>"           -> loser-of edge    (consolation; pattern present in
+                                       isPlaceholderTeam, not in the 6-game sample)
+  - "<PoolGroup> <N>(st|nd|rd|th) Place"  e.g. "National Orange 1st Place"
+                                   -> pool-finish seed (round-1 entry from pool standings)
+  The current parser DETECTS these only to SKIP them (isPlaceholderTeam, _parse.ts:142),
+  then discards the text. §2.B's job is to CAPTURE them as structured seed_source.
+
+ROUND NAMING: TM does NOT text-label rounds (the completed 24-game division rendered
+  only "final"/"Final"; no "Quarterfinal"/"Semifinal" strings). Round depth must be
+  DERIVED from the advancement topology (the advances_to graph built from the
+  "Bracket Winner B<n>" edges), not read from a label. bracket_slots.round is text, so
+  we store a derived label ("R1"/"R2"/.../"Final", or numeric depth) — our choice.
+
+--------------------------------------------------------------------------------
+PART 2 — THE data-gameid FINDING + ITS STABILITY PROFILE (grounded)
+--------------------------------------------------------------------------------
+FORMAT: `h` + 14-digit CREATION TIMESTAMP (YYYYMMDDHHMMSS) + random hex. Decoded from
+the live sample:
+      h20260624171154... = 2026-06-24 17:11:54   (B1, B2  — bracket scaffold first)
+      h20260624171253... = 2026-06-24 17:12:53   (P1, P2, P3 — pool batch)
+      h20260624172625... = 2026-06-24 17:26:25   (P4 — a pool game added later)
+The clustering by creation time is itself the evidence the id is row-stable, not
+positional.
+
+STABILITY (what I verified vs. what I infer):
+  [GROUNDED] Stable across re-scrapes: scraped the same division twice seconds apart;
+             all 6 data-gameids byte-identical. So it is NOT per-request random.
+  [GROUNDED] Survives reschedule / score entry / advancement: these UPDATE the existing
+             TM game row in place (time, court, team-fill, score change; data-gameid
+             unchanged). This is the killer-#1 trigger case — a MOVE keeps its id.
+  [REASONED, from the embedded creation-ts] A full bracket RE-SEED (admin regenerates
+             the bracket, deleting+recreating games) MINTS NEW data-gameids (new
+             creation timestamp). I cannot force a real TM re-seed to prove this
+             directly; the timestamp-embedding is strong structural evidence. THIS IS
+             EXACTLY THE TAIL the architect's matchup+structure key is meant to cover.
+
+  Net: data-gameid is durable for ~everything except a full regeneration — the same
+  boundary the ruling already drew. It replaces the positional slot label as the
+  primary key and makes the common MOVE a trivial same-id attribute-compare.
+
+PARALLEL FINDING (not for this decision, logged): `data-teamid` is a stable TM TEAM id
+  on every team cell (392/392 populated in the completed division; empty only for
+  unseeded slots). It is a candidate hardening for team linkage alongside resolved_key
+  [VERIFY whether external_team_key already derives from it] — flagged for §2.D, not
+  proposed here. `data-facilityid` is likewise a stable venue id (venue is currently
+  name-matched) — also §2.D.
+
+--------------------------------------------------------------------------------
+PART 3 — REVISED STABLE-KEY COMPOSITION (how data-gameid folds into the ruling)
+--------------------------------------------------------------------------------
+The ruling: identity = division + unordered resolved-key pair + structural role + seq;
+start_at/court/status/score/raw-slot-label are mutable attributes; C is the
+destination, A's matcher is the bounded tail. Unchanged. The only change is WHAT plays
+the role of "C's stored key":
+
+  LAYER 1 (primary stored identity) = TM data-gameid.
+     - Replaces external_game_id=cells[0] (positional) as the upsert key.
+     - The slot label (B2) demotes to a mutable attribute column (game_code / bracket_slot).
+     - A reschedule = same data-gameid, changed start_at/court  => trivial MOVE detect.
+  LAYER 2 (semantic identity, consumer-facing + re-seed reconciler) = the architect's
+     canonical key: division + sorted(resolved_key pair) + structural slot-role
+     (round + slot_index + seed_source, from §2.B/bracket_slots) + intra-context seq.
+     - This is what per-game consumers (alert subscription, film-to-game, deep link)
+       bind to, so a re-seed that churns data-gameid does NOT orphan the consumer ref.
+     - It is also A's tail reconciler: when data-gameid changes (regeneration), match
+       old->new by Layer 2 and read it as a MOVE, not delete+create.
+  For an UNSEEDED bracket game (no concrete teams yet) Layer 2 falls back to the
+  structural slot-role alone — exactly as the ruling states ("the structural slot-role
+  IS the identity until the matchup resolves into it").
+
+Why this is better than my original Option-C hash: the primary key is TM's own
+PK, observed and stable, not a value we synthesize and must keep canonical ourselves.
+Less surface for our own bugs; the synthesized key survives only where it must (the
+regeneration tail).
+
+--------------------------------------------------------------------------------
+PART 4 — §2.B BUILD PLAN (designed, NOT applied — for your bless before owner applies)
+--------------------------------------------------------------------------------
+A. Parser (aau-ingest-tournament/_parse.ts) — stop discarding structure. Capture per row:
+     game_id (data-gameid), facility_id (data-facilityid), slot_label (cells[0]),
+     and per team cell: team_id (data-teamid|null), seuuid, raw text, and a parsed
+     seed_source { kind: winner|loser|pool_finish, from_slot? , pool_group?, rank? }.
+   No behavior change to existing game upsert in THIS step — additive capture only, so
+   it can land dark and be validated before any key swap.
+B. bracket_slots population (currently 0 rows). For each bracket (B-prefix) game, write
+   slot rows keyed (tournament_division_id, round, slot_index):
+     - round            = derived depth label (topology from the winner-of edges)
+     - slot_index       = position within round
+     - seed_source      = the verbatim/normalized placeholder ("Bracket Winner B1",
+                          "National Orange 1st Place")
+     - division_team_id = resolved team if data-teamid present, else null
+     - event_id         = the division_games row (FK)
+     - advances_to_slot_id = self-FK built from "Bracket Winner B<n>" edges
+   Idempotent upsert; re-scrape converges (no dup slots).
+C. Schema: bracket_slots already fits. The ONLY identity/schema change (Layer 1) — add
+   a durable game-id column + the new unique index that swaps the upsert off the
+   positional key — is HELD for L99 (Part 6 decision) and ships in §2.D with the
+   stable_game_key maintenance, AFTER the re-seed proof. §2.B itself is additive
+   substrate and reads nothing new to a consumer yet.
+
+--------------------------------------------------------------------------------
+PART 5 — RE-SEED PROOF PLAN (the gate before any index lands; per the ruling)
+--------------------------------------------------------------------------------
+Prove, against live data, all three before proposing the Layer-1 index migration:
+  (a) a MOVED game keeps its key   — simulate a reschedule: same data-gameid, changed
+      start_at/court reads as MOVE (Layer 1); and independently the Layer-2 key is
+      invariant under the time/court change.
+  (b) the key stays UNIQUE across the 55 known same-day division+pairing collisions —
+      Layer 2 must disambiguate them via structural role + seq WITHOUT start_at.
+  (c) reordering two same-day rematches does NOT swap their keys.
+  Plus a data-gameid-specific check: enumerate, across all non-archived tournaments,
+  whether any two distinct games ever share a data-gameid (expect zero) and whether the
+  embedded-timestamp uniqueness holds at our scale. If (b)'s irreducible tail is
+  empirically zero, Layer-2-as-reconciler is the only fallback needed and A's engine
+  matcher isn't built at all; if not, it's scoped to that tail only.
+
+--------------------------------------------------------------------------------
+PART 6 — DECISIONS FOR ARCHITECT / FRANK (CC labeled lean; you decide)
+--------------------------------------------------------------------------------
+D1. Adopt data-gameid as the Layer-1 primary stored game identity (demoting the P#/B#/G#
+    slot label to a mutable attribute), with the architect's canonical key as Layer-2
+    semantic identity + re-seed reconciler?
+      CC LEAN: YES. It is TM-native, observed-stable, and makes the dominant MOVE case a
+      same-id compare; Layer 2 still does the consumer-binding + regeneration-tail work
+      the ruling requires. (AP#39: committing to the lean.)
+D2. §2.B scope = additive capture + bracket_slots population only, with the Layer-1
+    id column + unique-index swap deferred to §2.D AFTER the Part-5 proof?
+      CC LEAN: YES. Keeps the identity/index change behind the proof + L99, lets the
+      structural substrate land and be validated first. Lower blast radius.
+D3. round labeling for bracket_slots.round (text): derived numeric depth ("R1..Final")
+    vs. a named scheme?
+      CC LEAN: derived depth + "Final"/"3rd Place" specials; TM gives no round names to
+      copy, so deriving is the only grounded option.
+
+HOLDS INTACT (unchanged): owner applies all migrations; the Layer-1 id column + new
+unique index = identity/schema change = architect review + Frank L99 sign-off -> owner
+applies, AFTER the re-seed proof. Money / film / child data / *_LIVE untouched. §2.B
+writes only additive substrate; no consumer reads anything new from it yet.
+
+ONE LINE: TM already stamps every game with a durable id we were discarding —
+data-gameid becomes the Layer-1 stored identity (stronger than a synthesized hash),
+the architect's matchup+structure key becomes Layer-2 (consumer ref + re-seed
+reconciler); §2.B lands the bracket substrate additively now, the id/index swap waits
+for the re-seed proof + L99.
+================================================================================

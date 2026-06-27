@@ -1,0 +1,166 @@
+================================================================================
+RE-SEED PROOF (Part 5) — stable game identity, proven against live data
+aster-sports backbone (Supabase vrwwpsbfbnveawqwbdmj) · 2026-06-27 · CC -> Architect + Frank
+L99 · the gate before the §2.D Layer-1 index migration · follows ARCHITECT_RULING_GAMEID_AND_2B
+================================================================================
+
+WHAT THIS IS
+  The architect's Part-5 proof, drafted + run read-only against live data, before the
+  Layer-1 identity/index migration is proposed. It proves the three required properties
+  and quantifies the one honest unknown (the same-day-rematch tail). Harness is committed
+  (pure, vitest-tested); the live numbers below are from read-only queries + live TM
+  scrapes. NOTHING applied: no schema, no index, no ingest change. The §2.D index returns
+  for a fresh L99 with this proof attached.
+
+  Harness: src/lib/aau/stableGameKey.js (Layer-2 key) + __tests__/stableGameKey.test.js
+  (proofs a + c, fixtures drawn from the real rematch group). Proof (b) is the read-only
+  SQL below. data-gameid sweep via live scrape + the §2.B parser.
+
+--------------------------------------------------------------------------------
+THE CANDIDATE KEY (what was proven)
+--------------------------------------------------------------------------------
+LAYER 1 (primary stored id) = TM data-gameid (source-neutral: external_game_id behind
+  the `source` tag, per the ruling). Durable; survives reschedule/score/advancement.
+LAYER 2 (semantic id + regeneration reconciler) =
+    divisionId | sorted(resolved_key pair) | structural_role | seq
+  structural_role: bracket -> b:<round>:<slotIndex> (from §2.B bracket_slots);
+                   pool    -> p:<poolKey>;  generic -> g.
+  seq: 0 except for a genuine same-(division, pair, role, day) rematch, where games are
+  ordered by their DURABLE data-gameid (which embeds creation time -> stable across
+  reschedule) and numbered 0,1,2... start_at/court/status/score/slot-label are NEVER
+  in the key.
+
+KEY DESIGN POINT (why this composition): the seq — the one place start_at could have
+leaked into identity — is taken from data-gameid ORDER, not time. That single choice is
+what makes proof (c) hold. Layer-2's only soft spot therefore borrows Layer-1's
+stability; the true irreducible tail is only a full REGENERATION (data-gameid itself
+churns), which is the bounded case Option A's matcher covers.
+
+--------------------------------------------------------------------------------
+PROOF (b) — UNIQUENESS across the live same-day collisions  [GROUNDED]
+--------------------------------------------------------------------------------
+Read-only query over non-archived tournaments: group games by (division, ET event-date,
+unordered resolved_key pair) having count > 1 — the games a time-free key must still tell
+apart. Result:
+
+  collision_groups          = 55     (110 games; every group is a pair playing twice/day)
+  same-slot-KIND groups     = 2      (both games same kind: P/P)
+  cross-kind groups         = 53     (one pool + one bracket between the pair, same day)
+  groups w/ distinct slot labels = 55 / 55   (no group repeats a slot label)
+
+INTERPRETATION:
+  • 53 / 55 are POOL-vs-BRACKET between the same pair the same day. structural_role
+    (kind alone: p: vs b:) gives them DISTINCT keys outright. No seq needed.
+  • The hard tail is the 2 SAME-KIND groups. Both are POOL double-headers (NOT brackets):
+      - "Downtown Wolves 6 - Sigma" vs "Empire State Storm 6" — Ballers3, 2026-06-07,
+        games P2 (7:00) and P3 (8:00).
+      - "Riverside Hawks 2" vs "Rockland Spartans 2 - Steve" — Ballers, 2026-06-07,
+        games P1 (5:00) and P2 (6:00).
+    A pair genuinely played twice in pool play the same afternoon. Same division, same
+    pair, same role (pool), same day. These are EXACTLY the "intra-context sequence"
+    case the ruling named. With seq (by data-gameid order) they get distinct keys.
+  => Layer-2 (role) is unique for 53/55 outright; Layer-2 + seq is unique across all 55.
+
+  The exact query is appended (PROOF-SQL) so it re-runs verbatim. Once §2.B is applied
+  (source_game_id in the DB), the seq half runs end-to-end in-DB too; today the seq logic
+  is proven by the pure (c) test using real data-gameids from scrape.
+
+--------------------------------------------------------------------------------
+data-gameid SWEEP — the Layer-1 / seq substrate  [GROUNDED]
+--------------------------------------------------------------------------------
+Live scrape of 6 real divisions (640 distinct games) through the §2.B parser:
+  games = 640 · with data-gameid = 640 / 640 (none missing) · DUPLICATE ids = 0
+  => every game carries a durable id; globally unique.
+Stability: the same division scraped twice returned byte-identical data-gameids (the 6
+"duplicates" in the raw sweep were that re-scrape pair — i.e. the stability proof, not a
+collision). Format h<YYYYMMDDHHMMSS><hex>; the embedded creation timestamp is what gives
+the seq a stable, time-free ordering.
+
+--------------------------------------------------------------------------------
+PROOF (a) — a MOVED game keeps its key  [GROUNDED, pure test]
+--------------------------------------------------------------------------------
+Take a game, change start_at to a different day + change court (the mutable attributes a
+reschedule touches), recompute the key. UNCHANGED — the key contains none of those.
+Layer-1 (same data-gameid) makes the move a same-id attribute compare; Layer-2 is
+invariant. Test: stableGameKey.test.js "proof (a)". PASS.
+
+--------------------------------------------------------------------------------
+PROOF (c) — reordering same-day rematches does NOT swap keys  [GROUNDED, pure test]
+--------------------------------------------------------------------------------
+The real rematch pair, with the EARLIER-created game scheduled LATER in the day. seq is
+assigned by data-gameid order (not time), so the earlier-created game is seq 0 regardless
+of clock time. Swap the two games' start times -> both keys UNCHANGED, and the two remain
+DISTINCT. Test: stableGameKey.test.js "proof (c)". PASS. (Had seq been time-derived,
+swapping times would swap keys — the test pins that it does not.)
+
+--------------------------------------------------------------------------------
+RESULT — the honest tail
+--------------------------------------------------------------------------------
+  • Under NORMAL operation (reschedule, score, advancement, pool/bracket fill): Layer-1
+    data-gameid is stable, so identity never moves; (a)/(c) hold; (b) is unique. No engine
+    matcher fires. This covers killer #1 (schedule-change) completely.
+  • The irreducible tail is NOT empirically zero: a full REGENERATION (data-gameid
+    re-minted) of a division that contains a same-(div, pair, role, day) rematch. In
+    current live data that tail is 2 groups / 4 games — both pool double-headers. For that
+    case the bounded reconciler (Option A's matcher) maps old->new within the group; with
+    only 2 games per group the tie-break is trivial (by score, or by surviving start_at
+    proximity). It is the narrowly-scoped fallback the ruling kept, never the whole diff.
+  => Recommendation stands with the architect's ruling: data-gameid Layer-1 primary;
+     Layer-2 reconciles regeneration; A's matcher survives ONLY for the same-day-rematch
+     tail (2 groups today), not the general case.
+
+--------------------------------------------------------------------------------
+WHAT COMPLETES AFTER §2.B IS APPLIED (owner-apply, then re-run)
+--------------------------------------------------------------------------------
+  1. source_game_id populated in division_games -> run proof (b) end-to-end in-DB
+     including the seq half (today seq is proven via the pure test on scraped ids).
+  2. bracket_slots populated -> structural_role for bracket games carries real
+     round/slotIndex (today bracket collisions are all cross-kind, so kind-level role
+     already suffices; richer role only hardens it).
+  3. WATCH for a real regeneration in the wild during the proof window: if a division's
+     data-gameids change on a re-scrape with the matchup intact, CAPTURE it — that upgrades
+     the one [REASONED] fact (regeneration mints new ids) to [GROUNDED].
+
+--------------------------------------------------------------------------------
+DECISION FOR L99 (the §2.D shape — CC lean; architect/Frank decide)
+--------------------------------------------------------------------------------
+  Adopt the composition above as the stored identity: Layer-1 = external_game_id :=
+  source_game_id behind `source`, with a new unique index (tournament_division_id, source,
+  external_game_id); Layer-2 = the durable consumer reference + the regeneration
+  reconciler; A's matcher scoped to the same-day-rematch tail only.
+    CC LEAN: YES — proven on live data; the tail is bounded + characterized; the seq leans
+    on the durable id so normal ops never swap. (AP#39.) The index migration is the only
+    remaining identity/schema change and returns for a fresh L99 with this proof attached;
+    it ships in §2.D after owner applies §2.B.
+
+HOLDS INTACT: owner applies all migrations; the Layer-1 index = identity/schema change =
+architect review + Frank L99 -> owner applies, after this proof. Money / film / child data
+/ *_LIVE untouched. This proof is read-only; nothing was applied.
+
+================================================================================
+PROOF-SQL (read-only; re-runs verbatim) — proof (b) collision uniqueness
+================================================================================
+with g as (
+  select dg.id, dg.tournament_division_id as div,
+         (dg.start_at at time zone 'America/New_York')::date as et_date,
+         left(dg.external_game_id,1) as slot_kind, dg.external_game_id,
+         least(lower(ht.resolved_key), lower(at.resolved_key)) as rk_lo,
+         greatest(lower(ht.resolved_key), lower(at.resolved_key)) as rk_hi
+  from division_games dg
+  join tournament_division_teams ht on ht.id = dg.home_division_team_id
+  join tournament_division_teams at on at.id = dg.away_division_team_id
+  join tournament_divisions d on d.id = dg.tournament_division_id
+  join tournaments t on t.id = d.tournament_id
+  where t.archived_at is null and dg.start_at is not null
+),
+collide as (
+  select div, et_date, rk_lo, rk_hi, count(*) n,
+         string_agg(distinct slot_kind,'' order by slot_kind) kinds,
+         count(distinct external_game_id) distinct_slots
+  from g group by div, et_date, rk_lo, rk_hi having count(*) > 1
+)
+select count(*) collision_groups, sum(n) games_in_collisions,
+       sum(case when kinds ~ '^[A-Z]$' then 1 else 0 end) same_kind_groups,
+       count(*) filter (where distinct_slots = n) all_distinct_slot_labels
+from collide;
+================================================================================

@@ -1,0 +1,167 @@
+================================================================================
+KILLER #1 — SCHEDULE-CHANGE ALERT ENGINE (design — APPROVED, corrections folded)
+aster-sports backbone (Supabase vrwwpsbfbnveawqwbdmj) · 2026-06-27 · CC + Architect + Frank
+DESIGN APPROVED 2026-06-27 (ARCHITECT_REVIEW_KILLER1_SCHEDULE_DIFF). BUILD GATED on §2.D
+(stored source_game_id + the (source, external_game_id) unique index). Nothing applied.
+This is the locked build spec: the architect's 2 corrections + 3 sharpenings + 3 rulings
+are folded in below, marked [C1]/[C2]/[S1..S4]/[Q1..Q3].
+================================================================================
+
+THESIS
+  With the ratified stable identity, "did this game move?" is a SAME-ID ATTRIBUTE COMPARE,
+  not a fuzzy re-link. The engine matches the new ingest snapshot to stored state by the
+  durable key, then compares mutable attributes. [S1] The fuzzy surface is even smaller than
+  first framed: the Layer-2 reconcile is a DETERMINISTIC 1:1 lookup for ALL non-rematch
+  games — INCLUDING a full regeneration (every game REMOVED+ADDED, but each Layer-2 key
+  matches 1:1). The ONLY genuinely fuzzy decision is the intra-rematch-group pairing after a
+  regeneration (a same-(div,pair,role) pool double-header re-minted: new data-gameids, so
+  global-seq order may not line up old↔new → needs a tie-break). That is 2 groups / 4 games
+  in live data, 2 per group, low-stakes. Everything else is a lookup.
+
+--------------------------------------------------------------------------------
+THE DIFF — three buckets, one lookup
+--------------------------------------------------------------------------------
+Per division, on each re-ingest, BEFORE the division_games upsert:
+  oldByKey = current division_games rows for the division, keyed by the durable id
+             (source-neutral external_game_id behind `source`, post-§2.D).
+  newByKey = the incoming parsed+filtered games, same key.
+
+  1. MATCHED (id in both): compare the MUTABLE attributes
+       { start_at, court, venue_id, status, scores, resolved teams }.
+     - start_at changed  -> time_change   (the headline)
+     - court / venue_id  -> venue_change
+     - unseeded slot resolved (placeholder -> real teams) -> matchup_set  (predictions unlock)
+     - score/status only -> NO schedule alert (result-stream, separate)
+  2. ADDED (id in new, not old)   -> game_added
+  3. REMOVED (id in old, not new) -> reconcile by the Layer-2 key (division | sorted
+     resolved_key pair | structural_role | global seq) against unmatched ADDED games:
+       - Layer-2 match -> REGENERATION MOVE (not a cancel): emit the attribute delta.
+         [S1] Deterministic 1:1 EXCEPT inside a re-minted rematch group, where the
+         old↔new pairing tie-breaks by surviving start_at proximity (or final score). That
+         tie-break is the only fuzzy code in the engine.
+       - no Layer-2 match -> game_cancelled (genuine removal).
+
+--------------------------------------------------------------------------------
+[C1] ATOMICITY — required, not optional (the cost of DB-as-state-store)
+--------------------------------------------------------------------------------
+The diff reads stored rows, derives alerts, then upserts. If the UPSERT commits and the
+ALERT-WRITE then fails, the new state becomes the stored state -> the next ingest sees no
+change -> the alert is LOST PERMANENTLY. Silently dropping a move is the one failure that
+kills the whole "never miss a schedule change" promise.
+  RULE: the alert-write and the games-upsert for a division are ONE atomic transaction —
+  both commit or neither. On rollback the retry re-reads the unchanged stored state and
+  re-detects. This is also what makes IDEMPOTENCY hold UNDER FAILURE, not just under a clean
+  re-ingest. Mechanism: a single SECURITY DEFINER RPC that takes the division's game rows +
+  derived alert rows and writes both in one txn (the ingest's per-division upsert moves
+  inside it), so a partial write can't strand a lost move.
+
+--------------------------------------------------------------------------------
+[C2] MASS-CHANGE — record truth, group at delivery, flag anomalies (three layers)
+--------------------------------------------------------------------------------
+A weather-out legitimately moves every game; a parser glitch or a TM structural change can
+ALSO make every game look "changed." Neither may fan out N raw per-game pings. Three layers,
+each concern where it belongs:
+  (a) BACKBONE RECORDS TRUTH — still write a per-game alert row for each real change
+      (accurate; content-hashed per Q3). Do NOT collapse at detection.
+  (b) DELIVERY GROUPS PER-USER — the notification-orchestration layer groups a user's alerts
+      for one tournament/day into ONE "Saturday games rescheduled — see updated times"
+      surface, not N pings. REQUIREMENT ON THIS SCHEMA: schedule_change_alerts must be
+      queryable per-user-per-tournament-per-day so grouping is possible. (Delivery layer is a
+      later build; the schema anticipates it.)
+  (c) ANOMALY GUARD — when one ingest's change-fraction exceeds a threshold, FLAG it for
+      observability and HOLD fan-out pending a human glance: a real mass-reschedule clears
+      and delivers as a group; a parser bug is caught before it floods anyone. (Folds in the
+      S4 cost/rate observability.) The per-game rows are still written (truth); only fan-out
+      holds.
+
+--------------------------------------------------------------------------------
+ALERT TAXONOMY (the KIND encodes the delivery tier)
+--------------------------------------------------------------------------------
+  { kind, game_key, source_game_id, division_id, tournament_id,
+    teams: [resolved_key, resolved_key], before: {...}, after: {...}, detected_at }
+  [Q2] URGENT tier: time_change (the killer — "your 10:45 moved to 8:00"), venue_change.
+       LOW: game_added, game_cancelled.
+       INFORMATIONAL (its OWN stream, never diluting the urgent tier): matchup_set —
+       "opponent set / predictions unlocked," feeds the predictor + road-to-the-chip.
+  The delivery layer routes on KIND.
+
+--------------------------------------------------------------------------------
+WHERE IT RUNS + CONSUMER ROUTING
+--------------------------------------------------------------------------------
+  RUNS: inside aau-ingest-tournament, per division, post-parse / pre-upsert. Pure diff logic
+  factors into a vitest-mirrored helper (AP #30) like _bracket.ts; the atomic write [C1] is
+  the IO RPC in index.ts.
+  ROUTING: an alert is interesting only to someone tracking one of its teams. Fan-out = the
+  resolved_key pair -> tracked_teams (AAU hub accounts) + per-tenant subscriptions.
+  [S2] ROUTING NEEDS RESOLVED TEAMS. An UNSEEDED bracket slot has no resolved_key pair, so its
+  time/venue changes route to NO ONE — matchup_set is the FIRST routable event for a bracket
+  game. The Layer-2 key changes at seating (role-only -> role+pair), but the pre-seat thread
+  has no audience, so that transition is harmless (not a gap).
+
+--------------------------------------------------------------------------------
+SAFETY / NO-FABRICATION  ([S4] these are the tests that matter most)
+--------------------------------------------------------------------------------
+  • FIRST-INGEST SUPPRESSION: a division with no prior stored games emits NO alerts (initial
+    load, not a change). Same for a newly-tracked team's backfill.
+  • DRAFT-SCHEDULE GUARD: draft/preliminary schedule_status suppresses time/venue alerts
+    until the schedule is real (mirror of the map-UI draft guard).
+  • DEBOUNCE: multiple attribute changes on one game in one ingest = ONE alert (combined
+    before/after).
+  • NORMAL CHURN IS NOT AN ALERT: score/status + seed-fill that doesn't move time/venue
+    don't fire (matchup_set is the one deliberate exception).
+  • IDEMPOTENT (under failure too, per [C1]): re-ingesting an unchanged snapshot = zero alerts.
+  [S4] TEST HARDEST: first-ingest, draft->final transition, idempotent re-ingest, the
+  mass-change group/flag [C2], and the regenerated-doubleheader tie-break [S1]. A regression
+  in any of these = alert spam = the feature becomes a liability. These matter more than the
+  happy-path move.
+
+--------------------------------------------------------------------------------
+[S3] DATA PLANE — public game data only
+--------------------------------------------------------------------------------
+  A game moving is NOT private. schedule_change_alerts is a backbone table, reads gated by
+  org_is_public_listed, fanned via tracked_teams. It carries game_key / teams / before /
+  after — NEVER a child's identity or any private (Plane-C) data. Firmly on the public side
+  of the three-plane model.
+
+--------------------------------------------------------------------------------
+PROPOSED SCHEMA  [PROPOSED — returns for §2.D/§2.E L99 WITH the build]
+--------------------------------------------------------------------------------
+  schedule_change_alerts (
+    id, org_id, tournament_id, division_id,
+    game_key text,            -- Layer-2 thread key (regeneration-stable: one move = one thread)
+    source_game_id text,      -- Layer-1 id at detection
+    kind text,                -- taxonomy above; the delivery tier
+    before jsonb, after jsonb,
+    detected_at timestamptz default now(),
+    content_hash text,        -- [Q3] hash over (game_key, kind, before, after), NO detected_at
+    unique (content_hash)     -- re-detecting the identical change is idempotent (no re-alert);
+                              -- a second/move-back change is a NEW hash -> a new alert
+  )
+  [Q3] (game_key, kind, detected_at) is NOT a dedup (detected_at always differs) — content-hash
+  is. Index for [C2](b) grouping: (org_id, tournament_id, detected_at). game_key threads a
+  move across regeneration.
+
+--------------------------------------------------------------------------------
+OPEN QUESTIONS — RULED (architect 2026-06-27)
+--------------------------------------------------------------------------------
+  [Q1] TRANSPORT: in-DB rows FIRST. Detection (solved) and delivery decouple. The alert table
+       is the durable source; v1 read-side (next-up card + an alerts surface) consumes it;
+       push/VAPID/Realtime is a SEPARATE downstream build gated on TECH-1's iOS install work.
+  [Q2] matchup_set is ITS OWN stream (informational), never bundled with the urgent
+       time/venue tier. KIND encodes the tier.
+  [Q3] CONTENT-HASH dedup (above).
+
+--------------------------------------------------------------------------------
+BUILD GATE + HOLDS
+--------------------------------------------------------------------------------
+  GATE: needs source_game_id as the stored key + the (source, external_game_id) unique index
+  from §2.D before the durable lookup exists. Design approved; build waits. The schema returns
+  for §2.D/§2.E L99 WITH the build. Owner applies all migrations; alert carries no
+  child/private data; money / film / *_LIVE untouched. Design-only; nothing applied.
+
+ONE LINE: design approved — the stable key makes killer #1 a lookup + attribute-compare;
+make the alert-write + upsert ATOMIC (or a dropped move is lost forever), record per-game
+truth but GROUP at delivery + FLAG anomalous mass-changes, scope the only fuzzy code to the
+regenerated-doubleheader tie-break, keep it public game data fanned via tracked_teams; in-DB
+first, matchup_set its own stream, content-hash dedup — BUILD still gated on §2.D.
+================================================================================
