@@ -1,0 +1,364 @@
+================================================================================
+AAU TRACKING HUB — MASTER BUILD SPEC + RENDER CONTRACT
+astersports.io/aau · aster-sports backbone (Supabase vrwwpsbfbnveawqwbdmj)
+2026-06-27 · Architect → new CC session · L99 · THE single source of truth
+================================================================================
+This replaces the scattered docs. It is the only spec the new CC needs. It assumes
+the state in PART 1 already exists — DO NOT rebuild it. The last session shipped
+real work but (a) drifted from the renders and (b) left two things broken. This doc
+fixes both and makes the renders binding so it does not happen again.
+
+CANONICAL ARTIFACTS (hand all three to CC):
+  • THIS doc — spec, data, behavior, build order, acceptance.
+  • aau-tracking-hub-render-set-bestinclass.html — the 8 CORE surfaces (visual truth).
+  • aau-tracking-hub-12-features-render.html — the 12 FEATURE moments (visual truth).
+
+PRIME DIRECTIVE (the thing that was missing last time):
+  The renders are the BINDING visual contract. A screen is not "done" until a
+  screenshot of the built screen has been posted and visually matches its render
+  frame. No screen merges without that diff. All content in the renders is
+  PLACEHOLDER — bind every value to its RPC at runtime; hardcode nothing.
+
+HOLDS (unchanged): owner applies migrations; money path = architect review + Frank
+  flips (no Stripe on merge); child data = Supabase backbone ONLY; film = §C posture;
+  no agent flips *_LIVE; auth + predictor/engine + RPC are architect-scoped (§2.4).
+
+================================================================================
+PART 1 — GROUND TRUTH (already shipped — DO NOT rebuild; build ON it)
+================================================================================
+BACKBONE (aster-sports, project vrwwpsbfbnveawqwbdmj):
+  • get_public_tournament_standings returns per-team cross-tournament `rating` (+ gp)
+    — opponent-adjusted avg margin (cap ±25) over every public tournament, keyed by
+    stable resolved_key (#1125, prod migration 20260627060257).
+  • Venue geocoding hardened; TM venue-address scrape; tm_id persistence + match-by-
+    tm_id dedup. GEO: 91% of ~5,531 games resolve to an exact venue pin, 97% to a
+    street address; all 12 tournaments carry tm_id + addresses.
+  • tracked_teams table (owner-only RLS, UNIQUE(user_id, team_key)); tracked-team
+    schedule RPC; global team search.
+FRONTEND (astersports-web — client/src/components/aau/**, client/src/lib/aau/**,
+  client/src/lib/aster.ts):
+  • My Teams command-center: ONE schedule fetch owned by MyTeams; NextGame +
+    ConflictRadar derive from a passed `games` prop (#145/#146).
+  • Next-game + travel card (#144), conflict radar (#142), global search (#143).
+  • Strength + grade-aware predictor: predictBracket weights each game by
+    P(win)=logistic(rating gap); grade prior; a `basis` flag ("results"|"ratings"|
+    "even") gates the UI so a no-signal field shows "—"/"projection" (#147).
+  • Per-team odds in every My Teams row + Team Detail drill-down (full schedule +
+    results + venue + directions, next game as travel hero) (#148).
+  • Google sign-in for account-synced tracking: tracked_teams is source of truth when
+    signed in, localStorage when signed out, on-device tracks migrate up on first
+    sign-in (#149).
+VERIFIED LIVE: predictor sane on Grand Finale Girls 5/6 (Empire State Storm 65% leads;
+  4th-grade-playing-up team correctly fell 41%→15% after the fix; pre-game labeled
+  "projection"). Tests green; build clean.
+
+================================================================================
+PART 2 — P0: THE TWO BROKEN THINGS (fix these FIRST, before any new screen)
+================================================================================
+
+P0-A · NEXT-UP CARD DOESN'T WORK
+  ROOT CAUSE (high confidence): the STALE TRACKING KEY. Tracking is keyed on the
+  VOLATILE tournament_division_teams.id (`team_key`). A re-ingest mints fresh ids →
+  the tracked team is orphaned (often to an archived duplicate) → the schedule RPC
+  returns zero games → NextGame gets an empty `games` prop → the card renders blank.
+  The handoff confirms this "bit Frank's phone twice" (he re-tracked an archived
+  Grand Finale duplicate).
+  FIX (two layers):
+    1. DURABLE (architect-ruled, see PART 5): re-key ALL tracking (tracked_teams +
+       localStorage) on the STABLE `resolved_key` / `external_team_key`, not the
+       volatile id. Add a schedule-RPC path that resolves a stale/archived key to its
+       LIVE twin so existing tracks self-heal instead of orphaning.
+    2. CARD RESILIENCE: NextGame must (a) select next game = MIN(scheduled_at) where
+       scheduled_at > now AND status='scheduled', timezone-correct; (b) DEGRADE
+       GRACEFULLY — no upcoming game → "No upcoming games" empty state; travel/location
+       unavailable → render the card WITHOUT the drive-time row, never blank; (c) be
+       instrumented (log the games count it receives so the empty-prop case is visible).
+  ACCEPTANCE: a freshly-tracked LIVE team shows the next-up card (countdown · venue ·
+    directions); a re-ingest does NOT orphan it; a team with no upcoming game shows the
+    empty state, never a blank card. Screenshot must match render 12-features #02.
+
+P0-B · SIGN-IN DOESN'T WORK
+  ROOT CAUSE (high confidence): PROVIDER CONFIG in the Supabase dashboard, not code.
+  The OAuth round-trip can only complete on a real device, and the handoff flags that
+  Frank's dashboard screenshots showed the WRONG project / WRONG client values at one
+  point. CC cannot read provider secrets via MCP — so CC cannot fix this; it can only
+  surface the error.
+  FRANK (the actual fix — dashboard, project vrwwpsbfbnveawqwbdmj):
+    • Auth → Providers → Google: correct Google client id + secret.
+    • Auth → URL Configuration → Redirect URLs: list the EXACT hub callback URL(s)
+      (e.g. https://astersports.io/aau + any staging origin). Keep the allowlist
+      NARROW — NOT a domain wildcard (a wildcard widens the blast radius of any
+      open-redirect/XSS; security review, Copilot #1126).
+    • Confirm you are on project vrwwpsbfbnveawqwbdmj (re-check after the earlier
+      wrong-project screenshot).
+  CC (the code half): SURFACE the real OAuth error on the callback — no silent fail;
+    show a legible signed-in / signed-out state; ensure the callback URL the client
+    uses EXACTLY matches an allowlisted redirect; verify on a real device.
+  ACCEPTANCE: real-device round-trip completes (hub → Sign in → Google → back); tracked
+    teams sync cross-device; on failure a legible error NAMES the cause (not a blank).
+    Screenshot of the signed-in state must match the My Teams render.
+
+================================================================================
+PART 3 — THE PRODUCT (one page)
+================================================================================
+WHAT IT IS: a universal $20/mo PER-ACCOUNT tournament-tracking service. Paste a link
+  or search; track ONE or MANY teams; get real-time scores, the exact predictor, and
+  game-venue directions (Apple/Google/Waze) — for ANY persona (parent, coach, program
+  director, fan), with an OPTIONAL verified-kid overlay.
+THREE ACCESS PLANES (two independent gates):
+  A PUBLIC (free, anon): browse any tournament/team — directory, standings, scores,
+    bracket, predictor, schedule + directions. The funnel.
+  B PAID TRACKING ($20/account, gate is_entitled): save/track teams, the multi-team
+    dashboard, real-time + alerts, the predictor for your teams, navigation, self-serve
+    ingest. UNIVERSAL — any team, any persona, NO child data.
+  C CHILD OVERLAY (included, gate can_access_child = is_entitled AND verified-guardian,
+    LIVE): assign a kid, per-child stats + film. The ONLY roster-bound, child-data part.
+  INVARIANT: canAccessChildData = paidEntitlement AND verifiedGuardian, evaluated live.
+  Tracking a team ≠ claiming a kid. Payment never grants guardianship.
+THE ENGINE: the killer features (schedule-change alert, next-game+travel, conflict
+  radar) are ONE schedule-intelligence engine — re-scrape → diff against last-known →
+  derive. Build the engine once; the three killers are views on it (PART 7).
+EXPERIENCE PRINCIPLES (the 10/10 bar — these govern every screen):
+  T1 accuracy is the floor (no fabrication — least of all about a minor).
+  T2 relevance = simplicity (DEFAULT to the user's team/kid; never make them hunt).
+  T3 one nav, the user's jobs.  T4 stats → story (not a spreadsheet).
+  T5 value before friction (browse/see value before pay/claim).
+  T6 protect the differentiators (film + predictor get the most polish AND discipline).
+
+================================================================================
+PART 4 — THE BINDING RENDER CONTRACT  (the centerpiece — this is what was ignored)
+================================================================================
+PRECEDENCE:
+  • The two render HTML files are BINDING for layout, hierarchy, components, nav, brand,
+    and copy intent. If the built screen doesn't look/structure like its render, redo it.
+  • THIS doc is binding for data sources (RPC/field), states, logic, gates, phasing.
+  • Neither authorizes inventing data — render content is PLACEHOLDER; bind to RPCs.
+  • FLEXIBLE: exact pixel spacing within the tokens. BINDING: regions present + order,
+    hierarchy, components, nav, brand, copy intent, the full state matrix.
+
+ENFORCEMENT GATE (mandatory — this is how "follow the render" becomes real):
+  For EVERY screen, before it is "done", CC posts: (1) a SCREENSHOT of the built screen
+  in its default state plus its key states (empty / live / offline), (2) the RPCs it
+  binds to, (3) a tick against the screen's ACCEPTANCE line. The screen is done only
+  after a visual diff against its render frame passes. No diff, not done. Build in this
+  order; do not batch-merge eight screens then ask for review.
+
+THE 8 CORE SURFACES (render: bestinclass.html — frame # in brackets):
+  [01] DISCOVERY — search + paste-link + browse. RPC: get_tournament_directory,
+       get_division_browse, request_tournament_ingest. Public. States: default/typing/
+       empty/paste-resolving/paste-invalid-host.
+  [02] TRACK ONE OR MANY — multi-select + bulk "track all of [program]". RPC:
+       track_teams([refs], reason, program_key). IDEMPOTENT (UNIQUE on resolved_key —
+       see PART 5). States: none/some-selected/already-tracked/bulk/external-team.
+  [03] MY TEAMS / DASHBOARD — multi-team, grouped, with the LIVE tick (Realtime, PART 5
+       TECH-1) + the next-up hero. RPC: get_my_dashboard / the tracked-team schedule
+       RPC. States: loading/empty(→discovery)/1-team/many-teams/live/no-games. The
+       "updating live" badge shows ONLY when a Realtime channel is connected.
+  [04] TODAY · ROUTE THERE — every tracked team's games today, each with venue +
+       Apple/Google/Waze (buildDirections, client). Offline-cached (PART 5 S1). States:
+       default/live/venue-TBD(no directions)/offline/no-games. (NOT yet built — build it.)
+  [05] STANDINGS + PREDICTOR — DEFAULT to a tracked team's division; cap + advance line;
+       the predictor gauge + EXACT clinch/elim lines + provenance; champion derived from
+       the bracket (never "2 champs"). RPC: get_public_tournament_standings, get_predictor,
+       get_bracket/get_placement. The bracket detail is a required sub-view.
+  [06] iOS INSTALL PROMPT — honest, at the alert opt-in, iOS-Safari-uninstalled only;
+       register push AFTER install; instrument the funnel (PART 5 TECH-1).
+  [07] FILM — GATED (Track 2, §C). HLS player + grounded breakdown that reconciles or
+       holds; jersey-only, no face-rec. Render shows the happy path; build the hold-state.
+  [08] ADD KID + $20 — per-ACCOUNT; verify first; money HELD (no live billing on merge);
+       two-locks copy on the glass.
+
+THE 12 FEATURE MOMENTS (render: 12-features.html — these are the surfaces of PART 7):
+  Killers [01 schedule-change diff alert · 02 next-game+travel · 03 conflict radar +
+  split-up]; high-value [04 road-to-the-chip · 05 auto recap · 06 calendar subscribe ·
+  07 share-to-family · 08 watching-now]; kid/family [09 kid card · 10 weekend digest ·
+  11 milestones · 12 film(held)]. Each is built to its render frame, behind the same gate.
+
+DO-NOT (the drift guards):
+  ✗ hardcode any value from the renders (names, scores, venues, %, play-by-play).
+  ✗ ship happy-path only — every screen needs loading/empty/error/offline/TBD.
+  ✗ build a surface not in the renders, or drop one that is.
+  ✗ change the bottom nav or the brand tokens (PART 10).
+  ✗ show a stat/odds/placement without a provenance line + a real source.
+  ✗ show a champion/placement without ingested bracket data.
+  ✗ wire the paywall to live billing before the money-path review.
+  ✗ touch a minor's frame without consent + the live gate; never face recognition.
+
+================================================================================
+PART 5 — ARCHITECT RATIFICATIONS (the forks the last session left open)
+================================================================================
+F1 · PREDICTOR STRENGTH MODEL (#1125 + #147) — RATIFIED, with calibration discipline.
+  The model is sound and on-discipline: rating = opponent-adjusted avg point margin
+  (one SOS pass, per-game cap ±25, by resolved_key across all public tournaments, NULL
+  when no finals); win prob = logistic(0.1 · rating_gap) (~73% at a 10-pt edge); grade
+  prior = 12 pts docked per grade below the division floor; the `basis` gate showing
+  "—"/"projection" when there's no signal is EXACTLY right (no false precision).
+  CONDITIONS:
+    • CALIBRATE against outcomes once Grand Finale games land — backtest: do ~65%
+      favorites win ~65%? Tune the 0.1 scale to minimize Brier/log-loss; validate the
+      12-pt grade penalty against how playing-up teams actually perform. The 0.1 and 12
+      are reasonable priors, NOT yet validated against results — treat them as such.
+    • KEEP TWO THINGS DISTINCT ON THE GLASS: the EXACT clinch/elimination math
+      (enumerated bracket outcomes — exact, provenance "enumerated exactly") and the
+      ESTIMATED pre-game win % (rating-based — labeled "projection"). They must never be
+      visually conflated; the exact math is a trust asset and the estimate must not
+      borrow its authority. (This is also why an in-game live win-% tick stays OUT.)
+  No rework PR required — blessed; the calibration is a follow-up, not a blocker.
+
+F2 · GOOGLE SIGN-IN / AUTH (#149) — RATIFIED, with two conditions.
+  The posture is correct: Supabase Auth, publishable anon key client-side, owner-only
+  RLS on tracked_teams. CONDITIONS: (1) the redirect allowlist stays NARROW, never a
+  wildcard (security; Copilot #1126); (2) the UNIQUE(user_id, team_key) must move to
+  UNIQUE(user_id, resolved_key) as part of the durable fix below — keying account sync
+  on the volatile id will orphan tracks on re-ingest exactly as the next-up bug does.
+  Sign-in itself works once the dashboard config is right (PART 2 P0-B).
+
+DURABLE FIX · STABLE TRACKING KEY (architect-ruled, P0-adjacent — it's the next-up bug).
+  Re-key ALL tracking (tracked_teams + localStorage) on the STABLE resolved_key /
+  external_team_key. Add a schedule-RPC resolution path: a stale/archived key resolves
+  to its live twin so existing tracks self-heal. This changes the tracking contract, so
+  it is architect-scoped and ruled here. Do this in P0 — it unblocks the next-up card.
+
+TECH-CURRENCY (condensed from the prior ruling — still in force):
+  TECH-1 → Supabase Realtime on the live game tables for the in-app TICK (open clients)
+    + VAPID for closed apps, gated by the iOS install reality (PART 4 [06]); instrument
+    install rate; native app gated on measured rate, not assumption. Realtime is NOT yet
+    built — build it for [03]/[live].
+  TECH-2 → Film (Track 2, gated): grounded multimodal video model (box score + roster as
+    grounding) + KEEP reconcile-or-hold + BENCH-GATE before any minor's data + jersey-
+    only/no-face-rec; HLS via Mux or Cloudflare Stream with signed expiring tokens minted
+    after can_access_child + hard-delete. Behind Frank's child-data/consent sign-off + DPAs.
+  TECH-3 → TourneyMachine dependency: Frank's business/legal call. Posture: O1 written
+    risk acceptance + scraper etiquette, O3 our-program game_results authoritative +
+    external data provenance-labeled (the #1125 resolved_key cross-tournament rating
+    already leans this way), O2 partnership outreach in parallel. Resold-scraped-data
+    needs real legal counsel before scaling paid — surface now while small.
+
+ON THE PRE-ONBOARDING AUTO-MERGES (#1125/#147/#148/#149): blessed as grounded and sound;
+  the two refinements above (stable key; predictor calibration) fold in as follow-ups —
+  no revert, no blocking review needed.
+
+================================================================================
+PART 6 — DATA MODEL + RPC SURFACE (current reality + the additions)
+================================================================================
+HAVE: tournaments / tournament_divisions / tournament_division_teams (3-way identity +
+  resolved_key) / pools / bracket_slots (exists; populate it) / division_games / venues
+  (geocoded, 91% exact) / circuit_rules / tracked_teams (owner RLS) / the standings RPC
+  with rating / tracked-team schedule RPC / the predictor + engine. Trust schema
+  (family_subscriptions, family_children, family_entitlements per-USER, is_entitled,
+  can_access_child) DARK; can_access_child still needs the live guardian re-check JOIN
+  before any Plane-C ships.
+ADD / FINISH:
+  • RE-KEY tracking on resolved_key (PART 5 durable fix) — touches tracked_teams +
+    localStorage + the schedule RPC's stale→live resolution.
+  • bracket_slots + placement INGEST (the predictor's foundation; champion derivation).
+  • get_my_today (the [04] cross-team today list with venue + directions).
+  • Realtime publication on live game tables (TECH-1) + push_subscriptions (post-install).
+  • venues already power navigation; buildDirections(venue) is CLIENT-side (Apple
+    maps.apple.com/?daddr=LAT,LNG&dirflg=d · Google maps/dir/?api=1&destination=LAT,LNG ·
+    Waze waze.com/ul?ll=LAT,LNG&navigate=yes; lat/lng first, address fallback).
+  • the schedule-intelligence engine (PART 7) reads the schedule, snapshots last-known,
+    diffs, derives the three killers' events.
+PUBLIC RPCs (anon, SECDEF, gated, PII-stripped): get_tournament_directory,
+  get_division_browse, get_public_tournament_standings (w/ rating), get_team_schedule
+  (w/ venue), get_bracket, get_predictor, get_placement, get_venue.
+AUTHENTICATED: track_teams / untrack / prefs, get_my_dashboard, get_my_today,
+  is_entitled, get_entitlement_state, register_push; (Plane C, gated) assign_kid,
+  get_child_*; request_tournament_ingest (entitled, rate-limited).
+
+================================================================================
+PART 7 — THE 12 FEATURES AS ONE ENGINE (build order within)
+================================================================================
+THE SCHEDULE-INTELLIGENCE ENGINE (build this ONCE — it is the unit of work, not three
+  features): on each re-scrape of a tracked tournament → snapshot game state (time,
+  court, venue, status, seeding) → DIFF vs last-known → emit derived events:
+    • a TIME/COURT/SEED change  → KILLER #1 schedule-change alert (render 12-feat [01]).
+    • the soonest future game    → KILLER #2 next-game + travel + leave-by (12-feat [02]).
+    • overlapping games across a user's tracked teams → KILLER #3 conflict radar +
+      split-up assist (12-feat [03]).
+  One engine, three views. Notification orchestration is its required substrate:
+  priority tiers (a court change outranks a score), grouping/digest for multi-team,
+  quiet hours, per-team mute. Alerts are killers only if the layer above them is smart.
+FIRST BUILD (lock these): the engine + #1/#2/#3 + #5 auto-recap (a template on the
+  game_final event — near-free) + #4 road-to-the-chip (rides the bracket/placement
+  layer — near-free once it lands). Headline = schedule-change alert.
+NEXT WAVE: #6 calendar subscribe (auto-updating .ics — makes #1 stickiest), #7 share-to-
+  family follow-link (the viral family-onboarding lever), #8 watching-now (Realtime;
+  COUNT ONLY, never who, around minors), #10 AI weekend digest (grounded; the reopen
+  engine), #11 season milestones (team-level).
+GATED KID/FAMILY (behind money + verification flips): #9 kid card, per-kid stats, #12
+  film. Held as-is.
+ARCHITECT ENHANCEMENTS folded into the renders (build them): the split-up assist on #3;
+  weather + leave-by on #2 (reuse the aster-weather package); opponent-scouting is free
+  on the scraped record (a QF-opponent strength line) — pull it forward for coaches.
+PUSHED BACK (do NOT build): live in-game win-% tick (breaks the exact-math discipline —
+  see F1); concession/parking intel (not on scraped data); open chat around minors
+  (coach broadcast, if built, is one-way only and needs a coach role — next wave).
+NEW PAID DEPENDENCIES needing Frank's nod (sub-processor + cost): the drive-time API for
+  #2 (Google Distance Matrix), and the video model + platform for #12 (TECH-2). Same as
+  geocoding — approve or name an alternative.
+
+================================================================================
+PART 8 — BUILD ORDER + ACCEPTANCE GATES
+================================================================================
+  STEP 0 · TRUTH (immediate, fork-independent): de-fabricate any remaining demo data;
+    every number derives from the event log; one record per entity.
+  STEP 1 · P0 FIXES (before any new screen):
+    1a. Stable tracking key (PART 5) → unblocks the next-up card.
+    1b. Next-up card resilience + acceptance (PART 2 P0-A).
+    1c. Sign-in: CC surfaces the error; FRANK fixes the dashboard config (PART 2 P0-B).
+    GATE: screenshots of a working next-up card (populated + empty states) and a signed-in
+    state, diffed against the renders.
+  STEP 2 · CORE SURFACES to the renders (in order, each behind the gate): [04] Today·
+    route-there (build it), [05] standings+predictor default-to-team + bracket sub-view,
+    [03] dashboard with the Realtime tick (TECH-1). Each: screenshot diff + states + RPCs.
+  STEP 3 · THE ENGINE + KILLERS (PART 7 first build): engine → #1/#2/#3 → #5 → #4, each
+    to its 12-features render frame, behind the gate, with notification orchestration.
+  STEP 4 · NEXT WAVE features (#6/#7/#8/#10/#11) behind the gate.
+  TRACK 2 (parallel, gated): film (TECH-2), behind Frank's child-data/consent sign-off.
+  MONEY (held): Stripe + entitlement AFTER the architect money-path review; Frank flips.
+  EVERY STEP: the enforcement gate (PART 4) — no screen merges without a passing diff.
+
+================================================================================
+PART 9 — HOLDS + FRANK'S CALLS
+================================================================================
+HOLDS: owner applies migrations; money path held (architect review + Frank flips); child
+  data Supabase-only; film §C; no *_LIVE flips; auth/predictor/RPC architect-scoped.
+FRANK'S CALLS (open):
+  • P0-B sign-in: fix the Google provider config + redirect allowlist in the dashboard
+    (project vrwwpsbfbnveawqwbdmj); confirm the project is correct; test on a real device.
+  • $20 price + the freemium line (browse-free vs track-N-free vs all-paid).
+  • Sub-processor + cost nods: drive-time API (#2), video model + platform (#12), and the
+    existing geocoding provider.
+  • TECH-3: the written risk acceptance on TourneyMachine + whether to open partnership
+    outreach; legal counsel on resold-scraped-data before scaling paid.
+  • Child-data deletion + consent sign-off before any Plane-C / film ships.
+
+================================================================================
+PART 10 — DESIGN TOKENS + COMPONENT INVENTORY (build to these so it matches the render)
+================================================================================
+COLOR: bg #070a11 · surfaces #10141f/#151b29/#1b2233 · ink #f0f3fa · dim #9aa4ba · muted
+  #5f6981 · hairline rgba(255,255,255,.055). GOLD GRADIENT linear-gradient(100deg,
+  #E0631C,#E8902A,#F6CC55,#FBD56B). live #34e0a4 · positive #5ecb8f · trust #5ec98e ·
+  negative/conflict #ff6b5e · amber/change #ffb648 · cobalt(team) #5fa0e6. Providers:
+  apple #e3e7ef · google #6ea2ff · waze #2fd0ff.
+TYPE: display Space Grotesk (600/700) · body Inter · mono/labels Space Mono.
+RADIUS: card 16 · device 44 · button 13 · chip/pill 7–999. MOTION: the live pulse;
+  honor prefers-reduced-motion. CONTRAST: gold/ink-on-dark must pass WCAG AA (a11y is
+  table-stakes — aria, live regions for live scores, keyboard, reduced-motion).
+COMPONENTS (build once, reuse): bottom-nav (4 tabs) · card · search/paste · tournament-row
+  · track-select-row + bulk · sticky-CTA · realtime-badge · live-hero (+ momentum) ·
+  team-group · game-card + venue-row + directions(3 brand-tinted) · offline-chip ·
+  standings-table (cap + advance line) · odds-gauge (gradient arc + clinch rows +
+  provenance) · champion-banner · install-sheet · video-player (HLS) + grounded play-by-
+  play · verified-badge · paywall-card (two-locks) · schedule-diff (strike→highlight) ·
+  countdown · day-timeline (+ overlap) · bracket-path · recap-card · calendar-agenda ·
+  follower-stack · presence-bar · kid-card · digest-card · milestone-badge · provenance-line.
+
+================================================================================
+ONE LINE: fix the stable tracking key (the next-up card returns) and the dashboard auth
+config (sign-in returns), then build every remaining screen to the two render files behind
+a screenshot-diff gate — bind every value to an RPC, hold money + film + minors, and keep
+the predictor's exact math distinct from its projection. The renders are the contract; the
+diff is the enforcement.
+================================================================================
