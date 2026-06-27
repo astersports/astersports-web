@@ -1,0 +1,271 @@
+AAU TRACKING HUB — TRACKING-FLOW DESIGN  (HOLD: design only, nothing builds until ratified)
+Grounded in the canonical render set: docs/AAU_TRACKING_HUB_RENDER_SET.html (805e5a3a)
+Author: CC · 2026-06-26
+
+================================================================================
+0. WHY THIS DOC
+================================================================================
+Frank: "Discovery looks nothing like the renders / stop going rogue / design this
+with ALL the possibilities — tournament → divisions → grades → gender → teams, I
+select one or many to assign to my profile; the teams may or may not be my kids; a
+program director watches everything like LeagueApps. Hold everything until you get
+it right."
+
+This doc (a) reconciles what shipped against the render set, (b) designs the whole
+tracking spine (01 → 02 → 03) with every persona/permutation, (c) names the data we
+already have vs. must add, (d) lists the open forks that need Frank's ruling. NO code
+moves until this is ratified.
+
+================================================================================
+1. THE RENDER SET IS THE CONTRACT — 8 screens, 4-job nav (Find · My Teams · Standings · Film)
+================================================================================
+  01 Discovery .............. PUBLIC. Search/paste → find a tournament. Funnel before any account.
+  02 Track one or many ...... PUBLIC browse → the multi-select that CREATES tracking. Coach/director flow, no kid required.
+  03 My Teams (command ctr) . ACCOUNT. Tracked teams grouped by program, live (Realtime).
+  04 Today · route there .... ACCOUNT. Every tracked team's games today + venue + Apple/Google/Waze, offline-cached.
+  05 Standings + predictor .. PUBLIC. Defaults to your tracked team's division. (BUILT — matches render.)
+  06 iOS push install sheet . The Home-Screen-install reality, shown at alert opt-in.
+  07 Film (gated) ........... VERIFIED-KID. HLS, grounded on box score, child-private.
+  08 Add your kid · $20 ..... ACCOUNT + VERIFIED. The optional verified overlay; one $20 covers the account.
+
+GATE MODEL (straight from the render footer):
+  • PUBLIC, no account: Discovery, Standings, Predictor, Today+navigation, browse.
+  • $20/mo ACCOUNT (money HELD — Frank sets pricing/flips, no Stripe wired): Tracking,
+    My Teams dashboard, Realtime, alerts.
+  • VERIFIED-KID overlay (entitlement AND guardianship — two independent locks):
+    per-kid stats + Film. Payment never unlocks a child; verification never bills.
+
+================================================================================
+2. SCREEN 01 DISCOVERY — RECONCILIATION (what shipped vs. the render)
+================================================================================
+  ELEMENT              RENDER (contract)                          SHIPPED                         VERDICT
+  Search placeholder   "Search tournament, team, or circuit"      "...tournament, division..."    FIX → add team search
+  Paste field          "Paste a TourneyMachine link…"             self-serve paste→ingest         KEEP (this is the engine)
+  Tournament rows      FLAT row, tap → arrow → Screen 02 Track    ACCORDION expands divisions      FIX → flat rows, no inline expand
+  Row sub-line         "2 games live · 14 divisions" + live pulse "N divisions"                    FIX → live-games count + pulse
+  Tap target           → 02 Track (multi-select teams)            → 05 Standings                  FIX → route to 02, not Standings
+  Tokens / states      best-in-class palette, loading/empty/err   matches                         KEEP
+  Foot line            "Anyone can browse. Track teams to unlock…" matches                         KEEP
+
+  Verdict: the accordion + "division → Standings" routing was the rogue divergence.
+  The paste/ingest plumbing + tokens are correct and feed the real flow. Screen 01
+  becomes a thin browse/funnel; the action lives in Screen 02.
+
+================================================================================
+3. THE TRACKING SPINE (01 → 02 → 03) — the heart of what Frank described
+================================================================================
+DATA HIERARCHY (matches Frank's words):
+  tournament → division → grade → gender → TEAM → (track) → assign to profile/kid (optional)
+
+  In the data, a TM "division" already encodes grade+gender (e.g. "Boys - 5th").
+  Render 02 surfaces that as TITLE "Girls · 5th grade" + a Girls/Boys toggle, teams
+  listed with Pool + record.
+
+01 DISCOVERY (public): paste/search a tournament → tap a tournament row → Screen 02.
+
+02 TRACK ONE OR MANY (public browse, the multi-select that creates tracking):
+   SEARCH-FIRST, filters assist (RATIFIED — supersedes render-literal gender→grade drill-down):
+   • A single search box: "Search a team or club." Type "Legacy" → every Legacy Hoopers
+     team across all divisions, each with grade/gender/pool/record. Zero drilling for the
+     parent who knows their team (the people who pay).
+   • Gender + Grade chips below it are OPTIONAL filters that NARROW, never gate. "Girl
+     teams" = tap Girls; "just teams" = type the name. Neither forces the other.
+   • Results grouped by CLUB; each club carries an inline "+ All <Club>" bulk-track
+     (director/LeagueApps one-tap). Team rows = checkbox + name + "Pool A · 3–0" + a LIVE
+     score badge if on the court now.
+   • Sticky CTA: "+ Track N selected teams" → writes to the account's tracked set, then a
+     skippable "assign to a kid?" nudge + "alert me on tip-off & final?" opt-in.
+   • A team can be tracked with NO kid (fan/coach/director) — assignment is a SEPARATE axis.
+
+   TEAM-AS-THE-UNIT (RATIFIED — the spine underneath everything):
+   • You track the TEAM, not the tournament. Once tracked, the team FOLLOWS you across
+     every tournament it enters — automatically, no re-adding. The unit a parent cares
+     about is their kid's team, not a weekend's bracket. Set once, always know where/when.
+
+03 MY TEAMS (account, live command center):
+   • Tracked teams grouped BY PROGRAM (Legacy Hoopers · today · 9 games).
+   • Live hero (Realtime score tick), glance stats (to-advance %, live now, today).
+   • Scales 1 → 30 teams (director watching a whole club).
+
+================================================================================
+4. EVERY PERSONA / PERMUTATION (Frank: "all the possibilities")
+================================================================================
+  P1  Fan / just-interested ... Tracks a team, NO kid. Watches a rival or a friend's kid. Account, no verified overlay.
+  P2  Parent, one kid ......... Tracks kid's team → assigns the team to that child → child profile drives stats/film/alerts. Verified overlay (08).
+  P3  Parent, multi-kid ....... Several tracked teams, each optionally assigned to a different child. Kids are free-form labels (your ruling).
+  P4  Program Director ........ "+ All" bulk-tracks the whole club across the event; My Teams = the LeagueApps-style command center (1→30).
+  P5  Coach .................... Like P4 but a subset; tracks his teams, no kid. Director/coach share the no-kid flow.
+  P6  Team in MULTIPLE tournaments .. A tracked TEAM is a stable identity; it can appear in several tournaments. Tracking follows the team; the
+                                  schedule/standings resolve per-tournament. (Needs a stable team key — see §5/§6.)
+  P7  Mixed ................... Director who also has a kid: bulk-tracks the program AND assigns one team to his child. The two acts compose;
+                                  they are independent (tracking ≠ guardianship).
+
+  INVARIANT: TRACKING (what I watch) and ASSIGNMENT-TO-A-KID (whose it is) are two
+  separate axes. Every cell of {track yes/no} × {kid attached yes/no} is valid.
+
+================================================================================
+5. THE ACCOUNT / IDENTITY MODEL  (RATIFIED 2026-06-26)
+================================================================================
+  AUTH = Google sign-in (Supabase Auth, Google provider, on the aster-sports Supabase
+  the hub already reads). Public surfaces stay no-account; tracking is account-gated.
+
+  ENTITLEMENT (who gets tracking):
+    • SUPER-ADMIN (Frank's Google account) → FREE, full access. Stored as a flag/allow-
+      list, not hardcoded in UI (starts = Frank's user_id/email).
+    • EVERYONE ELSE → $20/mo via STRIPE, monthly subscription. Access = an active sub.
+
+  MONEY HELD: build the entitlement GATE now (super-admin free vs. paid-required), but
+  do NOT wire the Stripe charge. Today Frank tests everything free as super-admin; the
+  $20/Stripe subscription is the HELD FLIP Frank turns on when ready. Two independent
+  locks survive: payment unlocks the service; verification unlocks a child (§1).
+
+================================================================================
+6. DATA / RPC GAPS (what we already have vs. must add)
+================================================================================
+  HAVE: tournaments, tournament_divisions(grade_label, gender, advance_count),
+        tournament_division_teams(display_name), tournament_pools/pool_teams,
+        division_games, the standings engine (computes W–L, diff, pool standing),
+        the predictor, venues + directions, the self-serve ingest + directory.
+
+  ADD:
+   a) get_public_tournament_teams(tournamentId) → per division {grade, gender} →
+      teams [{teamKey, name, pool, W–L}]. (Powers Screen 02; reuses the standings
+      compute for pool + record.)
+   b) Team SEARCH (placeholder promises "team") — search teams across the directory.
+   c) PROGRAM grouping key — "all of Legacy Hoopers", and My-Teams "grouped by
+      program" — need a club/program identity for a team (FORK D3).
+   d) Tracked-teams store + kid labels — needs the account (FORK D1). Free-form kid
+      labels per your ruling.
+   e) Stable TEAM key across tournaments (P6) — likely a normalized
+      program+age+gender key from display_name, or an explicit teams table.
+
+================================================================================
+7. FORKS — RULINGS
+================================================================================
+  D1  ACCOUNT MECHANISM — RULED: Google sign-in (Supabase Auth). See §5.
+
+  D4  TRACKING vs MONEY — RULED: super-admin (Frank) free; everyone else $20/mo via
+      Stripe (monthly). Build the entitlement gate now; the Stripe charge is the HELD
+      flip. See §5.
+
+  D5  KID MODEL — RULED: free-form names you create (Rowan, Charlie + a color). A
+      signed-in platform parent later linking to a real roster player = the verified
+      overlay (08), additive.
+
+  D2  ENTRY INTO SCREEN 02 — CC proceeding with render-literal unless Frank objects:
+        tap a tournament → land on a grade with grade + gender toggles in-screen
+        (matches render 02 "Girls · 5th grade" + Girls/Boys toggle).
+
+  D3  "PROGRAM" GROUPING — CC proceeding with parse-from-display_name unless Frank
+        objects: "Legacy Hoopers 11U" → program "Legacy Hoopers" (zero schema, works on
+        scraped data). Powers "+ All <Program>" + My-Teams grouping. Swap to a real
+        club_id later if/when we control team identity.
+
+================================================================================
+7b. THE PRODUCT MODEL — 12 ENHANCEMENTS (RATIFIED 2026-06-26 — "this is the model going forward")
+================================================================================
+  All 12 are IN. They are the model, not a someday list. Each tagged with where it lives
+  and data feasibility (we already scrape schedules, scores, venues, brackets).
+
+  KILLERS (AAU-specific; LeagueApps/TeamSnap don't do these):
+   1. SCHEDULE-CHANGE ALERTS — periodic re-scrape + diff → "Legacy 11U moved up: 12:40
+      Court 2 (was 1:30 Court 4)." Backend (re-scrape+diff+notify). THE headline feature.
+   2. NEXT GAME + TRAVEL TIME — countdown + real drive time (venue lat/lng + Google) +
+      a "Leave by 12:05" nudge. Today/My Teams.
+   3. MULTI-KID / MULTI-TEAM CONFLICT RADAR — overlapping games across tracked teams on a
+      day-timeline so a family can split up. Pure logic over tracked schedule. Today/My Teams.
+
+  HIGH-VALUE:
+   4. BRACKET PATH / "road to the chip" — predictor + bracket tree → "Win Sat → 1-seed;
+      QF vs winner of Pool B, Sun 9am." Standings/predictor (bracket parse may need work).
+   5. AUTO GAME RECAP — final buzzer → "Legacy 11U 52–47, clinched Pool A." Push + My Teams.
+   6. ONE-TAP WEEKEND TO CALENDAR — tracked games → Apple/Google Calendar (ICS), auto-updates
+      when the schedule moves (ties #1). Easy.
+   7. SHARE-TO-FAMILY / MULTI-GUARDIAN — mom+dad+grandma see the same kids/scores; a
+      "Follow Charlie's team" link one-tap onboards extended family. Account layer.
+   8. "WATCHING NOW" + REACTIONS — Realtime presence ping ("14 following · fire") on a live
+      game. Supabase Realtime. Simple.
+
+  KID / FAMILY LAYER (emotional core; some gated):
+   9. KID CARD — name, jersey #, team color: the kid's identity in the app. Free-form (D5).
+   10. AI WEEKEND DIGEST — "Your Saturday in 3 lines…" grounded on real results. Backend + LLM.
+   11. SEASON MILESTONES — "10-game win streak," "first championship." Team-level engagement
+       only (per-kid game stats stay locked); shareable.
+   12. FILM (HELD) — per-kid HLS clips + AI breakdown grounded on the box score. Behind
+       money flip + guardian verification (screens 07/08).
+
+  STRETCH (Frank flagged "push further"): live win-probability tick, coach broadcast
+  messages, concession/parking intel, opponent scouting from scraped record. Parked as
+  candidates, not committed.
+
+  BUILD TARGET for these 12: docs/AAU_TRACKING_HUB_12_FEATURES_RENDER.html (architect,
+  2026-06-26). Each feature rendered as its hero moment. Note its nav shows
+  My Teams / Standings / Alerts / Film — "Alerts" surfaces here as the schedule-change /
+  recap stream; reconcile against the spine's Find/My Teams/Standings/Film when Alerts lands
+  (open: 4 tabs with Find folded into My Teams, or 5 tabs).
+
+================================================================================
+7c. THE PREDICTOR IS MATH (operator-clarified 2026-06-26 — "the predictor is really just math")
+================================================================================
+Frank: "What team beat what team by how much points; you're playing that team; that team is
+gonna play another team — that's how you predict the odds." The predictor is transitive
+margin math, transparent and exact — NOT a black box. Two layers, composed:
+
+  (A) RESULTS → RATINGS. From every final game we have (who beat whom, by how many points).
+      Each team gets a strength rating from its scoring margins, with the margin CAPPED per
+      circuit (e.g. Zero Gravity +20, from circuit_rules) so a blowout can't over-inflate.
+      Opponent-adjusted (a win over a strong team counts more) — a simple iterated power
+      rating (Massey/Colley-style), recomputed as games resolve. Source: get_public_
+      tournament_standings games[] + the circuit cap already in the bundle.
+
+  (B) RATINGS → MATCHUP ODDS. A future/hypothetical game's odds = f(ratingA − ratingB):
+      expected margin = ratingA − ratingB; win probability via a logistic on that gap. This
+      is the head-to-head "odds to beat CT Hoops."
+
+  COMPOSED into the two predictor surfaces:
+   • Standings predictor (Screen 05, BUILT): "% to advance" = EXACT enumeration of remaining
+     pool outcomes (already shipped) — answers "in how many remaining-game combinations do I
+     advance." The margin-rating (B) adds the per-matchup win-probability the render shows
+     ("In control · 82%") and the plain-English conditions ("Beat CT Hoops → clinched").
+   • Road to the chip (feature 04): chain it down the bracket — you play B; B's slot feeds the
+     winner of Pool C; project each slot by ratings; multiply the path to "odds to reach/win
+     the final." Seeds fill in as real games resolve; every step traces to a real result.
+
+  PROVENANCE (locked, per render): "Odds enumerated exactly · wording AI" and "Path exact from
+  the bracket · seeds fill as games resolve." The math is exact and shown; only the sentence
+  wording is AI. No fabricated probabilities — if inputs are missing, the surface says so.
+
+================================================================================
+8. BUILD ORDER (phased; nothing starts until Frank says go)
+================================================================================
+  PHASE A — the spine + the data:
+   A1. Converge Screen 01 to render 01 (flat rows, team in search, live sub-line, tap → 02).
+   A2. get_public_tournament_teams RPC + team SEARCH + program-grouping key (D3).
+   A3. Screen 02 Track — search-first, gender/grade assist-chips, club-grouped, "+ All",
+       multi-select, "Track N selected," team-as-the-unit write.
+   A4. Account/identity: Google sign-in + super-admin-free / paid entitlement gate (Stripe
+       charge HELD) + tracked-teams store + free-form kid labels + #9 kid card.
+   A5. Screen 03 My Teams (grouped-by-program, live) + Screen 04 Today (venue/directions reuse).
+
+  PHASE B — the killers:
+   B1. #1 Schedule-change alerts (re-scrape+diff+notify) — the headline.
+   B2. #2 Next-game + travel time + leave-by · #3 conflict radar.
+   B3. #6 calendar export · #5 auto recap.
+
+  PHASE C — depth + family:
+   C1. #4 bracket path · #10 AI weekend digest.
+   C2. #7 share / multi-guardian · #8 watching-now + reactions · #11 milestones.
+   C3. 05 Standings re-point to tracked division · 06 install sheet.
+
+  PHASE D — held: 07 Film · 08 $20 (behind guardian verification + Frank's money flip).
+       Stretch candidates revisited here.
+
+================================================================================
+9. WHAT'S TRUE RIGHT NOW (so we test from reality)
+================================================================================
+  • Live: self-serve paste→ingest (a parent pastes a TM link, it loads), the public
+    directory (17 tournaments), Standings + predictor (Screen 05), venue/directions
+    plumbing. These are correct and feed the spine above.
+  • Diverged: Screen 01's accordion + division→Standings routing (will converge to
+    render 01). Screens 02, 03, 04, 06, 07, 08 are not built.
+  • Held: ALL building, per Frank, until this design is ratified.
