@@ -163,6 +163,56 @@ export async function searchPublicTeams(query: string): Promise<TeamHit[]> {
   return (data as TeamHit[]) ?? [];
 }
 
+// ─── Discovery search v2: typed { teams, tournaments, divisions }, value-in-row ───
+// teams are FLAT variant rows carrying the authoritative teamKey (resolved_key) + a
+// NON-AUTHORITATIVE programGroup hint the client nests on (see lib/aau/programGroups).
+// record/rating/basis come straight from search_public_aau (same source as standings —
+// no cross-surface divergence). search_public_teams (v1) stays for the legacy callers.
+export interface AauTeamVariant {
+  teamKey: string; name: string;
+  programGroup: string | null;
+  tournamentId: string; tournamentName: string;
+  divisionId: string; divisionName: string;
+  gender: string | null; gradeLabel: string | null; tier: string | null; day: string | null;
+  record: { w: number; l: number };
+  rating: number | null; basis: boolean; isLive: boolean;
+}
+export interface AauTournamentHit {
+  tournamentId: string; name: string; circuit: string | null;
+  startDate: string | null; endDate: string | null; divisionCount: number; isLive: boolean;
+}
+export interface AauDivisionHit {
+  divisionId: string; label: string | null; tournamentName: string; teamCount: number;
+}
+export interface AauSearchResult {
+  teams: AauTeamVariant[]; tournaments: AauTournamentHit[]; divisions: AauDivisionHit[];
+}
+
+const EMPTY_SEARCH: AauSearchResult = { teams: [], tournaments: [], divisions: [] };
+
+/** Typed discovery search. [] sections for queries under 2 chars (never hits the RPC). */
+export async function searchPublicAau(query: string): Promise<AauSearchResult> {
+  const q = query.trim();
+  if (q.length < 2) return EMPTY_SEARCH;
+  const { data, error } = await aster.rpc("search_public_aau", { p_query: q });
+  if (error) throw error;
+  return (data as AauSearchResult) ?? EMPTY_SEARCH;
+}
+
+// ─── Live-now strip (front door). Realtime tick is TECH-1 (deferred); this reads on load. ───
+export interface LiveNowGame {
+  gameId: string; startAt: string | null;
+  homeName: string; awayName: string;
+  homeScore: number | null; awayScore: number | null;
+  divisionLabel: string | null; tournamentName: string;
+}
+/** Currently-live public games (most-recent first). [] when nothing is live. */
+export async function getPublicLiveNow(limit = 12): Promise<LiveNowGame[]> {
+  const { data, error } = await aster.rpc("get_public_live_now", { p_limit: limit });
+  if (error) throw error;
+  return (data as LiveNowGame[]) ?? [];
+}
+
 // ─── Screen 02 "Track one or many": a tournament's teams by division ───
 export interface TrackTeam {
   id: string; name: string; pool: string | null;
