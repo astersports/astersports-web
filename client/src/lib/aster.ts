@@ -267,6 +267,27 @@ export async function getTrackedTeamSchedule(teamIds: string[]): Promise<TeamGam
   return (data as TeamGame[]) ?? [];
 }
 
+// ─── Tournament Detail scoreboard (one page for a whole tournament) ───
+export interface TournamentGameVenue { name: string | null; city: string | null; state: string | null }
+export interface TournamentGame {
+  gameId: string;
+  divisionId: string; divisionName: string;
+  gender: "M" | "F" | "Coed" | null; gradeLabel: string | null; tier: string | null;
+  startAt: string | null; court: string | null;
+  status: "scheduled" | "live" | "final";
+  home: string; homeScore: number | null;
+  away: string; awayScore: number | null;
+  venue: TournamentGameVenue | null;
+}
+
+/** Every game in a public tournament (display names + scores + court + venue + status),
+ *  ordered by start time. Plane A read; [] when the tournament is empty/non-public. */
+export async function getTournamentGames(tournamentId: string): Promise<TournamentGame[]> {
+  const { data, error } = await aster.rpc("get_public_tournament_games", { p_tournament_id: tournamentId });
+  if (error) throw error;
+  return (data as TournamentGame[]) ?? [];
+}
+
 // ─── Self-serve paste-to-track (Screen 01) ───
 // A parent pastes a TourneyMachine link; the public aau-submit-tournament edge function
 // resolves it, scrapes server-side (the ingest_secret never leaves the server), and the
