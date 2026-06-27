@@ -140,9 +140,11 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
     onTracked(chosen.length);
   };
 
+  // extra bottom room when the sticky Track bar is up (incl. iOS safe area), so the
+  // last rows stay tappable
+  const bottomPad = sel.size > 0 ? "pb-[calc(176px+env(safe-area-inset-bottom))]" : "pb-24";
   return (
-    // extra bottom room when the sticky Track bar is up, so the last rows stay tappable
-    <div className={`as-fade-in ${sel.size > 0 ? "pb-[176px]" : "pb-24"}`}>
+    <div className={`as-fade-in ${bottomPad}`}>
       <button
         type="button"
         onClick={onBack}
