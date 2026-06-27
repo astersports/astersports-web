@@ -130,7 +130,14 @@ export default function AAUBasketball() {
               onTracked={handleTracked}
             />
           ) : (
-            <FindDiscovery onOpenTournament={(t) => setTrackTournament(t)} />
+            <FindDiscovery
+              onOpenTournament={(t) => {
+                // opening a tournament IS navigation into the Track flow — mark it so a late
+                // useHubAuth() resolve can't yank the visitor out to My Teams (Copilot #152).
+                navigated.current = true;
+                setTrackTournament(t);
+              }}
+            />
           ))}
         {activeSection === "myteams" && <MyTeams />}
         {activeSection === "standings" && <StandingsHub />}
