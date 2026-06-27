@@ -36,7 +36,7 @@ export default function FrontDoor({ dir, onOpen, onBrowseAll, onAddTournament }:
   // door (North Star §5). File-upload / enter-by-hand are honest pre-gate (not wired) — they say so
   // rather than pretend; the paste path is the working ingress today.
   const addTournament = (
-    <div className="mx-[18px] mt-[16px] rounded-[14px] p-[13px]" style={{ border: `1px dashed ${C.hair2}`, background: "linear-gradient(160deg,rgba(224,99,28,.05),#121a2e)" }}>
+    <div className="mx-[18px] mt-[16px] rounded-[14px] p-[13px]" style={{ border: `1px dashed ${C.hair2}`, background: "linear-gradient(160deg,rgba(224,99,28,.05),#FFFFFF)" }}>
       <div className="flex items-center justify-between gap-2">
         <div className="font-[var(--font-display)] text-[13.5px] font-bold" style={{ color: C.ink }}>Don&apos;t see your tournament?</div>
         <span className="shrink-0 rounded-[6px] px-[7px] py-[2px] font-[var(--font-mono)] text-[9px] font-bold tracking-[0.06em]" style={{ color: C.g3, border: "1px solid rgba(246,204,85,.35)", background: "rgba(246,204,85,.08)" }}>PLUS</span>
@@ -76,11 +76,11 @@ export default function FrontDoor({ dir, onOpen, onBrowseAll, onAddTournament }:
       {dir === null ? (
         <div className="space-y-[10px] px-[18px]">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-[60px] animate-pulse rounded-[13px]" style={{ border: `1px solid ${C.hair}`, background: "rgba(16,20,31,.6)" }} />
+            <div key={i} className="h-[60px] animate-pulse rounded-[13px]" style={{ border: `1px solid ${C.hair}`, background: "rgba(0,0,0,0.04)" }} />
           ))}
         </div>
       ) : liveUpcoming.length === 0 ? (
-        <div className="mx-[18px] rounded-[13px] p-6 text-center text-[12px]" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#151b29,#10141f)", color: C.mut }}>
+        <div className="mx-[18px] rounded-[13px] p-6 text-center text-[12px]" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#F9FAFB,#FFFFFF)", color: C.mut }}>
           Nothing live or upcoming on the board right now — browse past tournaments or paste a link to add one.
         </div>
       ) : (
@@ -94,7 +94,7 @@ export default function FrontDoor({ dir, onOpen, onBrowseAll, onAddTournament }:
           >
             <span
               className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-[11px] font-[var(--font-display)] text-[15px] font-bold"
-              style={{ background: "rgba(232,144,42,.13)", color: C.g3, border: "1px solid #5a4a25" }}
+              style={{ background: "rgba(232,144,42,.13)", color: C.g3, border: "1px solid #E2C98A" }}
               aria-hidden
             >
               {initials(t.name)}

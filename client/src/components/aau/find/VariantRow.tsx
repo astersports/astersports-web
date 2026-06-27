@@ -62,7 +62,7 @@ export default function VariantRow({
                 c.kind === "g"
                   ? { color: "#e7b6c8", borderColor: "#4a2f3a" }
                   : c.kind === "tier"
-                    ? { color: C.g3, borderColor: "#5a4a25" }
+                    ? { color: C.g3, borderColor: "#E2C98A" }
                     : { color: C.dim, borderColor: C.line }
               }
             >

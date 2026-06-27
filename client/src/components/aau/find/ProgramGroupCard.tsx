@@ -29,7 +29,7 @@ function GroupBlock({
         {/* pinned program header (render .proghead) — "Track all of [club]" bulk action */}
         <div
           className="mx-[18px] mt-[10px] flex items-center justify-between rounded-[13px] px-[13px] py-[11px]"
-          style={{ border: "1px solid rgba(246,204,85,.34)", background: "radial-gradient(160px 70px at 12% 0,rgba(246,204,85,.08),transparent),linear-gradient(180deg,#151b29,#10141f)" }}
+          style={{ border: "1px solid rgba(246,204,85,.34)", background: "radial-gradient(160px 70px at 12% 0,rgba(246,204,85,.08),transparent),linear-gradient(180deg,#F9FAFB,#FFFFFF)" }}
         >
           <span className="min-w-0">
             <span className="block truncate font-[var(--font-display)] text-[14px] font-bold" style={{ color: C.ink }}>
@@ -88,7 +88,7 @@ export default function TeamsResults({
     <section className="mt-[6px]" aria-label="Team results">
       <div
         className="flex items-center justify-between px-[18px] pb-[6px] pt-[9px] font-[var(--font-mono)] text-[10px] uppercase tracking-[0.08em]"
-        style={{ color: "#cdb98c" }}
+        style={{ color: "#8F6708" }}
       >
         <span>Teams</span>
         <span style={{ color: C.mut }}>{countLabel}</span>

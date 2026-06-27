@@ -55,16 +55,37 @@ export default function AAUBasketball() {
     }
   }, [user]);
 
-  // Aster AAU wears the house GOLD accent; override the team tokens at the root so
-  // every sub-component inherits gold. Page bg is the repo's dark surface.
+  // LIGHT MODE (operator-directed 2026-06-27, one-way). The repo's base --as-* tokens are DARK
+  // (--as-bg-page #0F1119); the AAU hub is light, so override the full --as-* set to the Aster
+  // Sports light brand at the hub root — every var(--as-*) inside the hub resolves light. Gold stays
+  // the house accent (darkened to #8F6708 so gold text passes AA on white).
   const goldTheme = {
     minHeight: "100vh",
     paddingBottom: "calc(64px + env(safe-area-inset-bottom))",
-    backgroundColor: "var(--as-bg-page)",
-    "--as-team-primary": "#F6CC55",
-    "--as-team-primary-soft": "rgba(246,204,85,0.12)",
-    "--as-accent": "#E8902A",
-    "--as-accent-soft": "rgba(232,144,42,0.12)",
+    backgroundColor: "#F7F8FA",
+    "--as-bg-page": "#F7F8FA",
+    "--as-bg-card": "#FFFFFF",
+    "--as-bg-card-hover": "#F9FAFB",
+    "--as-bg-secondary": "#F1F3F5",
+    "--as-bg-tertiary": "#E9ECEF",
+    "--as-text-primary": "#1A1D23",
+    "--as-text-secondary": "#4A5568",
+    "--as-text-tertiary": "#6B7280",
+    "--as-text-inverse": "#FFFFFF",
+    "--as-border-default": "#E2E8F0",
+    "--as-border-subtle": "#EDF2F7",
+    "--as-success": "#16A34A",
+    "--as-danger": "#DC2626",
+    "--as-neutral": "#9CA3AF",
+    "--as-neutral-soft": "#F3F4F6",
+    "--as-live": "#16A34A",
+    "--as-live-soft": "#DCFCE7",
+    "--as-gold-soft": "#FBF3DC",
+    "--as-shadow-sm": "0 1px 2px rgba(0,0,0,0.04)",
+    "--as-team-primary": "#8F6708",
+    "--as-team-primary-soft": "rgba(246,204,85,0.14)",
+    "--as-accent": "#C9952E",
+    "--as-accent-soft": "rgba(201,149,46,0.12)",
   } as React.CSSProperties;
 
   const handleTracked = (count: number) => {
@@ -85,7 +106,7 @@ export default function AAUBasketball() {
           top: 0,
           zIndex: 30,
           paddingTop: "env(safe-area-inset-top)",
-          background: "rgba(8,11,20,0.95)",
+          background: "rgba(255,255,255,0.92)",
           backdropFilter: "blur(12px)",
           borderBottom: "1px solid var(--as-border-default)",
         }}
@@ -206,7 +227,7 @@ export default function AAUBasketball() {
           display: "flex",
           justifyContent: "space-around",
           padding: "8px 6px calc(8px + env(safe-area-inset-bottom))",
-          background: "rgba(8,11,20,0.92)",
+          background: "rgba(255,255,255,0.92)",
           backdropFilter: "blur(12px)",
           borderTop: "1px solid var(--as-border-default)",
         }}

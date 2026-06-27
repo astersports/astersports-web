@@ -49,13 +49,13 @@ function GameCard({ g, multiDay }: { g: TournamentGame; multiDay: boolean }) {
   );
 
   return (
-    <div className="mb-[9px] rounded-[14px] p-[11px_12px]" style={{ border: `1px solid ${live ? "rgba(52,224,164,.28)" : C.hair}`, background: live ? "linear-gradient(160deg,rgba(52,224,164,.05),#121a2e)" : "#121a2e" }}>
+    <div className="mb-[9px] rounded-[14px] p-[11px_12px]" style={{ border: `1px solid ${live ? "rgba(52,224,164,.28)" : C.hair}`, background: live ? "linear-gradient(160deg,rgba(52,224,164,.05),#FFFFFF)" : "#FFFFFF" }}>
       <div className="mb-[9px] flex items-center justify-between gap-2">
         <span className="inline-flex items-center gap-[6px] font-[var(--font-mono)] text-[10px] font-bold tracking-[0.06em]" style={{ color: live ? C.live : final ? C.mut : "#ffb648" }}>
           {live && <span className="as-pulse inline-block h-[6px] w-[6px] rounded-full" style={{ background: C.live, boxShadow: `0 0 6px ${C.live}` }} aria-hidden />}
           {live ? "LIVE" : final ? "FINAL" : upcomingLabel(g.startAt, multiDay)}
         </span>
-        <span className="shrink-0 truncate font-[var(--font-mono)] text-[9.5px]" style={{ color: C.mut, border: `1px solid ${C.hair}`, background: "rgba(255,255,255,.04)", padding: "2px 7px", borderRadius: 6 }}>{g.divisionName}</span>
+        <span className="shrink-0 truncate font-[var(--font-mono)] text-[9.5px]" style={{ color: C.mut, border: `1px solid ${C.hair}`, background: "rgba(0,0,0,0.04)", padding: "2px 7px", borderRadius: 6 }}>{g.divisionName}</span>
       </div>
       {teamRow(g.away, g.awayScore, awayWon, homeWon)}
       {teamRow(g.home, g.homeScore, homeWon, awayWon)}
@@ -128,7 +128,7 @@ export default function TournamentDetail({ tournament, onBack, onTrack }: { tour
       </button>
 
       {/* tournament header */}
-      <div className="rounded-[18px] p-[15px]" style={{ border: `1px solid ${C.hair2}`, background: "linear-gradient(160deg,#16203a,#121a2e)" }}>
+      <div className="rounded-[18px] p-[15px]" style={{ border: `1px solid ${C.hair2}`, background: "linear-gradient(160deg,#F1F3F5,#FFFFFF)" }}>
         {tournament.circuit && (
           <div className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.06em]" style={{ color: C.g3 }}>{tournament.circuit}</div>
         )}
@@ -140,7 +140,7 @@ export default function TournamentDetail({ tournament, onBack, onTrack }: { tour
             </span>
           )}
           {[fmtRange(tournament.start_date, tournament.end_date), tournament.states.length ? tournament.states.join("/") : null, `${tournament.divisions.length} divisions`, games ? `${all.length} games` : null].filter(Boolean).map((t) => (
-            <span key={t as string} className="rounded-[7px] px-2 py-[3px] text-[10.5px] font-semibold" style={{ color: C.dim, border: `1px solid ${C.hair}`, background: "rgba(255,255,255,.06)" }}>{t}</span>
+            <span key={t as string} className="rounded-[7px] px-2 py-[3px] text-[10.5px] font-semibold" style={{ color: C.dim, border: `1px solid ${C.hair}`, background: "rgba(0,0,0,0.04)" }}>{t}</span>
           ))}
         </div>
         <button type="button" onClick={onTrack} className="as-press mt-[13px] flex min-h-[44px] w-full items-center justify-center gap-[7px] rounded-[11px] text-[13px] font-bold" style={{ background: C.grad, color: "#1a1206" }}>
@@ -158,12 +158,12 @@ export default function TournamentDetail({ tournament, onBack, onTrack }: { tour
       </div>
 
       {error && (
-        <div className="mt-4 rounded-[15px] p-6 text-center text-[12px]" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#151b29,#10141f)", color: C.mut }}>
+        <div className="mt-4 rounded-[15px] p-6 text-center text-[12px]" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#F9FAFB,#FFFFFF)", color: C.mut }}>
           Couldn&apos;t reach the scoreboard. Try again in a moment.
         </div>
       )}
       {!games && !error && (
-        <div className="mt-4 space-y-[9px]">{[0, 1, 2].map((i) => <div key={i} className="h-[78px] animate-pulse rounded-[14px]" style={{ border: `1px solid ${C.hair}`, background: "rgba(16,20,31,.6)" }} />)}</div>
+        <div className="mt-4 space-y-[9px]">{[0, 1, 2].map((i) => <div key={i} className="h-[78px] animate-pulse rounded-[14px]" style={{ border: `1px solid ${C.hair}`, background: "rgba(0,0,0,0.04)" }} />)}</div>
       )}
 
       {/* SCOREBOARD tab */}
@@ -174,7 +174,7 @@ export default function TournamentDetail({ tournament, onBack, onTrack }: { tour
               {[{ id: null as string | null, name: "All" }, ...tournament.divisions.map((d) => ({ id: d.id, name: d.name }))].map((d) => {
                 const on = divFilter === d.id;
                 return (
-                  <button key={d.id ?? "all"} type="button" onClick={() => setDivFilter(d.id)} className="as-press shrink-0 rounded-full px-[11px] py-[6px] text-[11px] font-semibold" style={{ color: on ? C.g3 : C.dim, border: `1px solid ${on ? "rgba(246,204,85,.4)" : C.hair2}`, background: on ? "rgba(246,204,85,.07)" : "#121a2e" }}>
+                  <button key={d.id ?? "all"} type="button" onClick={() => setDivFilter(d.id)} className="as-press shrink-0 rounded-full px-[11px] py-[6px] text-[11px] font-semibold" style={{ color: on ? C.g3 : C.dim, border: `1px solid ${on ? "rgba(246,204,85,.4)" : C.hair2}`, background: on ? "rgba(246,204,85,.07)" : "#FFFFFF" }}>
                     {d.name}
                   </button>
                 );
@@ -187,7 +187,7 @@ export default function TournamentDetail({ tournament, onBack, onTrack }: { tour
           {upcoming.length > 0 && <><Zone label="Upcoming" count="next tip" />{upcoming.map((g) => <GameCard key={g.gameId} g={g} multiDay={multiDay} />)}</>}
 
           {filtered.length === 0 && (
-            <div className="mt-4 rounded-[15px] p-8 text-center" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#151b29,#10141f)" }}>
+            <div className="mt-4 rounded-[15px] p-8 text-center" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#F9FAFB,#FFFFFF)" }}>
               <Trophy className="mx-auto mb-3 h-7 w-7" style={{ color: C.mut }} />
               <div className="text-[13px] font-semibold" style={{ color: C.ink }}>{all.length === 0 ? "Schedule not posted yet" : "No games in this division"}</div>
               <div className="mt-1 text-[12px]" style={{ color: C.mut }}>{all.length === 0 ? "Games appear here once the bracket is released." : "Pick another division or All."}</div>
@@ -200,7 +200,7 @@ export default function TournamentDetail({ tournament, onBack, onTrack }: { tour
       {games && tab === "divisions" && (
         <div className="mt-2">
           {tournament.divisions.map((d) => (
-            <button key={d.id} type="button" onClick={() => setDivision(d)} className="as-press mb-[9px] flex w-full items-center gap-[11px] rounded-[14px] p-[12px] text-left" style={{ border: `1px solid ${C.hair}`, background: "#121a2e" }}>
+            <button key={d.id} type="button" onClick={() => setDivision(d)} className="as-press mb-[9px] flex w-full items-center gap-[11px] rounded-[14px] p-[12px] text-left" style={{ border: `1px solid ${C.hair}`, background: "#FFFFFF" }}>
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-[var(--font-display)] text-[14px] font-semibold" style={{ color: C.ink }}>{d.name}</span>
                 <span className="mt-[3px] block font-[var(--font-mono)] text-[11px]" style={{ color: C.mut }}>

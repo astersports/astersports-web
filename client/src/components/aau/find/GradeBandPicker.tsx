@@ -68,7 +68,7 @@ export default function GradeBandPicker({
                 })
               }
               className="as-press flex w-full items-center gap-[10px] px-[18px] py-[12px] text-left font-[var(--font-mono)] text-[10px] uppercase tracking-[0.1em]"
-              style={{ color: isOpen ? "#cdb98c" : C.mut }}
+              style={{ color: isOpen ? "#8F6708" : C.mut }}
             >
               <ChevronDown className="h-[10px] w-[10px] transition-transform" style={{ color: isOpen ? C.g3 : C.mut, transform: isOpen ? "none" : "rotate(-90deg)" }} />
               {b.label} · {b.sub}

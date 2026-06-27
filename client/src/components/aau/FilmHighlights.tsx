@@ -30,7 +30,7 @@ export default function FilmHighlights() {
   return (
     <div className="as-fade-in">
       <SectionHeading eyebrow="Film Room" title="Film" ghostText="FILM" />
-      <div className="mx-[18px] mt-4 rounded-[16px] p-8 text-center" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#151b29,#10141f)" }}>
+      <div className="mx-[18px] mt-4 rounded-[16px] p-8 text-center" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#F9FAFB,#FFFFFF)" }}>
         <div className="text-[13px] font-semibold" style={{ color: C.ink }}>No reels yet</div>
         <div className="mx-auto mt-1.5 max-w-[280px] text-[12px] leading-[1.5]" style={{ color: C.mut }}>
           Your verified film loads here once the film room is connected — reels are served per child, never embedded in the app.

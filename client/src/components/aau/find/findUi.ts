@@ -4,24 +4,27 @@
 // render's :root and the existing FindDiscovery inline tokens — not platform --as-* tokens
 // (the AAU hub wears its own dark palette).
 
+// LIGHT MODE (operator-directed 2026-06-27, one-way) — aligned to the Aster Sports light brand:
+// cool-gray/white surfaces, dark text ranks, gold + cobalt accents, semantic status colors. Keys
+// are unchanged so every consumer flips automatically; values map each token to its light role.
 export const C = {
-  bg: "#070a11",
-  s1: "#10141f",
-  s2: "#151b29",
-  s3: "#1b2233",
-  ink: "#f0f3fa",
-  dim: "#9aa4ba",
-  mut: "#5f6981",
-  faint: "#454e63",
-  line: "#212939",
-  hair: "rgba(255,255,255,0.055)",
-  hair2: "rgba(255,255,255,0.09)",
-  g2: "#E8902A",
-  g3: "#F6CC55",
-  live: "#34e0a4",
-  pos: "#5ecb8f",
-  cobalt: "#5fa0e6",
-  grad: "linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)",
+  bg: "#F7F8FA",                 // page surface
+  s1: "#FFFFFF",                 // card
+  s2: "#FFFFFF",                 // raised card
+  s3: "#F1F3F5",                 // secondary surface
+  ink: "#1A1D23",                // primary text
+  dim: "#4A5568",                // secondary text
+  mut: "#6B7280",                // muted text (AA on white)
+  faint: "#9CA3AF",              // faint text / icons / dividers
+  line: "#E2E8F0",               // border
+  hair: "rgba(0,0,0,0.06)",      // hairline
+  hair2: "rgba(0,0,0,0.10)",     // hairline (stronger)
+  g2: "#C9952E",                 // gold accent (fills / borders)
+  g3: "#8F6708",                 // gold TEXT (AA on white) — was bright #F6CC55 on dark
+  live: "#16A34A",               // live / success (reads on white)
+  pos: "#16A34A",                // positive
+  cobalt: "#2563eb",             // info / cobalt (AA)
+  grad: "linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)", // gold gradient (dark text on it)
 } as const;
 
 /** First 1–2 initials for a row avatar/badge (program/tournament/division glyph). */

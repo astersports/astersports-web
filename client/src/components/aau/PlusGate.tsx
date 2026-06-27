@@ -23,12 +23,12 @@ export default function PlusGate({ onClose }: { onClose: () => void }) {
   return (
     <div
       className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center"
-      style={{ background: "rgba(8,11,20,.72)", backdropFilter: "blur(8px)" }}
+      style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(8px)" }}
       onClick={onClose}
     >
       <div
         className="as-fade-in w-full max-w-[440px] rounded-t-[22px] p-[18px] sm:rounded-[22px]"
-        style={{ border: "1px solid rgba(246,204,85,.3)", background: "linear-gradient(165deg,rgba(246,204,85,.08),#0d1322 60%)", boxShadow: "0 -10px 50px -20px rgba(0,0,0,.8)" }}
+        style={{ border: "1px solid rgba(246,204,85,.3)", background: "linear-gradient(165deg,rgba(246,204,85,.08),#FFFFFF 60%)", boxShadow: "0 -10px 50px -20px rgba(0,0,0,.8)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between">

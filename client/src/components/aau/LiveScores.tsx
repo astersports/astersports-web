@@ -34,14 +34,14 @@ function LiveRow({ g }: { g: LiveNowGame }) {
     </div>
   );
   return (
-    <div className="mb-[9px] rounded-[14px] p-[11px_12px]" style={{ border: "1px solid rgba(52,224,164,.28)", background: "linear-gradient(160deg,rgba(52,224,164,.05),#121a2e)" }}>
+    <div className="mb-[9px] rounded-[14px] p-[11px_12px]" style={{ border: "1px solid rgba(52,224,164,.28)", background: "linear-gradient(160deg,rgba(52,224,164,.05),#FFFFFF)" }}>
       <div className="mb-[9px] flex items-center justify-between gap-2">
         <span className="inline-flex items-center gap-[6px] font-[var(--font-mono)] text-[10px] font-bold tracking-[0.06em]" style={{ color: C.live }}>
           <span className="as-pulse inline-block h-[6px] w-[6px] rounded-full" style={{ background: C.live, boxShadow: `0 0 6px ${C.live}` }} aria-hidden /> LIVE
           {g.startAt && <span style={{ color: C.mut }}>· {timeET(g.startAt)}</span>}
           {!lit && <span style={{ color: C.mut }}>· score pending</span>}
         </span>
-        <span className="shrink-0 truncate font-[var(--font-mono)] text-[9.5px]" style={{ color: C.mut, border: `1px solid ${C.hair}`, background: "rgba(255,255,255,.04)", padding: "2px 7px", borderRadius: 6 }}>
+        <span className="shrink-0 truncate font-[var(--font-mono)] text-[9.5px]" style={{ color: C.mut, border: `1px solid ${C.hair}`, background: "rgba(0,0,0,0.04)", padding: "2px 7px", borderRadius: 6 }}>
           {[g.divisionLabel, g.tournamentName].filter(Boolean).join(" · ")}
         </span>
       </div>
@@ -69,23 +69,23 @@ export default function LiveScores() {
   return (
     <div className="as-fade-in">
       <div className="px-[18px] pt-[8px]">
-        <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em]" style={{ color: "#cdb98c" }}>Happening now</div>
+        <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em]" style={{ color: "#8F6708" }}>Happening now</div>
         <h2 className="mt-1 font-[var(--font-display)] text-[23px] font-bold tracking-[-0.3px]" style={{ color: C.ink }}>Live scores</h2>
         <div className="mt-[5px] text-[12.5px]" style={{ color: C.dim }}>Every public game in progress, refreshing live.</div>
       </div>
 
       <div className="mt-[16px] px-[18px]">
         {error && (
-          <div className="rounded-[15px] p-6 text-center text-[12px]" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#151b29,#10141f)", color: C.mut }}>
+          <div className="rounded-[15px] p-6 text-center text-[12px]" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#F9FAFB,#FFFFFF)", color: C.mut }}>
             Couldn&apos;t reach live scores. Try again in a moment.
           </div>
         )}
         {!games && !error && (
-          <div className="space-y-[9px]">{[0, 1, 2].map((i) => <div key={i} className="h-[74px] animate-pulse rounded-[14px]" style={{ border: `1px solid ${C.hair}`, background: "rgba(16,20,31,.6)" }} />)}</div>
+          <div className="space-y-[9px]">{[0, 1, 2].map((i) => <div key={i} className="h-[74px] animate-pulse rounded-[14px]" style={{ border: `1px solid ${C.hair}`, background: "rgba(0,0,0,0.04)" }} />)}</div>
         )}
         {games && games.length > 0 && games.map((g) => <LiveRow key={g.gameId} g={g} />)}
         {games && games.length === 0 && !error && (
-          <div className="rounded-[15px] p-8 text-center" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#151b29,#10141f)" }}>
+          <div className="rounded-[15px] p-8 text-center" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#F9FAFB,#FFFFFF)" }}>
             <Radio className="mx-auto mb-3 h-7 w-7" style={{ color: C.mut }} />
             <div className="text-[13px] font-semibold" style={{ color: C.ink }}>No games are live right now</div>
             <div className="mt-1 text-[12px]" style={{ color: C.mut }}>Check <span style={{ color: C.g3 }}>Find</span> for what&apos;s live &amp; upcoming this weekend.</div>

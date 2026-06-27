@@ -216,7 +216,7 @@ export default function FindDiscovery({ onOpenTournament }: { onOpenTournament: 
       {/* header — varies by mode but the search box stays mounted in search mode */}
       {mode === "search" && term.length < 2 && (
         <div className="px-[18px] pt-[8px]">
-          <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em]" style={{ color: "#cdb98c" }}>
+          <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em]" style={{ color: "#8F6708" }}>
             Find your team
           </div>
           <h2 className="mt-1 font-[var(--font-display)] text-[23px] font-bold tracking-[-0.3px]" style={{ color: C.ink }}>
@@ -233,7 +233,7 @@ export default function FindDiscovery({ onOpenTournament }: { onOpenTournament: 
         <div
           className="mx-[18px] mt-[14px] flex items-center gap-[10px] rounded-[15px] px-[15px] py-[14px]"
           style={{
-            background: "linear-gradient(180deg,#1b2233,#10141f)",
+            background: "linear-gradient(180deg,#F1F3F5,#FFFFFF)",
             border: focused || term ? "1px solid rgba(246,204,85,.4)" : `1px solid ${C.hair2}`,
             boxShadow: focused || term ? "0 0 0 3px rgba(246,204,85,.08),0 10px 30px -16px rgba(0,0,0,.6)" : "0 10px 30px -16px rgba(0,0,0,.6)",
           }}
@@ -268,13 +268,13 @@ export default function FindDiscovery({ onOpenTournament }: { onOpenTournament: 
       {mode === "browse" &&
         (dir === null ? (
           dirError ? (
-            <div className="mx-[18px] mt-4 rounded-[15px] p-6 text-center text-[12px]" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#151b29,#10141f)", color: C.mut }}>
+            <div className="mx-[18px] mt-4 rounded-[15px] p-6 text-center text-[12px]" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#F9FAFB,#FFFFFF)", color: C.mut }}>
               Couldn&apos;t reach the directory. Try again in a moment.
             </div>
           ) : (
             <div className="space-y-[10px] px-[18px] pt-4">
               {[0, 1, 2].map((i) => (
-                <div key={i} className="h-[60px] animate-pulse rounded-[13px]" style={{ border: `1px solid ${C.hair}`, background: "rgba(16,20,31,.6)" }} />
+                <div key={i} className="h-[60px] animate-pulse rounded-[13px]" style={{ border: `1px solid ${C.hair}`, background: "rgba(0,0,0,0.04)" }} />
               ))}
             </div>
           )
@@ -289,7 +289,7 @@ export default function FindDiscovery({ onOpenTournament }: { onOpenTournament: 
       {isSearchMode && searching && !results && (
         <div className="space-y-[10px] px-[18px] pt-4" aria-live="polite">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-[56px] animate-pulse rounded-[13px]" style={{ border: `1px solid ${C.hair}`, background: "rgba(16,20,31,.6)" }} />
+            <div key={i} className="h-[56px] animate-pulse rounded-[13px]" style={{ border: `1px solid ${C.hair}`, background: "rgba(0,0,0,0.04)" }} />
           ))}
         </div>
       )}

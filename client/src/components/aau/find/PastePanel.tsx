@@ -39,7 +39,7 @@ export default function PastePanel({
   return (
     <div className="as-fade-in">
       <div className="px-[18px] pt-[8px]">
-        <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em]" style={{ color: "#cdb98c" }}>
+        <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em]" style={{ color: "#8F6708" }}>
           Got a link?
         </div>
         <h2 className="mt-1 font-[var(--font-display)] text-[23px] font-bold tracking-[-0.3px]" style={{ color: C.ink }}>
@@ -52,7 +52,7 @@ export default function PastePanel({
         className="mx-[18px] mt-[14px] flex items-center gap-[10px] rounded-[14px] p-[13px_14px]"
         style={{
           border: "1px solid rgba(246,204,85,.34)",
-          background: "radial-gradient(180px 80px at 12% 0,rgba(246,204,85,.08),transparent),linear-gradient(180deg,#151b29,#10141f)",
+          background: "radial-gradient(180px 80px at 12% 0,rgba(246,204,85,.08),transparent),linear-gradient(180deg,#F9FAFB,#FFFFFF)",
         }}
       >
         <Link2 className="h-[16px] w-[16px] shrink-0" style={{ color: C.g3 }} />
@@ -86,7 +86,7 @@ export default function PastePanel({
       {working && (
         <div
           className="mx-[18px] mt-[13px] rounded-[14px] p-[14px]"
-          style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#151b29,#10141f)" }}
+          style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#F9FAFB,#FFFFFF)" }}
           aria-live="polite"
         >
           <div className="flex items-center gap-[9px] font-[var(--font-display)] text-[14px] font-semibold" style={{ color: C.ink }}>
