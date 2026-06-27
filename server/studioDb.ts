@@ -11,6 +11,7 @@ import {
   tenants,
   memberships,
   creditLedger,
+  tenantDomains,
   jobs,
   jobVariations,
   jobFavorites,
@@ -234,6 +235,7 @@ export async function deleteTenantCascade(tenantId: number): Promise<void> {
   if (!db) return;
   await db.delete(memberships).where(eq(memberships.tenantId, tenantId));
   await db.delete(creditLedger).where(eq(creditLedger.tenantId, tenantId));
+  await db.delete(tenantDomains).where(eq(tenantDomains.tenantId, tenantId));
   await db.delete(tenants).where(eq(tenants.id, tenantId));
 }
 
