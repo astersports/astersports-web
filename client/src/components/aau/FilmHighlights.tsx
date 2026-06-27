@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Film, Play, Trophy, Clock, Maximize2, X } from "lucide-react";
 import SectionHeading from "./SectionHeading";
 import FilmAiReviewGate from "./FilmAiReviewGate";
+import { canAccessChild } from "@/lib/aau/entitlement";
 
 // ─── Featured Video ──────────────────────────────────────────────────────────
 // "Birdie Buckets" — Finals highlight reel (video/mp4, ~126 MB). Streamed from
@@ -41,6 +42,18 @@ const TOURNAMENT_INFO = {
 export default function FilmHighlights() {
   const [playing, setPlaying] = useState(false);
   const [expanded, setExpanded] = useState(false);
+
+  // Child-data gate (North Star §6 #3 / build-review P1-B): film involves minors, so until a viewer
+  // is a verified, entitled, consented guardian, NO named minor or reel is shown — only the locked
+  // pre-gate state. canAccessChild() is owner-applied (false until wired); auto mode never opens it.
+  if (!canAccessChild()) {
+    return (
+      <div className="as-fade-in">
+        <SectionHeading eyebrow="Film Room" title="Film" ghostText="FILM" />
+        <FilmAiReviewGate />
+      </div>
+    );
+  }
 
   return (
     <div className="as-fade-in">

@@ -16,13 +16,14 @@ import { addLeaveReminder } from "@/lib/aau/calendar";
 // is upcoming. No fabrication — drive/weather/leave-by each render only when their real
 // source resolves; "Remind me" appears only once a leave-by time exists.
 
-/** One short, honest weather nudge from the game-time forecast. */
-function weatherAdvice(w: EventWeather): string {
+/** One short, honest weather nudge — null when there's nothing to add beyond the condition itself,
+ *  so the caller never renders "overcast — overcast" (the descriptor was duplicating). */
+function weatherAdvice(w: EventWeather): string | null {
   if (w.isSevereWarning) return "severe weather — check before you go";
   if (w.isRainWarning) return "rain likely — bring an umbrella";
   if (w.temperature >= 85) return "bring water + shade";
   if (w.temperature <= 38) return "bundle up — it's cold";
-  return w.description.toLowerCase();
+  return null;
 }
 
 export default function NextGame({ games }: { games: TeamGame[] }) {
@@ -108,7 +109,7 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
             {weather && (
               <div className="flex items-center gap-1.5 text-[11.5px] text-[#9aa4ba]">
                 <ColorfulWeatherIcon icon={weather.icon} isDay={weather.isDay} className="h-[14px] w-[14px]" />
-                {Math.round(weather.temperature)}°F & {weather.description.toLowerCase()} — {weatherAdvice(weather)}
+                {Math.round(weather.temperature)}°F · {weather.description.toLowerCase()}{weatherAdvice(weather) ? ` — ${weatherAdvice(weather)}` : ""}
               </div>
             )}
           </div>

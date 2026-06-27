@@ -1,28 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { Users, X, Trophy, ChevronRight } from "lucide-react";
 import { getTracked, untrack, TRACKED_EVENT, type TrackedTeam } from "@/lib/aau/trackingStore";
-import { getTrackedTeamSchedule, getTournamentStandings, type TeamGame } from "@/lib/aster";
+import { getTrackedTeamSchedule, type TeamGame } from "@/lib/aster";
 import { buildMyTeamsModel, type MyTeamsModel } from "@/lib/aau/myTeamsModel";
-import { predictBracket } from "@/lib/standings/predictBracket";
-import { effectiveRatings } from "@/lib/aau/gradePrior";
 import ConflictRadar from "./ConflictRadar";
 import NextGame from "./NextGame";
 import TeamDetail from "./TeamDetail";
 import HomeGatedSections from "./HomeGatedSections";
 
-// Screen 03 "My Teams · command center" — render-faithful. Header + "updating live" (only
-// when a tracked team is in progress), a live score hero, three glance stats (to-advance %
-// from the predictor · live now · today), and tracked teams grouped by program with each
-// team's record + today's pill. All real: records from FINAL games, live/today from status
-// + start times, odds enumerated by the predictor. No fabrication — the hero exists only
-// when a game is in progress; absent data degrades quietly.
-
-const norm = (s: string) => s.trim().toLowerCase();
+// Home command center — render-faithful. Header + "updating live" (only when a tracked team is in
+// progress), a live score hero, three glance stats (to-advance · live now · today), and tracked
+// teams grouped by program with each team's record + today's pill. Records come from FINAL games;
+// live/today from status + start times. The "to-advance" likelihood is SUPPRESSED to "—" everywhere
+// on this screen — per the exact-vs-estimate constitution, no surface shows a model likelihood it
+// hasn't earned, and a clinched team never shows a probability. The exact clinch/in-the-cut/bubble/
+// out status lights up with the §2.B bracket engine; the calibrated % only once F1 calibrates. No
+// fabrication — the hero exists only when a game is in progress; absent data degrades quietly.
 
 export default function MyTeams() {
   const [teams, setTeams] = useState<TrackedTeam[]>([]);
   const [games, setGames] = useState<TeamGame[]>([]);
-  const [odds, setOdds] = useState<Record<string, number>>({}); // teamKey → "to advance" %
   const [selected, setSelected] = useState<string | null>(null); // open a team's detail
 
   useEffect(() => {
@@ -52,64 +49,8 @@ export default function MyTeams() {
     return list.length === 1 ? list[0] : list.length > 1 ? `${list.length} programs` : "";
   }, [teams]);
 
-  // Featured team for the "to advance" stat: the live team if one is in progress, else the
-  // team playing soonest, else the first tracked. Always ONE definite team — never a blend
-  // of the tracked set (the % belongs to a single team's division bracket).
-  const nextUpKey = useMemo(() => {
-    const up = games
-      .filter((g) => g.status !== "final" && g.startAt)
-      .sort((a, b) => +new Date(a.startAt!) - +new Date(b.startAt!));
-    return up[0]?.trackedTeamId ?? null;
-  }, [games]);
-  const featured = useMemo(() => {
-    const key = model.hero?.teamKey ?? nextUpKey ?? teams[0]?.teamKey ?? null;
-    return key ? teams.find((t) => t.teamKey === key) ?? null : null;
-  }, [model.hero, nextUpKey, teams]);
-
-  // "to advance" odds for EVERY tracked team (not just the featured one) — the predictor
-  // over each team's division standings, weighted by strength + grade. Each distinct
-  // division is fetched once; teams sharing it reuse the bundle. Gate out "even" (no signal)
-  // so a row shows a number only when there's a real basis. Keyed by teamKey → every row
-  // shows its own odds, so two teams with different odds both appear (not just one).
-  useEffect(() => {
-    let live = true;
-    const byDiv = new Map<string, TrackedTeam[]>();
-    for (const t of teams) {
-      if (!t.divisionId) continue;
-      const arr = byDiv.get(t.divisionId) ?? [];
-      arr.push(t);
-      byDiv.set(t.divisionId, arr);
-    }
-    if (!byDiv.size) { setOdds({}); return; }
-    Promise.all(
-      Array.from(byDiv.entries()).map(async ([divId, members]): Promise<[string, number][]> => {
-        const b = await getTournamentStandings(divId).catch(() => null);
-        if (!b) return [];
-        const eff = effectiveRatings(b.teams, b.division.name);
-        const out: [string, number][] = [];
-        for (const t of members) {
-          const me = b.teams.find((x) => norm(x.name) === norm(t.name));
-          if (!me) continue;
-          const p = predictBracket({
-            teams: b.teams, games: b.games, remaining: b.remaining,
-            rules: b.rules, advanceCount: b.division.advance_count, focusId: me.id, eff,
-          });
-          if (p.available && p.basis !== "even" && p.oddsPct != null) out.push([t.teamKey, p.oddsPct]);
-        }
-        return out;
-      }),
-    ).then((all) => {
-      if (!live) return;
-      const map: Record<string, number> = {};
-      for (const arr of all) for (const [k, v] of arr) map[k] = v;
-      setOdds(map);
-    });
-    return () => { live = false; };
-  }, [teams]);
-
   const drop = (key: string) => setTeams(untrack(key));
   const liveActive = model.glance.liveNow > 0;
-  const featuredPct = featured ? odds[featured.teamKey] : undefined; // headline = featured team
 
   // team detail drill-down (game-by-game schedule + results + directions)
   const sel = selected ? teams.find((t) => t.teamKey === selected) : null;
@@ -162,16 +103,14 @@ export default function MyTeams() {
       {teams.length > 0 && (
         <>
           <div className="flex gap-[10px] px-[18px] pt-3">
-            <GlanceCard value={featuredPct == null ? "—" : `${featuredPct}%`} label="to advance" grad />
+            <GlanceCard value="—" label="to advance" grad />
             <GlanceCard value={String(model.glance.liveNow)} label="live now" />
             <GlanceCard value={String(model.glance.today)} label="today" />
           </div>
-          {/* the headline % is the featured (next-to-play) team; per-team odds sit in each row */}
-          {teams.length > 1 && featuredPct != null && featured && (
-            <div className="px-[18px] pt-1.5 text-center font-[var(--font-mono)] text-[9.5px] text-[#5f6981]">
-              headline odds: <span className="text-[#9aa4ba]">{featured.name}</span> · each team's below
-            </div>
-          )}
+          {/* to-advance is suppressed until the bracket engine + calibration earn it (constitution) */}
+          <div className="px-[18px] pt-1.5 text-center font-[var(--font-mono)] text-[9.5px] text-[#5f6981]">
+            To-advance status computes when pool play wraps — no estimate before the model earns it.
+          </div>
         </>
       )}
 
@@ -213,11 +152,6 @@ export default function MyTeams() {
                   <span className="min-w-0 flex-1 truncate font-semibold text-[#f0f3fa]">{t.name}</span>
                   {(t.record.w > 0 || t.record.l > 0) && (
                     <span className="shrink-0 font-[var(--font-mono)] text-[11px] text-[#9aa4ba]">{t.record.w}–{t.record.l}</span>
-                  )}
-                  {odds[t.teamKey] != null && (
-                    <span className="shrink-0 rounded-[6px] bg-[rgba(246,204,85,0.08)] px-2 py-[3px] font-[var(--font-mono)] text-[10px] font-semibold text-[#F6CC55]">
-                      {odds[t.teamKey]}%
-                    </span>
                   )}
                   {t.todayPill && (
                     <span className={`shrink-0 font-[var(--font-mono)] text-[10px] rounded-[6px] px-2 py-[3px] ${t.todayPill.won ? "bg-[rgba(94,203,143,0.08)] text-[#5ecb8f]" : "bg-[rgba(246,204,85,0.08)] text-[#F6CC55]"}`}>{t.todayPill.text}</span>
