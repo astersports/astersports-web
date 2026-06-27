@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Users, X, Trophy } from "lucide-react";
-import { getTracked, untrack, type TrackedTeam } from "@/lib/aau/trackingStore";
+import { getTracked, untrack, TRACKED_EVENT, type TrackedTeam } from "@/lib/aau/trackingStore";
 
 // Screen 03 "My Teams" — foundation. Renders the REAL tracked set (trackingStore),
 // grouped by program/club, no placeholder. The live command-center treatment (Realtime
@@ -10,10 +10,17 @@ export default function MyTeams() {
   const [teams, setTeams] = useState<TrackedTeam[]>([]);
 
   useEffect(() => {
-    setTeams(getTracked());
-    const onFocus = () => setTeams(getTracked());
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+    const refresh = () => setTeams(getTracked());
+    refresh();
+    // refresh on same-tab track changes, cross-tab storage writes, and tab focus
+    window.addEventListener(TRACKED_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.removeEventListener(TRACKED_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("focus", refresh);
+    };
   }, []);
 
   const groups = useMemo(() => {

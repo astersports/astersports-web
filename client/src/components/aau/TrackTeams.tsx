@@ -140,8 +140,11 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
     onTracked(chosen.length);
   };
 
+  // extra bottom room when the sticky Track bar is up (incl. iOS safe area), so the
+  // last rows stay tappable
+  const bottomPad = sel.size > 0 ? "pb-[calc(176px+env(safe-area-inset-bottom))]" : "pb-24";
   return (
-    <div className="as-fade-in pb-24">
+    <div className={`as-fade-in ${bottomPad}`}>
       <button
         type="button"
         onClick={onBack}
@@ -251,9 +254,9 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13.5px] font-semibold text-[#f0f3fa]">{t.name}</span>
                     <small className="mt-0.5 block font-[var(--font-mono)] text-[10px] text-[#5f6981]">
-                      {t.pool ? `${t.pool} · ` : ""}
-                      {t.wins}–{t.losses}
-                      {t.grade ? ` · ${t.grade}` : ""}
+                      {[[t.gender, t.grade].filter(Boolean).join(" "), t.pool, `${t.wins}–${t.losses}`]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </small>
                   </span>
                 </button>
@@ -263,9 +266,9 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
         ))}
       </div>
 
-      {/* sticky track CTA */}
+      {/* sticky track CTA — sits above the 64px nav incl. iOS safe area */}
       {sel.size > 0 && (
-        <div className="fixed inset-x-0 bottom-[64px] z-30 bg-[linear-gradient(transparent,#070a11_40%)] px-[18px] pb-3 pt-4">
+        <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-30 bg-[linear-gradient(transparent,#070a11_40%)] px-[18px] pb-3 pt-5">
           <button
             type="button"
             onClick={doTrack}

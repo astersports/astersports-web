@@ -21,20 +21,36 @@ export interface TrackedTeam {
 }
 
 const KEY = "aau.tracked.v1";
+export const TRACKED_EVENT = "aau:tracked-changed";
+
+// In-memory mirror so the session stays correct even when localStorage is unavailable
+// (private mode / quota): write() always updates this, and read() falls back to it when
+// storage can't be read. null = not yet hydrated this session.
+let memCache: TrackedTeam[] | null = null;
 
 function read(): TrackedTeam[] {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as TrackedTeam[]) : [];
+    const list = raw ? (JSON.parse(raw) as TrackedTeam[]) : memCache ?? [];
+    memCache = list;
+    return list;
   } catch {
-    return [];
+    return memCache ?? [];
   }
 }
+
 function write(list: TrackedTeam[]) {
+  memCache = list; // always current, even if persistence fails
   try {
     localStorage.setItem(KEY, JSON.stringify(list));
   } catch {
-    /* private mode / quota — non-fatal; the UI still reflects the in-memory result */
+    /* private mode / quota — non-fatal; memCache keeps the session correct */
+  }
+  // notify same-tab listeners (the storage event only fires in OTHER tabs)
+  try {
+    window.dispatchEvent(new CustomEvent(TRACKED_EVENT));
+  } catch {
+    /* SSR / no window — non-fatal */
   }
 }
 
