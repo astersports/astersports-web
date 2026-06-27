@@ -67,8 +67,8 @@ export default function MyTeams() {
           </div>
         </div>
         {liveActive ? (
-          <span className="flex items-center gap-1.5 rounded-full border border-[rgba(52,224,164,0.3)] bg-[rgba(52,224,164,0.05)] px-[11px] py-[5px] font-[var(--font-mono)] text-[9.5px] text-[#16A34A]">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-[#16A34A] shadow-[0_0_10px_rgba(52,224,164,0.7)]" /> updating live
+          <span className="flex items-center gap-1.5 rounded-full border border-[rgba(22,163,74,0.3)] bg-[rgba(22,163,74,0.05)] px-[11px] py-[5px] font-[var(--font-mono)] text-[9.5px] text-[#16A34A]">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-[#16A34A] shadow-[0_0_10px_rgba(22,163,74,0.7)]" /> updating live
           </span>
         ) : (
           <Users className="h-5 w-5 text-[#6B7280]" />
@@ -77,7 +77,7 @@ export default function MyTeams() {
 
       {/* live score hero — only when a tracked team is in progress */}
       {model.hero && (
-        <div className="mx-[18px] mt-[10px] overflow-hidden rounded-[18px] border border-[rgba(52,224,164,0.28)] bg-[radial-gradient(300px_120px_at_20%_0%,rgba(52,224,164,0.12),transparent),linear-gradient(180deg,#F1F3F5,#FFFFFF)] shadow-[0_16px_40px_-24px_rgba(52,224,164,0.4)]">
+        <div className="mx-[18px] mt-[10px] overflow-hidden rounded-[18px] border border-[rgba(22,163,74,0.28)] bg-[radial-gradient(300px_120px_at_20%_0%,rgba(22,163,74,0.12),transparent),linear-gradient(180deg,#F1F3F5,#FFFFFF)] shadow-[0_16px_40px_-24px_rgba(22,163,74,0.4)]">
           <div className="flex items-center justify-between border-b border-[rgba(0,0,0,0.06)] px-[15px] py-[11px] font-[var(--font-mono)] text-[10px] text-[#16A34A]">
             <span className="flex items-center gap-1.5"><span className="h-2 w-2 animate-pulse rounded-full bg-[#16A34A]" /> LIVE{model.hero.pool ? ` · ${model.hero.pool}` : ""}</span>
             <span>{model.hero.division}</span>
@@ -159,7 +159,7 @@ export default function MyTeams() {
                   <ChevronRight className="h-[15px] w-[15px] shrink-0 text-[#9CA3AF]" />
                 </button>
                 <button type="button" onClick={() => drop(t.teamKey)} aria-label={`Stop tracking ${t.name}`}
-                  className="as-press grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#E2E8F0] text-[#6B7280] hover:text-[#ff8a7e]">
+                  className="as-press grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#E2E8F0] text-[#6B7280] hover:text-[#DC2626]">
                   <X className="h-[13px] w-[13px]" />
                 </button>
               </div>

@@ -77,7 +77,7 @@ export default function BracketOdds({ teamName, prediction: p }: Props) {
             // doesn't flatter.
             const tone =
               s.kind === "out"
-                ? { cls: "bg-[rgba(255,107,94,0.14)] text-[#ff6b5e]", Icon: X }
+                ? { cls: "bg-[rgba(255,107,94,0.14)] text-[#DC2626]", Icon: X }
                 : s.kind === "maybe"
                   ? { cls: "bg-[rgba(246,204,85,0.14)] text-[#8F6708]", Icon: Minus }
                   : { cls: "bg-[rgba(94,203,143,0.16)] text-[#16A34A]", Icon: Check };

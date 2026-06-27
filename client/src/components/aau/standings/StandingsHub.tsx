@@ -54,7 +54,7 @@ export default function StandingsHub() {
               <button
                 key={d.id}
                 onClick={() => setPicked({ div: d })}
-                className="flex items-center gap-3 rounded-xl border border-[#E2E8F0] bg-[#FFFFFF] px-4 py-3 text-left transition-colors hover:bg-[#FFFFFF]"
+                className="flex items-center gap-3 rounded-xl border border-[#E2E8F0] bg-[#FFFFFF] px-4 py-3 text-left transition-colors hover:bg-[#F9FAFB]"
               >
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[13.5px] font-semibold text-[#1A1D23]">{d.name}</div>

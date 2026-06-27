@@ -36,7 +36,7 @@ export default function BrowseLiveStrip() {
           const lit = g.homeScore != null && g.awayScore != null;
           const homeWon = lit && (g.homeScore ?? 0) > (g.awayScore ?? 0);
           return (
-            <div key={g.gameId} className="flex items-center gap-[10px] rounded-[12px] px-[11px] py-[9px]" style={{ border: "1px solid rgba(52,224,164,.22)", background: "rgba(52,224,164,.04)" }}>
+            <div key={g.gameId} className="flex items-center gap-[10px] rounded-[12px] px-[11px] py-[9px]" style={{ border: "1px solid rgba(22,163,74,.22)", background: "rgba(22,163,74,.04)" }}>
               <span className="as-pulse inline-block h-[6px] w-[6px] shrink-0 rounded-full" style={{ background: C.live }} aria-hidden />
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-[var(--font-display)] text-[12.5px] font-semibold" style={{ color: C.ink }}>

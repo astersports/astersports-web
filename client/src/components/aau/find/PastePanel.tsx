@@ -123,7 +123,7 @@ export default function PastePanel({
         </div>
       )}
       {ui.kind === "error" && (
-        <div className="mx-[18px] mt-[13px] text-[12px] leading-[1.45]" style={{ color: "#ff8a7e" }} aria-live="polite">
+        <div className="mx-[18px] mt-[13px] text-[12px] leading-[1.45]" style={{ color: "#DC2626" }} aria-live="polite">
           {ui.msg}
         </div>
       )}
