@@ -10,6 +10,8 @@ import {
   type AauTeamVariant,
 } from "@/lib/aster";
 import { track, untrack, isTracked as storeIsTracked, getTracked, TRACKED_EVENT } from "@/lib/aau/trackingStore";
+import { isPlusEntitled } from "@/lib/aau/entitlement";
+import { GO_PLUS_EVENT } from "./PlusGate";
 import { C } from "./find/findUi";
 import FrontDoor from "./find/FrontDoor";
 import SearchResults from "./find/SearchResults";
@@ -196,6 +198,14 @@ export default function FindDiscovery({ onOpenTournament }: { onOpenTournament: 
     }
   }
 
+  // Uploading a tournament is a Plus feature ("anyone who pays $20/mo can upload"). Entitled
+  // accounts reach the paste/ingest flow; everyone else gets the Plus gate. Enforcement source is
+  // is_entitled (owner-applied billing) — until wired, isPlusEntitled() is false, so this gates.
+  const openUpload = useCallback(() => {
+    if (isPlusEntitled()) setMode("paste");
+    else window.dispatchEvent(new Event(GO_PLUS_EVENT));
+  }, []);
+
   // ─── what body to show ───
   const term = q.trim();
   const isSearchMode = mode === "search" && term.length >= 2;
@@ -274,7 +284,7 @@ export default function FindDiscovery({ onOpenTournament }: { onOpenTournament: 
 
       {mode === "paste" && <PastePanel url={paste} onUrl={(v) => { setPaste(v); if (pasteUi.kind !== "working") setPasteUi({ kind: "idle" }); }} onSubmit={handlePaste} ui={pasteUi} disabled={pasteBusy} />}
 
-      {mode === "search" && term.length < 2 && <FrontDoor dir={dir} onOpen={onOpenTournament} onBrowseAll={() => setMode("browse")} onAddTournament={() => setMode("paste")} />}
+      {mode === "search" && term.length < 2 && <FrontDoor dir={dir} onOpen={onOpenTournament} onBrowseAll={() => setMode("browse")} onAddTournament={openUpload} />}
 
       {isSearchMode && searching && !results && (
         <div className="space-y-[10px] px-[18px] pt-4" aria-live="polite">
@@ -291,12 +301,8 @@ export default function FindDiscovery({ onOpenTournament }: { onOpenTournament: 
       {noResults && (
         <NoResults
           query={q}
-          onPaste={() => setMode("paste")}
-          onRequest={() => {
-            // "Ask us to add this tournament" — routes into the same paste/ingest funnel (the
-            // real way in). No separate request RPC exists; the paste flow IS the request path.
-            setMode("paste");
-          }}
+          onPaste={openUpload}
+          onRequest={openUpload}
         />
       )}
     </div>

@@ -16,6 +16,7 @@ const FEATURES = [
   "Leave-by, directions & game-time weather",
   "Schedule-change alerts, conflicts & split-up",
   "Saturday-night bracket scenarios",
+  "Add a tournament that isn't in the system yet",
 ];
 
 export default function PlusGate({ onClose }: { onClose: () => void }) {
