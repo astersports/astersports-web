@@ -140,7 +140,14 @@ export interface DirTournament {
 export async function getTournamentDirectory(): Promise<DirTournament[]> {
   const { data, error } = await aster.rpc("get_public_tournament_directory");
   if (error) throw error;
-  return (data as DirTournament[]) ?? [];
+  // The RPC is runtime-typed (cast, not validated). Normalize the array fields so a
+  // missing/null `states` or `divisions` can never throw at a consumer (.length/.includes/
+  // .map/.some). The RPC COALESCEs both to [] today; this is fail-safe defense (Copilot #154).
+  return ((data as DirTournament[]) ?? []).map((t) => ({
+    ...t,
+    states: Array.isArray(t.states) ? t.states : [],
+    divisions: Array.isArray(t.divisions) ? t.divisions : [],
+  }));
 }
 
 // ─── Global team search (Find): one query → the team across every tournament ───

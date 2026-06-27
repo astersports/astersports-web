@@ -46,9 +46,12 @@ export function bandOf(grade: string | null | undefined): GradeBand {
   return BAND_OF[grade] ?? "other";
 }
 
+// Flattened once at module scope (GRADE_BANDS is static) so gradeOrder doesn't re-allocate the
+// list on every sort-comparator call (Copilot #155).
+const GRADE_FLAT: string[] = GRADE_BANDS.flatMap((b) => b.grades);
+
 /** Stable display order index for an individual grade (younger → older), for sorting chips. */
 export function gradeOrder(grade: string): number {
-  const flat = GRADE_BANDS.flatMap((b) => b.grades);
-  const i = flat.indexOf(grade);
-  return i === -1 ? flat.length : i;
+  const i = GRADE_FLAT.indexOf(grade);
+  return i === -1 ? GRADE_FLAT.length : i;
 }

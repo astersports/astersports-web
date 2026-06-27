@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, Search, Check, Plus, Trophy } from "lucide-react";
+import { ChevronLeft, ChevronDown, Search, Check, Plus, Trophy } from "lucide-react";
 import { getTournamentTeams, type TournamentTeams } from "@/lib/aster";
 import { parseDivisionMeta, parseProgram, type Gender } from "@/lib/aau/teamMeta";
 import { track } from "@/lib/aau/trackingStore";
+import GradeBandPicker from "./find/GradeBandPicker";
+import { expandGrade, gradeOrder } from "./find/gradeBands";
 
 // Screen 02 "Track one or many" — best-in-class render 02, ratified search-first.
 // A tournament → its teams across every division, with gender + grade as ASSIST chips
@@ -30,15 +32,13 @@ interface FlatTeam {
   divisionName: string;
 }
 
-const GRADE_ORDER = (g: string) =>
-  g === "High School" ? 99 : parseInt(g, 10) || (g.endsWith("U") ? parseInt(g, 10) : 50);
-
 export default function TrackTeams({ tournamentId, tournamentName, onBack, onTracked }: Props) {
   const [data, setData] = useState<TournamentTeams | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [q, setQ] = useState("");
   const [gender, setGender] = useState<Gender | "All">("All");
-  const [grade, setGrade] = useState<string>("All");
+  const [gradeSel, setGradeSel] = useState<Set<string>>(new Set()); // individual grades (split-expanded)
+  const [gradeOpen, setGradeOpen] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -83,10 +83,12 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
     flat.forEach((t) => t.gender && s.add(t.gender));
     return Array.from(s);
   }, [flat]);
-  const grades = useMemo(() => {
+  // individual grades present — a "5th/6th" division contributes both 5th and 6th (operator-directed,
+  // matches BrowseTree). Feeds the shared age-band picker.
+  const availGrades = useMemo(() => {
     const s = new Set<string>();
-    flat.forEach((t) => t.grade && s.add(t.grade));
-    return Array.from(s).sort((a, b) => GRADE_ORDER(a) - GRADE_ORDER(b));
+    flat.forEach((t) => expandGrade(t.grade).forEach((g) => s.add(g)));
+    return Array.from(s).sort((a, b) => gradeOrder(a) - gradeOrder(b));
   }, [flat]);
 
   const filtered = useMemo(() => {
@@ -94,10 +96,24 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
     return flat.filter(
       (t) =>
         (gender === "All" || t.gender === gender) &&
-        (grade === "All" || t.grade === grade) &&
+        (gradeSel.size === 0 || expandGrade(t.grade).some((g) => gradeSel.has(g))) &&
         (!term || t.name.toLowerCase().includes(term) || t.program.toLowerCase().includes(term)),
     );
-  }, [flat, q, gender, grade]);
+  }, [flat, q, gender, gradeSel]);
+
+  const toggleGrade = (g: string) =>
+    setGradeSel((p) => {
+      const n = new Set(p);
+      n.has(g) ? n.delete(g) : n.add(g);
+      return n;
+    });
+  const toggleBand = (bandGrades: string[]) =>
+    setGradeSel((p) => {
+      const n = new Set(p);
+      const allOn = bandGrades.every((g) => n.has(g));
+      bandGrades.forEach((g) => (allOn ? n.delete(g) : n.add(g)));
+      return n;
+    });
 
   // group filtered teams by program (club), program order by first appearance
   const groups = useMemo(() => {
@@ -177,8 +193,8 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
         />
       </div>
 
-      {/* gender + grade assist-chips (narrow, never gate) */}
-      {(genders.length > 1 || grades.length > 1) && (
+      {/* gender chips + grade age-band picker (assist filters — narrow, never gate) */}
+      {(genders.length > 1 || availGrades.length > 0) && (
         <div className="mt-3 space-y-2">
           {genders.length > 1 && (
             <ChipRow
@@ -187,8 +203,26 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
               onPick={(v) => setGender(v as Gender | "All")}
             />
           )}
-          {grades.length > 1 && (
-            <ChipRow items={["All", ...grades]} active={grade} onPick={setGrade} />
+          {availGrades.length > 0 && (
+            <div className="px-[18px]">
+              <button
+                type="button"
+                aria-expanded={gradeOpen}
+                onClick={() => setGradeOpen((o) => !o)}
+                className="as-press inline-flex min-h-[32px] items-center gap-[6px] rounded-full px-[12px] font-[var(--font-mono)] text-[11px]"
+                style={
+                  gradeOpen || gradeSel.size > 0
+                    ? { background: "rgba(246,204,85,.13)", border: "1px solid rgba(246,204,85,.4)", color: "#F6CC55" }
+                    : { border: "1px solid #212939", color: "#9aa4ba" }
+                }
+              >
+                {gradeSel.size ? `${gradeSel.size} grade${gradeSel.size === 1 ? "" : "s"}` : "Grade"}
+                <ChevronDown className="h-[10px] w-[10px]" />
+              </button>
+            </div>
+          )}
+          {gradeOpen && availGrades.length > 0 && (
+            <GradeBandPicker available={availGrades} selected={gradeSel} onToggleGrade={toggleGrade} onToggleBand={toggleBand} />
           )}
         </div>
       )}
@@ -216,12 +250,12 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
 
       {/* grouped teams */}
       <div className="mt-3">
-        {groups.map(([program, teams]) => (
+        {groups.map(([program, teams]) => {
+          const nested = teams.length > 1; // multi-team club → pinned header + indented rows
+          const allOn = nested && teams.every((t) => sel.has(t.selKey));
+          return (
           <div key={program} className="mt-3 first:mt-0">
-            {teams.length > 1 &&
-              (() => {
-                const allOn = teams.every((t) => sel.has(t.selKey));
-                return (
+            {nested && (
                   <button
                     type="button"
                     onClick={() => toggleAll(teams)}
@@ -239,8 +273,7 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
                     </span>
                     <span className="font-[var(--font-mono)] text-[11px] text-[#F6CC55]">{allOn ? "Clear" : "+ All"}</span>
                   </button>
-                );
-              })()}
+            )}
             {teams.map((t) => {
               const on = sel.has(t.selKey);
               return (
@@ -249,7 +282,9 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
                   type="button"
                   onClick={() => toggle(t.selKey)}
                   aria-pressed={on}
-                  className={`as-press mx-[18px] mt-[9px] flex w-[calc(100%-36px)] items-center gap-[13px] rounded-[14px] border px-[15px] py-[13px] text-left ${
+                  className={`as-press mt-[9px] flex items-center gap-[13px] rounded-[14px] border px-[15px] py-[13px] text-left ${
+                    nested ? "ml-[30px] mr-[18px] w-[calc(100%-48px)] border-l-[2px] border-l-[#5a4a25]" : "mx-[18px] w-[calc(100%-36px)]"
+                  } ${
                     on
                       ? "border-[rgba(246,204,85,0.4)] bg-[linear-gradient(180deg,rgba(246,204,85,0.07),rgba(246,204,85,0.01))]"
                       : "border-[rgba(255,255,255,0.055)] bg-[linear-gradient(180deg,#151b29,#10141f)]"
@@ -274,7 +309,8 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
               );
             })}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* sticky track CTA — sits above the 64px nav incl. iOS safe area */}
