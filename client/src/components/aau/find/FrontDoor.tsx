@@ -37,8 +37,11 @@ export default function FrontDoor({ dir, onOpen, onBrowseAll, onAddTournament }:
   // rather than pretend; the paste path is the working ingress today.
   const addTournament = (
     <div className="mx-[18px] mt-[16px] rounded-[14px] p-[13px]" style={{ border: `1px dashed ${C.hair2}`, background: "linear-gradient(160deg,rgba(224,99,28,.05),#121a2e)" }}>
-      <div className="font-[var(--font-display)] text-[13.5px] font-bold" style={{ color: C.ink }}>Don&apos;t see your tournament?</div>
-      <div className="mt-[4px] text-[11px] leading-[1.45]" style={{ color: C.mut }}>Point us at it and we&apos;ll ingest the schedule, divisions, and teams — through the same pipeline the scraper uses.</div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="font-[var(--font-display)] text-[13.5px] font-bold" style={{ color: C.ink }}>Don&apos;t see your tournament?</div>
+        <span className="shrink-0 rounded-[6px] px-[7px] py-[2px] font-[var(--font-mono)] text-[9px] font-bold tracking-[0.06em]" style={{ color: C.g3, border: "1px solid rgba(246,204,85,.35)", background: "rgba(246,204,85,.08)" }}>PLUS</span>
+      </div>
+      <div className="mt-[4px] text-[11px] leading-[1.45]" style={{ color: C.mut }}>Add it with Aster Plus — we&apos;ll ingest the schedule, divisions, and teams through the same pipeline the scraper uses.</div>
       <div className="mt-[11px] flex gap-[7px]">
         <button type="button" onClick={onAddTournament} className="as-press flex flex-1 flex-col items-center gap-[4px] rounded-[10px] px-[6px] py-[9px] text-[10.5px] font-semibold" style={{ border: `1px solid ${C.line}`, background: "rgba(0,0,0,.2)", color: C.dim }}>
           <Link2 className="h-[16px] w-[16px]" style={{ color: C.g2 }} /> Paste link
