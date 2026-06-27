@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Search, Users, BarChart3, Film, Check } from "lucide-react";
 import FindDiscovery from "../components/aau/FindDiscovery";
+import TournamentDetail from "../components/aau/TournamentDetail";
 import TrackTeams from "../components/aau/TrackTeams";
 import MyTeams from "../components/aau/MyTeams";
 import StandingsHub from "../components/aau/standings/StandingsHub";
@@ -27,7 +28,9 @@ export default function AAUBasketball() {
   // resolves async, so default to "find" and land once on "myteams" the first time a user
   // is known — unless the visitor has already navigated (don't yank them mid-tap).
   const [activeSection, setActiveSection] = useState<SectionId>("find");
-  // Find → tap a tournament → Screen 02 Track (sub-screen of Find, not a nav tab).
+  // Find → tap a tournament → its detail page (live scoreboard + divisions + standings),
+  // and FROM there → Screen 02 Track. Both are sub-screens of Find, not nav tabs.
+  const [detailTournament, setDetailTournament] = useState<DirTournament | null>(null);
   const [trackTournament, setTrackTournament] = useState<DirTournament | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   // Drives the tracking store's account/anon mode + provides the user for the sign-in UI.
@@ -56,6 +59,7 @@ export default function AAUBasketball() {
 
   const handleTracked = (count: number) => {
     setTrackTournament(null);
+    setDetailTournament(null);
     setActiveSection("myteams"); // land on My Teams so the tracked teams are right there
     setToast(`Tracking ${count} team${count === 1 ? "" : "s"}`);
     window.setTimeout(() => setToast(null), 3200);
@@ -123,19 +127,27 @@ export default function AAUBasketball() {
       <div className="container" style={{ paddingTop: 18, paddingBottom: 32 }}>
         {activeSection === "find" &&
           (trackTournament ? (
+            // Track flow opens FROM the tournament detail page; back lands on detail again
+            // (detailTournament is still set) rather than the front door.
             <TrackTeams
               tournamentId={trackTournament.id}
               tournamentName={trackTournament.name}
               onBack={() => setTrackTournament(null)}
               onTracked={handleTracked}
             />
+          ) : detailTournament ? (
+            <TournamentDetail
+              tournament={detailTournament}
+              onBack={() => setDetailTournament(null)}
+              onTrack={() => setTrackTournament(detailTournament)}
+            />
           ) : (
             <FindDiscovery
               onOpenTournament={(t) => {
-                // opening a tournament IS navigation into the Track flow — mark it so a late
+                // opening a tournament IS navigation into the detail flow — mark it so a late
                 // useHubAuth() resolve can't yank the visitor out to My Teams (Copilot #152).
                 navigated.current = true;
-                setTrackTournament(t);
+                setDetailTournament(t);
               }}
             />
           ))}
@@ -195,7 +207,10 @@ export default function AAUBasketball() {
               onClick={() => {
                 navigated.current = true;
                 setActiveSection(id);
-                if (id === "find") setTrackTournament(null);
+                if (id === "find") {
+                  setTrackTournament(null);
+                  setDetailTournament(null);
+                }
               }}
               aria-label={label}
               aria-current={active ? "page" : undefined}
