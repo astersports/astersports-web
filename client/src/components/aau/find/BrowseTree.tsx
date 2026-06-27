@@ -168,7 +168,7 @@ export default function BrowseTree({ dir, onOpen }: { dir: DirTournament[]; onOp
   return (
     <div className="as-fade-in">
       <div className="px-[18px] pt-[8px]">
-        <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em]" style={{ color: "#cdb98c" }}>
+        <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em]" style={{ color: "#8F6708" }}>
           Browse all
         </div>
         <h2 className="mt-1 font-[var(--font-display)] text-[20px] font-bold tracking-[-0.3px]" style={{ color: C.ink }}>
@@ -266,7 +266,7 @@ export default function BrowseTree({ dir, onOpen }: { dir: DirTournament[]; onOp
       )}
 
       {filtered.length === 0 ? (
-        <div className="mx-[18px] mt-4 rounded-[15px] p-8 text-center" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#151b29,#10141f)" }}>
+        <div className="mx-[18px] mt-4 rounded-[15px] p-8 text-center" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#F9FAFB,#FFFFFF)" }}>
           <div className="text-[13px] font-semibold" style={{ color: C.ink }}>
             Nothing in this filter
           </div>

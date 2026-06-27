@@ -109,7 +109,7 @@ export function WeatherCardView({ venueName, forecast, eyebrow = "Weather Hub", 
           {onRefresh && (
             <button onClick={onRefresh} className="as-press" aria-label="Refresh weather" style={{
               width: 30, height: 30, borderRadius: 8, cursor: "pointer", border: "none",
-              backgroundColor: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center",
+              backgroundColor: "rgba(0,0,0,0.06)", display: "flex", alignItems: "center", justifyContent: "center",
             }}>
               <RefreshCw size={13} style={{ color: "var(--as-text-tertiary)", transition: "transform 0.3s ease", transform: isFetching ? "rotate(180deg)" : "none" }} />
             </button>
@@ -217,7 +217,7 @@ function DetailChip({ icon, label, value }: { icon: React.ReactNode; label: stri
   return (
     <div style={{
       padding: "8px 6px", borderRadius: 10, textAlign: "center",
-      backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid var(--as-border-subtle)",
+      backgroundColor: "rgba(0,0,0,0.04)", border: "1px solid var(--as-border-subtle)",
     }}>
       <div style={{ display: "flex", justifyContent: "center", color: "var(--as-text-tertiary)", marginBottom: 3 }}>{icon}</div>
       <div style={{ fontSize: 12, fontWeight: 700, color: "var(--as-text-primary)" }}>{value}</div>

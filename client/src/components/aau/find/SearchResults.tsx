@@ -22,7 +22,7 @@ function TournamentRow({ t, onOpen }: { t: AauTournamentHit; onOpen: (id: string
     >
       <span
         className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-[11px] font-[var(--font-display)] text-[15px] font-bold"
-        style={{ background: "rgba(232,144,42,.13)", color: C.g3, border: "1px solid #5a4a25" }}
+        style={{ background: "rgba(232,144,42,.13)", color: C.g3, border: "1px solid #E2C98A" }}
         aria-hidden
       >
         {initials(t.name)}
@@ -89,7 +89,7 @@ export default function SearchResults({
 
       {result.tournaments.length > 0 && (
         <section className="mt-[6px]" aria-label="Tournament results">
-          <div className="flex items-center gap-[6px] px-[18px] pb-[6px] pt-[9px] font-[var(--font-mono)] text-[10px] uppercase tracking-[0.08em]" style={{ color: "#cdb98c" }}>
+          <div className="flex items-center gap-[6px] px-[18px] pb-[6px] pt-[9px] font-[var(--font-mono)] text-[10px] uppercase tracking-[0.08em]" style={{ color: "#8F6708" }}>
             <Trophy className="h-[11px] w-[11px]" /> Tournaments
           </div>
           {result.tournaments.map((t) => (
@@ -100,7 +100,7 @@ export default function SearchResults({
 
       {result.divisions.length > 0 && (
         <section className="mt-[6px]" aria-label="Division results">
-          <div className="flex items-center gap-[6px] px-[18px] pb-[6px] pt-[9px] font-[var(--font-mono)] text-[10px] uppercase tracking-[0.08em]" style={{ color: "#cdb98c" }}>
+          <div className="flex items-center gap-[6px] px-[18px] pb-[6px] pt-[9px] font-[var(--font-mono)] text-[10px] uppercase tracking-[0.08em]" style={{ color: "#8F6708" }}>
             <Grid3x3 className="h-[11px] w-[11px]" /> Divisions
           </div>
           {result.divisions.map((d) => (

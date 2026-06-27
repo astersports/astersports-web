@@ -167,29 +167,29 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
       <button
         type="button"
         onClick={onBack}
-        className="mb-2 flex items-center gap-1 font-[var(--font-mono)] text-[11px] text-[#9aa4ba]"
+        className="mb-2 flex items-center gap-1 font-[var(--font-mono)] text-[11px] text-[#4A5568]"
       >
         <ChevronLeft className="h-4 w-4" /> Find
       </button>
 
       <div className="px-[18px]">
-        <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em] text-[#cdb98c]">
+        <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em] text-[#8F6708]">
           {tournamentName}
         </div>
-        <h2 className="mt-1 font-[var(--font-display)] text-[23px] font-bold tracking-[-0.3px] text-[#f0f3fa]">
+        <h2 className="mt-1 font-[var(--font-display)] text-[23px] font-bold tracking-[-0.3px] text-[#1A1D23]">
           Track teams
         </h2>
       </div>
 
       {/* search */}
-      <div className="mx-[18px] mt-2 flex items-center gap-[11px] rounded-[15px] border border-[#212939] bg-[#151b29] px-[15px] py-[13px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-        <Search className="h-[18px] w-[18px] shrink-0 text-[#5f6981]" />
+      <div className="mx-[18px] mt-2 flex items-center gap-[11px] rounded-[15px] border border-[#E2E8F0] bg-[#F9FAFB] px-[15px] py-[13px] shadow-[inset_0_1px_0_rgba(0,0,0,0.04)]">
+        <Search className="h-[18px] w-[18px] shrink-0 text-[#6B7280]" />
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search a team or club"
           aria-label="Search teams or clubs"
-          className="w-full bg-transparent text-[13.5px] text-[#f0f3fa] placeholder-[#5f6981] outline-none"
+          className="w-full bg-transparent text-[13.5px] text-[#1A1D23] placeholder-[#6B7280] outline-none"
         />
       </div>
 
@@ -212,8 +212,8 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
                 className="as-press inline-flex min-h-[32px] items-center gap-[6px] rounded-full px-[12px] font-[var(--font-mono)] text-[11px]"
                 style={
                   gradeOpen || gradeSel.size > 0
-                    ? { background: "rgba(246,204,85,.13)", border: "1px solid rgba(246,204,85,.4)", color: "#F6CC55" }
-                    : { border: "1px solid #212939", color: "#9aa4ba" }
+                    ? { background: "rgba(246,204,85,.13)", border: "1px solid rgba(246,204,85,.4)", color: "#8F6708" }
+                    : { border: "1px solid #E2E8F0", color: "#4A5568" }
                 }
               >
                 {gradeSel.size ? `${gradeSel.size} grade${gradeSel.size === 1 ? "" : "s"}` : "Grade"}
@@ -229,22 +229,22 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
 
       {/* states */}
       {error && (
-        <div className="mx-[18px] mt-4 rounded-[15px] border border-[rgba(255,255,255,0.055)] bg-[linear-gradient(180deg,#151b29,#10141f)] p-6 text-center text-[12px] text-[#5f6981]">
+        <div className="mx-[18px] mt-4 rounded-[15px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)] p-6 text-center text-[12px] text-[#6B7280]">
           Couldn't load this tournament's teams. Try again in a moment.
         </div>
       )}
       {!data && !error && (
         <div className="mt-4 space-y-[9px] px-[18px]">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-[58px] animate-pulse rounded-[14px] border border-[rgba(255,255,255,0.055)] bg-[#10141f]/60" />
+            <div key={i} className="h-[58px] animate-pulse rounded-[14px] border border-[rgba(0,0,0,0.06)] bg-[#FFFFFF]/60" />
           ))}
         </div>
       )}
       {data && filtered.length === 0 && (
-        <div className="mx-[18px] mt-4 rounded-[15px] border border-[rgba(255,255,255,0.055)] bg-[linear-gradient(180deg,#151b29,#10141f)] p-8 text-center">
-          <Trophy className="mx-auto mb-3 h-7 w-7 text-[#5f6981]" />
-          <div className="text-[14px] font-semibold text-[#f0f3fa]">No teams match</div>
-          <div className="mt-1 text-[12px] text-[#5f6981]">Clear the filters or try a different search.</div>
+        <div className="mx-[18px] mt-4 rounded-[15px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)] p-8 text-center">
+          <Trophy className="mx-auto mb-3 h-7 w-7 text-[#6B7280]" />
+          <div className="text-[14px] font-semibold text-[#1A1D23]">No teams match</div>
+          <div className="mt-1 text-[12px] text-[#6B7280]">Clear the filters or try a different search.</div>
         </div>
       )}
 
@@ -260,18 +260,18 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
                     type="button"
                     onClick={() => toggleAll(teams)}
                     aria-pressed={allOn}
-                    className="as-press mx-[18px] flex w-[calc(100%-36px)] items-center justify-between rounded-[14px] border border-[#5a4a25] bg-[linear-gradient(180deg,rgba(246,204,85,0.08),rgba(246,204,85,0.02))] px-[15px] py-[12px] text-left"
+                    className="as-press mx-[18px] flex w-[calc(100%-36px)] items-center justify-between rounded-[14px] border border-[#E2C98A] bg-[linear-gradient(180deg,rgba(246,204,85,0.08),rgba(246,204,85,0.02))] px-[15px] py-[12px] text-left"
                   >
                     <span>
-                      <span className="text-[13px] font-semibold text-[#f0f3fa]">
+                      <span className="text-[13px] font-semibold text-[#1A1D23]">
                         {allOn ? "Unselect all of " : "Track all of "}
                         {program}
                       </span>
-                      <small className="mt-0.5 block font-[var(--font-mono)] text-[10px] text-[#5f6981]">
+                      <small className="mt-0.5 block font-[var(--font-mono)] text-[10px] text-[#6B7280]">
                         {teams.length} teams in this view
                       </small>
                     </span>
-                    <span className="font-[var(--font-mono)] text-[11px] text-[#F6CC55]">{allOn ? "Clear" : "+ All"}</span>
+                    <span className="font-[var(--font-mono)] text-[11px] text-[#8F6708]">{allOn ? "Clear" : "+ All"}</span>
                   </button>
             )}
             {teams.map((t) => {
@@ -283,23 +283,23 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
                   onClick={() => toggle(t.selKey)}
                   aria-pressed={on}
                   className={`as-press mt-[9px] flex items-center gap-[13px] rounded-[14px] border px-[15px] py-[13px] text-left ${
-                    nested ? "ml-[30px] mr-[18px] w-[calc(100%-48px)] border-l-[2px] border-l-[#5a4a25]" : "mx-[18px] w-[calc(100%-36px)]"
+                    nested ? "ml-[30px] mr-[18px] w-[calc(100%-48px)] border-l-[2px] border-l-[#E2C98A]" : "mx-[18px] w-[calc(100%-36px)]"
                   } ${
                     on
                       ? "border-[rgba(246,204,85,0.4)] bg-[linear-gradient(180deg,rgba(246,204,85,0.07),rgba(246,204,85,0.01))]"
-                      : "border-[rgba(255,255,255,0.055)] bg-[linear-gradient(180deg,#151b29,#10141f)]"
+                      : "border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)]"
                   }`}
                 >
                   <span
                     className={`grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[7px] border ${
-                      on ? "border-transparent bg-[linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)]" : "border-[#212939]"
+                      on ? "border-transparent bg-[linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)]" : "border-[#E2E8F0]"
                     }`}
                   >
                     {on && <Check className="h-[13px] w-[13px] text-[#1a1206]" />}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13.5px] font-semibold text-[#f0f3fa]">{t.name}</span>
-                    <small className="mt-0.5 block font-[var(--font-mono)] text-[10px] text-[#5f6981]">
+                    <span className="block truncate text-[13.5px] font-semibold text-[#1A1D23]">{t.name}</span>
+                    <small className="mt-0.5 block font-[var(--font-mono)] text-[10px] text-[#6B7280]">
                       {[[t.gender, t.grade].filter(Boolean).join(" "), t.pool, `${t.wins}–${t.losses}`]
                         .filter(Boolean)
                         .join(" · ")}
@@ -315,7 +315,7 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
 
       {/* sticky track CTA — sits above the 64px nav incl. iOS safe area */}
       {sel.size > 0 && (
-        <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-30 bg-[linear-gradient(transparent,#070a11_40%)] px-[18px] pb-3 pt-5">
+        <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-30 bg-[linear-gradient(transparent,#F7F8FA_40%)] px-[18px] pb-3 pt-5">
           <button
             type="button"
             onClick={doTrack}
@@ -342,7 +342,7 @@ function ChipRow({ items, active, onPick }: { items: string[]; active: string; o
             className={`shrink-0 rounded-full border px-[15px] py-[7px] text-[12.5px] font-semibold ${
               on
                 ? "border-transparent bg-[linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)] text-[#1a1206]"
-                : "border-[#212939] bg-[#151b29] text-[#9aa4ba]"
+                : "border-[#E2E8F0] bg-[#F9FAFB] text-[#4A5568]"
             }`}
           >
             {it}

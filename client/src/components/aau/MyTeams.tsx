@@ -61,39 +61,39 @@ export default function MyTeams() {
       {/* page header */}
       <div className="flex items-center justify-between px-[18px] pb-1 pt-[14px]">
         <div>
-          <h2 className="font-[var(--font-display)] text-[21px] font-bold text-[#f0f3fa]">Home</h2>
-          <div className="mt-0.5 font-[var(--font-mono)] text-[10.5px] text-[#5f6981]">
+          <h2 className="font-[var(--font-display)] text-[21px] font-bold text-[#1A1D23]">Home</h2>
+          <div className="mt-0.5 font-[var(--font-mono)] text-[10.5px] text-[#6B7280]">
             {teams.length ? `${teams.length} tracked${programLabel ? ` · ${programLabel}` : ""}` : "your weekend, handled"}
           </div>
         </div>
         {liveActive ? (
-          <span className="flex items-center gap-1.5 rounded-full border border-[rgba(52,224,164,0.3)] bg-[rgba(52,224,164,0.05)] px-[11px] py-[5px] font-[var(--font-mono)] text-[9.5px] text-[#34e0a4]">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-[#34e0a4] shadow-[0_0_10px_rgba(52,224,164,0.7)]" /> updating live
+          <span className="flex items-center gap-1.5 rounded-full border border-[rgba(52,224,164,0.3)] bg-[rgba(52,224,164,0.05)] px-[11px] py-[5px] font-[var(--font-mono)] text-[9.5px] text-[#16A34A]">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-[#16A34A] shadow-[0_0_10px_rgba(52,224,164,0.7)]" /> updating live
           </span>
         ) : (
-          <Users className="h-5 w-5 text-[#5f6981]" />
+          <Users className="h-5 w-5 text-[#6B7280]" />
         )}
       </div>
 
       {/* live score hero — only when a tracked team is in progress */}
       {model.hero && (
-        <div className="mx-[18px] mt-[10px] overflow-hidden rounded-[18px] border border-[rgba(52,224,164,0.28)] bg-[radial-gradient(300px_120px_at_20%_0%,rgba(52,224,164,0.12),transparent),linear-gradient(180deg,#1b2233,#10141f)] shadow-[0_16px_40px_-24px_rgba(52,224,164,0.4)]">
-          <div className="flex items-center justify-between border-b border-[rgba(255,255,255,0.055)] px-[15px] py-[11px] font-[var(--font-mono)] text-[10px] text-[#34e0a4]">
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 animate-pulse rounded-full bg-[#34e0a4]" /> LIVE{model.hero.pool ? ` · ${model.hero.pool}` : ""}</span>
+        <div className="mx-[18px] mt-[10px] overflow-hidden rounded-[18px] border border-[rgba(52,224,164,0.28)] bg-[radial-gradient(300px_120px_at_20%_0%,rgba(52,224,164,0.12),transparent),linear-gradient(180deg,#F1F3F5,#FFFFFF)] shadow-[0_16px_40px_-24px_rgba(52,224,164,0.4)]">
+          <div className="flex items-center justify-between border-b border-[rgba(0,0,0,0.06)] px-[15px] py-[11px] font-[var(--font-mono)] text-[10px] text-[#16A34A]">
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 animate-pulse rounded-full bg-[#16A34A]" /> LIVE{model.hero.pool ? ` · ${model.hero.pool}` : ""}</span>
             <span>{model.hero.division}</span>
           </div>
           <div className="flex items-center justify-between px-4 pb-2 pt-[14px]">
             <div className="w-[86px] shrink-0">
-              <div className="font-[var(--font-display)] text-[15px] font-semibold leading-[1.12] text-[#bfe7d8]">{model.hero.myName}</div>
+              <div className="font-[var(--font-display)] text-[15px] font-semibold leading-[1.12] text-[#166534]">{model.hero.myName}</div>
             </div>
-            <div className={`font-[var(--font-mono)] text-[32px] font-bold tracking-[-1px] ${model.hero.myWinning ? "text-[#F6CC55]" : "text-[#f0f3fa]"}`}>{model.hero.myScore}</div>
-            <div className="px-[9px] font-[var(--font-mono)] text-[11px] text-[#454e63]">–</div>
-            <div className="font-[var(--font-mono)] text-[32px] font-bold tracking-[-1px] text-[#f0f3fa]">{model.hero.oppScore}</div>
+            <div className={`font-[var(--font-mono)] text-[32px] font-bold tracking-[-1px] ${model.hero.myWinning ? "text-[#8F6708]" : "text-[#1A1D23]"}`}>{model.hero.myScore}</div>
+            <div className="px-[9px] font-[var(--font-mono)] text-[11px] text-[#9CA3AF]">–</div>
+            <div className="font-[var(--font-mono)] text-[32px] font-bold tracking-[-1px] text-[#1A1D23]">{model.hero.oppScore}</div>
             <div className="w-[86px] shrink-0 text-right">
-              <div className="font-[var(--font-display)] text-[15px] font-semibold leading-[1.12] text-[#f0f3fa]">{model.hero.oppName}</div>
+              <div className="font-[var(--font-display)] text-[15px] font-semibold leading-[1.12] text-[#1A1D23]">{model.hero.oppName}</div>
             </div>
           </div>
-          <div className="mx-4 mb-[14px] h-1 overflow-hidden rounded-[2px] bg-[rgba(255,255,255,0.06)]">
+          <div className="mx-4 mb-[14px] h-1 overflow-hidden rounded-[2px] bg-[rgba(0,0,0,0.06)]">
             <i className="block h-full rounded-[2px] bg-[linear-gradient(90deg,#E8902A,#F6CC55)]" style={{ width: `${heroBar(model.hero.myScore, model.hero.oppScore)}%` }} />
           </div>
         </div>
@@ -108,7 +108,7 @@ export default function MyTeams() {
             <GlanceCard value={String(model.glance.today)} label="today" />
           </div>
           {/* to-advance is suppressed until the bracket engine + calibration earn it (constitution) */}
-          <div className="px-[18px] pt-1.5 text-center font-[var(--font-mono)] text-[9.5px] text-[#5f6981]">
+          <div className="px-[18px] pt-1.5 text-center font-[var(--font-mono)] text-[9.5px] text-[#6B7280]">
             To-advance status computes when pool play wraps — no estimate before the model earns it.
           </div>
         </>
@@ -126,13 +126,13 @@ export default function MyTeams() {
 
       {/* empty state */}
       {teams.length === 0 && (
-        <div className="mx-[18px] mt-4 overflow-hidden rounded-[16px] border border-[rgba(255,255,255,0.055)] border-t-[rgba(255,255,255,0.09)] bg-[radial-gradient(240px_130px_at_50%_-10%,rgba(232,144,42,0.10),transparent),linear-gradient(180deg,#151b29,#10141f)] px-6 py-9 text-center">
-          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full border border-[#5a4a25] bg-[rgba(246,204,85,0.10)]">
-            <Trophy className="h-6 w-6 text-[#F6CC55]" />
+        <div className="mx-[18px] mt-4 overflow-hidden rounded-[16px] border border-[rgba(0,0,0,0.06)] border-t-[rgba(0,0,0,0.10)] bg-[radial-gradient(240px_130px_at_50%_-10%,rgba(232,144,42,0.10),transparent),linear-gradient(180deg,#F9FAFB,#FFFFFF)] px-6 py-9 text-center">
+          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full border border-[#E2C98A] bg-[rgba(246,204,85,0.10)]">
+            <Trophy className="h-6 w-6 text-[#8F6708]" />
           </div>
-          <div className="font-[var(--font-display)] text-[16px] font-bold text-[#f0f3fa]">No teams tracked yet</div>
-          <div className="mx-auto mt-1.5 max-w-[280px] text-[12.5px] leading-[1.55] text-[#9aa4ba]">
-            Head to <span className="font-semibold text-[#f0f3fa]">Browse</span>, open a tournament, and track your team — it'll live here and follow you to every tournament it plays.
+          <div className="font-[var(--font-display)] text-[16px] font-bold text-[#1A1D23]">No teams tracked yet</div>
+          <div className="mx-auto mt-1.5 max-w-[280px] text-[12.5px] leading-[1.55] text-[#4A5568]">
+            Head to <span className="font-semibold text-[#1A1D23]">Browse</span>, open a tournament, and track your team — it'll live here and follow you to every tournament it plays.
           </div>
         </div>
       )}
@@ -140,26 +140,26 @@ export default function MyTeams() {
       {/* program groups — each team with record + today's pill */}
       <div className="mt-4 space-y-4">
         {model.groups.map((grp) => (
-          <div key={grp.program} className="mx-[18px] overflow-hidden rounded-[16px] border border-[rgba(255,255,255,0.055)] bg-[linear-gradient(180deg,#151b29,#10141f)]">
-            <div className="flex items-center justify-between border-b border-[rgba(255,255,255,0.055)] px-[15px] py-[11px] font-[var(--font-mono)] text-[10px] uppercase tracking-[0.05em] text-[#cdb98c]">
+          <div key={grp.program} className="mx-[18px] overflow-hidden rounded-[16px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)]">
+            <div className="flex items-center justify-between border-b border-[rgba(0,0,0,0.06)] px-[15px] py-[11px] font-[var(--font-mono)] text-[10px] uppercase tracking-[0.05em] text-[#8F6708]">
               <span>{grp.program}{grp.todayCount > 0 ? " · today" : ""}</span>
-              <span className="text-[#5f6981]">{grp.todayCount > 0 ? `${grp.todayCount} game${grp.todayCount === 1 ? "" : "s"}` : `${grp.teams.length} team${grp.teams.length === 1 ? "" : "s"}`}</span>
+              <span className="text-[#6B7280]">{grp.todayCount > 0 ? `${grp.todayCount} game${grp.todayCount === 1 ? "" : "s"}` : `${grp.teams.length} team${grp.teams.length === 1 ? "" : "s"}`}</span>
             </div>
             {grp.teams.map((t) => (
-              <div key={t.teamKey} className="flex items-center gap-[10px] border-t border-[rgba(255,255,255,0.055)] px-[15px] py-[12px] text-[13px] first:border-t-0">
+              <div key={t.teamKey} className="flex items-center gap-[10px] border-t border-[rgba(0,0,0,0.06)] px-[15px] py-[12px] text-[13px] first:border-t-0">
                 <button type="button" onClick={() => setSelected(t.teamKey)} aria-label={`Open ${t.name}`}
                   className="as-press flex min-w-0 flex-1 items-center gap-[10px] text-left">
-                  <span className="min-w-0 flex-1 truncate font-semibold text-[#f0f3fa]">{t.name}</span>
+                  <span className="min-w-0 flex-1 truncate font-semibold text-[#1A1D23]">{t.name}</span>
                   {(t.record.w > 0 || t.record.l > 0) && (
-                    <span className="shrink-0 font-[var(--font-mono)] text-[11px] text-[#9aa4ba]">{t.record.w}–{t.record.l}</span>
+                    <span className="shrink-0 font-[var(--font-mono)] text-[11px] text-[#4A5568]">{t.record.w}–{t.record.l}</span>
                   )}
                   {t.todayPill && (
-                    <span className={`shrink-0 font-[var(--font-mono)] text-[10px] rounded-[6px] px-2 py-[3px] ${t.todayPill.won ? "bg-[rgba(94,203,143,0.08)] text-[#5ecb8f]" : "bg-[rgba(246,204,85,0.08)] text-[#F6CC55]"}`}>{t.todayPill.text}</span>
+                    <span className={`shrink-0 font-[var(--font-mono)] text-[10px] rounded-[6px] px-2 py-[3px] ${t.todayPill.won ? "bg-[rgba(94,203,143,0.08)] text-[#16A34A]" : "bg-[rgba(246,204,85,0.08)] text-[#8F6708]"}`}>{t.todayPill.text}</span>
                   )}
-                  <ChevronRight className="h-[15px] w-[15px] shrink-0 text-[#454e63]" />
+                  <ChevronRight className="h-[15px] w-[15px] shrink-0 text-[#9CA3AF]" />
                 </button>
                 <button type="button" onClick={() => drop(t.teamKey)} aria-label={`Stop tracking ${t.name}`}
-                  className="as-press grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#212939] text-[#5f6981] hover:text-[#ff8a7e]">
+                  className="as-press grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#E2E8F0] text-[#6B7280] hover:text-[#ff8a7e]">
                   <X className="h-[13px] w-[13px]" />
                 </button>
               </div>
@@ -184,9 +184,9 @@ function heroBar(a: number, b: number): number {
 
 function GlanceCard({ value, label, grad = false }: { value: string; label: string; grad?: boolean }) {
   return (
-    <div className="flex-1 rounded-[14px] border border-[rgba(255,255,255,0.055)] bg-[linear-gradient(180deg,#151b29,#10141f)] px-[10px] py-3 text-center">
-      <div className={`font-[var(--font-display)] text-[19px] font-bold ${grad ? "bg-[linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)] bg-clip-text text-transparent" : "text-[#f0f3fa]"}`}>{value}</div>
-      <div className="mt-[3px] font-[var(--font-mono)] text-[9px] uppercase tracking-[0.05em] text-[#5f6981]">{label}</div>
+    <div className="flex-1 rounded-[14px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)] px-[10px] py-3 text-center">
+      <div className={`font-[var(--font-display)] text-[19px] font-bold ${grad ? "bg-[linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)] bg-clip-text text-transparent" : "text-[#1A1D23]"}`}>{value}</div>
+      <div className="mt-[3px] font-[var(--font-mono)] text-[9px] uppercase tracking-[0.05em] text-[#6B7280]">{label}</div>
     </div>
   );
 }
