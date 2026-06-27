@@ -258,6 +258,58 @@ function yukselEliminate(points: Point[], m: number, rng: () => number): Point[]
   return points.filter((_, i) => alive[i]);
 }
 
+// ─── Lloyd / CVT Relaxation ──────────────────────────────────────────────────
+
+const LLOYD_SAMPLE_CAP = 4000;
+
+/**
+ * Lloyd relaxation toward a centroidal Voronoi tessellation: even out the voids
+ * Yuksel elimination leaves so local density is uniform (not merely min-distance
+ * bounded). Deterministic (no RNG). Bounded cost: the fabric is sampled on a stride
+ * so work is ~O(LLOYD_SAMPLE_CAP · m · iters) regardless of raster size. A point
+ * whose centroid would land off-fabric keeps its prior position (stays on garment).
+ */
+function lloydRelax(
+  points: Point[],
+  raster: RasterMask,
+  inset: { x0: number; y0: number; w: number; h: number },
+  iters: number
+): Point[] {
+  if (points.length <= 1) return points;
+  const { width: w, height: h, data } = raster;
+  const area = Math.max(1, inset.w * inset.h);
+  const stride = Math.max(1, Math.round(Math.sqrt(area / LLOYD_SAMPLE_CAP)));
+  const pts = points.map((p) => [p[0], p[1]] as Point);
+  const x1 = inset.x0 + inset.w, y1 = inset.y0 + inset.h;
+  for (let it = 0; it < iters; it++) {
+    const sumX = new Float64Array(pts.length);
+    const sumY = new Float64Array(pts.length);
+    const cnt = new Int32Array(pts.length);
+    for (let y = inset.y0; y < y1; y += stride) {
+      for (let x = inset.x0; x < x1; x += stride) {
+        const ix = Math.round(x), iy = Math.round(y);
+        if (ix < 0 || ix >= w || iy < 0 || iy >= h || data[iy * w + ix] <= 127) continue;
+        let bi = 0, bd = Infinity;
+        for (let j = 0; j < pts.length; j++) {
+          const dx = pts[j][0] - x, dy = pts[j][1] - y;
+          const d = dx * dx + dy * dy;
+          if (d < bd) { bd = d; bi = j; }
+        }
+        sumX[bi] += x; sumY[bi] += y; cnt[bi]++;
+      }
+    }
+    for (let j = 0; j < pts.length; j++) {
+      if (cnt[j] === 0) continue;
+      const nx = sumX[j] / cnt[j], ny = sumY[j] / cnt[j];
+      const rx = Math.round(nx), ry = Math.round(ny);
+      if (rx >= 0 && rx < w && ry >= 0 && ry < h && data[ry * w + rx] > 127) {
+        pts[j][0] = nx; pts[j][1] = ny;
+      }
+    }
+  }
+  return pts;
+}
+
 // ─── Main Entry Point ────────────────────────────────────────────────────────
 
 /**
@@ -355,6 +407,13 @@ export function blueNoiseLayout(
   if (samples.length > m) {
     samples = yukselEliminate(samples, m, rng);
   }
+
+  // Lloyd/CVT relaxation: Bridson + Yuksel guarantee a MIN spacing but leave VOIDS
+  // where crowded points were eliminated, so local density is uneven (visible clumps
+  // + streaks, not a clean even scatter). A few relaxation passes move each point to
+  // the centroid of the fabric pixels nearest it, evening local density to a uniform
+  // distribution like a couture flat-swatch reduction. Deterministic (no RNG).
+  samples = lloydRelax(samples, raster, insetBBox, 4);
 
   // Snap all points to integer fabric pixels (the composite step uses integer coords)
   return samples.map(([x, y]) => {

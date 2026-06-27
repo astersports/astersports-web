@@ -18,7 +18,7 @@ import {
   deleteTenantCascade,
   grantCredits,
 } from "../studioDb";
-import { emailAllowedForDomain } from "../../shared/domain";
+import { isEmailAllowedForTenant } from "../tenantDomains";
 import { ENV } from "../_core/env";
 import { TRIAL_CREDITS } from "../../shared/billing";
 import { eq, and, inArray, sql } from "drizzle-orm";
@@ -227,11 +227,21 @@ export const tenantsRouter = router({
   invite: tenantAdminProcedure
     .input(z.object({ email: z.string().email(), role: z.enum(["admin", "member"]).default("member") }))
     .mutation(async ({ ctx, input }) => {
-      // Check domain restriction
-      if (!emailAllowedForDomain(input.email, ctx.tenant.allowedEmailDomain)) {
+      // D2 role ceiling: an admin cannot mint another admin — only the OWNER
+      // grants the admin role. (Admins invite/manage members; owner manages admins.)
+      if (input.role === "admin" && ctx.membership.role !== "owner") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only the organization owner can invite an admin.",
+        });
+      }
+
+      // Domain restriction — multi-domain set (falls back to the legacy single
+      // domain for tenants not yet migrated).
+      if (!(await isEmailAllowedForTenant(ctx.tenant.id, input.email, ctx.tenant.allowedEmailDomain))) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: `Email must be from @${ctx.tenant.allowedEmailDomain}`,
+          message: "That email isn't on this organization's allowed domains. Invite a matching address, or contact your administrator to add the domain.",
         });
       }
 

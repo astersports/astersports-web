@@ -72,5 +72,5 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Apply schema to test DB
         run: pnpm exec drizzle-kit migrate
-      - name: Money-path integration tests
-        run: pnpm exec vitest run server/creditLedger.integration.test.ts
+      - name: Integration tests (money-path + cross-org isolation)
+        run: pnpm exec vitest run server/creditLedger.integration.test.ts server/orgIsolation.integration.test.ts

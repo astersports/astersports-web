@@ -12,6 +12,8 @@ import { grantCredits, createTenant, createMembership, escapeLike } from "../stu
 import { TRIAL_DURATION_DAYS } from "../../shared/billing";
 import { signImpersonationToken, setImpersonationCookie, clearImpersonationCookie, getImpersonationFromRequest } from "../impersonation";
 import { writeAuditLog, listAuditLog } from "../auditLog";
+import { addTenantDomains } from "../tenantDomains";
+import { autoDomainLockForOwnerEmail } from "../../shared/domain";
 
 // ─── Super Admin Middleware ──────────────────────────────────────────────────
 
@@ -319,6 +321,11 @@ export const platformRouter = router({
       if (input.initialCredits > 0) {
         await grantCredits(tenant.id, input.initialCredits, "grant", undefined, undefined);
       }
+
+      // Seed the multi-domain lock: the explicit domainLock the super-admin passed
+      // PLUS the owner's email domain auto-set (skipped when the owner is on a
+      // public provider — autoDomainLockForOwnerEmail returns null there).
+      await addTenantDomains(tenant.id, [input.domainLock, autoDomainLockForOwnerEmail(input.ownerEmail)]);
 
       // Audit the provisioning event (append-only; never blocks the action).
       await writeAuditLog({
