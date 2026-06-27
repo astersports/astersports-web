@@ -28,6 +28,16 @@ export default function BracketOdds({ teamName, prediction: p }: Props) {
       </div>
     );
   }
+  // No games played and nothing differentiates the field (no history, no grade gap) —
+  // a precise % would be a coin-flip in disguise. Say so instead of faking confidence.
+  if (p.basis === "even") {
+    return (
+      <div className="rounded-[16px] border border-[rgba(255,255,255,0.055)] bg-[linear-gradient(180deg,#151b29,#10141f)] p-4 text-[12px] text-[#5f6981]">
+        Odds appear once games tip off — there's no result or prior history to project from yet.
+      </div>
+    );
+  }
+  const projected = p.basis === "ratings"; // no games here yet; a strength/grade projection
   const pct = Math.max(0, Math.min(100, p.oddsPct ?? 0));
   return (
     <div className={CARD}>
@@ -54,7 +64,7 @@ export default function BracketOdds({ teamName, prediction: p }: Props) {
             {STATUS_LABEL[p.status ?? "live"] ?? teamName}
           </div>
           <div className="mt-1 font-[var(--font-mono)] text-[10.5px] text-[#5f6981]">
-            {p.decided ? "final" : `${p.advancing} of ${p.outcomes} outcomes advance`}
+            {p.decided ? "final" : projected ? "projected · no games played yet" : `${p.advancing} of ${p.outcomes} outcomes advance`}
           </div>
         </div>
       </div>
@@ -85,7 +95,9 @@ export default function BracketOdds({ teamName, prediction: p }: Props) {
 
       <div className="flex items-center gap-[7px] border-t border-[rgba(255,255,255,0.055)] px-4 pb-[14px] pt-[10px] font-[var(--font-mono)] text-[10px] leading-[1.4] text-[#5f6981]">
         <Check className="h-[11px] w-[11px] shrink-0 text-[#5ecb8f]" />
-        Odds enumerated exactly · wording AI
+        {projected
+          ? "Projected from cross-tournament strength · wording AI"
+          : "Odds enumerated exactly, weighted by team strength · wording AI"}
       </div>
     </div>
   );

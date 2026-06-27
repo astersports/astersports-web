@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getTournamentStandings, type PublicStandingsBundle } from "@/lib/aster";
 import { computeStandings, type RankedRow } from "@/lib/standings/computeStandings";
 import { predictBracket, type Prediction } from "@/lib/standings/predictBracket";
+import { effectiveRatings } from "@/lib/aau/gradePrior";
 
 /**
  * Reads one division's standings inputs from the aster-sports backbone (public RPC) and
@@ -49,8 +50,9 @@ export function useAauStandings(divisionId: string | null): AauStandings {
     const { teams, games, remaining, rules, division } = bundle;
     const advanceCount = division?.advance_count ?? null;
     const standings = computeStandings({ teams, games, rules, advanceCount });
+    const eff = effectiveRatings(teams, division?.name);
     const predictFor = (focusId: string): Prediction =>
-      predictBracket({ teams, games, remaining, rules, advanceCount, focusId });
+      predictBracket({ teams, games, remaining, rules, advanceCount, focusId, eff });
     return { loading, error, bundle, standings, advanceCount, predictFor };
   }, [bundle, loading, error]);
 }
