@@ -65,6 +65,7 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
   const venueLine = [game.court, venue?.name].filter(Boolean).join(" · ");
 
   const leaveBy = driveMin !== null ? leaveByLabel(startMs, driveMin) : null;
+  const advice = weather ? weatherAdvice(weather) : null; // computed once (Copilot #159)
   const remind = () => {
     if (driveMin === null) return;
     addLeaveReminder({
@@ -109,7 +110,7 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
             {weather && (
               <div className="flex items-center gap-1.5 text-[11.5px] text-[#9aa4ba]">
                 <ColorfulWeatherIcon icon={weather.icon} isDay={weather.isDay} className="h-[14px] w-[14px]" />
-                {Math.round(weather.temperature)}°F · {weather.description.toLowerCase()}{weatherAdvice(weather) ? ` — ${weatherAdvice(weather)}` : ""}
+                {Math.round(weather.temperature)}°F · {weather.description.toLowerCase()}{advice ? ` — ${advice}` : ""}
               </div>
             )}
           </div>
