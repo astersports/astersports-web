@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Search, Users, BarChart3, Film, Check } from "lucide-react";
 import FindDiscovery from "../components/aau/FindDiscovery";
 import TrackTeams from "../components/aau/TrackTeams";
@@ -22,12 +22,25 @@ const NAV = [
 type SectionId = (typeof NAV)[number]["id"];
 
 export default function AAUBasketball() {
-  const [activeSection, setActiveSection] = useState<SectionId>("myteams");
+  // Default landing: a new/anonymous visitor opens on FIND (the front door — they have no
+  // teams yet); a signed-in user opens on MY TEAMS (their teams are the point). useHubAuth
+  // resolves async, so default to "find" and land once on "myteams" the first time a user
+  // is known — unless the visitor has already navigated (don't yank them mid-tap).
+  const [activeSection, setActiveSection] = useState<SectionId>("find");
   // Find → tap a tournament → Screen 02 Track (sub-screen of Find, not a nav tab).
   const [trackTournament, setTrackTournament] = useState<DirTournament | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   // Drives the tracking store's account/anon mode + provides the user for the sign-in UI.
   const user = useHubAuth();
+  const landed = useRef(false);
+  const navigated = useRef(false);
+  useEffect(() => {
+    if (landed.current || navigated.current) return;
+    if (user) {
+      landed.current = true;
+      setActiveSection("myteams");
+    }
+  }, [user]);
 
   // Aster AAU wears the house GOLD accent; override the team tokens at the root so
   // every sub-component inherits gold. Page bg is the repo's dark surface.
@@ -50,8 +63,19 @@ export default function AAUBasketball() {
 
   return (
     <div style={goldTheme}>
-      {/* Thin top bar (back + wordmark) */}
-      <div style={{ borderBottom: "1px solid var(--as-border-default)" }}>
+      {/* Thin top bar (back + wordmark). Sticky + safe-area-inset-top so it pins BELOW the
+          iPhone status bar / camera island instead of sliding up under it on scroll. */}
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 30,
+          paddingTop: "env(safe-area-inset-top)",
+          background: "rgba(8,11,20,0.95)",
+          backdropFilter: "blur(12px)",
+          borderBottom: "1px solid var(--as-border-default)",
+        }}
+      >
         <div style={{ height: 4, width: "100%", background: "var(--brand-grad)" }} />
         <div
           className="container"
@@ -106,7 +130,14 @@ export default function AAUBasketball() {
               onTracked={handleTracked}
             />
           ) : (
-            <FindDiscovery onOpenTournament={(t) => setTrackTournament(t)} />
+            <FindDiscovery
+              onOpenTournament={(t) => {
+                // opening a tournament IS navigation into the Track flow — mark it so a late
+                // useHubAuth() resolve can't yank the visitor out to My Teams (Copilot #152).
+                navigated.current = true;
+                setTrackTournament(t);
+              }}
+            />
           ))}
         {activeSection === "myteams" && <MyTeams />}
         {activeSection === "standings" && <StandingsHub />}
@@ -162,6 +193,7 @@ export default function AAUBasketball() {
             <button
               key={id}
               onClick={() => {
+                navigated.current = true;
                 setActiveSection(id);
                 if (id === "find") setTrackTournament(null);
               }}

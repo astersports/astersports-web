@@ -116,10 +116,13 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
       n.has(k) ? n.delete(k) : n.add(k);
       return n;
     });
-  const addAll = (teams: FlatTeam[]) =>
+  // Toggle the whole program group: if every team in the view is already selected, clear them
+  // all (Frank: "unselect all is a good option"); otherwise select them all.
+  const toggleAll = (teams: FlatTeam[]) =>
     setSel((p) => {
       const n = new Set(p);
-      teams.forEach((t) => n.add(t.selKey));
+      const allOn = teams.every((t) => n.has(t.selKey));
+      teams.forEach((t) => (allOn ? n.delete(t.selKey) : n.add(t.selKey)));
       return n;
     });
 
@@ -215,21 +218,29 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
       <div className="mt-3">
         {groups.map(([program, teams]) => (
           <div key={program} className="mt-3 first:mt-0">
-            {teams.length > 1 && (
-              <button
-                type="button"
-                onClick={() => addAll(teams)}
-                className="as-press mx-[18px] flex w-[calc(100%-36px)] items-center justify-between rounded-[14px] border border-[#5a4a25] bg-[linear-gradient(180deg,rgba(246,204,85,0.08),rgba(246,204,85,0.02))] px-[15px] py-[12px] text-left"
-              >
-                <span>
-                  <span className="text-[13px] font-semibold text-[#f0f3fa]">Track all of {program}</span>
-                  <small className="mt-0.5 block font-[var(--font-mono)] text-[10px] text-[#5f6981]">
-                    {teams.length} teams in this view
-                  </small>
-                </span>
-                <span className="font-[var(--font-mono)] text-[11px] text-[#F6CC55]">+ All</span>
-              </button>
-            )}
+            {teams.length > 1 &&
+              (() => {
+                const allOn = teams.every((t) => sel.has(t.selKey));
+                return (
+                  <button
+                    type="button"
+                    onClick={() => toggleAll(teams)}
+                    aria-pressed={allOn}
+                    className="as-press mx-[18px] flex w-[calc(100%-36px)] items-center justify-between rounded-[14px] border border-[#5a4a25] bg-[linear-gradient(180deg,rgba(246,204,85,0.08),rgba(246,204,85,0.02))] px-[15px] py-[12px] text-left"
+                  >
+                    <span>
+                      <span className="text-[13px] font-semibold text-[#f0f3fa]">
+                        {allOn ? "Unselect all of " : "Track all of "}
+                        {program}
+                      </span>
+                      <small className="mt-0.5 block font-[var(--font-mono)] text-[10px] text-[#5f6981]">
+                        {teams.length} teams in this view
+                      </small>
+                    </span>
+                    <span className="font-[var(--font-mono)] text-[11px] text-[#F6CC55]">{allOn ? "Clear" : "+ All"}</span>
+                  </button>
+                );
+              })()}
             {teams.map((t) => {
               const on = sel.has(t.selKey);
               return (

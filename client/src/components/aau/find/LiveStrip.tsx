@@ -49,7 +49,7 @@ export default function LiveStrip() {
         <span className="h-px flex-1" style={{ background: C.hair }} />
       </div>
       <div
-        className="flex gap-[10px] overflow-x-auto px-[18px] pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex gap-[10px] overflow-x-auto px-[18px] pb-[6px] [scrollbar-width:thin] [scrollbar-color:#2a3346_transparent] [&::-webkit-scrollbar]:h-[6px] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#2a3346]"
         aria-live="polite"
       >
         {games.map((g) => {

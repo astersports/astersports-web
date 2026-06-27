@@ -33,19 +33,14 @@ export function initials(label: string | null | undefined): string {
   return (words[0][0] + words[1][0]).toUpperCase();
 }
 
-/** Season label from an ISO date: Dec–Feb Winter, Mar–May Spring, Jun–Aug Summer, Sep–Nov Fall. */
+/** Year label from an ISO start date — the only grouping a date reliably gives us. We do NOT
+ *  derive a calendar SEASON (Spring/Summer/…): AAU "season" is a circuit concept that does not
+ *  map to calendar months (June events belong to the spring circuit), so a month→season guess
+ *  mislabels them. Until a real season field exists on the backbone, group/label by year only
+ *  (no-fabrication, spec §7). Kept named seasonOf so the Browse grouping reads unchanged. */
 export function seasonOf(iso: string | null | undefined): string {
-  if (!iso) return "Season TBD";
+  if (!iso) return "Undated";
   const d = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return "Season TBD";
-  const m = d.getMonth(); // 0=Jan
-  const year = d.getFullYear();
-  let season: string;
-  if (m === 11 || m <= 1) season = "Winter";
-  else if (m <= 4) season = "Spring";
-  else if (m <= 7) season = "Summer";
-  else season = "Fall";
-  // Winter spans Dec→Feb; label Dec by the year it rolls into is overkill for browse — use the
-  // calendar year of the start date (matches the render's "Summer 2026" plain labeling).
-  return `${season} ${year}`;
+  if (Number.isNaN(d.getTime())) return "Undated";
+  return String(d.getFullYear());
 }
