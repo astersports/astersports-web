@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { AlertTriangle, Clock } from "lucide-react";
-import { getTrackedTeamSchedule } from "@/lib/aster";
-import { findConflicts, type DayConflict } from "@/lib/aau/conflicts";
+import type { TeamGame } from "@/lib/aster";
+import { findConflicts } from "@/lib/aau/conflicts";
 import type { TrackedTeam } from "@/lib/aau/trackingStore";
 
 // Killer #3 — Conflict radar + split-up. "Two kids, two courts, overlapping. We catch it
@@ -10,25 +10,15 @@ import type { TrackedTeam } from "@/lib/aau/trackingStore";
 // surface, not a permanent card). No fabrication, no held flip.
 interface Props {
   tracked: TrackedTeam[];
+  games: TeamGame[];
 }
 
-export default function ConflictRadar({ tracked }: Props) {
-  const [days, setDays] = useState<DayConflict[]>([]);
-
-  useEffect(() => {
-    const ids = tracked.map((t) => t.teamKey);
-    if (ids.length < 2) {
-      setDays([]);
-      return;
-    }
-    let live = true;
-    getTrackedTeamSchedule(ids)
-      .then((games) => live && setDays(findConflicts(tracked, games, new Date())))
-      .catch(() => live && setDays([]));
-    return () => {
-      live = false;
-    };
-  }, [tracked]);
+export default function ConflictRadar({ tracked, games }: Props) {
+  // Derived, not fetched — MyTeams owns the single schedule read and passes games down.
+  const days = useMemo(
+    () => (tracked.length < 2 ? [] : findConflicts(tracked, games, new Date())),
+    [tracked, games],
+  );
 
   if (!days.length) return null;
 
