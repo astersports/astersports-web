@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Search, Link2, Trophy, ChevronRight, Loader2, Check, ArrowUpRight } from "lucide-react";
+import { Search, Link2, Trophy, ChevronRight, Loader2, Check, ArrowUpRight, Plus } from "lucide-react";
 import {
   getTournamentDirectory,
   submitTournament,
   getIngestStatus,
+  searchPublicTeams,
   type DirTournament,
+  type TeamHit,
 } from "@/lib/aster";
+import { track, untrack, isTracked, getTracked, TRACKED_EVENT } from "@/lib/aau/trackingStore";
+import { fmtRange } from "@/lib/aau/dates";
 
 // Screen 01 Discovery — best-in-class render 01. Public + free to browse, and self-serve:
 // a parent pastes their TourneyMachine link and the hub ingests it itself. FLAT tournament
@@ -23,6 +27,59 @@ export default function FindDiscovery({ onOpenTournament }: { onOpenTournament: 
   const [flashId, setFlashId] = useState<string | null>(null);
   const busy = sub.phase === "working";
   const alive = useRef(true);
+
+  // Global team search — one query → the team across every public tournament.
+  const [teamHits, setTeamHits] = useState<TeamHit[]>([]);
+  const [trackedKeys, setTrackedKeys] = useState<Set<string>>(() => new Set(getTracked().map((t) => t.teamKey)));
+
+  useEffect(() => {
+    const term = q.trim();
+    if (term.length < 2) {
+      setTeamHits([]);
+      return;
+    }
+    let live = true;
+    const id = setTimeout(() => {
+      searchPublicTeams(term)
+        .then((hits) => live && setTeamHits(hits))
+        .catch(() => live && setTeamHits([]));
+    }, 220);
+    return () => {
+      live = false;
+      clearTimeout(id);
+    };
+  }, [q]);
+
+  const toggleTrack = (h: TeamHit) => {
+    if (isTracked(h.teamKey)) untrack(h.teamKey);
+    else
+      track([
+        {
+          teamKey: h.teamKey,
+          name: h.name,
+          pool: null,
+          tournamentId: h.tournamentId,
+          tournamentName: h.tournamentName,
+          divisionId: h.divisionId,
+          divisionName: h.divisionName,
+        },
+      ]);
+    setTrackedKeys(new Set(getTracked().map((t) => t.teamKey)));
+  };
+
+  // keep the Track/Tracked toggle fresh — same-tab track changes, cross-tab
+  // storage writes, and tab focus (mirrors MyTeams) so it never reads stale.
+  useEffect(() => {
+    const refresh = () => setTrackedKeys(new Set(getTracked().map((t) => t.teamKey)));
+    window.addEventListener(TRACKED_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.removeEventListener(TRACKED_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
 
   const loadDir = useCallback(async () => {
     const d = await getTournamentDirectory();
@@ -112,11 +169,64 @@ export default function FindDiscovery({ onOpenTournament }: { onOpenTournament: 
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search tournament or circuit"
-          aria-label="Search tournaments"
+          placeholder="Search tournament, team, or circuit"
+          aria-label="Search tournaments or teams"
           className="w-full bg-transparent text-[13.5px] text-[#f0f3fa] placeholder-[#5f6981] outline-none"
         />
       </div>
+
+      {/* global team-search results — the team across every tournament, tap → track */}
+      {q.trim().length >= 2 && teamHits.length > 0 && (
+        <div className="mx-[18px] mt-3">
+          <div className="mb-2 font-[var(--font-mono)] text-[10px] uppercase tracking-[0.1em] text-[#5f6981]">
+            Teams matching “{q.trim()}”
+          </div>
+          <div className="space-y-[8px]">
+            {teamHits.map((h) => {
+              const on = trackedKeys.has(h.teamKey);
+              const meta = [
+                [h.gender, h.gradeLabel].filter(Boolean).join(" ") || h.divisionName,
+                h.tournamentName,
+                fmtRange(h.startDate, h.endDate),
+              ]
+                .filter(Boolean)
+                .join(" · ");
+              return (
+                <div
+                  key={h.teamKey}
+                  className="flex items-center gap-[11px] rounded-[14px] border border-[rgba(255,255,255,0.055)] bg-[linear-gradient(180deg,#151b29,#10141f)] px-[14px] py-[11px]"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13.5px] font-semibold text-[#f0f3fa]">{h.name}</span>
+                    <small className="mt-0.5 block truncate font-[var(--font-mono)] text-[10px] text-[#5f6981]">{meta}</small>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => toggleTrack(h)}
+                    aria-pressed={on}
+                    aria-label={`${on ? "Untrack" : "Track"} ${h.name} (${h.tournamentName})`}
+                    className={`as-press flex shrink-0 items-center gap-1 rounded-full px-[12px] py-[6px] text-[11.5px] font-semibold ${
+                      on
+                        ? "border border-[rgba(94,203,143,0.4)] bg-[rgba(94,203,143,0.12)] text-[#5ecb8f]"
+                        : "bg-[linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)] text-[#1a1206]"
+                    }`}
+                  >
+                    {on ? (
+                      <>
+                        <Check className="h-[12px] w-[12px]" /> Tracked
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-[12px] w-[12px]" /> Track
+                      </>
+                    )}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* paste-to-track */}
       <div className="mx-[18px] my-[13px] flex items-center gap-3 font-[var(--font-mono)] text-[10px] text-[#454e63]">
