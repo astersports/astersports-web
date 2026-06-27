@@ -81,6 +81,31 @@ export async function getTournamentTeams(tournamentId: string): Promise<Tourname
   return (data as TournamentTeams | null) ?? null;
 }
 
+// ─── Tracked teams' schedule (My Teams killers: next-game+travel, conflict radar) ───
+export interface TeamGameVenue {
+  name: string | null; address: string | null; city: string | null; state: string | null;
+  lat: number | null; lng: number | null;
+}
+export interface TeamGame {
+  gameId: string; gameCode: string;
+  trackedTeamId: string; trackedTeamName: string;
+  isHome: boolean; opponent: string | null;
+  myScore: number | null; oppScore: number | null;
+  status: "scheduled" | "live" | "final";
+  startAt: string | null; court: string | null;
+  division: string; tournamentId: string; tournament: string;
+  venue: TeamGameVenue | null;
+}
+
+/** Every game (past + upcoming) for the given tracked team ids (tournament_division_team
+ *  ids), with opponent + time + venue. [] for an empty id list. Sorted by start time. */
+export async function getTrackedTeamSchedule(teamIds: string[]): Promise<TeamGame[]> {
+  if (!teamIds.length) return [];
+  const { data, error } = await aster.rpc("get_public_aau_team_schedule", { p_team_ids: teamIds });
+  if (error) throw error;
+  return (data as TeamGame[]) ?? [];
+}
+
 // ─── Self-serve paste-to-track (Screen 01) ───
 // A parent pastes a TourneyMachine link; the public aau-submit-tournament edge function
 // resolves it, scrapes server-side (the ingest_secret never leaves the server), and the

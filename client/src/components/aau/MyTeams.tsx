@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Users, X, Trophy } from "lucide-react";
 import { getTracked, untrack, TRACKED_EVENT, type TrackedTeam } from "@/lib/aau/trackingStore";
+import ConflictRadar from "./ConflictRadar";
 
 // Screen 03 "My Teams" — foundation. Renders the REAL tracked set (trackingStore),
 // grouped by program/club, no placeholder. The live command-center treatment (Realtime
@@ -45,6 +46,11 @@ export default function MyTeams() {
           </div>
         </div>
         <Users className="h-5 w-5 text-[#5f6981]" />
+      </div>
+
+      {/* Killer #3 — conflict radar (self-hides when no overlap) */}
+      <div className="mt-4">
+        <ConflictRadar tracked={teams} />
       </div>
 
       {teams.length === 0 && (

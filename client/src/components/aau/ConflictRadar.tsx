@@ -1,0 +1,90 @@
+import { useEffect, useState } from "react";
+import { AlertTriangle, Clock } from "lucide-react";
+import { getTrackedTeamSchedule } from "@/lib/aster";
+import { findConflicts, type DayConflict } from "@/lib/aau/conflicts";
+import type { TrackedTeam } from "@/lib/aau/trackingStore";
+
+// Killer #3 — Conflict radar + split-up. "Two kids, two courts, overlapping. We catch it
+// — and tell you who covers whom." Pure read over get_public_aau_team_schedule; renders
+// ONLY when a real overlap exists across two tracked teams on the same day (an alert
+// surface, not a permanent card). No fabrication, no held flip.
+interface Props {
+  tracked: TrackedTeam[];
+}
+
+export default function ConflictRadar({ tracked }: Props) {
+  const [days, setDays] = useState<DayConflict[]>([]);
+
+  useEffect(() => {
+    const ids = tracked.map((t) => t.teamKey);
+    if (ids.length < 2) {
+      setDays([]);
+      return;
+    }
+    let live = true;
+    getTrackedTeamSchedule(ids)
+      .then((games) => live && setDays(findConflicts(tracked, games, new Date())))
+      .catch(() => live && setDays([]));
+    return () => {
+      live = false;
+    };
+  }, [tracked]);
+
+  if (!days.length) return null;
+
+  return (
+    <div className="mx-[18px] mb-4 space-y-3">
+      {days.map((day) => (
+        <div
+          key={day.dayKey}
+          className="overflow-hidden rounded-[16px] border border-[rgba(255,107,94,0.28)] bg-[radial-gradient(280px_120px_at_18%_0%,rgba(255,107,94,0.10),transparent),linear-gradient(180deg,#151b29,#10141f)]"
+        >
+          {/* header: day · "your day" + overlap count */}
+          <div className="flex items-center justify-between border-b border-[rgba(255,255,255,0.055)] px-[15px] py-[11px]">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-[15px] w-[15px] text-[#ff6b5e]" />
+              <span className="text-[12.5px] font-semibold text-[#f0f3fa]">{day.dayLabel}</span>
+              <span className="font-[var(--font-mono)] text-[10px] text-[#5f6981]">· your day</span>
+            </div>
+            <span className="rounded-full border border-[rgba(255,107,94,0.4)] bg-[rgba(255,107,94,0.12)] px-[9px] py-[3px] font-[var(--font-mono)] text-[10px] font-semibold text-[#ff8a7e]">
+              {day.overlaps.length} game{day.overlaps.length === 1 ? "" : "s"} overlap
+            </span>
+          </div>
+
+          {/* the involved games */}
+          <div className="px-[15px] py-[10px]">
+            {day.games.map((g) => (
+              <div key={g.teamKey + g.timeLabel} className="flex items-center gap-3 py-[7px]">
+                <span className="font-[var(--font-mono)] text-[12px] font-semibold tabular-nums text-[#f0f3fa] w-[58px] shrink-0">
+                  {g.timeLabel}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-semibold text-[#f0f3fa]">{g.label}</span>
+                  <small className="mt-0.5 block truncate font-[var(--font-mono)] text-[10px] text-[#5f6981]">
+                    {[g.court, g.venue, g.opponent ? `vs ${g.opponent}` : null].filter(Boolean).join(" · ")}
+                  </small>
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* overlap callout(s) — who runs at the same time */}
+          {day.overlaps.map((o, i) => (
+            <div
+              key={i}
+              className="flex items-start gap-2 border-t border-[rgba(255,255,255,0.055)] bg-[rgba(255,107,94,0.06)] px-[15px] py-[10px]"
+            >
+              <Clock className="mt-px h-[13px] w-[13px] shrink-0 text-[#ff8a7e]" />
+              <div className="text-[12px] leading-[1.5] text-[#f0f3fa]">
+                <span className="font-semibold text-[#ff8a7e]">Overlap · {o.windowLabel}</span>
+                {" — "}
+                {o.a.label} ({o.a.court ?? "court TBD"}, {o.a.timeLabel}) and {o.b.label} ({o.b.court ?? "court TBD"},{" "}
+                {o.b.timeLabel}) run at the same time. Split up?
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
