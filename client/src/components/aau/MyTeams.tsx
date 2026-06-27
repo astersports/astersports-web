@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Users, X, Trophy } from "lucide-react";
+import { Users, X, Trophy, ChevronRight } from "lucide-react";
 import { getTracked, untrack, TRACKED_EVENT, type TrackedTeam } from "@/lib/aau/trackingStore";
 import { getTrackedTeamSchedule, getTournamentStandings, type TeamGame } from "@/lib/aster";
 import { buildMyTeamsModel, type MyTeamsModel } from "@/lib/aau/myTeamsModel";
@@ -7,6 +7,7 @@ import { predictBracket } from "@/lib/standings/predictBracket";
 import { effectiveRatings } from "@/lib/aau/gradePrior";
 import ConflictRadar from "./ConflictRadar";
 import NextGame from "./NextGame";
+import TeamDetail from "./TeamDetail";
 
 // Screen 03 "My Teams · command center" — render-faithful. Header + "updating live" (only
 // when a tracked team is in progress), a live score hero, three glance stats (to-advance %
@@ -20,7 +21,8 @@ const norm = (s: string) => s.trim().toLowerCase();
 export default function MyTeams() {
   const [teams, setTeams] = useState<TrackedTeam[]>([]);
   const [games, setGames] = useState<TeamGame[]>([]);
-  const [advancePct, setAdvancePct] = useState<number | null>(null);
+  const [odds, setOdds] = useState<Record<string, number>>({}); // teamKey → "to advance" %
+  const [selected, setSelected] = useState<string | null>(null); // open a team's detail
 
   useEffect(() => {
     const refresh = () => setTeams(getTracked());
@@ -63,32 +65,54 @@ export default function MyTeams() {
     return key ? teams.find((t) => t.teamKey === key) ?? null : null;
   }, [model.hero, nextUpKey, teams]);
 
-  // to-advance % for the featured team — predictor over its division standings (real,
-  // enumerated). Team matched by name (standings ids are resolved keys).
+  // "to advance" odds for EVERY tracked team (not just the featured one) — the predictor
+  // over each team's division standings, weighted by strength + grade. Each distinct
+  // division is fetched once; teams sharing it reuse the bundle. Gate out "even" (no signal)
+  // so a row shows a number only when there's a real basis. Keyed by teamKey → every row
+  // shows its own odds, so two teams with different odds both appear (not just one).
   useEffect(() => {
-    setAdvancePct(null);
-    if (!featured?.divisionId) return;
     let live = true;
-    getTournamentStandings(featured.divisionId)
-      .then((b) => {
-        if (!live || !b) return;
-        const me = b.teams.find((t) => norm(t.name) === norm(featured.name));
-        if (!me) return;
-        const p = predictBracket({
-          teams: b.teams, games: b.games, remaining: b.remaining,
-          rules: b.rules, advanceCount: b.division.advance_count, focusId: me.id,
-          eff: effectiveRatings(b.teams, b.division.name),
-        });
-        // gate: show a number only when there's a basis (results, or a strength/grade
-        // signal) — never a uniform coin-flip dressed up as odds.
-        if (p.available && p.basis !== "even") setAdvancePct(p.oddsPct ?? null);
-      })
-      .catch(() => {});
+    const byDiv = new Map<string, TrackedTeam[]>();
+    for (const t of teams) {
+      if (!t.divisionId) continue;
+      const arr = byDiv.get(t.divisionId) ?? [];
+      arr.push(t);
+      byDiv.set(t.divisionId, arr);
+    }
+    if (!byDiv.size) { setOdds({}); return; }
+    Promise.all(
+      Array.from(byDiv.entries()).map(async ([divId, members]): Promise<[string, number][]> => {
+        const b = await getTournamentStandings(divId).catch(() => null);
+        if (!b) return [];
+        const eff = effectiveRatings(b.teams, b.division.name);
+        const out: [string, number][] = [];
+        for (const t of members) {
+          const me = b.teams.find((x) => norm(x.name) === norm(t.name));
+          if (!me) continue;
+          const p = predictBracket({
+            teams: b.teams, games: b.games, remaining: b.remaining,
+            rules: b.rules, advanceCount: b.division.advance_count, focusId: me.id, eff,
+          });
+          if (p.available && p.basis !== "even" && p.oddsPct != null) out.push([t.teamKey, p.oddsPct]);
+        }
+        return out;
+      }),
+    ).then((all) => {
+      if (!live) return;
+      const map: Record<string, number> = {};
+      for (const arr of all) for (const [k, v] of arr) map[k] = v;
+      setOdds(map);
+    });
     return () => { live = false; };
-  }, [featured?.divisionId, featured?.name]);
+  }, [teams]);
 
   const drop = (key: string) => setTeams(untrack(key));
   const liveActive = model.glance.liveNow > 0;
+  const featuredPct = featured ? odds[featured.teamKey] : undefined; // headline = featured team
+
+  // team detail drill-down (game-by-game schedule + results + directions)
+  const sel = selected ? teams.find((t) => t.teamKey === selected) : null;
+  if (sel) return <TeamDetail team={sel} games={games} onBack={() => setSelected(null)} />;
 
   return (
     <div className="as-fade-in pb-6">
@@ -137,14 +161,14 @@ export default function MyTeams() {
       {teams.length > 0 && (
         <>
           <div className="flex gap-[10px] px-[18px] pt-3">
-            <GlanceCard value={advancePct == null ? "—" : `${advancePct}%`} label="to advance" grad />
+            <GlanceCard value={featuredPct == null ? "—" : `${featuredPct}%`} label="to advance" grad />
             <GlanceCard value={String(model.glance.liveNow)} label="live now" />
             <GlanceCard value={String(model.glance.today)} label="today" />
           </div>
-          {/* name the team the odds belong to — one number, never a blend of the tracked set */}
-          {teams.length > 1 && advancePct != null && featured && (
+          {/* the headline % is the featured (next-to-play) team; per-team odds sit in each row */}
+          {teams.length > 1 && featuredPct != null && featured && (
             <div className="px-[18px] pt-1.5 text-center font-[var(--font-mono)] text-[9.5px] text-[#5f6981]">
-              advance odds for <span className="text-[#9aa4ba]">{featured.name}</span>
+              headline odds: <span className="text-[#9aa4ba]">{featured.name}</span> · each team's below
             </div>
           )}
         </>
@@ -180,14 +204,23 @@ export default function MyTeams() {
               <span className="text-[#5f6981]">{grp.todayCount > 0 ? `${grp.todayCount} game${grp.todayCount === 1 ? "" : "s"}` : `${grp.teams.length} team${grp.teams.length === 1 ? "" : "s"}`}</span>
             </div>
             {grp.teams.map((t) => (
-              <div key={t.teamKey} className="flex items-center gap-[11px] border-t border-[rgba(255,255,255,0.055)] px-[15px] py-[12px] text-[13px] first:border-t-0">
-                <span className="min-w-0 flex-1 truncate font-semibold text-[#f0f3fa]">{t.name}</span>
-                {(t.record.w > 0 || t.record.l > 0) && (
-                  <span className="font-[var(--font-mono)] text-[11px] text-[#9aa4ba]">{t.record.w}–{t.record.l}</span>
-                )}
-                {t.todayPill && (
-                  <span className={`font-[var(--font-mono)] text-[10px] rounded-[6px] px-2 py-[3px] ${t.todayPill.won ? "bg-[rgba(94,203,143,0.08)] text-[#5ecb8f]" : "bg-[rgba(246,204,85,0.08)] text-[#F6CC55]"}`}>{t.todayPill.text}</span>
-                )}
+              <div key={t.teamKey} className="flex items-center gap-[10px] border-t border-[rgba(255,255,255,0.055)] px-[15px] py-[12px] text-[13px] first:border-t-0">
+                <button type="button" onClick={() => setSelected(t.teamKey)} aria-label={`Open ${t.name}`}
+                  className="as-press flex min-w-0 flex-1 items-center gap-[10px] text-left">
+                  <span className="min-w-0 flex-1 truncate font-semibold text-[#f0f3fa]">{t.name}</span>
+                  {(t.record.w > 0 || t.record.l > 0) && (
+                    <span className="shrink-0 font-[var(--font-mono)] text-[11px] text-[#9aa4ba]">{t.record.w}–{t.record.l}</span>
+                  )}
+                  {odds[t.teamKey] != null && (
+                    <span className="shrink-0 rounded-[6px] bg-[rgba(246,204,85,0.08)] px-2 py-[3px] font-[var(--font-mono)] text-[10px] font-semibold text-[#F6CC55]">
+                      {odds[t.teamKey]}%
+                    </span>
+                  )}
+                  {t.todayPill && (
+                    <span className={`shrink-0 font-[var(--font-mono)] text-[10px] rounded-[6px] px-2 py-[3px] ${t.todayPill.won ? "bg-[rgba(94,203,143,0.08)] text-[#5ecb8f]" : "bg-[rgba(246,204,85,0.08)] text-[#F6CC55]"}`}>{t.todayPill.text}</span>
+                  )}
+                  <ChevronRight className="h-[15px] w-[15px] shrink-0 text-[#454e63]" />
+                </button>
                 <button type="button" onClick={() => drop(t.teamKey)} aria-label={`Stop tracking ${t.name}`}
                   className="as-press grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#212939] text-[#5f6981] hover:text-[#ff8a7e]">
                   <X className="h-[13px] w-[13px]" />
