@@ -45,7 +45,7 @@ function GameRow({ g }: { g: TeamGame }) {
           {venueLine && <div className="mt-0.5 truncate font-[var(--font-mono)] text-[10px] text-[#6B7280]">{venueLine}</div>}
         </div>
         {isFinal ? (
-          <span className={`shrink-0 font-[var(--font-mono)] text-[12px] font-bold ${won ? "text-[#16A34A]" : "text-[#ff8a7e]"}`}>
+          <span className={`shrink-0 font-[var(--font-mono)] text-[12px] font-bold ${won ? "text-[#16A34A]" : "text-[#DC2626]"}`}>
             {won ? "W" : "L"} {g.myScore}–{g.oppScore}
           </span>
         ) : g.status === "live" ? (

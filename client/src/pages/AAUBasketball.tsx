@@ -106,9 +106,12 @@ export default function AAUBasketball() {
           top: 0,
           zIndex: 30,
           paddingTop: "env(safe-area-inset-top)",
-          background: "rgba(255,255,255,0.92)",
+          // Navy chrome — the Aster signature is a dark navy header on a light body (operator:
+          // "more dark highlights in the aster theme", 2026-06-27). Light text + bright gold accent
+          // ride on the navy; the body stays the light brand.
+          background: "rgba(21,21,37,0.95)",
           backdropFilter: "blur(12px)",
-          borderBottom: "1px solid var(--as-border-default)",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
         }}
       >
         <div style={{ height: 4, width: "100%", background: "var(--brand-grad)" }} />
@@ -130,7 +133,7 @@ export default function AAUBasketball() {
               gap: 6,
               fontSize: 12,
               fontWeight: 600,
-              color: "var(--as-text-secondary)",
+              color: "#CBD2E0", // light-on-navy
               textDecoration: "none",
             }}
           >
@@ -143,7 +146,7 @@ export default function AAUBasketball() {
                 fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: "0.08em",
-                color: "var(--as-team-primary)",
+                color: "#F6CC55", // bright gold reads on navy
                 textTransform: "uppercase",
               }}
             >
@@ -227,9 +230,9 @@ export default function AAUBasketball() {
           display: "flex",
           justifyContent: "space-around",
           padding: "8px 6px calc(8px + env(safe-area-inset-bottom))",
-          background: "rgba(255,255,255,0.92)",
+          background: "rgba(21,21,37,0.95)", // navy chrome — matches the header
           backdropFilter: "blur(12px)",
-          borderTop: "1px solid var(--as-border-default)",
+          borderTop: "1px solid rgba(255,255,255,0.08)",
         }}
       >
         {NAV.map(({ id, label, Icon }) => {
@@ -261,7 +264,7 @@ export default function AAUBasketball() {
                 fontFamily: "inherit",
                 fontSize: 10,
                 fontWeight: 600,
-                color: active ? "var(--as-team-primary)" : "var(--as-text-tertiary)",
+                color: active ? "#F6CC55" : "#8896AB", // bright gold active · muted slate inactive, on navy
               }}
             >
               <Icon style={{ width: 20, height: 20 }} />

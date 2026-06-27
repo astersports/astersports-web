@@ -30,12 +30,12 @@ export default function HomeGatedSections({ teamCount }: { teamCount: number }) 
       {/* Saturday-night predictive model — gated on §2.B bracket data + F1 calibration */}
       <div className="overflow-hidden rounded-[16px] p-[14px]" style={{ border: "1px solid rgba(167,139,250,.24)", background: "linear-gradient(165deg,rgba(167,139,250,.10),rgba(255,255,255,0.7))" }}>
         <div className="flex items-center justify-between">
-          <span className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em]" style={{ color: "#a78bfa" }}>Saturday night · the bracket</span>
-          <Moon className="h-[14px] w-[14px]" style={{ color: "#a78bfa" }} aria-hidden />
+          <span className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em]" style={{ color: "#7C3AED" }}>Saturday night · the bracket</span>
+          <Moon className="h-[14px] w-[14px]" style={{ color: "#7C3AED" }} aria-hidden />
         </div>
         <div className="mt-[7px] font-[var(--font-display)] text-[14.5px] font-bold" style={{ color: C.ink }}>What it takes to make Sunday</div>
         <div className="mt-[5px] text-[12px] leading-[1.55]" style={{ color: C.dim }}>
-          When pool play wraps, you&apos;ll see exactly what each team needs — <span style={{ color: "#16A34A", fontWeight: 600 }}>clinched</span>, <span style={{ color: "#ff6b5e", fontWeight: 600 }}>out</span>, or the if/then (&ldquo;win 9:00 and you clinch the 4-seed&rdquo;). The conditions are exact math.
+          When pool play wraps, you&apos;ll see exactly what each team needs — <span style={{ color: "#16A34A", fontWeight: 600 }}>clinched</span>, <span style={{ color: "#DC2626", fontWeight: 600 }}>out</span>, or the if/then (&ldquo;win 9:00 and you clinch the 4-seed&rdquo;). The conditions are exact math.
         </div>
         <div className="mt-[11px] flex items-center justify-between rounded-[11px] px-[11px] py-[9px]" style={{ background: "rgba(0,0,0,0.03)", border: `1px solid ${C.hair}` }}>
           <span className="font-[var(--font-mono)] text-[10.5px]" style={{ color: C.mut }}>Make the bracket</span>

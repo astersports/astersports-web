@@ -32,11 +32,11 @@ export default function ConflictRadar({ tracked, games }: Props) {
           {/* header: day · "your day" + overlap count */}
           <div className="flex items-center justify-between border-b border-[rgba(0,0,0,0.06)] px-[15px] py-[11px]">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="h-[15px] w-[15px] text-[#ff6b5e]" />
+              <AlertTriangle className="h-[15px] w-[15px] text-[#DC2626]" />
               <span className="text-[12.5px] font-semibold text-[#1A1D23]">{day.dayLabel}</span>
               <span className="font-[var(--font-mono)] text-[10px] text-[#6B7280]">· your day</span>
             </div>
-            <span className="rounded-full border border-[rgba(255,107,94,0.4)] bg-[rgba(255,107,94,0.12)] px-[9px] py-[3px] font-[var(--font-mono)] text-[10px] font-semibold text-[#ff8a7e]">
+            <span className="rounded-full border border-[rgba(255,107,94,0.4)] bg-[rgba(255,107,94,0.12)] px-[9px] py-[3px] font-[var(--font-mono)] text-[10px] font-semibold text-[#DC2626]">
               {day.overlaps.length} game{day.overlaps.length === 1 ? "" : "s"} overlap
             </span>
           </div>
@@ -64,9 +64,9 @@ export default function ConflictRadar({ tracked, games }: Props) {
               key={i}
               className="flex items-start gap-2 border-t border-[rgba(0,0,0,0.06)] bg-[rgba(255,107,94,0.06)] px-[15px] py-[10px]"
             >
-              <Clock className="mt-px h-[13px] w-[13px] shrink-0 text-[#ff8a7e]" />
+              <Clock className="mt-px h-[13px] w-[13px] shrink-0 text-[#DC2626]" />
               <div className="text-[12px] leading-[1.5] text-[#1A1D23]">
-                <span className="font-semibold text-[#ff8a7e]">Overlap · {o.windowLabel}</span>
+                <span className="font-semibold text-[#DC2626]">Overlap · {o.windowLabel}</span>
                 {" — "}
                 {o.a.label} ({o.a.court ?? "court TBD"}, {o.a.timeLabel}) and {o.b.label} ({o.b.court ?? "court TBD"},{" "}
                 {o.b.timeLabel}) run at the same time. Split up?

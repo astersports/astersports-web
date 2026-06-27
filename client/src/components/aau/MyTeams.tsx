@@ -159,7 +159,7 @@ export default function MyTeams() {
                   <ChevronRight className="h-[15px] w-[15px] shrink-0 text-[#9CA3AF]" />
                 </button>
                 <button type="button" onClick={() => drop(t.teamKey)} aria-label={`Stop tracking ${t.name}`}
-                  className="as-press grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#E2E8F0] text-[#6B7280] hover:text-[#ff8a7e]">
+                  className="as-press grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#E2E8F0] text-[#6B7280] hover:text-[#DC2626]">
                   <X className="h-[13px] w-[13px]" />
                 </button>
               </div>

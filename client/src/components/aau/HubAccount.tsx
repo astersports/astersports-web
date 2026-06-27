@@ -45,7 +45,7 @@ export default function HubAccount({ user }: { user: HubUser | null }) {
             <button
               type="button"
               onClick={() => { setOpen(false); void signOutHub(); }}
-              className="as-press w-full rounded-[8px] px-3 py-2 text-left text-[12px] text-[#ff8a7e] hover:bg-[rgba(255,107,94,0.08)]"
+              className="as-press w-full rounded-[8px] px-3 py-2 text-left text-[12px] text-[#DC2626] hover:bg-[rgba(255,107,94,0.08)]"
             >
               Sign out
             </button>

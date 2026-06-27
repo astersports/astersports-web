@@ -56,7 +56,7 @@ export default function PlusGate({ onClose }: { onClose: () => void }) {
             </div>
           ))}
           <div className="flex items-start gap-[9px] text-[12px] leading-[1.4]" style={{ color: C.mut }}>
-            <span className="mt-[1px] shrink-0 font-bold" style={{ color: "#a78bfa" }}>◆</span> Film + AI review — verified, when it ships
+            <span className="mt-[1px] shrink-0 font-bold" style={{ color: "#7C3AED" }}>◆</span> Film + AI review — verified, when it ships
           </div>
         </div>
 
