@@ -25,7 +25,7 @@ export default function StandingsTable({ title, subtitle, rows, advanceCount, ca
       <div className="flex items-center justify-between px-4 pb-2.5 pt-3.5">
         <div>
           <div className="font-[var(--font-display)] text-[15px] font-semibold text-[#1A1D23]">{title}</div>
-          {subtitle && <div className="mt-0.5 text-[11px] text-[#6B7280]">{subtitle}</div>}
+          {subtitle && <div className="mt-0.5 text-[11px] text-[#4B5563]">{subtitle}</div>}
         </div>
         {capLabel && (
           <span className="rounded-[7px] border border-[rgba(246,204,85,0.22)] bg-[rgba(246,204,85,0.08)] px-2 py-[3px] font-[var(--font-mono)] text-[10px] text-[#8F6708]">
@@ -35,7 +35,7 @@ export default function StandingsTable({ title, subtitle, rows, advanceCount, ca
       </div>
       <table className="w-full border-collapse">
         <thead>
-          <tr className="font-[var(--font-mono)] text-[9px] uppercase tracking-wide text-[#6B7280]">
+          <tr className="font-[var(--font-mono)] text-[9px] uppercase tracking-wide text-[#4B5563]">
             <th className={`border-b ${HAIR} px-3 py-2 text-left`} colSpan={2}>Team</th>
             <th className={`border-b ${HAIR} px-3 py-2 text-right`}>W–L</th>
             <th className={`border-b ${HAIR} px-3 py-2 text-right`}>DIFF*</th>
@@ -47,7 +47,7 @@ export default function StandingsTable({ title, subtitle, rows, advanceCount, ca
           ))}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={4} className="px-3 py-6 text-center text-[12px] text-[#6B7280]">
+              <td colSpan={4} className="px-3 py-6 text-center text-[12px] text-[#4B5563]">
                 No games on the board yet — standings appear as the tournament plays.
               </td>
             </tr>
@@ -55,7 +55,7 @@ export default function StandingsTable({ title, subtitle, rows, advanceCount, ca
         </tbody>
       </table>
       {footNote && (
-        <div className={`flex items-center gap-1.5 border-t ${HAIR} px-3 py-2 font-[var(--font-mono)] text-[9.5px] text-[#6B7280]`}>
+        <div className={`flex items-center gap-1.5 border-t ${HAIR} px-3 py-2 font-[var(--font-mono)] text-[9.5px] text-[#4B5563]`}>
           <Check className="h-2.5 w-2.5 shrink-0 text-[#16A34A]" /> {footNote}
         </div>
       )}
@@ -72,7 +72,7 @@ function FragmentRow({ r, i, focusId, advanceCount }: { r: RankedRow; i: number;
   return (
     <>
       <tr className={me ? "bg-[rgba(95,160,230,0.10)]" : ""}>
-        <td className={`w-[18px] ${cell} text-right text-[#6B7280]`}>{r.rank}</td>
+        <td className={`w-[18px] ${cell} text-right text-[#4B5563]`}>{r.rank}</td>
         <td className={`border-t border-[rgba(0,0,0,0.06)] px-3 py-3 text-left text-[13px] font-semibold ${me ? "text-[#bcd8f3]" : "text-[#1A1D23]"}`}>{r.name}</td>
         <td className={`${cell} text-right text-[#1A1D23]`}>{wl}</td>
         <td className={`${cell} text-right text-[#1A1D23]`}>{diff}</td>

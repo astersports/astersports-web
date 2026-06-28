@@ -52,9 +52,9 @@ export function weatherAccent(code: number, isDay = true): string {
   switch (kind) {
     case "clear":
     case "mostly-clear":
-      return isDay ? "#FFB22E" : "#6B7280";
+      return isDay ? "#FFB22E" : "#4B5563";
     case "partly-cloudy":
-      return isDay ? "#FFB22E" : "#6B7280";
+      return isDay ? "#FFB22E" : "#4B5563";
     case "rain":
     case "drizzle":
       return "#4a8fd4";
@@ -63,9 +63,9 @@ export function weatherAccent(code: number, isDay = true): string {
     case "thunder":
       return "#FFD43B";
     case "fog":
-      return "#6B7280";
+      return "#4B5563";
     default:
-      return "#4A5568";
+      return "#374151";
   }
 }
 
@@ -73,8 +73,8 @@ const SUN = "#FFD43B";
 const SUN_EDGE = "#FF9F1C";
 const MOON = "#E8EEF7";
 const CLOUD_LIGHT = "#E2E8F0";
-const CLOUD_MID = "#6B7280"; // names track luminance: LIGHT > MID > DARK
-const CLOUD_DARK = "#4A5568";
+const CLOUD_MID = "#4B5563"; // names track luminance: LIGHT > MID > DARK
+const CLOUD_DARK = "#374151";
 const RAIN = "#5BA0E0";
 const SNOW = "#DCEcFF";
 const BOLT = "#FFD43B";

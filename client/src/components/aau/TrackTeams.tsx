@@ -167,7 +167,7 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
       <button
         type="button"
         onClick={onBack}
-        className="mb-2 flex items-center gap-1 font-[var(--font-mono)] text-[11px] text-[#4A5568]"
+        className="mb-2 flex items-center gap-1 font-[var(--font-mono)] text-[11px] text-[#374151]"
       >
         <ChevronLeft className="h-4 w-4" /> Find
       </button>
@@ -183,13 +183,13 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
 
       {/* search */}
       <div className="mx-[18px] mt-2 flex items-center gap-[11px] rounded-[15px] border border-[#E2E8F0] bg-[#F9FAFB] px-[15px] py-[13px] shadow-[inset_0_1px_0_rgba(0,0,0,0.04)]">
-        <Search className="h-[18px] w-[18px] shrink-0 text-[#6B7280]" />
+        <Search className="h-[18px] w-[18px] shrink-0 text-[#4B5563]" />
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search a team or club"
           aria-label="Search teams or clubs"
-          className="w-full bg-transparent text-[13.5px] text-[#1A1D23] placeholder-[#6B7280] outline-none"
+          className="w-full bg-transparent text-[13.5px] text-[#1A1D23] placeholder-[#4B5563] outline-none"
         />
       </div>
 
@@ -213,7 +213,7 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
                 style={
                   gradeOpen || gradeSel.size > 0
                     ? { background: "rgba(246,204,85,.13)", border: "1px solid rgba(246,204,85,.4)", color: "#8F6708" }
-                    : { border: "1px solid #E2E8F0", color: "#4A5568" }
+                    : { border: "1px solid #E2E8F0", color: "#374151" }
                 }
               >
                 {gradeSel.size ? `${gradeSel.size} grade${gradeSel.size === 1 ? "" : "s"}` : "Grade"}
@@ -229,7 +229,7 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
 
       {/* states */}
       {error && (
-        <div className="mx-[18px] mt-4 rounded-[15px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)] p-6 text-center text-[12px] text-[#6B7280]">
+        <div className="mx-[18px] mt-4 rounded-[15px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)] p-6 text-center text-[12px] text-[#4B5563]">
           Couldn't load this tournament's teams. Try again in a moment.
         </div>
       )}
@@ -242,9 +242,9 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
       )}
       {data && filtered.length === 0 && (
         <div className="mx-[18px] mt-4 rounded-[15px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)] p-8 text-center">
-          <Trophy className="mx-auto mb-3 h-7 w-7 text-[#6B7280]" />
+          <Trophy className="mx-auto mb-3 h-7 w-7 text-[#4B5563]" />
           <div className="text-[14px] font-semibold text-[#1A1D23]">No teams match</div>
-          <div className="mt-1 text-[12px] text-[#6B7280]">Clear the filters or try a different search.</div>
+          <div className="mt-1 text-[12px] text-[#4B5563]">Clear the filters or try a different search.</div>
         </div>
       )}
 
@@ -267,7 +267,7 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
                         {allOn ? "Unselect all of " : "Track all of "}
                         {program}
                       </span>
-                      <small className="mt-0.5 block font-[var(--font-mono)] text-[10px] text-[#6B7280]">
+                      <small className="mt-0.5 block font-[var(--font-mono)] text-[10px] text-[#4B5563]">
                         {teams.length} teams in this view
                       </small>
                     </span>
@@ -299,7 +299,7 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13.5px] font-semibold text-[#1A1D23]">{t.name}</span>
-                    <small className="mt-0.5 block font-[var(--font-mono)] text-[10px] text-[#6B7280]">
+                    <small className="mt-0.5 block font-[var(--font-mono)] text-[10px] text-[#4B5563]">
                       {[[t.gender, t.grade].filter(Boolean).join(" "), t.pool, `${t.wins}–${t.losses}`]
                         .filter(Boolean)
                         .join(" · ")}
@@ -342,7 +342,7 @@ function ChipRow({ items, active, onPick }: { items: string[]; active: string; o
             className={`shrink-0 rounded-full border px-[15px] py-[7px] text-[12.5px] font-semibold ${
               on
                 ? "border-transparent bg-[linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)] text-[#1a1206]"
-                : "border-[#E2E8F0] bg-[#F9FAFB] text-[#4A5568]"
+                : "border-[#E2E8F0] bg-[#F9FAFB] text-[#374151]"
             }`}
           >
             {it}

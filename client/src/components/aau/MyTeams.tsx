@@ -62,7 +62,7 @@ export default function MyTeams() {
       <div className="flex items-center justify-between px-[18px] pb-1 pt-[14px]">
         <div>
           <h2 className="font-[var(--font-display)] text-[21px] font-bold text-[#1A1D23]">Home</h2>
-          <div className="mt-0.5 font-[var(--font-mono)] text-[10.5px] text-[#6B7280]">
+          <div className="mt-0.5 font-[var(--font-mono)] text-[10.5px] text-[#4B5563]">
             {teams.length ? `${teams.length} tracked${programLabel ? ` · ${programLabel}` : ""}` : "your weekend, handled"}
           </div>
         </div>
@@ -71,7 +71,7 @@ export default function MyTeams() {
             <span className="h-2 w-2 animate-pulse rounded-full bg-[#16A34A] shadow-[0_0_10px_rgba(22,163,74,0.7)]" /> updating live
           </span>
         ) : (
-          <Users className="h-5 w-5 text-[#6B7280]" />
+          <Users className="h-5 w-5 text-[#4B5563]" />
         )}
       </div>
 
@@ -108,7 +108,7 @@ export default function MyTeams() {
             <GlanceCard value={String(model.glance.today)} label="today" />
           </div>
           {/* to-advance is suppressed until the bracket engine + calibration earn it (constitution) */}
-          <div className="px-[18px] pt-1.5 text-center font-[var(--font-mono)] text-[9.5px] text-[#6B7280]">
+          <div className="px-[18px] pt-1.5 text-center font-[var(--font-mono)] text-[9.5px] text-[#4B5563]">
             To-advance status computes when pool play wraps — no estimate before the model earns it.
           </div>
         </>
@@ -145,7 +145,7 @@ export default function MyTeams() {
           <div key={grp.program} className="mx-[18px] overflow-hidden rounded-[16px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)]">
             <div className="flex items-center justify-between border-b border-[rgba(0,0,0,0.06)] px-[15px] py-[11px] font-[var(--font-mono)] text-[10px] uppercase tracking-[0.05em] text-[#8F6708]">
               <span>{grp.program}{grp.todayCount > 0 ? " · today" : ""}</span>
-              <span className="text-[#6B7280]">{grp.todayCount > 0 ? `${grp.todayCount} game${grp.todayCount === 1 ? "" : "s"}` : `${grp.teams.length} team${grp.teams.length === 1 ? "" : "s"}`}</span>
+              <span className="text-[#4B5563]">{grp.todayCount > 0 ? `${grp.todayCount} game${grp.todayCount === 1 ? "" : "s"}` : `${grp.teams.length} team${grp.teams.length === 1 ? "" : "s"}`}</span>
             </div>
             {grp.teams.map((t) => {
               // disambiguator (architect §1): division (gender·grade) · tournament — so five
@@ -160,13 +160,13 @@ export default function MyTeams() {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-semibold text-[#1A1D23]">{t.name}</span>
                     {qual && (
-                      <span className="mt-[2px] block truncate font-[var(--font-mono)] text-[10.5px] text-[#6B7280]">
+                      <span className="mt-[2px] block truncate font-[var(--font-mono)] text-[10.5px] text-[#4B5563]">
                         {qual}
                       </span>
                     )}
                   </span>
                   {(t.record.w > 0 || t.record.l > 0) && (
-                    <span className="shrink-0 font-[var(--font-mono)] text-[11px] text-[#4A5568]">{t.record.w}–{t.record.l}</span>
+                    <span className="shrink-0 font-[var(--font-mono)] text-[11px] text-[#374151]">{t.record.w}–{t.record.l}</span>
                   )}
                   {t.todayPill && (
                     <span className={`shrink-0 font-[var(--font-mono)] text-[10px] rounded-[6px] px-2 py-[3px] ${t.todayPill.won ? "bg-[rgba(94,203,143,0.08)] text-[#16A34A]" : "bg-[rgba(246,204,85,0.08)] text-[#8F6708]"}`}>{t.todayPill.text}</span>
@@ -174,7 +174,7 @@ export default function MyTeams() {
                   <ChevronRight className="h-[15px] w-[15px] shrink-0 text-[#9CA3AF]" />
                 </button>
                 <button type="button" onClick={() => drop(t.teamKey)} aria-label={`Stop tracking ${labelName}`}
-                  className="as-press grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#E2E8F0] text-[#6B7280] hover:text-[#DC2626]">
+                  className="as-press grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#E2E8F0] text-[#4B5563] hover:text-[#DC2626]">
                   <X className="h-[13px] w-[13px]" />
                 </button>
               </div>

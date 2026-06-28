@@ -93,22 +93,22 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
           {cd ?? "LIVE"}
         </div>
         <div className="text-[15px] font-semibold text-[#1A1D23]">
-          {who} <span className="font-normal text-[#6B7280]">vs</span> {game.opponent || "TBD"}
+          {who} <span className="font-normal text-[#4B5563]">vs</span> {game.opponent || "TBD"}
         </div>
-        <div className="mt-1 font-[var(--font-mono)] text-[12px] text-[#4A5568]">
+        <div className="mt-1 font-[var(--font-mono)] text-[12px] text-[#374151]">
           {venueLine || "Venue TBD"}
         </div>
 
         {(driveMin !== null || weather) && (
           <div className="mt-[13px] flex flex-col items-center gap-[9px] border-t border-[rgba(0,0,0,0.06)] pt-[13px]">
             {driveMin !== null && (
-              <div className="flex items-center gap-2 text-[13px] text-[#4A5568]">
-                <Car className="h-[15px] w-[15px] text-[#6B7280]" />
+              <div className="flex items-center gap-2 text-[13px] text-[#374151]">
+                <Car className="h-[15px] w-[15px] text-[#4B5563]" />
                 ~{driveMin} min drive · <span className="font-semibold text-[#ffb648]">leave by {leaveBy}</span>
               </div>
             )}
             {weather && (
-              <div className="flex items-center gap-1.5 text-[11.5px] text-[#4A5568]">
+              <div className="flex items-center gap-1.5 text-[11.5px] text-[#374151]">
                 <ColorfulWeatherIcon icon={weather.icon} isDay={weather.isDay} className="h-[14px] w-[14px]" />
                 {Math.round(weather.temperature)}°F · {weather.description.toLowerCase()}{advice ? ` — ${advice}` : ""}
               </div>
@@ -121,7 +121,7 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
       {dirs && (
         <div className="mt-[13px] flex gap-[9px]">
           <a href={dirs.apple} target="_blank" rel="noopener noreferrer"
-            className="as-press flex flex-1 items-center justify-center gap-1.5 rounded-[11px] border border-[#E2E8F0] bg-[#F9FAFB] py-[9px] text-[11.5px] font-semibold text-[#4A5568]">
+            className="as-press flex flex-1 items-center justify-center gap-1.5 rounded-[11px] border border-[#E2E8F0] bg-[#F9FAFB] py-[9px] text-[11.5px] font-semibold text-[#374151]">
             <Navigation className="h-[14px] w-[14px]" /> Apple
           </a>
           <a href={dirs.google} target="_blank" rel="noopener noreferrer"
@@ -143,7 +143,7 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
         </button>
       )}
 
-      <div className="px-[18px] pb-1 pt-[11px] text-center font-[var(--font-mono)] text-[10.5px] leading-[1.5] text-[#6B7280]">
+      <div className="px-[18px] pb-1 pt-[11px] text-center font-[var(--font-mono)] text-[10.5px] leading-[1.5] text-[#4B5563]">
         Countdown + drive time from venue lat/lng. Weather via aster-weather.
       </div>
     </div>
