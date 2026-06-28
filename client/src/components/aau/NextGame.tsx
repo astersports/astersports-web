@@ -40,6 +40,10 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
     return () => clearInterval(id);
   }, []);
 
+  // a reminder belongs to ONE game — reset the optimistic flag whenever the chosen next
+  // game changes, so the button doesn't stay disabled (with a stale leave-by) for the next.
+  useEffect(() => { setReminded(false); }, [game?.gameId]);
+
   // weather + drive for the chosen game
   const venue = game?.venue;
   const hasCoords = typeof venue?.lat === "number" && typeof venue?.lng === "number";
@@ -72,14 +76,22 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
   const advice = weather ? weatherAdvice(weather) : null; // computed once (Copilot #159)
   const remind = () => {
     if (driveMin === null) return;
-    addLeaveReminder({
-      title: `Leave for ${who} vs ${game.opponent || "TBD"}`,
-      leaveAtMs: startMs - (driveMin + 10) * 60_000, // mirror leaveByLabel's 10-min buffer
-      gameStartMs: startMs,
-      location: venueLine || venue?.name || null,
-      url: dirs?.google ?? null,
-    });
-    setReminded(true); // optimistic confirmation (16.1) — the calendar drop already fired
+    // Honest optimistic UI: only announce "Reminder set" when the calendar drop actually
+    // happened. addLeaveReminder returns false with no DOM (SSR) and can throw in rare envs —
+    // on either, keep the button actionable and stay silent.
+    let ok = false;
+    try {
+      ok = addLeaveReminder({
+        title: `Leave for ${who} vs ${game.opponent || "TBD"}`,
+        leaveAtMs: startMs - (driveMin + 10) * 60_000, // mirror leaveByLabel's 10-min buffer
+        gameStartMs: startMs,
+        location: venueLine || venue?.name || null,
+        url: dirs?.google ?? null,
+      });
+    } catch {
+      ok = false;
+    }
+    if (ok) setReminded(true);
   };
 
   return (
@@ -95,6 +107,7 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
           {cd ? (soon ? `${who} tips soon · in` : `${who} plays in`) : "playing now"}
         </div>
         <div
+          role="img"
           aria-label={cd ? `${who} plays in ${cd}` : "playing now"}
           className={`mt-1.5 mb-0.5 bg-[linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)] bg-clip-text font-[var(--font-mono)] text-[52px] font-bold leading-none tracking-[-2px] text-transparent ${soon ? "as-pulse" : ""}`}
         >

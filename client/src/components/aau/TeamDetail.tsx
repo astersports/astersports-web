@@ -79,7 +79,9 @@ function Section({ title, count, children }: { title: string; count: number; chi
 /** Last-5 form guide: most-recent-first W/L chips from posted finals. Engagement stat (not a
  *  game stat — §16.12) derived purely from results; renders nothing if no final has posted. */
 function FormGuide({ results }: { results: TeamGame[] }) {
-  const last5 = results.slice(0, 5); // results already sorted most-recent-first
+  // a final with a missing score is NOT a result — exclude it so we never render a fake "L"
+  // chip (no-fabrication). results are sorted most-recent-first; take the freshest 5 scored.
+  const last5 = results.filter((g) => g.myScore != null && g.oppScore != null).slice(0, 5);
   if (!last5.length) return null;
   const wins = last5.filter((g) => (g.myScore as number) > (g.oppScore as number)).length;
   // chips render oldest→newest left-to-right, so the freshest result sits at the right edge
