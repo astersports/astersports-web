@@ -61,6 +61,37 @@ describe("predictBracket grade prior (the 4th-grade anomaly)", () => {
   });
 });
 
+describe("posture tracks the math (architect odds-review 2A — no 'In control' mislabel)", () => {
+  // A clinched (2-0); B & C are 1-1 and play for the last spot; D is 0-3 (out).
+  const t4 = [{ id: "A" }, { id: "B" }, { id: "C" }, { id: "D" }];
+  const played = [
+    { aId: "A", bId: "C", aScore: 50, bScore: 30 }, // A 2-0
+    { aId: "A", bId: "B", aScore: 48, bScore: 40 },
+    { aId: "B", bId: "D", aScore: 44, bScore: 30 }, // B 1-1
+    { aId: "C", bId: "D", aScore: 46, bScore: 33 }, // C 1-1, D 0-3
+  ];
+  const rem = [{ aId: "B", bId: "C" }]; // the bubble game
+
+  it("a team that controls its own fate reads 'win_and_in' (win → in, lose → out) — never a bare 'in control'", () => {
+    const b = predictBracket({ teams: t4, games: played, remaining: rem, advanceCount: 2, focusId: "B" });
+    expect(b.posture).toBe("win_and_in");
+    expect(b.scenarios?.some((s) => s.kind === "in")).toBe(true); // win → clinch
+    expect(b.scenarios?.some((s) => s.kind === "out")).toBe(true); // lose → out
+  });
+
+  it("an eliminated trailing team is NEVER labeled 'in control'", () => {
+    const d = predictBracket({ teams: t4, games: played, remaining: rem, advanceCount: 2, focusId: "D" });
+    expect(d.posture).not.toBe("in_control");
+  });
+
+  it("the exact advancing count is independent of strength weighting (the number we lead with)", () => {
+    const uniform = predictBracket({ teams: t4, games: played, remaining: rem, advanceCount: 2, focusId: "B" });
+    const weighted = predictBracket({ teams: t4, games: played, remaining: rem, advanceCount: 2, focusId: "B", eff: { A: 10, B: -10, C: 0, D: 0 } });
+    expect(weighted.advancing).toBe(uniform.advancing); // count is exact; only oddsPct moves with weighting
+    expect(weighted.outcomes).toBe(uniform.outcomes);
+  });
+});
+
 describe("predictBracket gate", () => {
   it("marks a decided bracket with no games as even (caller shows —)", () => {
     const p = predictBracket({ teams, remaining: [], advanceCount: 2, focusId: "strong" });

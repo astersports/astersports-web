@@ -10,9 +10,19 @@ import type { Prediction } from "@/lib/standings/predictBracket";
  */
 interface Props { teamName: string; prediction: Prediction }
 
+// Decided (final) labels by status. The live card labels from POSTURE, which tracks the math, so the
+// badge can never say "In control" for a 0-2 must-win team (architect odds-review 2A).
 const STATUS_LABEL: Record<string, string> = {
   clinched: "Clinched a bracket spot", eliminated: "Eliminated from the bracket",
-  in: "In the bracket", out: "Out of the bracket", live: "In control",
+  in: "In the bracket", out: "Out of the bracket",
+};
+const POSTURE_LABEL: Record<string, string> = {
+  clinched: "Clinched a bracket spot",
+  win_and_in: "Win and in", // controls own fate
+  in_control: "In control", // a win clinches and a loss doesn't kill you
+  must_win: "Must win", // alive only by winning
+  needs_help: "On the brink", // can't control it
+  eliminated: "Eliminated from the bracket",
 };
 
 // best-in-class surface: gradient card + top-hairline highlight + odds glow
@@ -38,33 +48,42 @@ export default function BracketOdds({ teamName, prediction: p }: Props) {
     );
   }
   const projected = p.basis === "ratings"; // no games here yet; a strength/grade projection
-  const pct = Math.max(0, Math.min(100, p.oddsPct ?? 0));
+  // EXACT fraction of remaining scenarios in which the team advances — independent of the strength
+  // weighting. We LEAD with this count; the team-strength-weighted oddsPct is SUPPRESSED until A4
+  // calibration earns it (architect odds-review 2B: count is exact + confident, % is the estimate).
+  const exactPct = p.outcomes ? Math.round(((p.advancing ?? 0) / p.outcomes) * 100) : 0;
+  const label = p.decided
+    ? STATUS_LABEL[p.status ?? "in"] ?? teamName
+    : POSTURE_LABEL[p.posture ?? "needs_help"] ?? teamName;
+  const countLine = p.decided
+    ? "final"
+    : `advances in ${p.advancing} of ${p.outcomes} remaining scenario${p.outcomes === 1 ? "" : "s"}`;
   return (
     <div className={CARD}>
       <div className="flex items-center gap-4 p-4">
-        {/* conic gauge — gold-gradient sweep + gold glow (best-in-class) */}
+        {/* conic gauge — filled by the EXACT advancing fraction (not the suppressed weighted %) */}
         <div
           className="relative grid h-[84px] w-[84px] shrink-0 place-items-center rounded-full"
           style={{
-            background: `conic-gradient(from -90deg, #E0631C 0%, #F6CC55 ${pct}%, #E2E8F0 ${pct}% 100%)`,
+            background: `conic-gradient(from -90deg, #E0631C 0%, #F6CC55 ${exactPct}%, #E2E8F0 ${exactPct}% 100%)`,
             filter: "drop-shadow(0 0 14px rgba(246,204,85,0.25))",
           }}
         >
           <span className="absolute inset-[8px] rounded-full bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)]" />
           <span
-            className="relative font-[var(--font-mono)] text-[22px] font-bold"
+            className="relative font-[var(--font-mono)] text-[15px] font-bold leading-none"
             style={{ background: "var(--brand-grad)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}
           >
-            {pct}%
+            {p.decided ? `${exactPct}%` : `${p.advancing}/${p.outcomes}`}
           </span>
         </div>
         <div className="flex-1">
-          <div className="text-[12px] text-[#4A5568]">Bracket odds</div>
+          <div className="text-[12px] text-[#4A5568]">Advancement</div>
           <div className="mt-[3px] font-[var(--font-display)] text-[18px] font-bold text-[#1A1D23]">
-            {STATUS_LABEL[p.status ?? "live"] ?? teamName}
+            {label}
           </div>
           <div className="mt-1 font-[var(--font-mono)] text-[10.5px] text-[#6B7280]">
-            {p.decided ? "final" : projected ? "projected · no games played yet" : `${p.advancing} of ${p.outcomes} outcomes advance`}
+            {projected ? `projected · ${countLine} (no games yet)` : countLine}
           </div>
         </div>
       </div>
@@ -97,7 +116,7 @@ export default function BracketOdds({ teamName, prediction: p }: Props) {
         <Check className="h-[11px] w-[11px] shrink-0 text-[#16A34A]" />
         {projected
           ? "Projected from cross-tournament strength · wording AI"
-          : "Odds enumerated exactly, weighted by team strength · wording AI"}
+          : "Outcomes enumerated exactly · wording AI"}
       </div>
     </div>
   );

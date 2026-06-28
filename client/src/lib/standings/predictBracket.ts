@@ -25,12 +25,24 @@ const RATING_SCALE = 0.1;
 
 export interface RemainingMatch { aId: string; bId: string }
 export interface Scenario { kind: "in" | "out" | "maybe"; text: string }
+// Posture is the math-tracking label state (architect odds-review 2A: the "In control" badge was
+// mis-mapped onto every live team, including a 0-2 must-win one). Derived from the SAME win/lose
+// enumeration the if/then text uses, so the badge can never contradict the math.
+export type Posture =
+  | "clinched"
+  | "win_and_in" // controls own fate: win → in, lose → out
+  | "in_control" // a win clinches and a loss doesn't kill you
+  | "must_win" // alive only by winning (lose → out), and a win alone isn't enough
+  | "needs_help" // can't control it — depends on other results
+  | "eliminated";
+
 export interface Prediction {
   available: boolean;
   reason?: string;
   decided?: boolean;
   oddsPct?: number;
   status?: "in" | "out" | "live" | "clinched" | "eliminated";
+  posture?: Posture;
   outcomes?: number;
   advancing?: number;
   remaining?: number;
@@ -115,12 +127,23 @@ export function predictBracket({ teams = [], games = [], remaining = [], rules =
   if (advancing === total) status = "clinched";
   else if (advancing === 0) status = "eliminated";
 
+  // Posture tracks the win/lose math so the badge can't say "In control" for a must-win team (2A).
+  const winClinches = winFocusTotal > 0 && winFocusAdv === winFocusTotal;
+  const loseEliminates = loseFocusTotal > 0 && loseFocusAdv === 0;
+  let posture: Posture;
+  if (status === "clinched") posture = "clinched";
+  else if (status === "eliminated") posture = "eliminated";
+  else if (winClinches && loseEliminates) posture = "win_and_in";
+  else if (winClinches) posture = "in_control";
+  else if (loseEliminates) posture = "must_win";
+  else posture = "needs_help";
+
   const scenarios: Scenario[] = [];
   if (focusGameIdx >= 0 && status === "live") {
-    if (winFocusTotal > 0 && winFocusAdv === winFocusTotal) scenarios.push({ kind: "in", text: "Win your next game and you clinch." });
-    if (loseFocusTotal > 0 && loseFocusAdv === 0) scenarios.push({ kind: "out", text: "Lose your next game and you are out." });
+    if (winClinches) scenarios.push({ kind: "in", text: "Win your next game and you clinch." });
+    if (loseEliminates) scenarios.push({ kind: "out", text: "Lose your next game and you are out." });
     if (loseFocusTotal > 0 && loseFocusAdv > 0 && loseFocusAdv < loseFocusTotal) scenarios.push({ kind: "maybe", text: "A loss still leaves you in, depending on the other results." });
   }
 
-  return { available: true, decided: false, oddsPct, status, outcomes: total, advancing, scenarios, basis };
+  return { available: true, decided: false, oddsPct, status, posture, outcomes: total, advancing, scenarios, basis };
 }
