@@ -100,7 +100,7 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
       <div className="flex items-center gap-2 font-[var(--font-mono)] text-[11.5px] uppercase tracking-[0.12em] text-[#8F6708]">
         <span>Up next · {who}</span>
         {game.isBracket && (
-          <span className="rounded-full bg-[rgba(124,58,237,0.10)] px-[7px] py-[1px] text-[10px] font-bold tracking-[0.08em] text-[#7C3AED]">Bracket</span>
+          <span className="rounded-full bg-[rgba(124,58,237,0.10)] px-[7px] py-[1px] text-[10px] font-bold tracking-[0.08em] text-[#7C3AED]">BRACKET</span>
         )}
       </div>
 
