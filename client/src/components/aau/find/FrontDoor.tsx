@@ -2,12 +2,12 @@ import { Trophy, Grid3x3, Link2, FileUp, PencilLine } from "lucide-react";
 import type { DirTournament } from "@/lib/aster";
 import { fmtRange, etTodayISO, tournamentTimeState } from "@/lib/aau/dates";
 import { initials, C } from "./findUi";
-import BrowseLiveStrip from "./BrowseLiveStrip";
 
 // Browse front door (below the search box, which the orchestrator owns so it stays mounted across
-// modes). North Star: Browse discovers/tracks AND uploads. A LIVE-now section rides at the top
-// (Live is a section in Browse, not a tab), then LIVE + UPCOMING tournaments (past ones under Browse
-// all), then the "Add a tournament" upload panel. No fabricated rows.
+// modes). Browse is search → track AND upload — NOT a live-scoreboard tease (architect §5: the global
+// un-scoped LIVE NOW firehose was removed; live is strictly scoped to MY tracked teams on Home). Shows
+// LIVE + UPCOMING tournaments (past ones under Browse all), then the "Add a tournament" upload panel.
+// No fabricated rows.
 
 export default function FrontDoor({ dir, onOpen, onBrowseAll, onAddTournament }: { dir: DirTournament[] | null; onOpen: (t: DirTournament) => void; onBrowseAll: () => void; onAddTournament: () => void }) {
   const today = etTodayISO();
@@ -60,11 +60,6 @@ export default function FrontDoor({ dir, onOpen, onBrowseAll, onAddTournament }:
 
   return (
     <div className="as-fade-in">
-      {/* Live games ride at the top of Browse (Live is a section here, not a tab); self-hides */}
-      <div className="mt-[14px]">
-        <BrowseLiveStrip />
-      </div>
-
       <div
         className="mx-[18px] mb-[9px] mt-[18px] flex items-center gap-[9px] font-[var(--font-mono)] text-[10px] uppercase tracking-[0.1em]"
         style={{ color: C.mut }}
