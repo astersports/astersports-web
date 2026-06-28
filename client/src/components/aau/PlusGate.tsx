@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { X, Check, Sparkles } from "lucide-react";
 import { C } from "./find/findUi";
 
@@ -20,6 +21,22 @@ const FEATURES = [
 ];
 
 export default function PlusGate({ onClose }: { onClose: () => void }) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  // Dialog a11y: Escape closes, the close button takes initial focus, and body scroll
+  // is locked while the sheet is open. prefers-reduced-motion is honored by `as-fade-in`.
+  useEffect(() => {
+    closeRef.current?.focus();
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
   return (
     <div
       className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center"
@@ -27,21 +44,26 @@ export default function PlusGate({ onClose }: { onClose: () => void }) {
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="plus-gate-title"
         className="as-fade-in w-full max-w-[440px] rounded-t-[22px] p-[18px] sm:rounded-[22px]"
         style={{ border: "1px solid rgba(246,204,85,.3)", background: "linear-gradient(165deg,rgba(246,204,85,.08),#FFFFFF 60%)", boxShadow: "0 -10px 50px -20px rgba(0,0,0,.8)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between">
           <span className="inline-flex items-center gap-[6px] font-[var(--font-mono)] text-[10px] uppercase tracking-[0.1em]" style={{ color: C.g3 }}>
-            <Sparkles className="h-[13px] w-[13px]" /> Aster Plus
+            <Sparkles className="h-[13px] w-[13px]" aria-hidden="true" /> Aster Plus
           </span>
-          <button type="button" onClick={onClose} aria-label="Close" className="as-press grid h-8 w-8 place-items-center rounded-full" style={{ border: `1px solid ${C.hair2}`, color: C.mut }}>
-            <X className="h-[14px] w-[14px]" />
+          <button ref={closeRef} type="button" onClick={onClose} aria-label="Close Aster Plus" className="as-press -m-[5px] grid h-[44px] w-[44px] place-items-center rounded-full" style={{ color: C.mut }}>
+            <span className="grid h-9 w-9 place-items-center rounded-full" style={{ border: `1px solid ${C.hair2}` }}>
+              <X className="h-[14px] w-[14px]" aria-hidden="true" />
+            </span>
           </button>
         </div>
 
         <div className="mt-[12px] text-center">
-          <div className="font-[var(--font-display)] text-[30px] font-bold tracking-[-0.02em]">
+          <div id="plus-gate-title" className="font-[var(--font-display)] text-[30px] font-bold tracking-[-0.02em]">
             <span className="bg-[linear-gradient(95deg,#E8902A,#F6CC55,#FBD56B)] bg-clip-text text-transparent">$20</span>
             <span className="text-[15px]" style={{ color: C.dim }}>/mo</span>
           </div>
@@ -69,7 +91,7 @@ export default function PlusGate({ onClose }: { onClose: () => void }) {
           Start Aster Plus
         </button>
         <div className="mt-[8px] text-center text-[10px]" style={{ color: C.mut }}>
-          Annual $200 · cancel anytime · Browse, Live &amp; public pages stay free.
+          Annual $200 <span style={{ color: C.g3, fontWeight: 600 }}>(save $40)</span> · cancel anytime · Browse, Live &amp; public pages stay free.
         </div>
         <div className="mt-[6px] text-center font-[var(--font-mono)] text-[9px]" style={{ color: C.faint }}>
           Checkout activates once billing is wired — it&apos;s owner-applied.
