@@ -9,6 +9,11 @@ import { useEffect, useRef, useState } from "react";
 import { Mail, ArrowRight, ArrowUpRight, MapPin, Menu, X, ChevronDown, Send, Settings } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { PRODUCTS, SERVICES, NAV_PRODUCTS, STATUS_META, type ServiceEntry } from "@/lib/services";
+import ScrollProgress from "@/components/landing/ScrollProgress";
+import MetricsSection from "@/components/landing/MetricsSection";
+import IntelligenceSection from "@/components/landing/IntelligenceSection";
+import FrontierSection from "@/components/landing/FrontierSection";
+import TechMarquee from "@/components/landing/TechMarquee";
 
 const LOGO_URL = "/aster-mark.png";
 const SERVICES_VISUAL_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663756289268/4gGAtBP2vWCBU9FC7zDMWA/services-visual-iD7nJ76bKWcPDDk2JN8BYh.webp";
@@ -208,10 +213,20 @@ const STARS = [
 
 function HeroSection() {
   const { ref, isVisible } = useScrollReveal();
+  const sectionRef = useRef<HTMLElement>(null);
+
+  const handleGlow = (e: React.MouseEvent<HTMLElement>) => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    el.style.setProperty("--mx", `${e.clientX - rect.left}px`);
+    el.style.setProperty("--my", `${e.clientY - rect.top}px`);
+  };
 
   return (
-    <section className="relative flex items-center overflow-hidden md:min-h-[100svh]">
+    <section ref={sectionRef} onMouseMove={handleGlow} className="relative flex items-center overflow-hidden md:min-h-[100svh]">
       <div className="aster-sky" />
+      <div className="aster-hero-glow" aria-hidden="true" />
       <div className="aster-stars absolute inset-0" aria-hidden="true">
         {STARS.map((s, i) => (
           <span key={i} className={s.tw ? "tw" : ""} style={{ top: s.top, left: s.left }} />
@@ -904,10 +919,16 @@ function Footer() {
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-[#0a0e1a] overflow-x-hidden">
+    <div className="relative min-h-screen bg-[#0a0e1a] overflow-x-hidden">
+      <div className="aster-grain" aria-hidden="true" />
+      <ScrollProgress />
       <Header />
       <HeroSection />
+      <MetricsSection />
       <PlatformSection />
+      <IntelligenceSection />
+      <FrontierSection />
+      <TechMarquee />
       <ServicesSection />
       <ProcessSection />
       <AboutSection />
