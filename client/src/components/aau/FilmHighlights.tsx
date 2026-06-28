@@ -13,7 +13,7 @@ import { C } from "./find/findUi";
 // URL in source can be lifted straight out of the JS by an unverified viewer, defeating the gate. So
 // this component carries ZERO child data: the locked state shows only the jersey-not-face / AI-
 // review framing, and the verified state loads reels from a gated server source (not yet wired) —
-// never from constants in the bundle. canAccessChild() is owner-applied and false for EVERY account —
+// never from constants in the bundle. canAccessChild(user) is owner-applied and false for EVERY account —
 // including the super-admin (architect A5: Film stays locked until a real COPPA-grade guardian-
 // verification + consent design exists; an operator email bypass is not consent). It flips true only
 // when entitlement + guardian verification + consent are all wired.
