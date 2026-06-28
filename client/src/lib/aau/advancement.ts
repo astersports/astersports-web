@@ -55,6 +55,17 @@ export function circuitConfig(circuit: string | null | undefined): CircuitConfig
   return circuit ? CIRCUITS[circuit] ?? null : null;
 }
 
+// Neutral fallback for an UNKNOWN circuit — NOT a borrow of any named circuit's rules (that would be
+// the cross-application the header forbids). Ranks by record then capped PD only; never claims a
+// circuit-specific step (no points-allowed, no coin-flip) and never hard-outs a forfeit.
+const NEUTRAL: CircuitConfig = {
+  name: "default",
+  pointDiffCap: 25,
+  cascade: ["capped_point_diff"],
+  forfeitMode: "recorded_loss",
+  hasExhibition: false,
+};
+
 export interface TeamStanding {
   id: string;
   wins: number;
@@ -216,8 +227,17 @@ export function computeAdvancement(input: AdvInput): Map<string, AdvStatus> {
   }
 
   // Current-standing rank for the position read (in the cut / bubble / needs help).
-  const ranked = rankTeams(eligible, cfg ?? CIRCUITS["League Play"], games);
+  const effCfg = cfg ?? NEUTRAL;
+  const ranked = rankTeams(eligible, effCfg, games);
   const curRank = new Map(ranked.order.map((t, i) => [t.id, i]));
+
+  // PER-TEAM coin-flip: resolve only THIS team's own wins-tier group. A tie in an unrelated tier must
+  // never leak the flag pool-wide (Copilot #166). Returns true only if the team's own tied group
+  // bottoms out at a coin_flip step (BBallshootout); a singleton tier is never a coin flip.
+  const tierCoinFlip = (t: TeamStanding): boolean => {
+    const group = eligible.filter((e) => e.wins === t.wins);
+    return group.length >= 2 && resolveTie(group, effCfg, games).coinFlip;
+  };
 
   for (const t of teams) {
     if (forfeitOut.has(t.id)) {
@@ -235,8 +255,8 @@ export function computeAdvancement(input: AdvInput): Map<string, AdvStatus> {
     // in_play — read position from current standing, flag tiebreak/coin-flip dependence
     const rank = curRank.get(t.id) ?? teams.length;
     const position = rank < N ? "in_the_cut" : everBoundary.has(t.id) ? "on_the_bubble" : "needs_help";
-    const byTiebreaker = ranked.usedTiebreak || everBoundary.has(t.id);
-    const coinFlip = ranked.coinFlip && (cfg?.cascade.includes("coin_flip") ?? false);
+    const byTiebreaker = everBoundary.has(t.id); // per-team: this team can hinge on a tiebreak
+    const coinFlip = byTiebreaker && tierCoinFlip(t); // and its own tied group bottoms out in a coin flip
     result.set(t.id, {
       state: "in_play",
       position,

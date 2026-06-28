@@ -78,6 +78,20 @@ describe("coin flip — BBallshootout states it, ZG never does", () => {
     expect(r.get("A")!.coinFlip).toBeUndefined();
     expect(r.get("A")!.byTiebreaker).toBe(true);
   });
+
+  it("does NOT leak the coin-flip flag to an in_play team in a different wins-tier (Copilot #166)", () => {
+    // A,B are a coin-flip pair at wins-tier 2; C is in_play at wins-tier 1 via its remaining game.
+    const teams = [
+      team("A", 2, 0, { cappedPointDiff: 10, pointsFor: 80, pointsAgainst: 70 }),
+      team("B", 2, 0, { cappedPointDiff: 10, pointsFor: 80, pointsAgainst: 70 }),
+      team("C", 1, 1),
+      team("D", 0, 2),
+    ];
+    const r = computeAdvancement({ teams, games: [], remaining: [{ aId: "C", bId: "D" }], advanceCount: 2, circuit: "BBallshootout" });
+    expect(r.get("A")!.coinFlip).toBe(true); // A's own tier (A,B) IS a coin flip
+    expect(r.get("C")!.state).toBe("in_play"); // C is contending in a different tier
+    expect(r.get("C")!.coinFlip).toBeUndefined(); // …but its tier is a singleton — no coin-flip leak
+  });
 });
 
 describe("head-to-head breaks a two-team tie", () => {
