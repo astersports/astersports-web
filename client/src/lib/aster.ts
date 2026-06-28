@@ -251,6 +251,7 @@ export interface TeamGameVenue {
 export interface TeamGame {
   gameId: string; gameCode: string;
   trackedTeamId: string; trackedTeamName: string;
+  qkey: string | null;
   isHome: boolean; opponent: string | null;
   myScore: number | null; oppScore: number | null;
   status: "scheduled" | "live" | "final";
