@@ -68,9 +68,8 @@ export default function IntelligenceSection() {
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
           >
-            Print Studio runs a four-stage vision pipeline — segmentation, pattern
-            analysis, a deterministic transform, and generative finishing. Real
-            models, doing real production work, in the time it takes to blink.
+            A four-stage vision pipeline — segment, read, transform, finish. Real
+            models doing real production work, in the time it takes to blink.
           </p>
         </div>
 
