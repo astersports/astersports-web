@@ -108,6 +108,10 @@ export class LandingAgentGuard {
     try {
       if (!input.live) return deny("disabled");
 
+      // Reject a malformed token estimate up front (fail closed) so a bad/forwarded
+      // client value can never reach — let alone corrupt — the spend ledger.
+      if (!Number.isFinite(input.estTokens) || input.estTokens <= 0) return deny("error");
+
       if (!this.sessionLimiter.check(`sess:${input.sessionId}`, input.now).allowed) {
         return deny("rate_limited");
       }
@@ -156,9 +160,17 @@ export class LandingAgentGuard {
   }
 }
 
-/** $/day budget ÷ blended $/Mtok cost → token ceiling for the day. */
+/**
+ * $/day budget ÷ blended $/Mtok cost → token ceiling for the day. Robust to bad
+ * inputs: a non-positive or non-finite budget/price yields the minimal ceiling
+ * (1), which fails CLOSED — never Infinity/NaN, which would silently disable the
+ * ceiling. (ENV guards these too, but the helper is exported and must stand alone.)
+ */
 export function dailyTokenCeiling(usdCeiling: number, usdPerMtok: number): number {
-  return Math.max(1, Math.round((usdCeiling / usdPerMtok) * 1_000_000));
+  if (!Number.isFinite(usdCeiling) || usdCeiling <= 0) return 1;
+  if (!Number.isFinite(usdPerMtok) || usdPerMtok <= 0) return 1;
+  const tokens = Math.round((usdCeiling / usdPerMtok) * 1_000_000);
+  return Number.isFinite(tokens) && tokens >= 1 ? tokens : 1;
 }
 
 /** Build the production config from ENV (read once at module load). */
