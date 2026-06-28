@@ -61,7 +61,7 @@ export default function PastePanel({
           onChange={(e) => onUrl(e.target.value)}
           inputMode="url"
           placeholder="Paste a TourneyMachine tournament link"
-          aria-label="Paste a tournament link"
+          aria-label="Paste a TourneyMachine tournament link — TourneyMachine links supported for now"
           disabled={disabled}
           className="w-full bg-transparent font-[var(--font-mono)] text-[12.6px] outline-none disabled:opacity-60"
           style={{ color: C.dim }}
@@ -78,7 +78,8 @@ export default function PastePanel({
         </button>
       </form>
 
-      {/* source line — labeled provenance (spec §5 / §7). Generic until the server resolves it. */}
+      {/* source line — labeled provenance (spec §5 / §7). TourneyMachine-only for now; copy + the
+          aria-label both say so. We label the source, validate-or-hold what we ingest, never fabricate. */}
       <div className="mx-[18px] mt-[11px] inline-flex items-center gap-[6px] font-[var(--font-mono)] text-[11.5px]" style={{ color: C.dim }}>
         <span className="h-[7px] w-[7px] rounded-full" style={{ background: C.cobalt }} aria-hidden />
         TourneyMachine links for now · source labeled, validated-or-held — never fabricated
