@@ -131,6 +131,35 @@ export const KNOWLEDGE_PRODUCTS: KnowledgeProduct[] = [
   },
 ];
 
+/**
+ * Model-facing projection of the product facts for the "Aster Scout" agent (P3).
+ * Deliberately DROPS `href` (and never carries any URL): the agent routes by
+ * `id`, and the CLIENT renders the registry-sourced CTA card with the actual
+ * link — the model never sees or emits a URL (condition C1). Build the agent
+ * prompt from SCOUT_FACTS, NEVER from KNOWLEDGE_PRODUCTS (which keeps `href` for
+ * the page's CTA + the C4 registry mirror). The guard test asserts SCOUT_FACTS
+ * is URL-free.
+ */
+export interface ScoutFact {
+  id: string;
+  kind: "product" | "service";
+  name: string;
+  tagline: string;
+  description: string;
+  status?: KnowledgeStatus;
+}
+
+export const SCOUT_FACTS: ScoutFact[] = KNOWLEDGE_PRODUCTS.map(
+  ({ id, kind, name, tagline, description, status }) => ({
+    id,
+    kind,
+    name,
+    tagline,
+    description,
+    status,
+  })
+);
+
 /** Short studio positioning — the "who we are" the agent leads with. */
 export const POSITIONING: string[] = [
   "Aster Sports is a design and technology studio based in Westchester, NY, building the products youth sports actually run on — print, the app, and the programs we field ourselves.",
@@ -156,7 +185,7 @@ export const FAQ: FaqEntry[] = [
   },
   {
     q: "What is the Sports Management App?",
-    a: "It's a mobile-first platform for youth sports organizations — schedules, rosters, RSVPs, team messaging, and financials in one place, replacing spreadsheets, group texts, and LeagueApps. It's live in beta with our pilot program and available at astersports.app.",
+    a: "It's a mobile-first platform for youth sports organizations — schedules, rosters, RSVPs, team messaging, and financials in one place, replacing spreadsheets, group texts, and LeagueApps. It's live in beta with our pilot program; open it from the Aster Sports App card.",
   },
   {
     q: "How does the Print Studio work?",

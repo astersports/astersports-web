@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { KNOWLEDGE_PRODUCTS, FAQ, POSITIONING } from "@shared/landingKnowledge";
+import { KNOWLEDGE_PRODUCTS, SCOUT_FACTS, FAQ, POSITIONING } from "@shared/landingKnowledge";
 import { PRODUCTS, SERVICES } from "@/lib/services";
+
+/** http(s) links and bare domains (astersports.app, foo.io, …). Node.js / e.g.
+ *  don't match — `.js`/single-letter TLDs are excluded. */
+const URL_OR_BARE_DOMAIN = /(https?:\/\/)|(\b[a-z0-9-]+\.(app|io|co|com|net|org|ai|dev|xyz)\b)/i;
 
 /**
  * P1 guard for the landing knowledge pack (docs/SPEC_LANDING_AGENT.txt).
@@ -46,10 +50,20 @@ describe("landing knowledge pack", () => {
     for (const entry of KNOWLEDGE_PRODUCTS) {
       expect(registryHrefs.has(entry.href)).toBe(true);
     }
-    // FAQ/positioning prose must not smuggle in an http(s) link the registry
-    // doesn't own — links are the registry's job, surfaced as CTA cards.
+    // FAQ/positioning prose must not smuggle in a link OR a bare domain the
+    // registry doesn't own — links are the registry's job, surfaced as CTA
+    // cards. Catches "astersports.app", not just "https://…".
     const prose = [...POSITIONING, ...FAQ.flatMap((f) => [f.q, f.a])].join("\n");
-    expect(prose).not.toMatch(/https?:\/\//);
+    expect(prose).not.toMatch(URL_OR_BARE_DOMAIN);
+  });
+
+  it("exposes a URL-free model-facing projection (SCOUT_FACTS — condition C1)", () => {
+    // The agent prompt is built from SCOUT_FACTS, never KNOWLEDGE_PRODUCTS, so
+    // the model has no href/URL to inline or parrot — enforced by construction.
+    expect(SCOUT_FACTS.map((f) => f.id)).toEqual(KNOWLEDGE_PRODUCTS.map((k) => k.id));
+    expect(JSON.stringify(SCOUT_FACTS)).not.toMatch(/href/);
+    const factsCorpus = SCOUT_FACTS.flatMap((f) => [f.name, f.tagline, f.description]).join("\n");
+    expect(factsCorpus).not.toMatch(URL_OR_BARE_DOMAIN);
   });
 
   it("has non-empty positioning and FAQ", () => {
