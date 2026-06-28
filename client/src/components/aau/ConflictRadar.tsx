@@ -23,21 +23,36 @@ export default function ConflictRadar({ tracked, games }: Props) {
   if (!days.length) return null;
 
   return (
-    <div className="mx-[18px] mb-4 space-y-3" role="region" aria-label="Schedule conflicts across your tracked teams">
-      {days.map((day) => (
+    <div className="mx-[18px] mb-4 space-y-3" role="region" aria-label="Schedule overlaps across your tracked teams">
+      {days.map((day) => {
+        // A real "split up" needs two DIFFERENT venues at once. If every overlap this day is at the
+        // same building, it's a calm "both at once, hop courts" heads-up — not an alarm. Tone the
+        // whole card by whether at least one cross-venue split exists.
+        const hasSplit = day.overlaps.some((o) => !o.sameVenue);
+        return (
         <div
           key={day.dayKey}
-          className="overflow-hidden rounded-[16px] border border-[rgba(255,107,94,0.28)] bg-[radial-gradient(280px_120px_at_18%_0%,rgba(255,107,94,0.10),transparent),linear-gradient(180deg,#F9FAFB,#FFFFFF)]"
+          className={`overflow-hidden rounded-[16px] border ${
+            hasSplit
+              ? "border-[rgba(255,107,94,0.28)] bg-[radial-gradient(280px_120px_at_18%_0%,rgba(255,107,94,0.10),transparent),linear-gradient(180deg,#F9FAFB,#FFFFFF)]"
+              : "border-[rgba(246,204,85,0.32)] bg-[radial-gradient(280px_120px_at_18%_0%,rgba(246,204,85,0.12),transparent),linear-gradient(180deg,#F9FAFB,#FFFFFF)]"
+          }`}
         >
           {/* header: day · "your day" + overlap count */}
           <div className="flex items-center justify-between border-b border-[rgba(0,0,0,0.06)] px-[15px] py-[11px]">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="h-[15px] w-[15px] text-[#DC2626]" aria-hidden="true" />
+              <AlertTriangle className={`h-[15px] w-[15px] ${hasSplit ? "text-[#DC2626]" : "text-[#8F6708]"}`} aria-hidden="true" />
               <span className="text-[14.4px] font-semibold text-[#1A1D23]">{day.dayLabel}</span>
               <span className="font-[var(--font-mono)] text-[11.5px] text-[#4B5563]">· your day</span>
             </div>
-            <span className="rounded-full border border-[rgba(255,107,94,0.4)] bg-[rgba(255,107,94,0.12)] px-[9px] py-[3px] font-[var(--font-mono)] text-[11.5px] font-semibold text-[#DC2626]">
-              {day.overlaps.length} game{day.overlaps.length === 1 ? "" : "s"} overlap
+            <span
+              className={`rounded-full border px-[9px] py-[3px] font-[var(--font-mono)] text-[11.5px] font-semibold ${
+                hasSplit
+                  ? "border-[rgba(255,107,94,0.4)] bg-[rgba(255,107,94,0.12)] text-[#DC2626]"
+                  : "border-[rgba(246,204,85,0.45)] bg-[rgba(246,204,85,0.16)] text-[#8F6708]"
+              }`}
+            >
+              {day.overlaps.length} {hasSplit ? `overlap${day.overlaps.length === 1 ? "" : "s"}` : "at once"}
             </span>
           </div>
 
@@ -61,36 +76,57 @@ export default function ConflictRadar({ tracked, games }: Props) {
           {/* overlap callout(s) — who runs at the same time */}
           {day.overlaps.map((o, i) => {
             // honest tip-off gap: the minutes between the two starts (real math, both Dates).
-            // When the tips are staggered, one parent can catch the start of A then cross to B —
-            // we surface the exact gap so the split plan is concrete, not vague.
             const gapMin = Math.round(Math.abs(o.b.start.getTime() - o.a.start.getTime()) / 60_000);
             const earlier = o.a.start.getTime() <= o.b.start.getTime() ? o.a : o.b;
             const later = earlier === o.a ? o.b : o.a;
+            const courts = [o.a.court, o.b.court].filter(Boolean).join(" & ");
             return (
             <div
               key={i}
-              className="flex items-start gap-2 border-t border-[rgba(0,0,0,0.06)] bg-[rgba(255,107,94,0.06)] px-[15px] py-[10px]"
+              className={`flex items-start gap-2 border-t border-[rgba(0,0,0,0.06)] px-[15px] py-[10px] ${
+                o.sameVenue ? "bg-[rgba(246,204,85,0.07)]" : "bg-[rgba(255,107,94,0.06)]"
+              }`}
             >
-              <Clock className="mt-px h-[13px] w-[13px] shrink-0 text-[#DC2626]" aria-hidden="true" />
+              <Clock className={`mt-px h-[13px] w-[13px] shrink-0 ${o.sameVenue ? "text-[#8F6708]" : "text-[#DC2626]"}`} aria-hidden="true" />
               <div className="text-[13.8px] leading-[1.5] text-[#1A1D23]">
-                <span className="font-semibold text-[#DC2626]">Overlap · {o.windowLabel}</span>
-                {" — "}
-                {o.a.label} ({o.a.court ?? "court TBD"}, {o.a.timeLabel}) and {o.b.label} ({o.b.court ?? "court TBD"},{" "}
-                {o.b.timeLabel}) run at the same time. Split up?
-                {gapMin > 0 && (
-                  <span className="mt-1 block font-[var(--font-mono)] text-[12.1px] text-[#374151]">
-                    Tips stagger {gapMin} min — one of you can catch {earlier.label}&apos;s start, then cross to {later.label}.
-                  </span>
-                )}
-                {(!o.a.court || !o.b.court) && (
-                  <span className="text-[#374151]"> Leave-by pending venue — the drive plan firms up once courts post.</span>
+                {o.sameVenue ? (
+                  // same building: you're already there — this is a "hop courts" heads-up, not a split.
+                  <>
+                    <span className="font-semibold text-[#8F6708]">Both at once · {o.windowLabel}</span>
+                    {" — "}
+                    {o.a.label} and {o.b.label} play at the same time
+                    {o.a.venue ? ` at ${o.a.venue}` : ""}
+                    {courts ? ` (${courts})` : ""}. You&apos;re already there — just hop between courts.
+                    {gapMin > 0 && (
+                      <span className="mt-1 block font-[var(--font-mono)] text-[12.1px] text-[#374151]">
+                        Tips stagger {gapMin} min — catch {earlier.label}&apos;s start, then walk over to {later.label}.
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  // two different venues at once: the genuine "split up" — surface the cross-town plan.
+                  <>
+                    <span className="font-semibold text-[#DC2626]">Overlap · {o.windowLabel}</span>
+                    {" — "}
+                    {o.a.label} ({o.a.court ?? "court TBD"}, {o.a.timeLabel}) and {o.b.label} ({o.b.court ?? "court TBD"},{" "}
+                    {o.b.timeLabel}) run at the same time at different venues. Split up?
+                    {gapMin > 0 && (
+                      <span className="mt-1 block font-[var(--font-mono)] text-[12.1px] text-[#374151]">
+                        Tips stagger {gapMin} min — one of you can catch {earlier.label}&apos;s start, then cross to {later.label}.
+                      </span>
+                    )}
+                    {(!o.a.court || !o.b.court) && (
+                      <span className="text-[#374151]"> Leave-by pending venue — the drive plan firms up once courts post.</span>
+                    )}
+                  </>
                 )}
               </div>
             </div>
             );
           })}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

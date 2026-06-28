@@ -37,6 +37,19 @@ export function venueShortName(venueName: string | null): string | null {
   return venueName.replace(/^\s*\d+\s*-\s*/, "").replace(/\s*-\s*court\s*[0-9A-Za-z]+\s*$/i, "").trim() || venueName;
 }
 
+/** Two games at the SAME building? Prefer coords (a venue can have several TM name spellings);
+ *  fall back to the cleaned venue name. A same-venue simultaneity is "both at once, hop courts" —
+ *  NOT a "split up" (you're already there), so the radar frames it calmly. */
+function sameVenueOf(a: TeamGame, b: TeamGame): boolean {
+  const va = a.venue, vb = b.venue;
+  if (!va || !vb) return false;
+  if (va.lat != null && va.lng != null && vb.lat != null && vb.lng != null) {
+    return Math.abs(va.lat - vb.lat) < 1e-4 && Math.abs(va.lng - vb.lng) < 1e-4;
+  }
+  const na = venueShortName(va.name), nb = venueShortName(vb.name);
+  return !!na && !!nb && na.toLowerCase() === nb.toLowerCase();
+}
+
 export interface ConflictGame {
   teamKey: string;
   label: string; // kid name if assigned, else team name
@@ -55,6 +68,7 @@ export interface Overlap {
   from: Date;
   to: Date;
   windowLabel: string; // "12:50–1:10pm"
+  sameVenue: boolean; // both games at the same building → "both at once, hop courts", not "split up"
 }
 
 export interface DayConflict {
@@ -104,7 +118,10 @@ export function findConflicts(tracked: TrackedTeam[], games: TeamGame[], now: Da
         teamName: meta?.name ?? x.g.trackedTeamName,
         start: x.start,
         timeLabel: timeET(x.start),
-        court: parseCourt(x.g.venue?.name ?? null),
+        // Prefer the RPC's structured court (get_public_aau_team_schedule returns dg.court); the
+        // venue NAME usually has no "Court N" in it, so name-parsing alone yields a false "TBD"
+        // even when the court is right there in the data. Name-parse stays only as a legacy fallback.
+        court: x.g.court ?? parseCourt(x.g.venue?.name ?? null),
         venue: venueShortName(x.g.venue?.name ?? null),
         opponent: x.g.opponent,
         tournament: x.g.tournament,
@@ -115,6 +132,10 @@ export function findConflicts(tracked: TrackedTeam[], games: TeamGame[], now: Da
       for (let j = i + 1; j < dayGames.length; j++) {
         const A = dayGames[i], B = dayGames[j];
         if (A.g.trackedTeamId === B.g.trackedTeamId) continue; // same team can't double-book itself
+        // Two tracked teams playing EACH OTHER are the same physical game, fanned out once per
+        // tracked team with the SAME gameId — that's not a conflict, it's one game. Skip it, else
+        // every head-to-head matchup between two tracked teams cries a false "split up".
+        if (A.g.gameId === B.g.gameId) continue;
         const aEnd = A.start.getTime() + windowMs;
         const bEnd = B.start.getTime() + windowMs;
         const from = Math.max(A.start.getTime(), B.start.getTime());
@@ -124,7 +145,7 @@ export function findConflicts(tracked: TrackedTeam[], games: TeamGame[], now: Da
           involved.set(A.g.gameId, cgA);
           involved.set(B.g.gameId, cgB);
           const f = new Date(from), t = new Date(to);
-          overlaps.push({ a: cgA, b: cgB, from: f, to: t, windowLabel: fmtWindow(f, t) });
+          overlaps.push({ a: cgA, b: cgB, from: f, to: t, windowLabel: fmtWindow(f, t), sameVenue: sameVenueOf(A.g, B.g) });
         }
       }
     }
