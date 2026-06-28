@@ -51,6 +51,19 @@ export default function MetricsSection() {
   return (
     <section className="relative py-10 md:py-14 bg-[#1a2133]">
       <div className="container" ref={ref}>
+        {/* agent eyebrow — ties the metrics into the live-scan motif */}
+        <div
+          className={`flex items-center gap-2 mb-4 transition-all duration-500 ${
+            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+          }`}
+        >
+          <span className="aster-dot-live" />
+          <span className="aster-mono text-[11px] tracking-[0.14em] uppercase text-slate-400">
+            aster-agent · live metrics
+          </span>
+          <span className="flex-1 h-px bg-white/10" />
+          <span className="aster-mono text-[10px] text-[#34d399]">live</span>
+        </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
           {METRICS.map((metric, i) => (
             <MetricTile key={metric.label} metric={metric} start={isVisible} index={i} />

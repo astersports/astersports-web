@@ -330,19 +330,23 @@ function NodePill({ status }: { status: NonNullable<ServiceEntry["status"]> }) {
   );
 }
 
-function ConstellationNode({ product, index, isVisible }: { product: ServiceEntry; index: number; isVisible: boolean }) {
+function ConstellationNode({ product, index, isVisible, active }: { product: ServiceEntry; index: number; isVisible: boolean; active: boolean }) {
   const Icon = product.icon;
   const lit = product.status === "live" || product.status === "members";
   return (
     <a
       href={product.href}
       {...(product.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-      className={`aster-node group relative flex flex-col p-4 min-h-[124px] transition-all duration-500 ${
-        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-      }`}
+      className={`aster-node aster-trend-card group relative flex flex-col p-4 min-h-[124px] transition-all duration-500 ${
+        active ? "active" : ""
+      } ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
       style={{ transitionDelay: `${120 + index * 100}ms` }}
     >
-      <div className={`aster-star ${lit ? "on" : ""} mb-2.5`}>
+      {/* the scout's scan sweeps the node it's currently charting */}
+      {active && (
+        <span className="aster-scan-track absolute inset-0 rounded-[18px] pointer-events-none" aria-hidden="true" />
+      )}
+      <div className={`aster-star ${lit || active ? "on" : ""} mb-2.5 transition-all duration-300`}>
         <Icon className="w-5 h-5" />
       </div>
       <h3 className="text-base font-semibold text-white mb-1" style={{ fontFamily: "var(--font-display)" }}>
@@ -359,12 +363,25 @@ function ConstellationNode({ product, index, isVisible }: { product: ServiceEntr
 
 function PlatformSection() {
   const { ref, isVisible } = useScrollReveal();
+  const [active, setActive] = useState(0);
+
+  // The agent "maps the constellation" — a scout cycles through and charts each
+  // node in turn (same live-scan motif as the frontier section). Pauses under
+  // prefers-reduced-motion (first node stays lit, no cycling).
+  useEffect(() => {
+    if (!isVisible) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const id = window.setInterval(() => setActive((a) => (a + 1) % PRODUCTS.length), 2200);
+    return () => window.clearInterval(id);
+  }, [isVisible]);
+
+  const current = PRODUCTS[active];
 
   return (
     <section id="platform" className="relative py-10 md:py-20 bg-[#2b3652]">
       <div className="container aster-constellation" ref={ref}>
         <h2
-          className={`flex items-center gap-3 text-[13px] font-semibold tracking-[0.2em] uppercase text-slate-400 mb-6 transition-all duration-500 ${
+          className={`flex items-center gap-3 text-[13px] font-semibold tracking-[0.2em] uppercase text-slate-400 mb-4 transition-all duration-500 ${
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
           }`}
           style={{ fontFamily: "var(--font-display)" }}
@@ -373,9 +390,44 @@ function PlatformSection() {
           <span className="flex-1 h-px bg-white/10" />
         </h2>
 
+        {/* agent console — the scout charting the platform map, live */}
+        <div
+          className={`aster-terminal p-4 md:p-4 mb-5 transition-all duration-700 ${
+            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <span className="aster-dot-live" />
+            <span className="aster-mono text-[11px] tracking-[0.14em] uppercase text-slate-400">
+              aster-agent · mapping the constellation
+            </span>
+            <span className="aster-mono text-[10px] text-[#34d399] ml-auto">live</span>
+          </div>
+          <div className="aster-scan-track rounded-lg bg-white/[0.02] border border-white/5 px-3.5 py-3">
+            <div className="aster-mono text-[12px] text-slate-300 leading-relaxed">
+              <span className="text-[#F6CC55]">▸</span> charting node{" "}
+              <span className="text-white">{active + 1}</span>
+              <span className="text-slate-500"> / {PRODUCTS.length}</span> —{" "}
+              <span className="aster-grad-text font-semibold" aria-live="polite">
+                {current.name}
+              </span>
+            </div>
+            <div className="as-progress-bar mt-2.5" aria-hidden="true">
+              <div
+                className="as-progress-fill"
+                style={{
+                  width: `${((active + 1) / PRODUCTS.length) * 100}%`,
+                  background: "var(--brand-grad)",
+                  transition: "width .5s cubic-bezier(0.23,1,0.32,1)",
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
           {PRODUCTS.map((product, i) => (
-            <ConstellationNode key={product.id} product={product} index={i} isVisible={isVisible} />
+            <ConstellationNode key={product.id} product={product} index={i} isVisible={isVisible} active={i === active} />
           ))}
         </div>
 
