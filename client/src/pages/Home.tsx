@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Mail, ArrowRight, ArrowUpRight, MapPin, Menu, X, ChevronDown, Send, Settings } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useScanCycle } from "@/hooks/useScanCycle";
 import { PRODUCTS, SERVICES, NAV_PRODUCTS, STATUS_META, type ServiceEntry } from "@/lib/services";
 import { FAQ } from "@shared/landingKnowledge";
 import ScrollProgress from "@/components/landing/ScrollProgress";
@@ -311,6 +312,37 @@ function HeroSection() {
   );
 }
 
+/**
+ * Unified "ASTER-AGENT · <tag>" section eyebrow — the quiet thread of the
+ * live-scan motif across the whole page (the pulsing live dot + mono tag). Left
+ * variant trails a divider line; center variant sits inline above a centered
+ * heading.
+ */
+function AgentEyebrow({ tag, isVisible, center = false }: { tag: string; isVisible: boolean; center?: boolean }) {
+  const reveal = isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4";
+  if (center) {
+    return (
+      <div className={`flex items-center justify-center gap-2 mb-4 transition-all duration-500 ${reveal}`}>
+        <span className="aster-dot-live" />
+        <span className="aster-mono text-[11px] tracking-[0.14em] uppercase text-slate-400">
+          aster-agent · {tag}
+        </span>
+        <span className="aster-mono text-[10px] text-[#34d399]">live</span>
+      </div>
+    );
+  }
+  return (
+    <div className={`flex items-center gap-2 mb-4 transition-all duration-500 ${reveal}`}>
+      <span className="aster-dot-live" />
+      <span className="aster-mono text-[11px] tracking-[0.14em] uppercase text-slate-400">
+        aster-agent · {tag}
+      </span>
+      <span className="flex-1 h-px bg-white/10" />
+      <span className="aster-mono text-[10px] text-[#34d399]">live</span>
+    </div>
+  );
+}
+
 function NodePill({ status }: { status: NonNullable<ServiceEntry["status"]> }) {
   const meta = STATUS_META[status];
   if (status === "live" || status === "members") {
@@ -363,18 +395,10 @@ function ConstellationNode({ product, index, isVisible, active }: { product: Ser
 
 function PlatformSection() {
   const { ref, isVisible } = useScrollReveal();
-  const [active, setActive] = useState(0);
-
   // The agent "maps the constellation" — a scout cycles through and charts each
-  // node in turn (same live-scan motif as the frontier section). Pauses under
-  // prefers-reduced-motion (first node stays lit, no cycling).
-  useEffect(() => {
-    if (!isVisible) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const id = window.setInterval(() => setActive((a) => (a + 1) % PRODUCTS.length), 2200);
-    return () => window.clearInterval(id);
-  }, [isVisible]);
-
+  // node in turn (same live-scan motif as the frontier section). The hook pauses
+  // under prefers-reduced-motion and reacts to the user toggling it mid-session.
+  const active = useScanCycle(PRODUCTS.length, isVisible);
   const current = PRODUCTS[active];
 
   return (
@@ -404,13 +428,11 @@ function PlatformSection() {
             <span className="aster-mono text-[10px] text-[#34d399] ml-auto">live</span>
           </div>
           <div className="aster-scan-track rounded-lg bg-white/[0.02] border border-white/5 px-3.5 py-3">
-            <div className="aster-mono text-[12px] text-slate-300 leading-relaxed">
+            <div className="aster-mono text-[12px] text-slate-300 leading-relaxed" aria-live="polite" aria-atomic="true">
               <span className="text-[#F6CC55]">▸</span> charting node{" "}
               <span className="text-white">{active + 1}</span>
               <span className="text-slate-500"> / {PRODUCTS.length}</span> —{" "}
-              <span className="aster-grad-text font-semibold" aria-live="polite">
-                {current.name}
-              </span>
+              <span className="aster-grad-text font-semibold">{current.name}</span>
             </div>
             <div className="as-progress-bar mt-2.5" aria-hidden="true">
               <div
@@ -461,16 +483,7 @@ function ServicesSection() {
       <div className="container" ref={ref}>
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           <div>
-            <div
-              className={`flex items-center gap-2 mb-4 transition-all duration-500 ${
-                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
-              }`}
-            >
-              <StarAccent />
-              <span className="text-sm font-medium text-[#F6CC55] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
-                What We Do
-              </span>
-            </div>
+            <AgentEyebrow tag="capabilities online" isVisible={isVisible} />
 
             <h2
               className={`text-3xl md:text-4xl font-bold text-white mb-12 tracking-tight transition-all duration-700 delay-100 ${
@@ -551,16 +564,7 @@ function ProcessSection() {
     <section className="relative py-10 md:py-16 bg-[#2b3652]">
       <div className="container" ref={ref}>
         <div className="text-center mb-16">
-          <div
-            className={`flex items-center justify-center gap-2 mb-4 transition-all duration-500 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
-            }`}
-          >
-            <StarAccent />
-            <span className="text-sm font-medium text-[#F6CC55] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
-              Our Process
-            </span>
-          </div>
+          <AgentEyebrow tag="workflow" isVisible={isVisible} center />
           <h2
             className={`text-3xl md:text-4xl font-bold text-white tracking-tight transition-all duration-700 delay-100 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
@@ -607,16 +611,7 @@ function AboutSection() {
     <section id="about" className="relative py-10 md:py-16 bg-[#323d5c]">
       <div className="container" ref={ref}>
         <div className="max-w-3xl mx-auto">
-          <div
-            className={`flex items-center gap-2 mb-4 transition-all duration-500 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
-            }`}
-          >
-            <StarAccent />
-            <span className="text-sm font-medium text-[#F6CC55] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
-              About Us
-            </span>
-          </div>
+          <AgentEyebrow tag="profile" isVisible={isVisible} />
 
           <h2
             className={`text-3xl md:text-4xl font-bold text-white mb-8 tracking-tight transition-all duration-700 delay-100 ${
@@ -673,16 +668,7 @@ function FAQSection() {
       <div className="container" ref={ref}>
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-12">
-            <div
-              className={`flex items-center justify-center gap-2 mb-4 transition-all duration-500 ${
-                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
-              }`}
-            >
-              <StarAccent />
-              <span className="text-sm font-medium text-[#F6CC55] tracking-wider uppercase" style={{ fontFamily: "var(--font-display)" }}>
-                FAQ
-              </span>
-            </div>
+            <AgentEyebrow tag="knowledge base" isVisible={isVisible} center />
             <h2
               className={`text-3xl md:text-4xl font-bold text-white tracking-tight transition-all duration-700 delay-100 ${
                 isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
@@ -771,7 +757,7 @@ function ContactSection() {
                 isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
               }`}
             >
-              <StarAccent className="mb-6 w-5 h-5 animate-pulse-glow" />
+              <AgentEyebrow tag="open channel" isVisible={isVisible} />
               <h2
                 className="text-3xl md:text-4xl font-bold text-white mb-6 tracking-tight"
                 style={{ fontFamily: "var(--font-display)" }}
