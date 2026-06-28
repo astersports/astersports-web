@@ -33,7 +33,7 @@ const CARD =
 export default function BracketOdds({ teamName, prediction: p }: Props) {
   if (!p.available) {
     return (
-      <div className="rounded-[16px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)] p-4 text-[12px] text-[#6B7280]">
+      <div className="rounded-[16px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)] p-4 text-[12px] text-[#4B5563]">
         Bracket odds appear once this division's advancement rule is confirmed.
       </div>
     );
@@ -42,7 +42,7 @@ export default function BracketOdds({ teamName, prediction: p }: Props) {
   // a precise % would be a coin-flip in disguise. Say so instead of faking confidence.
   if (p.basis === "even") {
     return (
-      <div className="rounded-[16px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)] p-4 text-[12px] text-[#6B7280]">
+      <div className="rounded-[16px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)] p-4 text-[12px] text-[#4B5563]">
         Odds appear once games tip off — there's no result or prior history to project from yet.
       </div>
     );
@@ -63,14 +63,17 @@ export default function BracketOdds({ teamName, prediction: p }: Props) {
       <div className="flex items-center gap-4 p-4">
         {/* conic gauge — filled by the EXACT advancing fraction (not the suppressed weighted %) */}
         <div
+          role="img"
+          aria-label={p.decided ? `${label} — ${exactPct}% of scenarios` : `Advances in ${p.advancing} of ${p.outcomes} remaining scenarios`}
           className="relative grid h-[84px] w-[84px] shrink-0 place-items-center rounded-full"
           style={{
             background: `conic-gradient(from -90deg, #E0631C 0%, #F6CC55 ${exactPct}%, #E2E8F0 ${exactPct}% 100%)`,
             filter: "drop-shadow(0 0 14px rgba(246,204,85,0.25))",
           }}
         >
-          <span className="absolute inset-[8px] rounded-full bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)]" />
+          <span className="absolute inset-[8px] rounded-full bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)]" aria-hidden />
           <span
+            aria-hidden
             className="relative font-[var(--font-mono)] text-[15px] font-bold leading-none"
             style={{ background: "var(--brand-grad)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}
           >
@@ -78,11 +81,11 @@ export default function BracketOdds({ teamName, prediction: p }: Props) {
           </span>
         </div>
         <div className="flex-1">
-          <div className="text-[12px] text-[#4A5568]">Advancement</div>
+          <div className="text-[12px] text-[#374151]">Advancement</div>
           <div className="mt-[3px] font-[var(--font-display)] text-[18px] font-bold text-[#1A1D23]">
             {label}
           </div>
-          <div className="mt-1 font-[var(--font-mono)] text-[10.5px] text-[#6B7280]">
+          <div className="mt-1 font-[var(--font-mono)] text-[10.5px] text-[#4B5563]">
             {projected ? `projected · ${countLine} (no games yet)` : countLine}
           </div>
         </div>
@@ -112,7 +115,7 @@ export default function BracketOdds({ teamName, prediction: p }: Props) {
         </div>
       )}
 
-      <div className="flex items-center gap-[7px] border-t border-[rgba(0,0,0,0.06)] px-4 pb-[14px] pt-[10px] font-[var(--font-mono)] text-[10px] leading-[1.4] text-[#6B7280]">
+      <div className="flex items-center gap-[7px] border-t border-[rgba(0,0,0,0.06)] px-4 pb-[14px] pt-[10px] font-[var(--font-mono)] text-[10px] leading-[1.4] text-[#4B5563]">
         <Check className="h-[11px] w-[11px] shrink-0 text-[#16A34A]" />
         {projected
           ? "Projected from cross-tournament strength · wording AI"

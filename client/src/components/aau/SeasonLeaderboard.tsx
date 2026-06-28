@@ -298,9 +298,11 @@ export default function SeasonLeaderboard() {
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
           <span style={{ fontSize: 11, color: 'var(--as-text-tertiary)' }}>{stats.winRate}% Win Rate</span>
-          <span style={{ fontSize: 11, color: 'var(--as-text-tertiary)' }}>
-            Best: +{stats.bestWinDiff} vs {stats.bestWinOpponent.split(' - ')[0] || stats.bestWinOpponent}
-          </span>
+          {stats.bestWinDiff > 0 && stats.bestWinOpponent && (
+            <span style={{ fontSize: 11, color: 'var(--as-text-tertiary)' }}>
+              Best: +{stats.bestWinDiff} vs {stats.bestWinOpponent.split(' - ')[0] || stats.bestWinOpponent}
+            </span>
+          )}
         </div>
       </div>
 
@@ -332,15 +334,25 @@ export default function SeasonLeaderboard() {
           OPPONENT BREAKDOWN
         </h3>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {sortedEntries.map((entry, idx) => (
-            <TeamAccordion
-              key={entry.teamName}
-              entry={entry}
-              expanded={expandedTeam === entry.teamName}
-              onToggle={() => setExpandedTeam(expandedTeam === entry.teamName ? null : entry.teamName)}
-              staggerIndex={idx}
-            />
-          ))}
+          {sortedEntries.length === 0 ? (
+            <div style={{
+              padding: '20px 16px', borderRadius: 10, textAlign: 'center',
+              backgroundColor: 'var(--as-bg-card)', border: '1px dashed var(--as-border-default)',
+              fontSize: 12, color: 'var(--as-text-tertiary)',
+            }}>
+              No opponent results yet — they appear here as games are scored.
+            </div>
+          ) : (
+            sortedEntries.map((entry, idx) => (
+              <TeamAccordion
+                key={entry.teamName}
+                entry={entry}
+                expanded={expandedTeam === entry.teamName}
+                onToggle={() => setExpandedTeam(expandedTeam === entry.teamName ? null : entry.teamName)}
+                staggerIndex={idx}
+              />
+            ))
+          )}
         </div>
       </div>
     </div>

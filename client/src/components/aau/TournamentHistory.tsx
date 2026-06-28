@@ -29,7 +29,7 @@ function getBadge(result?: string): Badge {
 function getBadgeConfig(badge: Badge) {
   switch (badge) {
     case 'champions':
-      return { icon: Trophy, label: 'CHAMPIONS', bg: 'var(--as-gold-soft)', color: '#FFD700', borderColor: 'rgba(255,215,0,0.3)' };
+      return { icon: Trophy, label: 'CHAMPIONS', bg: 'var(--as-gold-soft)', color: 'var(--as-gold-text)', borderColor: 'rgba(184,134,11,0.3)' };
     case 'finalists':
       return { icon: Medal, label: 'FINALISTS', bg: 'rgba(167, 139, 250, 0.12)', color: 'var(--as-team-primary)', borderColor: 'rgba(167,139,250,0.3)' };
     case 'final-four':
@@ -105,19 +105,28 @@ export default function TournamentHistory() {
         </div>
       </div>
 
-      {/* Win rate progress bar */}
-      <div style={{ marginBottom: 20, padding: '0 4px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-          <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--as-text-tertiary)' }}>Win Rate</span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--as-success)' }}>{winRate}%</span>
+      {/* Win rate progress bar — only when there are completed games to rate (no fabricated 0%) */}
+      {totalWins + totalLosses > 0 && (
+        <div style={{ marginBottom: 20, padding: '0 4px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--as-text-secondary)' }}>Win Rate</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--as-success)' }}>{winRate}%</span>
+          </div>
+          <div
+            className="as-progress-bar"
+            role="progressbar"
+            aria-label="Win rate"
+            aria-valuenow={winRate}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div className="as-progress-fill" style={{
+              width: `${winRate}%`,
+              backgroundColor: 'var(--as-success)',
+            }} />
+          </div>
         </div>
-        <div className="as-progress-bar">
-          <div className="as-progress-fill" style={{
-            width: `${winRate}%`,
-            backgroundColor: 'var(--as-success)',
-          }} />
-        </div>
-      </div>
+      )}
 
       {/* Championship highlights row */}
       {tournamentRecords.filter(t => t.badge).length > 0 && (

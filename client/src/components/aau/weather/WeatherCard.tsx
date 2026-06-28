@@ -49,10 +49,10 @@ export default function WeatherCard() {
         backgroundColor: "var(--as-bg-card)", border: "1px solid var(--as-border-default)",
       }}>
         <p style={{ fontSize: 13, color: "var(--as-text-tertiary)", margin: 0 }}>
-          Weather unavailable right now.
+          Couldn&apos;t load the forecast. Try again in a moment.
         </p>
-        <button onClick={() => refetch()} className="as-press" style={{
-          marginTop: 10, padding: "6px 12px", borderRadius: 8, cursor: "pointer",
+        <button onClick={() => refetch()} className="as-press" aria-label="Retry loading weather" style={{
+          marginTop: 10, minHeight: 44, padding: "6px 16px", borderRadius: 8, cursor: "pointer",
           fontFamily: "inherit", fontSize: 12, fontWeight: 600,
           backgroundColor: "var(--as-bg-tertiary)", color: "var(--as-text-secondary)",
           border: "1px solid var(--as-border-default)",
@@ -156,11 +156,12 @@ export function WeatherCardView({ venueName, forecast, eyebrow = "Weather Hub", 
           <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", color: "var(--as-text-tertiary)", marginBottom: 10 }}>
             HOURLY
           </div>
-          <div className="as-no-scrollbar" style={{ display: "flex", gap: 4, overflowX: "auto", paddingRight: 16 }}>
+          <div className="as-no-scrollbar" role="list" aria-label="Hourly forecast" style={{ display: "flex", gap: 4, overflowX: "auto", paddingRight: 16 }}>
             {nextHours.map((h, i) => (
-              <div key={h.time} style={{
+              <div key={h.time} role="listitem" style={{
                 flexShrink: 0, width: 52, textAlign: "center", padding: "6px 0", borderRadius: 10,
                 backgroundColor: i === 0 ? "var(--as-bg-tertiary)" : "transparent",
+                border: i === 0 ? "1px solid color-mix(in srgb, var(--as-accent) 35%, transparent)" : "1px solid transparent",
               }}>
                 <div style={{ fontSize: 10, fontWeight: 600, color: "var(--as-text-tertiary)" }}>
                   {i === 0 ? "Now" : hourLabel(h.time)}
@@ -193,8 +194,8 @@ export function WeatherCardView({ venueName, forecast, eyebrow = "Weather Hub", 
                   {dayLabel(d.date, todayStr)}
                 </span>
                 <WeatherIcon code={d.weatherCode} isDay size={24} animate={false} />
-                <span style={{ width: 30, fontSize: 10, fontWeight: 600, color: d.precipProbPct >= 10 ? "var(--as-accent)" : "transparent" }}>
-                  {d.precipProbPct >= 10 ? `${d.precipProbPct}%` : "0%"}
+                <span aria-hidden={d.precipProbPct < 10} style={{ width: 30, fontSize: 10, fontWeight: 600, color: "var(--as-accent)" }}>
+                  {d.precipProbPct >= 10 ? `${d.precipProbPct}%` : ""}
                 </span>
                 <span style={{ width: 26, textAlign: "right", fontSize: 12, color: "var(--as-text-tertiary)" }}>{d.tempMinF}°</span>
                 <div style={{ flex: 1, position: "relative", height: 5, borderRadius: 3, backgroundColor: "var(--as-bg-tertiary)" }}>

@@ -69,10 +69,11 @@ export default function PastePanel({
         <button
           type="submit"
           disabled={disabled || !url.trim()}
-          className="as-press flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-[10px] px-[13px] font-[var(--font-display)] text-[12px] font-bold disabled:opacity-40"
+          aria-label={working ? "Importing tournament" : "Import tournament from link"}
+          className="as-press flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[10px] px-[13px] font-[var(--font-display)] text-[12px] font-bold disabled:opacity-40"
           style={{ background: C.grad, color: "#1a1206" }}
         >
-          {working ? <Loader2 className="h-[13px] w-[13px] animate-spin" /> : null}
+          {working ? <Loader2 className="h-[13px] w-[13px] animate-spin motion-reduce:animate-none" /> : null}
           Go
         </button>
       </form>
@@ -103,13 +104,17 @@ export default function PastePanel({
           </div>
           <div className="mt-[11px] font-[var(--font-mono)] text-[10.5px] leading-[1.8]" style={{ color: C.dim }}>
             {STEPS.map((s, i) => {
+              // Only step 0 is RPC-confirmable (the status RPC reports divisionCount). Once it
+              // reports, step 0 is DONE and step 1 is the in-flight step; later steps stay pending.
+              // No fabricated progress past what the RPC actually confirms (spec §7).
               const reached = ui.divisions != null;
-              const isFirst = i === 0;
-              const active = isFirst ? reached : false;
+              const doneStep = reached && i === 0;
+              const activeStep = i === (reached ? 1 : 0);
+              const mark = doneStep ? "✓ " : activeStep ? "→ " : "· ";
               return (
-                <div key={s} style={{ color: active ? C.pos : i === (reached ? 1 : 0) ? C.g3 : C.faint }}>
-                  {active ? "✓ " : i === (reached ? 1 : 0) ? "→ " : "· "}
-                  {isFirst && reached ? `Tournament & ${ui.divisions} divisions found` : s}
+                <div key={s} style={{ color: doneStep ? C.pos : activeStep ? C.g3 : C.faint }}>
+                  {mark}
+                  {i === 0 && reached ? `Tournament & ${ui.divisions} divisions found` : s}
                 </div>
               );
             })}

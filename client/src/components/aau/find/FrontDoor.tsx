@@ -84,7 +84,8 @@ export default function FrontDoor({ dir, onOpen, onBrowseAll, onAddTournament }:
             key={t.id}
             type="button"
             onClick={() => onOpen(t)}
-            className="as-press flex w-full items-center gap-[12px] px-[18px] py-[11px] text-left"
+            aria-label={`Open ${t.name}${state === "live" ? " — live now" : ""}`}
+            className="as-press flex min-h-[44px] w-full items-center gap-[12px] px-[18px] py-[11px] text-left"
             style={{ borderTop: `1px solid ${C.hair}` }}
           >
             <span
