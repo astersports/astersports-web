@@ -35,6 +35,22 @@ describe("parseSseBuffer", () => {
     expect(events).toEqual([]);
   });
 
+  it("drops events missing their required field (contract validation)", () => {
+    const buf =
+      `data: ${JSON.stringify({ type: "delta" })}\n\n` + // no text
+      `data: ${JSON.stringify({ type: "cta" })}\n\n` + // no serviceId
+      `data: ${JSON.stringify({ type: "denied" })}\n\n` + // no message
+      `data: ${JSON.stringify({ type: "delta", text: "" })}\n\n` + // empty text is valid
+      `data: ${JSON.stringify({ type: "lead_ack", name: 42 })}\n\n`; // wrong type
+    const { events } = parseSseBuffer(buf);
+    expect(events).toEqual([{ type: "delta", text: "" }]);
+  });
+
+  it("normalizes done.denied to a boolean", () => {
+    const { events } = parseSseBuffer(`data: ${JSON.stringify({ type: "done", denied: true })}\n\n`);
+    expect(events).toEqual([{ type: "done", denied: true }]);
+  });
+
   it("returns nothing for an empty buffer", () => {
     expect(parseSseBuffer("")).toEqual({ events: [], rest: "" });
   });
