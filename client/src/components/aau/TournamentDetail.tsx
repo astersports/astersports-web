@@ -4,6 +4,7 @@ import { getTournamentGames, type DirTournament, type DirDivision, type Tourname
 import { fmtRange } from "@/lib/aau/dates";
 import { C } from "./find/findUi";
 import DivisionStandings from "./standings/DivisionStandings";
+import AgentConsole, { type AgentStep } from "./AgentConsole";
 
 // Tournament Detail — ONE public page per tournament (Plane A, free, no account): the live
 // scoreboard, the divisions (tap → live standings/bracket), and the Track action. This is where
@@ -153,6 +154,22 @@ export default function TournamentDetail({ tournament, onBack, onTrack }: { tour
           <Plus className="h-[15px] w-[15px]" /> Track a team here
         </button>
       </div>
+
+      {games !== null && (
+        <div className="mt-[14px]">
+          <AgentConsole
+            label="aster-agent · tournament"
+            verb="scanning"
+            status={anyLive ? "live" : "watching"}
+            steps={[
+              { tag: "Divisions", line: `${tournament.divisions.length} in play` },
+              { tag: "Live", line: anyLive ? `${all.filter((g) => g.status === "live").length} game(s) live now` : "no games live right now" },
+              { tag: "Final", line: `${all.filter((g) => g.status === "final").length} result(s) posted` },
+              { tag: "Scores", line: "refreshing every 30 seconds" },
+            ]}
+          />
+        </div>
+      )}
 
       {/* in-page tabs */}
       <div className="mb-1 mt-[14px] flex items-center gap-[6px]" style={{ borderBottom: `1px solid ${C.hair}` }} role="tablist" aria-label="Tournament view">

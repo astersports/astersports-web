@@ -6,6 +6,7 @@ import { buildDirections } from "@/lib/aau/buildDirections";
 import { pickNextGame } from "@/lib/aau/nextGame";
 import { gamesForTeam } from "@/lib/aau/teamGames";
 import NextGame from "./NextGame";
+import AgentConsole, { type AgentStep } from "./AgentConsole";
 
 // Team detail — the drill-down from My Teams. One tracked team's full game-by-game schedule
 // and results: the next game as the travel hero (countdown + drive + weather + directions),
@@ -119,6 +120,13 @@ export default function TeamDetail({ team, games, onBack }: { team: TrackedTeam;
   const results = mine.filter((g) => g.status === "final").sort((a, b) => ms(b) - ms(a));
   const rec = record(mine);
   const meta = [team.divisionName || team.program, rec.w || rec.l ? `${rec.w}–${rec.l}` : null, team.tournamentName].filter(Boolean).join(" · ");
+  const teamSteps: AgentStep[] = [
+    { tag: "Record", line: rec.w || rec.l ? `${rec.w}–${rec.l} this season` : "record builds as games post" },
+    { tag: "Next", line: next ? `next: ${next.opponent || "TBD"}` : "awaiting the next game" },
+    { tag: "Path", line: "tracing the bracket route" },
+    { tag: "Scores", line: "refreshing from the bracket" },
+  ];
+  const teamLive = mine.some((g) => g.status === "live");
 
   return (
     <div className="as-fade-in pb-6">
@@ -129,6 +137,12 @@ export default function TeamDetail({ team, games, onBack }: { team: TrackedTeam;
         <h2 className="font-[var(--font-display)] text-[24.2px] font-bold text-[#1A1D23]">{team.name}</h2>
         {meta && <div className="mt-0.5 font-[var(--font-mono)] text-[12.1px] text-[#4B5563]">{meta}</div>}
       </div>
+
+      {mine.length > 0 && (
+        <div className="mx-[18px] mt-3">
+          <AgentConsole label="aster-agent · team" verb="tracing" status={teamLive ? "live" : "watching"} steps={teamSteps} />
+        </div>
+      )}
 
       {next && <div className="mt-3"><NextGame games={mine} /></div>}
 

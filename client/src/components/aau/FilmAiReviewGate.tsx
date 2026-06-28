@@ -1,5 +1,15 @@
 import { Lock, ShieldCheck, Trash2, FileCheck2 } from "lucide-react";
 import { C } from "./find/findUi";
+import AgentConsole, { type AgentStep } from "./AgentConsole";
+
+// The agent narrates the film-room pipeline as honest framing — privacy + consent + grounding.
+// Static (no child data, nothing live): the console describes how review works, never any kid.
+const FILM_STEPS: AgentStep[] = [
+  { tag: "Privacy", line: "tracking by jersey, not face" },
+  { tag: "Review", line: "grounded in the footage, never invented" },
+  { tag: "Consent", line: "locked until a guardian verifies" },
+  { tag: "Deletion", line: "one tap removes every reel" },
+];
 
 const PURPLE = "#7C3AED";
 
@@ -21,6 +31,8 @@ const CONTROLS: { icon: typeof FileCheck2; label: string; detail: string }[] = [
 export default function FilmAiReviewGate() {
   return (
     <div className="mb-4 space-y-3" role="region" aria-label="Verified-guardian film and AI review — locked">
+      <AgentConsole label="aster-agent · film-room" verb="reviewing" status="standby" steps={FILM_STEPS} />
+
       {/* guardian-verification gate */}
       <div className="as-fade-in as-stagger-1 flex items-start gap-[11px] rounded-[14px] p-[13px]" style={{ border: `1px solid ${C.hair2}`, background: "linear-gradient(165deg,rgba(167,139,250,.08),rgba(255,255,255,0.7))" }}>
         <div className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full" style={{ border: `2px solid ${PURPLE}`, color: PURPLE }}>

@@ -2,6 +2,7 @@ import { Trophy, Grid3x3, Link2, FileUp, PencilLine } from "lucide-react";
 import type { DirTournament } from "@/lib/aster";
 import { fmtRange, etTodayISO, tournamentTimeState } from "@/lib/aau/dates";
 import { initials, C } from "./findUi";
+import AgentConsole, { type AgentStep } from "../AgentConsole";
 
 // Browse front door (below the search box, which the orchestrator owns so it stays mounted across
 // modes). Browse is search → track AND upload — NOT a live-scoreboard tease (architect §5: the global
@@ -58,8 +59,23 @@ export default function FrontDoor({ dir, onOpen, onBrowseAll, onAddTournament }:
     </div>
   );
 
+  const all = dir ?? [];
+  const liveCount = liveUpcoming.filter((x) => x.state === "live").length;
+  const totalDivs = all.reduce((n, t) => n + t.divisions.length, 0);
+  const indexSteps: AgentStep[] = [
+    { tag: "Indexed", line: `${all.length} tournament${all.length === 1 ? "" : "s"}` },
+    { tag: "Live", line: liveCount ? `${liveCount} in progress now` : "none live right now" },
+    { tag: "Divisions", line: `${totalDivs} bracket${totalDivs === 1 ? "" : "s"} mapped` },
+    { tag: "Source", line: "TourneyMachine · validated or held" },
+  ];
+
   return (
     <div className="as-fade-in">
+      {dir !== null && (
+        <div className="mx-[18px] mt-[16px]">
+          <AgentConsole label="aster-agent · indexing" verb="indexing" status={liveCount ? "live" : "watching"} steps={indexSteps} />
+        </div>
+      )}
       <div
         className="mx-[18px] mb-[9px] mt-[18px] flex items-center gap-[9px] font-[var(--font-mono)] text-[11.5px] uppercase tracking-[0.1em]"
         style={{ color: C.mut }}
