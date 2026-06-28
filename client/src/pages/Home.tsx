@@ -95,7 +95,7 @@ function Header() {
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled
-          ? "bg-[#1a2133]/90 backdrop-blur-xl border-b border-white/5"
+          ? "bg-[#2b3652]/90 backdrop-blur-xl border-b border-white/5"
           : "bg-transparent"
       }`}
     >
@@ -139,7 +139,7 @@ function Header() {
           )}
           <a
             href="#contact"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#F6CC55] to-[#E0631C] text-[#1a2133] font-medium text-sm transition-transform duration-160 hover:scale-[1.03] active:scale-[0.97]"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#F6CC55] to-[#E0631C] text-[#2b3652] font-medium text-sm transition-transform duration-160 hover:scale-[1.03] active:scale-[0.97]"
             style={{ fontFamily: "var(--font-display)" }}
           >
             <Mail className="w-4 h-4" />
@@ -163,7 +163,7 @@ function Header() {
           mobileOpen ? "max-h-[34rem] opacity-100" : "max-h-0 opacity-0"
         }`}
       >
-        <nav className="container pt-2 pb-6 flex flex-col gap-4 bg-[#1a2133] border-b border-white/10 shadow-2xl">
+        <nav className="container pt-2 pb-6 flex flex-col gap-4 bg-[#2b3652] border-b border-white/10 shadow-2xl">
           {NAV_PRODUCTS.map((p) => (
             <a
               key={p.id}
@@ -191,7 +191,7 @@ function Header() {
           )}
           <a
             href="#contact"
-            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-gradient-to-r from-[#F6CC55] to-[#E0631C] text-[#1a2133] font-medium text-sm transition-transform duration-160 active:scale-[0.97]"
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-gradient-to-r from-[#F6CC55] to-[#E0631C] text-[#2b3652] font-medium text-sm transition-transform duration-160 active:scale-[0.97]"
             style={{ fontFamily: "var(--font-display)" }}
             onClick={() => setMobileOpen(false)}
           >
@@ -306,7 +306,7 @@ function HeroSection() {
         </div>
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-[#1a2133] to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-[#2b3652] to-transparent" />
     </section>
   );
 }
@@ -361,7 +361,7 @@ function PlatformSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section id="platform" className="relative py-10 md:py-20 bg-[#1a2133]">
+    <section id="platform" className="relative py-10 md:py-20 bg-[#2b3652]">
       <div className="container aster-constellation" ref={ref}>
         <h2
           className={`flex items-center gap-3 text-[13px] font-semibold tracking-[0.2em] uppercase text-slate-400 mb-6 transition-all duration-500 ${
@@ -405,7 +405,7 @@ function ServicesSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section id="services" className="relative py-10 md:py-16 bg-[#20283d]">
+    <section id="services" className="relative py-10 md:py-16 bg-[#323d5c]">
       <div className="container" ref={ref}>
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           <div>
@@ -476,7 +476,7 @@ function ServicesSection() {
                 alt="Network visualization"
                 className="w-full rounded-2xl opacity-80"
               />
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-[#20283d] via-transparent to-transparent" />
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-[#323d5c] via-transparent to-transparent" />
             </div>
           </div>
         </div>
@@ -496,7 +496,7 @@ function ProcessSection() {
   ];
 
   return (
-    <section className="relative py-10 md:py-16 bg-[#1a2133]">
+    <section className="relative py-10 md:py-16 bg-[#2b3652]">
       <div className="container" ref={ref}>
         <div className="text-center mb-16">
           <div
@@ -552,7 +552,7 @@ function AboutSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section id="about" className="relative py-10 md:py-16 bg-[#20283d]">
+    <section id="about" className="relative py-10 md:py-16 bg-[#323d5c]">
       <div className="container" ref={ref}>
         <div className="max-w-3xl mx-auto">
           <div
@@ -617,7 +617,7 @@ function FAQSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <section id="faq" className="relative py-10 md:py-16 bg-[#1a2133]">
+    <section id="faq" className="relative py-10 md:py-16 bg-[#2b3652]">
       <div className="container" ref={ref}>
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-12">
@@ -708,7 +708,7 @@ function ContactSection() {
           backgroundPosition: "center",
         }}
       />
-      <div className="absolute inset-0 bg-[#1a2133]/70" />
+      <div className="absolute inset-0 bg-[#2b3652]/70" />
 
       <div className="container relative z-10" ref={ref}>
         <div className="max-w-4xl mx-auto">
@@ -783,7 +783,7 @@ function ContactSection() {
                       required
                       value={formState.name}
                       onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-                      className="w-full px-4 py-3 rounded-lg bg-[#1b2236] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all"
+                      className="w-full px-4 py-3 rounded-lg bg-[#2d3855] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all"
                       placeholder="Your name"
                     />
                   </div>
@@ -797,7 +797,7 @@ function ContactSection() {
                       required
                       value={formState.email}
                       onChange={(e) => setFormState({ ...formState, email: e.target.value })}
-                      className="w-full px-4 py-3 rounded-lg bg-[#1b2236] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all"
+                      className="w-full px-4 py-3 rounded-lg bg-[#2d3855] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all"
                       placeholder="your@email.com"
                     />
                   </div>
@@ -811,13 +811,13 @@ function ContactSection() {
                       rows={4}
                       value={formState.message}
                       onChange={(e) => setFormState({ ...formState, message: e.target.value })}
-                      className="w-full px-4 py-3 rounded-lg bg-[#1b2236] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all resize-none"
+                      className="w-full px-4 py-3 rounded-lg bg-[#2d3855] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all resize-none"
                       placeholder="Tell us about your project..."
                     />
                   </div>
                   <button
                     type="submit"
-                    className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-gradient-to-r from-[#F6CC55] to-[#E0631C] text-[#1a2133] font-semibold text-base transition-transform duration-160 hover:scale-[1.02] active:scale-[0.97] shadow-lg shadow-[#F6CC55]/20"
+                    className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-gradient-to-r from-[#F6CC55] to-[#E0631C] text-[#2b3652] font-semibold text-base transition-transform duration-160 hover:scale-[1.02] active:scale-[0.97] shadow-lg shadow-[#F6CC55]/20"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     <Send className="w-4 h-4" />
@@ -835,7 +835,7 @@ function ContactSection() {
 
 function Footer() {
   return (
-    <footer className="py-12 bg-[#141a29] border-t border-white/5">
+    <footer className="py-12 bg-[#232d45] border-t border-white/5">
       <div className="container">
         <div className="flex flex-col gap-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
@@ -889,7 +889,7 @@ function Footer() {
 
 export default function Home() {
   return (
-    <div className="relative min-h-screen bg-[#1a2133] overflow-x-hidden">
+    <div className="relative min-h-screen bg-[#2b3652] overflow-x-hidden">
       <div className="aster-grain" aria-hidden="true" />
       <ScrollProgress />
       <Header />
