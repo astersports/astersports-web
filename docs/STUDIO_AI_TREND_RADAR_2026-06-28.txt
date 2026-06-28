@@ -1,0 +1,178 @@
+================================================================================
+PRINT STUDIO — AI/ML TREND RADAR + PER-OP MODEL SCOUTING (Round 1)
+astersports-web · 2026-06-28 · CC → Architect (relayed by Frank) · decision-request
+================================================================================
+WHAT THIS IS: Frank asked for "agents that identify + implement next-level AI/ML
+trends." Scoped (with Frank) to the two SAFE, bounded interpretations:
+  A — Trend Radar: survey advances relevant to the Studio pipeline.
+  B — Per-op model scouting: concretely better models for the EXISTING ops, with
+      adoption/cost/privacy/gate per candidate.
+This doc is the OUTPUT of that scouting (the "agent" = a re-runnable research pass,
+NOT an always-on autonomous bot, NOT per-page embedding, NOT self-implementing —
+every candidate lands as a normal gated PR after architect ratify). Re-run on a
+cadence or on request.
+
+GROUNDING: [GROUNDED/web 2026-06-28] = sourced below; [FIT] = CC's assessment of
+fit to OUR pipeline (inference — architect/eval to confirm). Sources at the end.
+
+GOVERNANCE: every candidate here is ARCHITECT-SCOPED — mask-provider / sub-processor
+changes (§2.4), money-path-adjacent, and several collide with our DETERMINISTIC-OP +
+count-based-billing contract. Nothing flips dark→live without Frank (§1/§3). Pilots
+run in the OFFLINE EVAL HARNESS first (no prod, no money path).
+
+--------------------------------------------------------------------------------
+0. THE PIPELINE TODAY (what we'd be improving — grounded against main)
+--------------------------------------------------------------------------------
+- Segmentation/masking: SAM2 via Replicate (STUDIO_MASK_PROVIDER=sam2,
+  pointsPerSide=16) → fabric raster + boundary + per-instance masks, then HEURISTIC
+  instance extraction (giant-instance filter MAX_INSTANCE_FRACTION=0.20, area
+  filters, MAX_INSTANCES=200). Feeds density (motif count) + scale.
+- Infill: LaMa via Replicate (texture-aware) with a flat-LAB deterministic fallback.
+- Density: deterministic ops (v1 densityThin / v2 densityRedistribute + the new
+  Lloyd even-spacing). Count accuracy depends ENTIRELY on the instance masks above.
+- Scale: repeat detector — REJECTION-SAFE but UNDER-CALIBRATED (false-rejects ~⅓ of
+  genuine repeats; CLAUDE.md §4 G3 flags this).
+- Generative fallback: classical recolor + a generative path for non-count edits.
+- Invariants this must respect: deterministic ops (byte-stable, cached), count-based
+  refund contract (removed===0 → refund), crop-to-fabric privacy minimization,
+  org_id-stamped outbound calls.
+
+--------------------------------------------------------------------------------
+1. TOP CANDIDATE — SAM 3 (concept-prompted, exhaustive instance segmentation)
+--------------------------------------------------------------------------------
+[GROUNDED/web] SAM 3 (Meta, released 2025-11-19): unlike SAM2 (one object per
+prompt), SAM 3 EXHAUSTIVELY segments EVERY instance of an open-vocabulary concept
+from a short text phrase (or exemplars), returning unique masks + IDs for all
+matches in ONE call. ~2× prior SOTA on concept segmentation; keeps SAM2 visual
+prompting (backward compatible). SAM 3.1 adds real-time/faster inference. Hosted on
+Replicate (lucataco/sam3-video ~$0.023/run, L40S, ~24s), Roboflow, HuggingFace.
+
+[FIT] This maps DIRECTLY onto our hardest sub-problem. Today we coax per-instance
+motif masks out of SAM2 + a stack of area/giant-instance heuristics; SAM 3 is built
+to do exactly "segment every occurrence of <concept>" — i.e. "every flower / every
+motif" → all instances with IDs. Expected wins:
+  · Density COUNT accuracy (the under-calibrated surface) — better instance recall/
+    separation than heuristic extraction → more accurate removeN, fewer no-op
+    refunds, truer thinning.
+  · Scale repeat detection — cleaner instance set to reason about periodicity.
+  · Possibly drops MAX_INSTANCE_FRACTION / area-filter hacks (model does the job).
+RISKS: (a) concept prompt for an abstract "motif" needs tuning (try "flower",
+"printed motif", or exemplar boxes); (b) cost/latency ~ comparable to SAM2, re-check
+on real garments; (c) still a Replicate sub-processor — crop-to-fabric minimization
++ org_id stamping already in place must extend unchanged; (d) determinism: masks may
+vary run-to-run — our ops downstream are deterministic GIVEN masks, so pin a seed/
+version and treat the mask as the input.
+CC LEAN: PILOT — add a sam3 provider in the OFFLINE EVAL HARNESS (not prod), behind
+a provider selector, and run the density/scale real-garment eval head-to-head vs the
+SAM2 baseline. If count accuracy beats SAM2 on fixed runners, propose it as the
+mask-provider candidate (its own §3 flip, G2 privacy re-confirm + G3 eval). HIGHEST
+ROI item here — it attacks the exact G3 calibration gap.
+
+--------------------------------------------------------------------------------
+2. SCALE / REPEAT DETECTION — periodicity / lattice methods
+--------------------------------------------------------------------------------
+[GROUNDED/web] Textile repeat-unit detection has matured: RPDNet (CNN repeated-
+pattern detector with semi-supervised periodic-knowledge injection), lattice-
+extraction that recovers the translational lattice + classifies the symmetry group,
+and Regular-Bands periodicity estimation — all purpose-built to find a print's
+repeat unit / translational symmetry.
+[FIT] Our scale detector is the explicitly under-calibrated component (false-rejects
+~⅓ of genuine repeats). A lattice/periodicity estimator is the principled fix vs
+hand-tuned thresholds: estimate the repeat vector, derive the motif scale from it.
+RISKS: integration effort (classical lattice is lighter than a CNN; CNN needs a
+model host); needs the same real-garment eval.
+CC LEAN: PROTOTYPE a classical lattice/periodicity estimator (Regular-Bands /
+autocorrelation-of-the-fabric-region) in the eval harness as a scale-detector
+augmentation, calibrate on real garments (the G3 work this gates anyway). Medium
+priority — it's already on the calibration to-do; this gives it a method.
+
+--------------------------------------------------------------------------------
+3. INFILL — diffusion object-removal (texture-aware)
+--------------------------------------------------------------------------------
+[GROUNDED/web] Diffusion-based object removal is the 2025-26 SOTA over GAN/LaMa for
+texture fidelity: Attentive Eraser (2025), OmniPaint (2025), FreeInpaint (2026),
+plus two-stage structure+texture methods. LaMa remains the popular, reliable, fast
+baseline.
+[FIT] Our infill (erase motif → reconstruct base cloth) is LaMa + flat-LAB. Diffusion
+could improve textured-cloth reconstruction. BUT it directly collides with our
+contract: diffusion infill is NONDETERMINISTIC (breaks byte-stable output + the LaMa
+cache), slower, costlier, and a new sub-processor.
+CC LEAN: DO NOT adopt for the deterministic money path. LaMa already gives texture-
+aware infill with caching; flat-LAB is the safe fallback. Revisit only IF a separate,
+clearly-quarantined GENERATIVE variant is ever built (§5). LOW priority / park.
+
+--------------------------------------------------------------------------------
+4. GENERATIVE INSTRUCTION-EDIT MODELS (the non-count / future path)
+--------------------------------------------------------------------------------
+[GROUNDED/web] Instruction image-editing is now strong: FLUX.1 Kontext (best
+PHOTOGRAPHIC fidelity — favored for e-commerce product photos), Qwen-Image-Edit
+(best instruction-following / multi-step), Google Nano Banana = Gemini 2.5 Flash
+Image (fast, low-latency product edits like "remove a stain on a t-shirt"; Nano
+Banana 2 / Gemini 3 raising fidelity). All API-hosted.
+[FIT] These are the ceiling for the GENERATIVE fallback (edits that aren't count-
+based: artistic restyle, complex recolor, "make it ditsy"). Flux Kontext's product-
+photo fidelity fits our hanging-garment photos best.
+RISKS: nondeterministic; CANNOT support count-based billing/refund; each is a NEW
+sub-processor (BFL / Google) → new privacy disclosure + DPA; cost per edit.
+CC LEAN: NOT for the deterministic ops or the money path. Keep as a PARKED option for
+a future, separately-gated generative feature (architect + privacy + billing design
+first). Do not wire pre-onboarding.
+
+--------------------------------------------------------------------------------
+5. CROSS-CUTTING TRENDS (A — the radar view)
+--------------------------------------------------------------------------------
+T1 Concept-prompted "segment all of X" (SAM3) is the structural shift — it replaces
+   bespoke instance heuristics with an open-vocabulary primitive. Biggest lever for us.
+T2 Diffusion editing keeps gaining product-photo fidelity, BUT nondeterminism is a
+   hard wall against our deterministic + count-billing core. Doctrine: keep the
+   deterministic core; quarantine anything generative behind its own feature + gates.
+T3 Real-time / distilled segmentation (SAM 3.1) → latency + cost headroom; our
+   pointsPerSide cost knob may relax.
+T4 Privacy compounds with model count: EVERY new model is a sub-processor. The
+   crop-to-fabric minimization + org_id stamping + disclosure/DPA must extend to any
+   candidate BEFORE a real image flows (G2). This is a gating constraint, not an
+   afterthought.
+T5 Cost: SAM3 on Replicate (~$0.02/run) is in the SAM2 range — adoption is a quality/
+   accuracy decision, not a cost blocker.
+
+--------------------------------------------------------------------------------
+6. PRIORITIZED RECOMMENDATION
+--------------------------------------------------------------------------------
+P1 (build first) — SAM 3 pilot in the OFFLINE eval harness, behind a provider
+   selector, head-to-head vs SAM2 on the density/scale real-garment runners. Pure
+   research/eval; no prod, no money path, no flip. Directly attacks the G3 gap.
+P2 — Scale lattice/periodicity prototype in the eval harness (calibration method for
+   the under-calibrated detector).
+P3 — keep LaMa infill; do NOT adopt diffusion infill on the deterministic path.
+P4 — park generative instruction-edit models for a future, separately-gated feature.
+ALL pilots are offline eval artifacts → results come back as a follow-up decision doc
+with numbers; only THEN does any provider/flag change get proposed (architect-scoped,
+G2 privacy + G3 eval, Frank flips).
+
+--------------------------------------------------------------------------------
+7. WHAT CC PROPOSES TO DO NEXT (awaiting architect/Frank ratify)
+--------------------------------------------------------------------------------
+On "go": build the P1 SAM3 eval pilot — a sam3 provider behind the eval harness
+(mirrors the existing sam2 offline eval path), run it on the fixed density/scale
+runners, and return a numbers-backed comparison doc. No prod touch; no flip; held
+for architect like every mask-provider change. P2 follows if P1 is promising.
+RE-RUN: this radar is re-runnable on a cadence (quarterly) or on request — that's the
+"agent," kept as a bounded research pass, not an autonomous live system.
+
+--------------------------------------------------------------------------------
+8. SOURCES (web, 2026-06-28)
+--------------------------------------------------------------------------------
+- SAM 3: github.com/facebookresearch/sam3 · ai.meta.com/blog/segment-anything-model-3/
+  · docs.ultralytics.com/models/sam-3 · blog.roboflow.com/what-is-sam3/
+- SAM 3 hosting: replicate.com/lucataco/sam3-video · inference.roboflow.com/foundation/sam3/
+- Inpainting SOTA: github.com/AlonzoLeeeooo/awesome-image-inpainting-studies ·
+  Attentive Eraser / OmniPaint (2025) · FreeInpaint (2026, arxiv)
+- Repeat/periodicity: PLOS One "Repeated pattern detection on fabric: survey + novel
+  approach" · RPDNet (PMC9414448) · translation-symmetry detection
+- Instruction edit: FLUX.1 Kontext / Qwen-Image-Edit (spheron.network deploy guide
+  2026; mimicpc comparison) · Google Nano Banana = Gemini 2.5 Flash Image
+  (ai.google.dev/gemini-api/docs/models/gemini-2.5-flash-image; blog.google Nano Banana 2)
+================================================================================
+END — A+B Round 1. CC scouted against the real pipeline; recommends the SAM3 eval
+pilot (P1) first. Held for architect ratify; no prod/flip; re-runnable on request.
+================================================================================
