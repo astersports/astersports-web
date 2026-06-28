@@ -883,6 +883,66 @@
   mask: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
 }
 
+/* Agentic frontier — live "agent" scan console + trend cards. */
+.aster-terminal {
+  background: linear-gradient(180deg, #0b1020, #0d1426);
+  border: 1px solid rgba(246, 204, 85, .16);
+  border-radius: 16px;
+  box-shadow: inset 0 0 70px -34px rgba(246, 204, 85, .3);
+}
+.aster-scan-track { position: relative; overflow: hidden; }
+@media (prefers-reduced-motion: no-preference) {
+  .aster-scan-track::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(246, 204, 85, .10), transparent);
+    transform: translateX(-100%);
+    animation: aster-scan 2.4s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes aster-scan { to { transform: translateX(100%); } }
+}
+.aster-dot-live {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 8px #34d399;
+  flex-shrink: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .aster-dot-live { animation: pulse-glow 1.6s ease-in-out infinite; }
+}
+.aster-trend-card {
+  transition: border-color .3s ease, box-shadow .3s ease, transform .3s ease;
+}
+.aster-trend-card.active {
+  border-color: rgba(246, 204, 85, .5) !important;
+  box-shadow: 0 0 0 1px rgba(246, 204, 85, .35), 0 0 26px -8px rgba(246, 204, 85, .4);
+}
+.aster-chip-idle,
+.aster-chip-on {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid;
+  transition: color .3s ease, background .3s ease, border-color .3s ease;
+}
+.aster-chip-idle {
+  color: #6b7a90;
+  border-color: rgba(255, 255, 255, .10);
+  background: rgba(255, 255, 255, .02);
+}
+.aster-chip-on {
+  color: #1a0e05;
+  border-color: transparent;
+  background: var(--brand-grad);
+  font-weight: 700;
+}
+
 /* ─── Weather icon animations (wx-*) ─── */
 @keyframes wx-spin { to { transform: rotate(360deg); } }
 @keyframes wx-pulse {

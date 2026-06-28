@@ -12,6 +12,7 @@ import { PRODUCTS, SERVICES, NAV_PRODUCTS, STATUS_META, type ServiceEntry } from
 import ScrollProgress from "@/components/landing/ScrollProgress";
 import MetricsSection from "@/components/landing/MetricsSection";
 import IntelligenceSection from "@/components/landing/IntelligenceSection";
+import FrontierSection from "@/components/landing/FrontierSection";
 import TechMarquee from "@/components/landing/TechMarquee";
 
 const LOGO_URL = "/aster-mark.png";
@@ -926,6 +927,7 @@ export default function Home() {
       <MetricsSection />
       <PlatformSection />
       <IntelligenceSection />
+      <FrontierSection />
       <TechMarquee />
       <ServicesSection />
       <ProcessSection />
