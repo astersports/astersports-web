@@ -107,8 +107,15 @@ function FormGuide({ results }: { results: TeamGame[] }) {
 export default function TeamDetail({ team, games, onBack }: { team: TrackedTeam; games: TeamGame[]; onBack: () => void }) {
   const mine = gamesForTeam(games, team);
   const next = pickNextGame(mine);
-  // the next game is the travel hero, so keep it out of the Upcoming list to avoid a repeat
-  const upcoming = mine.filter((g) => g.status !== "final" && g.gameId !== next?.gameId).sort((a, b) => ms(a) - ms(b));
+  const now = Date.now();
+  // Upcoming = live or genuinely-future non-final games, minus the travel hero (shown above) to
+  // avoid a repeat. A scheduled game whose start time is already PAST is stale/unposted (our
+  // source is final-only), NOT "upcoming" — exclude it so a months-old scheduled game can't sit
+  // in Upcoming while the imminent game is the hero (architect date-integrity finding). Matches
+  // pickNextGame's `ms < now` skip so the two surfaces agree.
+  const upcoming = mine
+    .filter((g) => g.status !== "final" && g.gameId !== next?.gameId && (g.status === "live" || !g.startAt || +new Date(g.startAt) >= now))
+    .sort((a, b) => ms(a) - ms(b));
   const results = mine.filter((g) => g.status === "final").sort((a, b) => ms(b) - ms(a));
   const rec = record(mine);
   const meta = [team.divisionName || team.program, rec.w || rec.l ? `${rec.w}–${rec.l}` : null, team.tournamentName].filter(Boolean).join(" · ");

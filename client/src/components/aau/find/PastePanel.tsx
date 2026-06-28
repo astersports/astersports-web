@@ -60,7 +60,7 @@ export default function PastePanel({
           value={url}
           onChange={(e) => onUrl(e.target.value)}
           inputMode="url"
-          placeholder="Paste any tournament link — TourneyMachine or not"
+          placeholder="Paste a TourneyMachine tournament link"
           aria-label="Paste a tournament link"
           disabled={disabled}
           className="w-full bg-transparent font-[var(--font-mono)] text-[17.6px] outline-none disabled:opacity-60"
@@ -81,7 +81,7 @@ export default function PastePanel({
       {/* source line — labeled provenance (spec §5 / §7). Generic until the server resolves it. */}
       <div className="mx-[18px] mt-[11px] inline-flex items-center gap-[6px] font-[var(--font-mono)] text-[16px]" style={{ color: C.dim }}>
         <span className="h-[7px] w-[7px] rounded-full" style={{ background: C.cobalt }} aria-hidden />
-        Any link ingests · source labeled, validated-or-held — never fabricated
+        TourneyMachine links for now · source labeled, validated-or-held — never fabricated
       </div>
 
       {working && (
@@ -134,7 +134,7 @@ export default function PastePanel({
       )}
 
       <div className="mx-[18px] mt-[13px] text-center font-[var(--font-mono)] text-[16px] leading-[1.5]" style={{ color: C.mut }}>
-        A link we don&apos;t recognize? It still ingests — the generic adapter validates-or-holds, never fabricates.
+        TourneyMachine links for now — more sources are coming. We validate or hold what we ingest, never fabricate.
       </div>
     </div>
   );
