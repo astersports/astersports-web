@@ -167,16 +167,16 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
       <button
         type="button"
         onClick={onBack}
-        className="mb-2 flex items-center gap-1 font-[var(--font-mono)] text-[11px] text-[#374151]"
+        className="mb-2 flex items-center gap-1 font-[var(--font-mono)] text-[17.6px] text-[#374151]"
       >
         <ChevronLeft className="h-4 w-4" /> Find
       </button>
 
       <div className="px-[18px]">
-        <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em] text-[#8F6708]">
+        <div className="font-[var(--font-mono)] text-[16px] uppercase tracking-[0.12em] text-[#8F6708]">
           {tournamentName}
         </div>
-        <h2 className="mt-1 font-[var(--font-display)] text-[23px] font-bold tracking-[-0.3px] text-[#1A1D23]">
+        <h2 className="mt-1 font-[var(--font-display)] text-[28.8px] font-bold tracking-[-0.3px] text-[#1A1D23]">
           Track teams
         </h2>
       </div>
@@ -189,7 +189,7 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search a team or club"
           aria-label="Search teams or clubs"
-          className="w-full bg-transparent text-[13.5px] text-[#1A1D23] placeholder-[#4B5563] outline-none"
+          className="w-full bg-transparent text-[19.6px] text-[#1A1D23] placeholder-[#4B5563] outline-none"
         />
       </div>
 
@@ -209,7 +209,7 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
                 type="button"
                 aria-expanded={gradeOpen}
                 onClick={() => setGradeOpen((o) => !o)}
-                className="as-press inline-flex min-h-[32px] items-center gap-[6px] rounded-full px-[12px] font-[var(--font-mono)] text-[11px]"
+                className="as-press inline-flex min-h-[32px] items-center gap-[6px] rounded-full px-[12px] font-[var(--font-mono)] text-[17.6px]"
                 style={
                   gradeOpen || gradeSel.size > 0
                     ? { background: "rgba(246,204,85,.13)", border: "1px solid rgba(246,204,85,.4)", color: "#8F6708" }
@@ -229,7 +229,7 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
 
       {/* states */}
       {error && (
-        <div className="mx-[18px] mt-4 rounded-[15px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)] p-6 text-center text-[12px] text-[#4B5563]">
+        <div className="mx-[18px] mt-4 rounded-[15px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)] p-6 text-center text-[19.2px] text-[#4B5563]">
           Couldn't load this tournament's teams. Try again in a moment.
         </div>
       )}
@@ -243,8 +243,8 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
       {data && filtered.length === 0 && (
         <div className="mx-[18px] mt-4 rounded-[15px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)] p-8 text-center">
           <Trophy className="mx-auto mb-3 h-7 w-7 text-[#4B5563]" />
-          <div className="text-[14px] font-semibold text-[#1A1D23]">No teams match</div>
-          <div className="mt-1 text-[12px] text-[#4B5563]">Clear the filters or try a different search.</div>
+          <div className="text-[20.3px] font-semibold text-[#1A1D23]">No teams match</div>
+          <div className="mt-1 text-[19.2px] text-[#4B5563]">Clear the filters or try a different search.</div>
         </div>
       )}
 
@@ -263,15 +263,15 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
                     className="as-press mx-[18px] flex w-[calc(100%-36px)] items-center justify-between rounded-[14px] border border-[#E2C98A] bg-[linear-gradient(180deg,rgba(246,204,85,0.08),rgba(246,204,85,0.02))] px-[15px] py-[12px] text-left"
                   >
                     <span>
-                      <span className="text-[13px] font-semibold text-[#1A1D23]">
+                      <span className="text-[20.8px] font-semibold text-[#1A1D23]">
                         {allOn ? "Unselect all of " : "Track all of "}
                         {program}
                       </span>
-                      <small className="mt-0.5 block font-[var(--font-mono)] text-[10px] text-[#4B5563]">
+                      <small className="mt-0.5 block font-[var(--font-mono)] text-[16px] text-[#4B5563]">
                         {teams.length} teams in this view
                       </small>
                     </span>
-                    <span className="font-[var(--font-mono)] text-[11px] text-[#8F6708]">{allOn ? "Clear" : "+ All"}</span>
+                    <span className="font-[var(--font-mono)] text-[17.6px] text-[#8F6708]">{allOn ? "Clear" : "+ All"}</span>
                   </button>
             )}
             {teams.map((t) => {
@@ -298,8 +298,8 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
                     {on && <Check className="h-[13px] w-[13px] text-[#1a1206]" />}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13.5px] font-semibold text-[#1A1D23]">{t.name}</span>
-                    <small className="mt-0.5 block font-[var(--font-mono)] text-[10px] text-[#4B5563]">
+                    <span className="block truncate text-[19.6px] font-semibold text-[#1A1D23]">{t.name}</span>
+                    <small className="mt-0.5 block font-[var(--font-mono)] text-[16px] text-[#4B5563]">
                       {[[t.gender, t.grade].filter(Boolean).join(" "), t.pool, `${t.wins}–${t.losses}`]
                         .filter(Boolean)
                         .join(" · ")}
@@ -319,7 +319,7 @@ export default function TrackTeams({ tournamentId, tournamentName, onBack, onTra
           <button
             type="button"
             onClick={doTrack}
-            className="as-press flex w-full items-center justify-center gap-2 rounded-[14px] bg-[linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)] py-[15px] font-[var(--font-display)] text-[14.5px] font-semibold text-[#1a1206] shadow-[0_12px_30px_-12px_rgba(224,99,28,0.6)]"
+            className="as-press flex w-full items-center justify-center gap-2 rounded-[14px] bg-[linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)] py-[15px] font-[var(--font-display)] text-[21px] font-semibold text-[#1a1206] shadow-[0_12px_30px_-12px_rgba(224,99,28,0.6)]"
           >
             <Plus className="h-4 w-4" /> Track {sel.size} selected team{sel.size === 1 ? "" : "s"}
           </button>
@@ -339,7 +339,7 @@ function ChipRow({ items, active, onPick }: { items: string[]; active: string; o
             key={it}
             type="button"
             onClick={() => onPick(it)}
-            className={`shrink-0 rounded-full border px-[15px] py-[7px] text-[12.5px] font-semibold ${
+            className={`shrink-0 rounded-full border px-[15px] py-[7px] text-[20px] font-semibold ${
               on
                 ? "border-transparent bg-[linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)] text-[#1a1206]"
                 : "border-[#E2E8F0] bg-[#F9FAFB] text-[#374151]"

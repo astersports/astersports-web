@@ -81,7 +81,7 @@ function DropPill({ label, on, onClick }: { label: string; on: boolean; onClick:
       type="button"
       aria-expanded={on}
       onClick={onClick}
-      className="as-press inline-flex min-h-[32px] items-center gap-[6px] rounded-full px-[11px] font-[var(--font-mono)] text-[10.5px]"
+      className="as-press inline-flex min-h-[32px] items-center gap-[6px] rounded-full px-[11px] font-[var(--font-mono)] text-[16.8px]"
       style={on ? { background: "rgba(246,204,85,.13)", border: "1px solid rgba(246,204,85,.4)", color: C.g3 } : { border: `1px solid ${C.line}`, color: C.dim }}
     >
       {label}
@@ -168,10 +168,10 @@ export default function BrowseTree({ dir, onOpen }: { dir: DirTournament[]; onOp
   return (
     <div className="as-fade-in">
       <div className="px-[18px] pt-[8px]">
-        <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em]" style={{ color: "#8F6708" }}>
+        <div className="font-[var(--font-mono)] text-[16px] uppercase tracking-[0.12em]" style={{ color: "#8F6708" }}>
           Browse all
         </div>
-        <h2 className="mt-1 font-[var(--font-display)] text-[20px] font-bold tracking-[-0.3px]" style={{ color: C.ink }}>
+        <h2 className="mt-1 font-[var(--font-display)] text-[25px] font-bold tracking-[-0.3px]" style={{ color: C.ink }}>
           Find a tournament
         </h2>
       </div>
@@ -191,7 +191,7 @@ export default function BrowseTree({ dir, onOpen }: { dir: DirTournament[]; onOp
                 type="button"
                 aria-pressed={on}
                 onClick={() => setGender(seg.id)}
-                className="as-press min-h-[32px] px-[11px] font-[var(--font-mono)] text-[10.5px]"
+                className="as-press min-h-[32px] px-[11px] font-[var(--font-mono)] text-[16.8px]"
                 style={on ? { background: C.grad, color: "#1a1206", fontWeight: 700 } : { color: C.dim }}
               >
                 {seg.label}
@@ -212,7 +212,7 @@ export default function BrowseTree({ dir, onOpen }: { dir: DirTournament[]; onOp
           type="button"
           aria-pressed={liveOnly}
           onClick={() => setLiveOnly((v) => !v)}
-          className="as-press min-h-[32px] rounded-full px-[12px] font-[var(--font-mono)] text-[10.5px]"
+          className="as-press min-h-[32px] rounded-full px-[12px] font-[var(--font-mono)] text-[16.8px]"
           style={liveOnly ? { background: "rgba(246,204,85,.13)", border: "1px solid rgba(246,204,85,.4)", color: C.g3 } : { border: `1px solid ${C.line}`, color: C.dim }}
         >
           Live &amp; upcoming
@@ -228,7 +228,7 @@ export default function BrowseTree({ dir, onOpen }: { dir: DirTournament[]; onOp
               type="button"
               aria-pressed={year === y}
               onClick={() => setYear(year === y ? null : y)}
-              className="as-press min-h-[32px] rounded-full px-[12px] font-[var(--font-mono)] text-[10.5px]"
+              className="as-press min-h-[32px] rounded-full px-[12px] font-[var(--font-mono)] text-[16.8px]"
               style={year === y ? { background: C.grad, color: "#1a1206", fontWeight: 700 } : { border: `1px solid ${C.line}`, color: C.dim }}
             >
               {y}
@@ -245,7 +245,7 @@ export default function BrowseTree({ dir, onOpen }: { dir: DirTournament[]; onOp
               type="button"
               aria-pressed={stateSel === s}
               onClick={() => setStateSel(stateSel === s ? null : s)}
-              className="as-press min-h-[32px] rounded-full px-[12px] font-[var(--font-mono)] text-[10.5px]"
+              className="as-press min-h-[32px] rounded-full px-[12px] font-[var(--font-mono)] text-[16.8px]"
               style={stateSel === s ? { background: C.grad, color: "#1a1206", fontWeight: 700 } : { border: `1px solid ${C.line}`, color: C.dim }}
             >
               {s}
@@ -256,7 +256,7 @@ export default function BrowseTree({ dir, onOpen }: { dir: DirTournament[]; onOp
               type="button"
               aria-pressed={stateSel === "__unknown__"}
               onClick={() => setStateSel(stateSel === "__unknown__" ? null : "__unknown__")}
-              className="as-press min-h-[32px] rounded-full px-[12px] font-[var(--font-mono)] text-[10.5px]"
+              className="as-press min-h-[32px] rounded-full px-[12px] font-[var(--font-mono)] text-[16.8px]"
               style={stateSel === "__unknown__" ? { background: "rgba(246,204,85,.13)", border: "1px solid rgba(246,204,85,.4)", color: C.g3 } : { border: `1px solid ${C.line}`, color: C.mut }}
             >
               State unknown
@@ -266,16 +266,16 @@ export default function BrowseTree({ dir, onOpen }: { dir: DirTournament[]; onOp
       )}
 
       {/* live result count — so a narrowing filter shows how many tournaments remain */}
-      <div className="px-[18px] pt-[8px] font-[var(--font-mono)] text-[10px]" style={{ color: C.mut }} aria-live="polite">
+      <div className="px-[18px] pt-[8px] font-[var(--font-mono)] text-[16px]" style={{ color: C.mut }} aria-live="polite">
         {filtered.length} tournament{filtered.length === 1 ? "" : "s"}
       </div>
 
       {filtered.length === 0 ? (
         <div className="mx-[18px] mt-4 rounded-[15px] p-8 text-center" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#F9FAFB,#FFFFFF)" }}>
-          <div className="text-[13px] font-semibold" style={{ color: C.ink }}>
+          <div className="text-[20.8px] font-semibold" style={{ color: C.ink }}>
             Nothing in this filter
           </div>
-          <button type="button" onClick={clearAll} className="as-press mt-2 text-[12px] underline" style={{ color: C.g3 }}>
+          <button type="button" onClick={clearAll} className="as-press mt-2 text-[19.2px] underline" style={{ color: C.g3 }}>
             Clear filters
           </button>
         </div>
@@ -296,17 +296,17 @@ export default function BrowseTree({ dir, onOpen }: { dir: DirTournament[]; onOp
                 >
                   <ChevronDown className="h-[11px] w-[11px] transition-transform" style={{ color: isOpen ? C.g3 : C.mut, transform: isOpen ? "none" : "rotate(-90deg)" }} />
                   <span className="h-[9px] w-[9px] rounded-[3px]" style={dot ? { background: dot } : { background: C.grad }} aria-hidden />
-                  <span className="flex-1 font-[var(--font-display)] text-[13px] font-bold" style={{ color: C.ink }}>
+                  <span className="flex-1 font-[var(--font-display)] text-[20.8px] font-bold" style={{ color: C.ink }}>
                     {cg.circuit}
                   </span>
-                  <span className="font-[var(--font-mono)] text-[10px]" style={{ color: C.mut }}>
+                  <span className="font-[var(--font-mono)] text-[16px]" style={{ color: C.mut }}>
                     {count} event{count === 1 ? "" : "s"}
                   </span>
                 </button>
                 {isOpen &&
                   cg.seasons.map((s) => (
                     <div key={s.season}>
-                      <div className="px-[18px] pb-[4px] pl-[32px] pt-[2px] font-[var(--font-mono)] text-[9.5px] uppercase tracking-[0.06em]" style={{ color: C.mut }}>
+                      <div className="px-[18px] pb-[4px] pl-[32px] pt-[2px] font-[var(--font-mono)] text-[15.2px] uppercase tracking-[0.06em]" style={{ color: C.mut }}>
                         {s.season}
                       </div>
                       {s.tournaments.map((t) => {
@@ -322,14 +322,14 @@ export default function BrowseTree({ dir, onOpen }: { dir: DirTournament[]; onOp
                           >
                             <span className="self-stretch w-[3px] shrink-0 rounded-[2px]" style={{ background: C.g2 }} aria-hidden />
                             <span className="min-w-0 flex-1">
-                              <span className="block truncate text-[13px] font-semibold" style={{ color: C.ink }}>
+                              <span className="block truncate text-[20.8px] font-semibold" style={{ color: C.ink }}>
                                 {t.name}
                               </span>
-                              <span className="mt-[2px] block truncate font-[var(--font-mono)] text-[10px]" style={{ color: C.mut }}>
+                              <span className="mt-[2px] block truncate font-[var(--font-mono)] text-[16px]" style={{ color: C.mut }}>
                                 {[fmtRange(t.start_date, t.end_date), t.states.length ? t.states.join("/") : null, `${t.divisions.length} div`, teamCount ? `${teamCount} teams` : null].filter(Boolean).join(" · ")}
                               </span>
                             </span>
-                            <span className="shrink-0 rounded-[8px] px-[11px] py-[6px] font-[var(--font-mono)] text-[10px]" style={{ border: `1px solid ${C.line}`, color: C.dim }}>
+                            <span className="shrink-0 rounded-[8px] px-[11px] py-[6px] font-[var(--font-mono)] text-[16px]" style={{ border: `1px solid ${C.line}`, color: C.dim }}>
                               Open
                             </span>
                           </button>
@@ -343,7 +343,7 @@ export default function BrowseTree({ dir, onOpen }: { dir: DirTournament[]; onOp
         </div>
       )}
 
-      <div className="mt-5 px-[18px] text-center font-[var(--font-mono)] text-[10px] leading-[1.5]" style={{ color: C.mut }}>
+      <div className="mt-5 px-[18px] text-center font-[var(--font-mono)] text-[16px] leading-[1.5]" style={{ color: C.mut }}>
         Filters read structured columns — no name-parsing. Past seasons collapse; tap to browse for records.
       </div>
     </div>

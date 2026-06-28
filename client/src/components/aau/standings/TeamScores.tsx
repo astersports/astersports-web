@@ -18,7 +18,7 @@ export default function TeamScores({ focusId, games, nameById }: Props) {
 
   return (
     <div className="rounded-[16px] border border-[#E2E8F0] bg-[#FFFFFF] p-4">
-      <div className="mb-2 font-[var(--font-mono)] text-[10px] uppercase tracking-[0.14em] text-[#4B5563]">Their games</div>
+      <div className="mb-2 font-[var(--font-mono)] text-[16px] uppercase tracking-[0.14em] text-[#4B5563]">Their games</div>
       <div className="space-y-1.5">
         {mine.map((g, i) => {
           const isA = g.aId === focusId;
@@ -31,16 +31,16 @@ export default function TeamScores({ focusId, games, nameById }: Props) {
             <div key={i} className="flex items-center justify-between gap-3 border-b border-[#EDF2F7] py-1.5 last:border-0">
               <span className="flex min-w-0 items-center gap-2">
                 <span
-                  className="shrink-0 rounded-[5px] px-[6px] py-[1px] font-[var(--font-mono)] text-[10px] font-bold"
+                  className="shrink-0 rounded-[5px] px-[6px] py-[1px] font-[var(--font-mono)] text-[16px] font-bold"
                   style={won ? { color: "#16A34A", background: "rgba(22,163,74,0.10)" } : tied ? { color: "#4B5563", background: "#F3F4F6" } : { color: "#DC2626", background: "rgba(220,38,38,0.08)" }}
                 >
                   {won ? "W" : tied ? "T" : "L"}
                 </span>
-                <span className="truncate text-[13px] text-[#374151]">
+                <span className="truncate text-[20.8px] text-[#374151]">
                   <span className="text-[#9CA3AF]">vs</span> {oppName}
                 </span>
               </span>
-              <span className="shrink-0 font-[var(--font-mono)] text-[14px] font-bold text-[#1A1D23]">
+              <span className="shrink-0 font-[var(--font-mono)] text-[20.3px] font-bold text-[#1A1D23]">
                 {my}<span className="text-[#9CA3AF]">–</span>{opp}
               </span>
             </div>
