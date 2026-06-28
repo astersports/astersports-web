@@ -44,7 +44,9 @@ function asScoutEvent(obj: unknown): ScoutEvent | null {
     case "error":
       return isStr(o.message) ? { type: "error", message: o.message } : null;
     case "done":
-      return { type: "done", denied: o.denied === true };
+      if (o.denied === undefined) return { type: "done" };
+      if (typeof o.denied === "boolean") return { type: "done", denied: o.denied };
+      return null; // malformed denied type — drop, matching the other validators
     default:
       return null;
   }

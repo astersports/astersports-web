@@ -46,9 +46,14 @@ describe("parseSseBuffer", () => {
     expect(events).toEqual([{ type: "delta", text: "" }]);
   });
 
-  it("normalizes done.denied to a boolean", () => {
-    const { events } = parseSseBuffer(`data: ${JSON.stringify({ type: "done", denied: true })}\n\n`);
-    expect(events).toEqual([{ type: "done", denied: true }]);
+  it("accepts done with a boolean or omitted denied, drops a malformed denied", () => {
+    expect(parseSseBuffer(`data: ${JSON.stringify({ type: "done", denied: true })}\n\n`).events).toEqual([
+      { type: "done", denied: true },
+    ]);
+    expect(parseSseBuffer(`data: ${JSON.stringify({ type: "done" })}\n\n`).events).toEqual([
+      { type: "done" },
+    ]);
+    expect(parseSseBuffer(`data: ${JSON.stringify({ type: "done", denied: "true" })}\n\n`).events).toEqual([]);
   });
 
   it("returns nothing for an empty buffer", () => {
