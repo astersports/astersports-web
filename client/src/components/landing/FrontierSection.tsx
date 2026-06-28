@@ -2,6 +2,15 @@ import { useEffect, useState } from "react";
 import { Bot, ScanSearch, Brush, Eye, Brain, Cpu, type LucideIcon } from "lucide-react";
 import { useInView } from "@/hooks/useInView";
 import SpotlightCard from "./SpotlightCard";
+import ScoutChat from "./ScoutChat";
+
+/**
+ * When live (Frank flips both LANDING_AGENT_LIVE on the server and this client
+ * flag at go-live), the section gains a real concierge chat below the scan
+ * console. Dark by default — the idle scan stays exactly as-is (condition C5:
+ * no copy implies a live capability that isn't on).
+ */
+const AGENT_LIVE = import.meta.env.VITE_LANDING_AGENT_LIVE === "true";
 
 /**
  * "The agent layer" — a frontier-trends showcase. A simulated scout agent
@@ -150,6 +159,13 @@ export default function FrontierSection() {
                 ))}
               </div>
             </div>
+
+            {/* Live concierge chat — only when the agent is flipped on. */}
+            {AGENT_LIVE && (
+              <div className="mt-3.5">
+                <ScoutChat />
+              </div>
+            )}
           </div>
 
           {/* Right: the trend cards (active one lights up in sync) */}
