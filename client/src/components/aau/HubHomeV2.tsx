@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { getTracked, untrack, TRACKED_EVENT, type TrackedTeam } from "@/lib/aau/trackingStore";
+import { getTracked, TRACKED_EVENT, type TrackedTeam } from "@/lib/aau/trackingStore";
 import { getTrackedTeamSchedule, type TeamGame } from "@/lib/aster";
 import { buildMyTeamsModel } from "@/lib/aau/myTeamsModel";
 import { rankTeams, mostUrgent } from "@/lib/aau/hubHome/urgency";
+import { useDivisionStandings } from "@/hooks/useDivisionStandings";
 import HeroSlot from "./home/HeroSlot";
 import StatusStrip from "./home/StatusStrip";
 import TeamAccordionCard from "./home/TeamAccordionCard";
@@ -49,6 +50,9 @@ export default function HubHomeV2({ onFindTeams }: { onFindTeams: () => void }) 
 
   const ranked = useMemo(() => rankTeams(teams, games), [teams, games]);
   const hero = mostUrgent(ranked);
+  // one standings poll per unique division, shared by every card (no per-card fetch fan-out)
+  const divisionIds = useMemo(() => teams.map((t) => t.divisionId), [teams]);
+  const getDivision = useDivisionStandings(divisionIds);
   const model = useMemo(() => buildMyTeamsModel(teams, games), [teams, games]);
   const liveNow = ranked.filter((r) => r.kind === "live").length;
   const todayCount = ranked.filter((r) => r.kind === "live" || r.kind === "today").length;
@@ -103,6 +107,7 @@ export default function HubHomeV2({ onFindTeams }: { onFindTeams: () => void }) 
             <TeamAccordionCard
               key={u.team.teamKey}
               u={u}
+              division={getDivision(u.team.divisionId)}
               expanded={expandedKey === u.team.teamKey}
               onToggle={() => { setTouched(true); setExpandedKey((k) => (k === u.team.teamKey ? null : u.team.teamKey)); }}
               onOpenTeam={() => setSelected(u.team.teamKey)}

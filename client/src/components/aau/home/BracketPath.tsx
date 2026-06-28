@@ -5,13 +5,14 @@ import type { Prediction } from "@/lib/standings/predictBracket";
  * BracketPath (Hub Home V2) — the exact-count advancement state for one team.
  *
  * HONESTY RULE H1 / §8 (enforced at the TYPE LEVEL): this component is structurally incapable of
- * rendering a probability. Its input OMITS `oddsPct`, so the un-earned, calibration-gated weighted
- * % cannot be passed to it, let alone displayed. Home shows exact-count state ONLY — the clinched /
- * win-and-in / in-control / must-win / on-the-bubble / out ladder + the enumerated scenario count.
- * The posture comes from predictBracket's win/lose enumeration, so a marginal team can never read
- * "in control" (H3).
+ * rendering a probability. Its input OMITS `oddsPct` AND bans it (`oddsPct?: never`), so a raw
+ * Prediction (which carries oddsPct) cannot be passed in — the call site must strip it first
+ * (Copilot review on #208: a plain Omit only stops READING the field, not passing a value that has
+ * it). Home shows exact-count state ONLY — the clinched / win-and-in / in-control / must-win /
+ * on-the-bubble / out ladder + the enumerated scenario count. The posture comes from
+ * predictBracket's win/lose enumeration, so a marginal team can never read "in control" (H3).
  */
-export type BracketPathInput = Omit<Prediction, "oddsPct">;
+export type BracketPathInput = Omit<Prediction, "oddsPct"> & { oddsPct?: never };
 
 // Decided (final) labels by status, and the live posture ladder. Honest wording (H3): a team that
 // can't control its fate reads "On the bubble", never "In control".
