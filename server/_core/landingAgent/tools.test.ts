@@ -26,6 +26,11 @@ describe("recommend_surface", () => {
       expect(() => validateRecommendSurface(bad)).toThrow();
     },
   );
+
+  it("is frozen — the allowlist can't be expanded at runtime", () => {
+    expect(Object.isFrozen(VALID_SURFACE_IDS)).toBe(true);
+    expect(() => (VALID_SURFACE_IDS as string[]).push("malicious")).toThrow();
+  });
 });
 
 describe("sanitizeLeadNeed (condition C2b)", () => {
@@ -46,6 +51,15 @@ describe("sanitizeLeadNeed (condition C2b)", () => {
     // inject real C0 control chars (bell, null) without literal bytes in source
     const raw = `line1${String.fromCharCode(7)}line2${String.fromCharCode(0)}end`;
     expect(sanitizeLeadNeed(raw)).toBe("line1 line2 end");
+  });
+
+  it("strips invisible bidi / zero-width spoof characters", () => {
+    // RLO override (202E), zero-width space (200B), zero-width joiner (200D), BOM (FEFF)
+    const cc = (n: number) => String.fromCharCode(n);
+    const raw = `pay${cc(0x202e)}me${cc(0x200b)}now${cc(0x200d)}${cc(0xfeff)}`;
+    const out = sanitizeLeadNeed(raw);
+    expect(out).toBe("paymenow");
+    expect(/[\u00AD\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/.test(out)).toBe(false);
   });
 
   it("caps length", () => {

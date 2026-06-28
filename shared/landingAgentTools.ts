@@ -15,8 +15,12 @@
 
 import { KNOWLEDGE_PRODUCTS } from "./landingKnowledge";
 
-/** Registry-pinned set of routable ids — the ONLY values recommend_surface accepts. */
-export const VALID_SURFACE_IDS: string[] = KNOWLEDGE_PRODUCTS.map((p) => p.id);
+/** Registry-pinned set of routable ids — the ONLY values recommend_surface accepts.
+ *  Frozen so the allowlist can't be expanded at runtime by accidental/malicious
+ *  mutation (both the tool-schema enum and validateRecommendSurface read it). */
+export const VALID_SURFACE_IDS: readonly string[] = Object.freeze(
+  KNOWLEDGE_PRODUCTS.map((p) => p.id),
+);
 
 export const LEAD_NEED_MAX = 600;
 export const LEAD_NAME_MAX = 80;
@@ -24,6 +28,9 @@ const EMAIL_MAX = 254;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHARS = /[\u0000-\u001F\u007F]/g;
+// Unicode bidi overrides/isolates + zero-width + soft hyphen + BOM: invisible chars
+// that can spoof or hide content in a human inbox.
+const SPOOF_CHARS = /[\u00AD\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
 
 /** Anthropic tool definitions (passed to messages.stream in P3b). */
 export const RECOMMEND_SURFACE_TOOL = {
@@ -59,7 +66,8 @@ export function sanitizeLeadNeed(input: unknown): string {
   s = s.replace(/<[^>]*>/g, " "); // drop HTML tags/comments
   s = s.replace(/&(?:lt|gt|amp|quot|#x?[0-9a-f]+);?/gi, " "); // neutralize entities so they can't re-form tags
   s = s.replace(/[<>]/g, ""); // belt + suspenders: no stray angle brackets
-  s = s.replace(CONTROL_CHARS, " "); // strip control chars
+  s = s.replace(CONTROL_CHARS, " "); // strip ASCII control chars
+  s = s.replace(SPOOF_CHARS, ""); // strip invisible bidi/zero-width spoof chars
   s = s.replace(/\s+/g, " ").trim();
   if (s.length > LEAD_NEED_MAX) s = s.slice(0, LEAD_NEED_MAX).trim();
   return s;
@@ -72,6 +80,7 @@ export function sanitizeLeadName(input: unknown): string {
     .replace(/<[^>]*>/g, " ")
     .replace(/[<>]/g, "")
     .replace(CONTROL_CHARS, " ")
+    .replace(SPOOF_CHARS, "")
     .replace(/\s+/g, " ")
     .trim();
   if (s.length > LEAD_NAME_MAX) s = s.slice(0, LEAD_NAME_MAX).trim();
