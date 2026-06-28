@@ -5,7 +5,7 @@ import type { TrackedTeam } from "./trackingStore";
 
 const NOW = Date.parse("2026-06-27T12:00:00-04:00");
 const team = (over: Partial<TrackedTeam>): TrackedTeam => ({
-  teamKey: "t1", name: "10U Girls", program: "Legacy Hoopers", pool: null,
+  teamKey: "t1", name: "10U Girls", program: "Aster AAU", pool: null,
   tournamentId: "T", tournamentName: "Rumble", divisionId: "d1", divisionName: "Girls - 5th",
   kid: null, addedAt: 0, ...over,
 });

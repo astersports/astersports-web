@@ -147,7 +147,7 @@ export default function MyTeams() {
             </div>
             {grp.teams.map((t) => {
               // disambiguator (architect §1): division (gender·grade) · tournament — so five
-              // identically-named "Legacy Hoopers" rows are distinguishable + safe to remove. Threaded
+              // identically-named "Aster AAU" rows are distinguishable + safe to remove. Threaded
               // into the aria-labels too, or screen-reader users still hear five identical labels.
               const qual = [t.divisionName, t.tournamentName].filter(Boolean).join(" · ");
               const labelName = qual ? `${t.name} · ${qual}` : t.name;

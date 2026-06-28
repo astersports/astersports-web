@@ -29,7 +29,7 @@ describe("parseCourt / venueShortName", () => {
 
 describe("findConflicts", () => {
   it("flags two different teams overlapping on the same day, with the overlap window", () => {
-    const tracked = [team("charlie", "Legacy 11U", "Charlie"), team("rowan", "Legacy 9U", "Rowan")];
+    const tracked = [team("charlie", "Aster 11U", "Charlie"), team("rowan", "Aster 9U", "Rowan")];
     const games = [
       game("charlie", "2026-06-14T16:40:00Z", "1 - County Center - Court 3"), // 12:40pm ET
       game("rowan", "2026-06-14T16:50:00Z", "1 - County Center - Court 1"),   // 12:50pm ET
@@ -46,7 +46,7 @@ describe("findConflicts", () => {
   });
 
   it("does NOT flag the same team's back-to-back games as a conflict", () => {
-    const tracked = [team("charlie", "Legacy 11U", "Charlie")];
+    const tracked = [team("charlie", "Aster 11U", "Charlie")];
     const games = [
       game("charlie", "2026-06-14T16:40:00Z", "Court 3"),
       game("charlie", "2026-06-14T16:50:00Z", "Court 3"),

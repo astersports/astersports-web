@@ -22,7 +22,7 @@ function escapeText(s: string): string {
 }
 
 export interface LeaveReminder {
-  title: string; // e.g. "Leave for Legacy 11U vs CT Hoops"
+  title: string; // e.g. "Leave for Aster 11U vs CT Hoops"
   leaveAtMs: number; // when to leave (event start)
   gameStartMs: number; // tip-off (event end)
   location?: string | null; // venue + court
