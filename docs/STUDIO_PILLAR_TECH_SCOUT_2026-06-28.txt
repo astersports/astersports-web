@@ -1,0 +1,201 @@
+================================================================================
+NEXT-LEVEL TECH SCOUTING PASS — PRINT STUDIO PILLAR
+astersports-web @ main · 2026-06-28 · CC → Architect (relayed by Frank)
+Bounded re-runnable research pass — identify + recommend only. No build, no flip.
+================================================================================
+PILLAR: Aster Sports Print Studio (deterministic textile-print editing: scale /
+  density / recolor on garment photos, credit-metered).
+REPO/BRANCH: astersports/astersports-web @ main.
+WHAT IT'S FOR: the credit-metered Studio — upload a garment photo, run a
+  deterministic print edit (scale/density/recolor), pay per generation.
+HARD INVARIANTS (must never break):
+  · deterministic / byte-stable ops + count-based billing (removed===0 → refund)
+  · credit ledger is append-only + idempotent on (refId,reason); no direct
+    creditBalance writes (Stripe/credit money path)
+  · honest claims — UI/labels never contradict the data
+  · schema migrations are owner-applied only (the deploy does NOT auto-migrate —
+    [GROUNDED] §1 below)
+  · no agent flips a *_LIVE / mask-provider / sub-processor secret (Frank flips)
+
+SCOPE NOTE: the AI/ML *pipeline* candidates (SAM3, scale-lattice, infill,
+generative) were scouted in docs/STUDIO_AI_TREND_RADAR_2026-06-28 (#183) + the
+SAM3 work order (#184). This pass is the BROADER pillar surface (architecture,
+money path, async, caching, client/perf, deps, observability) and CROSS-REFERENCES
+those rather than re-deriving them.
+
+--------------------------------------------------------------------------------
+STEP 1 — GROUNDED INVENTORY (against main; file-cited)
+--------------------------------------------------------------------------------
+STACK [GROUNDED package.json]:
+  · Client: React 19.2.1 + Vite 7.3.5 + Tailwind 4.1 + Radix UI + wouter (router)
+    + @tanstack/react-query 5.90 + tRPC 11.6 client + framer-motion 12.
+  · Server: Express 4.21 + tRPC 11.6 + Drizzle 0.44 on `postgres` 3.4 (Supabase
+    Postgres) + jose (own JWT) + sharp 0.35 (raster) + replicate 1.4 (SAM2/LaMa)
+    + stripe 22.2 + @anthropic-ai/sdk 0.105.
+  · Build: vite build + esbuild bundle (server). Tests: vitest 2.1. Migrations:
+    drizzle-kit (db:push = generate && migrate).
+CORE FLOWS [GROUNDED]:
+  · Money path: server/routers/studio.ts generate → deduct (studioDb.ts,
+    credit_ledger append-only, idempotent (refId,reason)) → startSam2Segmentation
+    → async job → poll-predictions cron → studioAsyncWorker.processAsyncJob →
+    deterministic op → removed===0 ? failAndRefund : addVariation. Stripe path in
+    server/routers/studioBilling.ts.
+  · Mask/AI: server/_core/masking/ (sam2Provider, replicateSam2, classicalProvider,
+    segCache) → Replicate. Ops: server/_core/studio/ops/ (densityThin,
+    densityRedistribute+blueNoiseLayout, scale, infill/lamaInfill).
+  · Storage: Supabase Storage (supabaseStorage.ts) + legacy /manus-storage path
+    kept by storageProxy.ts.
+  · Crons: in-process scheduler.ts (poll-predictions + stranded-job reaper),
+    CRON_SECRET / cronAuth.
+WEAK / HAND-ROLLED / UNDER-CALIBRATED (the scouting targets):
+  W1 [GROUNDED] Scale repeat detector under-calibrated — false-rejects ~⅓ of
+     genuine repeats (CLAUDE.md §4 G3). → covered by #183 P2 / #184.
+  W2 [GROUNDED] Seg cache is an IN-MEMORY LRU, MAX_CACHE=4, NOT persisted
+     (segCache.ts:19-20,24). Evicts after 4 garments; lost on restart; not
+     provider/seed-tagged. Blocks the SAM3 freeze-on-bill moat (#184 ruling).
+  W3 [GROUNDED] Replicate webhook is IMPLEMENTED + ENV-GATED, but DISABLED by
+     default. studio.ts:59 replicateWebhookUrl() returns undefined unless
+     REPLICATE_WEBHOOK_SECRET + a public base URL (PUBLIC_BASE_URL / VITE_APP_URL /
+     RAILWAY_PUBLIC_DOMAIN) are set; when unset, completion falls back to the cron
+     poll (N=1/tick). The wire-through exists (studio.ts:291 → sam2Provider.ts:323
+     startPrediction → replicateSam2.ts:257 registers webhook+events_filter). So the
+     remaining work is DEPLOY CONFIG + operational verification, NOT new wiring code.
+  W4 [GROUNDED] Residual deps: mysql2 ^3.15 AND postgres ^3.4 both present
+     (package.json:75,78) though the DB is Postgres; @aws-sdk/client-s3 +
+     @aws-sdk/s3-request-presigner (22-23) though storage is Supabase; vite-plugin-
+     manus-runtime devDep (120) though Manus is decommissioned (#103).
+  W5 [GROUNDED] No error-tracking / analytics dependency in package.json (no
+     sentry/posthog). §7 onboarding gate lists "Error tracking … (verify)" as
+     NOT-confirmed. Async worker / cron failures have no prod alerting surface
+     beyond server_logs.
+  W6 [GROUNDED] Deploy does NOT auto-apply migrations — prod was missing 0003/0004
+     until hand-applied this session (Supabase migrations list). Schema lands by
+     manual owner apply.
+
+--------------------------------------------------------------------------------
+STEP 2/3 — CANDIDATES (each: what · our code · win · cost · privacy · GATE ·
+invariant collision · lean)
+--------------------------------------------------------------------------------
+
+C1 — PERSISTENT SEGMENTATION CACHE + FREEZE-ON-BILL (the determinism moat)
+  WHAT [GROUNDED]: replace the in-memory LRU (W2) with a persistent, content-keyed
+    mask store (Supabase Postgres row or Storage object), keyed
+    provider+modelVersion+imageHash+bbox(+seed). Once a garment is billed, its mask
+    is frozen and never recomputed.
+  OUR CODE [FIT]: server/_core/masking/segCache.ts (swap the Map for a persistent
+    backend behind the same cachedSegmentation() signature).
+  WIN: (a) cost — skip the dominant SAM2 spend on every re-run/restart, not just the
+    last 4; (b) it is the PREREQUISITE for any SAM3 money-path flip (#184 A4 /
+    freeze-on-bill); (c) guarantees an already-billed customer's output can't change.
+  COST: moderate (a table/bucket + key derivation + read-through). New dep: none.
+  PRIVACY: masks are derived from the customer image → stored at rest in OUR
+    Supabase (already the storage boundary). No NEW third party. Retention/delete
+    policy must be defined.
+  GATE: 🔴 HUMAN — it underpins the money-path determinism contract (freeze-on-bill).
+  INVARIANT COLLISION: none — it STRENGTHENS determinism + byte-stability. (Must
+    preserve byte-identical read-through.)
+  LEAN: PROTOTYPE (highest leverage; unblocks SAM3 and saves cost standalone).
+
+C2 — ACTIVATE THE REPLICATE WEBHOOK (latency — config, not code)
+  WHAT [GROUNDED]: the webhook code path is already implemented + env-gated (W3);
+    ACTIVATE it by setting REPLICATE_WEBHOOK_SECRET + a public base URL so jobs
+    complete on Replicate's callback instead of the ≤poll-interval cron latency.
+  OUR CODE [FIT]: already wired — studio.ts:59 replicateWebhookUrl() →
+    startSam2Segmentation → startPrediction; server/routes/replicateWebhook.ts is
+    the fail-closed HMAC handler. No new wiring; this is deploy config + verify.
+  WIN: completion latency drops from "next poll tick" to "on inference done"; the
+    cron stays as the backstop. Billing UNCHANGED.
+  COST: low code; BLOCKED on a public base URL + REPLICATE_WEBHOOK_SECRET (the
+    domain/DNS situation — Frank's, not CC's).
+  PRIVACY: no new third party (same Replicate). Webhook is fail-closed HMAC.
+  GATE: 🟡 BENCH/architecture — not money (billing unchanged); verify the cron
+    backstop still refunds a stranded job (the Gate-B proof).
+  INVARIANT COLLISION: none. LEAN: PILOT once a public URL exists (sequence after
+    the domain is settled).
+
+C3 — DEPENDENCY / SUPPLY-CHAIN HYGIENE (prune residue)
+  WHAT [GROUNDED]: remove mysql2, @aws-sdk/client-s3 + @aws-sdk/s3-request-presigner,
+    and vite-plugin-manus-runtime IF a grep proves zero imports (W4).
+  OUR CODE [FIT]: package.json + an import grep across server/ client/.
+  WIN: smaller install + attack surface (airtight-build §6 Dependabot-at-0), less
+    confusion (no MySQL driver in a Postgres app).
+  COST: trivial; risk = a hidden import — gate the PR on `grep` proving zero refs.
+  PRIVACY: none. GATE: 🟢 ROUTINE. INVARIANT COLLISION: none.
+  LEAN: PROTOTYPE (cheap; do the grep first, then a routine prune PR).
+
+C4 — REACT COMPILER 1.0 (client auto-memoization)
+  WHAT [GROUNDED/web 2026-06-28]: React Compiler 1.0 went stable late 2025 — a
+    build-time Babel/Vite plugin that auto-memoizes React 19 components, removing
+    most manual useMemo/useCallback. [infoq.com/news/2025/12/react-compiler-meta/]
+  OUR CODE [FIT]: client/ (React 19.2 + Vite 7) — the Studio editor
+    (StudioEditor.tsx, ControlPanel, polling hooks) is the interactivity-sensitive
+    surface.
+  WIN: smoother editor interaction + less manual memo maintenance; build-time only.
+  COST: add the Vite plugin; build-time compile cost. New devDep.
+  PRIVACY: none (build tool). GATE: 🟡 — it changes RENDER behavior; pilot with a
+    visual/interaction regression check before merge (must not change UI output).
+  INVARIANT COLLISION: none on the deterministic SERVER ops (client-only). Honest-
+    claims unaffected. LEAN: PILOT (enable on a branch, eyeball the editor + key
+    flows, keep if no regressions).
+
+C5 — SERVER OBSERVABILITY ON THE MONEY/ASYNC PATH
+  WHAT [GROUNDED]: no error-tracking dep exists (W5); §7 lists it unconfirmed. Add
+    server-side error tracking (e.g. Sentry node) scoped to the async worker, cron,
+    and money path.
+  OUR CODE [FIT]: studioAsyncWorker.ts, scheduler.ts, studio.ts deduct/refund.
+  WIN: prod visibility into stranded jobs / refund failures / cron 403s (the class
+    that bit us at #88) — currently only server_logs.
+  COST: low-moderate; new dep + DSN secret. PRIVACY: scrub PII — do NOT send
+    customer image URLs/payloads to the tracker (server errors only); that scrubbing
+    must be configured FIRST (mirrors the aster-sports Sentry beforeSend discipline).
+  GATE: 🟡 — third-party egress of error data; privacy scrub before enabling.
+  INVARIANT COLLISION: none if payloads are scrubbed. LEAN: PROTOTYPE (real §7 gap).
+
+C6 — DEPLOY-TIME MIGRATIONS (close W6)
+  WHAT [GROUNDED]: the Railway release step does not run drizzle-kit migrate (W6) —
+    prod drifted behind main this session. Add a gated release migration step OR a
+    CI "pending-migrations" guard.
+  OUR CODE [FIT]: deploy/release config + drizzle-kit migrate.
+  WIN: schema stays in lockstep with main; no silent "table missing in prod."
+  COST: low. PRIVACY: none. GATE: 🔴 HUMAN — it auto-applies schema to prod
+    (owner-applied-only invariant); design it as owner-gated, not a blind auto-run.
+  INVARIANT COLLISION: must NOT violate "migrations owner-applied only" — so the
+    recommendation is a CI DRIFT GUARD (fail if main has unapplied migrations) +
+    a one-command owner apply, NOT a blind auto-migrate on deploy.
+  LEAN: PROTOTYPE the drift-guard (safe); the auto-apply itself stays owner's call.
+
+CROSS-REFERENCED (already scouted — not re-derived):
+  · SAM3 instance segmentation — #183 P1 / #184 work order; acceptance bar built
+    (sam3AcceptanceBar.ts). 🟡 BENCH now, 🔴 for the eventual provider flip.
+  · Scale lattice/periodicity — #183 P2. 🟡 BENCH.
+  · Infill (LaMa stays; diffusion rejected on deterministic path) — #183 P3. REJECT.
+  · Generative edit (Flux Kontext / Qwen / Nano Banana) — #183 P4. PARK behind its
+    own gated feature; 🔴 collides with determinism + count-billing — REJECT on the
+    protected path.
+
+--------------------------------------------------------------------------------
+STEP 4 — PRIORITIZATION
+--------------------------------------------------------------------------------
+P1  C1 persistent seg cache + freeze-on-bill — UNBLOCKS the SAM3 money-path flip
+    (#184) and is a standalone cost win. Highest leverage. 🔴 (architect + Frank).
+P2  C3 dependency prune — cheapest, reduces attack surface; do the grep, ship
+    routine. 🟢. (Unblocks a cleaner Dependabot-at-0 onboarding gate.)
+P3  C5 server observability (scrubbed) — closes a real §7 onboarding gap; makes the
+    money/async path debuggable in prod. 🟡.
+P4  C6 migration drift-guard — prevents the prod-schema-drift class (W6) that bit us
+    this session; auto-apply stays owner's call. 🔴-aware (drift-guard is 🟢/🟡).
+P5  C2 webhook activation (config, not code) — latency win; sequence AFTER the
+    public-URL/domain is settled + the secret is set (Frank-blocked). 🟡.
+P6  C4 React Compiler pilot — client perf polish; lowest urgency. 🟡.
+(AI/ML pipeline: SAM3 P1 already in flight per #184; scale lattice next per #183.)
+
+RULES HELD: every candidate architect-scoped; pilots offline/owned-data only; for
+any model/algo candidate the acceptance bar is declared before the run (SAM3 bar is
+already locked in #184); nothing here flips dark→live in this pass; code lands later
+as a dark-flagged gated PR after ratify. Re-runnable on cadence/request.
+SOURCES: package.json + cited files (GROUNDED against main); React Compiler 1.0 —
+infoq.com/news/2025/12/react-compiler-meta/ ; SAM3/infill/scale sources in #183.
+================================================================================
+END — Print Studio pillar pass. Recommend P1 (persistent cache/freeze-on-bill) as
+the highest-leverage next build; it also unblocks the SAM3 flip. Held for architect.
+================================================================================
