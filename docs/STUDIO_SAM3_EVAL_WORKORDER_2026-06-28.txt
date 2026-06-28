@@ -1,0 +1,130 @@
+================================================================================
+CC WORK ORDER — P1 SAM3 vs SAM2 OFFLINE EVAL (+ P2 SCALE PROTOTYPE)
+astersports-web · 2026-06-28 · per architect ratification of STUDIO_AI_TREND_RADAR
+================================================================================
+AUTHORITY: architect ratified P1 build + P2 prototype, OFFLINE HARNESS ONLY. No
+provider flip — STUDIO_MASK_PROVIDER stays SAM2 in prod; the flip is Frank's (L99),
+proposed only after this doc returns with numbers. Determinism is the PASS/FAIL axis,
+not a footnote. Acceptance bar is LOCKED BELOW before the first SAM3 run (16-not-35
+discipline) — no post-hoc threshold tuning.
+
+================================================================================
+P1 — SAM3 vs SAM2 instance-segmentation eval
+================================================================================
+
+SCOPE / SAFETY (resolved guardrails)
+- Runs ONLY in the offline eval harness (mirrors the existing sam2 offline path).
+  No prod, no money path, no flip, no UI.
+- DATA EGRESS: G2 obligations attach at EVAL time (the image leaves to Replicate),
+  not just flip time. RESOLUTION: the pilot uses OWNED / FIXTURE / SYNTHETIC garments
+  ONLY — NO real customer images — so no customer data egresses pre-G2. (G2 extends
+  to the SAM3 endpoint as a flip-time gate, separately, before any real garment.)
+- ENDPOINT: `mattsays/sam3-image` (Replicate) — confirmed STILL-IMAGE SAM3 path
+  (~$0.0013/run, ~2s, L40S), text + exemplar + box/point/mask prompts. Community-
+  published, but runs under Replicate's PLATFORM data-retention: prediction inputs/
+  outputs auto-delete after ~1h by default and we invoke via the API. This is PARITY
+  with our existing SAM2-on-Replicate posture, not new exposure. (Confirm the exact
+  retention terms for this community model against Replicate's policy at G2.)
+  [GROUNDED/web 2026-06-28: replicate.com/mattsays/sam3-image;
+  replicate.com/docs/topics/predictions/data-retention]
+- Pin the Replicate model VERSION hash (recorded in every row). Pin a seed ONLY IF
+  mattsays/sam3-image exposes one — it may not; where there is no seed parameter,
+  determinism is established EMPIRICALLY by A3/A4 below, never assumed.
+
+FIXED PROMPT STRATEGY (declared up front — no per-image cherry-picking)
+- ONE text-concept prompt per garment CLASS, set in the manifest BEFORE the run and
+  applied uniformly (e.g. floral set → "flower"; geometric set → "printed motif").
+  The per-class prompt is frozen in the manifest; it is never re-chosen after seeing
+  any output. Exemplar prompting is NOT used in round 1 (keeps it reproducible +
+  comparable). If a class needs a different fixed prompt, it is declared in the
+  manifest before the run, with rationale, and applied to ALL images in that class.
+
+ACCEPTANCE BAR — SAM3 ships as the candidate ONLY IF ALL pass (locked):
+[ ] A1 COUNT ACCURACY — on the fixed runners vs ground-truth instance counts, SAM3
+       count MAE ≤ 0.75 × SAM2 count MAE (≥25% relative improvement) AND the gap
+       exceeds the run-to-run noise band measured in A3. (A real margin, not noise.)
+[ ] A2 NO FAILURE-MODE REGRESSION — SAM3 does not regress the giant-instance / over-
+       segmentation mode: (giant-instance incidence = an instance whose area exceeds
+       MAX_INSTANCE_FRACTION=0.20 of the CROP area, per sam2Provider.ts) and
+       (over-segmentation rate = predicted/truth count ratio) are each ≤ SAM2's on
+       the same set.
+[ ] A3 COUNT STABILITY (billing-contract test) — under the pin (version, + seed if
+       exposed), K≥5 repeat inferences on each garment return the IDENTICAL instance
+       count every time (100% identical). Any count drift under pin = FAIL for the
+       money path.
+[ ] A4 MASK STABILITY (cache-moat test) — under the same pin, repeat masks are
+       pixel-stable: mean per-instance IoU across the K runs ≥ 0.99, and report the
+       byte-identical rate. Determines the freeze-on-bill requirement (see RULING).
+[ ] A5 SCALE FALSE-REJECT — on the scale repeat set, SAM3-fed detection improves the
+       false-reject rate vs the current SAM2-fed detector (the CLAUDE.md §4 G3 gap).
+
+DETERMINISM RULING (the moat — architect-set)
+- GROUNDING: today's seg cache (segCache.ts) is an IN-MEMORY LRU keyed on
+  hash(imageUrl)+bbox+modelVersion — ephemeral (MAX_CACHE=4), NOT persisted, and NOT
+  provider/seed-tagged. So the "same cache pinning SAM2 uses" is NOT yet sufficient
+  for a money-path SAM3; TWO things must be BUILT before SAM3 could bill:
+  (1) EXTEND the cache key with provider (+ model-version, + seed if exposed) so SAM2
+      and SAM3 results never collide on the same (image, bbox);
+  (2) ADD PERSISTENT freeze-on-bill storage — once a garment is billed its mask is
+      frozen and NEVER recomputed (the current in-memory LRU evicts after 4 entries,
+      so it cannot guarantee this on its own).
+- If A3 passes but A4 fails (count-stable, not mask-stable): still viable ONLY GIVEN
+  freeze-on-bill, AND the eval/design must prove the recompute-on-cache-miss path
+  cannot silently change an ALREADY-BILLED customer's output (i.e. a cache miss after
+  billing re-reads the frozen mask, never re-infers). State this explicitly in the
+  return doc.
+- If A3 FAILS (not count-stable under pin): SAM3 CANNOT touch the money path at any
+  accuracy — it could only ever feed a QUARANTINED non-count path. Report and stop.
+
+BASELINE
+- Re-run SAM2 FRESH on the same runners in the same harness pass — NO stale recorded
+  numbers. Apples-to-apples, both providers, same garments, same metrics, same run.
+
+HARNESS BUILD (what CC implements — offline, mirrors sam2 eval)
+1. `sam3` provider behind the eval harness (NOT registered as a prod STUDIO_MASK_
+   PROVIDER; an eval-only adapter calling mattsays/sam3-image with the pinned version).
+2. Manifest: fixture/owned garments + per-class fixed prompt + ground-truth instance
+   counts (+ the existing scale repeat set).
+3. Metrics: count MAE, giant-instance incidence, over-seg ratio, K-repeat count
+   stability, K-repeat mask IoU + byte-identical rate, scale false-reject rate.
+4. Output: a comparison TABLE (SAM2 vs SAM3 per metric) + per-garment rows +
+   reproducibility header (versions, seed, prompt, garment set hash).
+
+DELIVERABLE
+- A numbers-backed, REPRODUCIBLE decision doc (real runs, fresh SAM2 baseline, the
+  A1-A5 results as PASS/FAIL against the locked bar, stability measurements). Meta's
+  "~2× concept" benchmark is THEIR eval, not ours — only this harness ratifies the
+  fit claim. On a clean sweep, the doc carries the flip PROPOSAL to Frank (with the
+  determinism ruling's freeze-on-bill design if A4 is the binding case).
+
+================================================================================
+P2 — SCALE REPEAT-DETECTION PROTOTYPE (sequenced AFTER P1)
+================================================================================
+- CLASSICAL FIRST (architect-set): lattice / periodicity via autocorrelation /
+  Regular-Bands — chosen BECAUSE it is deterministic + byte-stable (fits the moat).
+  Estimate the repeat vector → derive motif scale; calibrate against the under-
+  calibrated detector's false-reject set.
+- Fall to a model-host CNN (e.g. RPDNet) ONLY if classical fails the calibration bar.
+- Same real-garment eval, same G3 work it gates. Same offline-only / no-flip posture.
+
+================================================================================
+P3 / P4 — ratified as written (NO work this arc)
+================================================================================
+- P3: LaMa stays; NO diffusion inpainting on the deterministic path.
+- P4: generative instruction-edit models (Flux Kontext / Qwen-Image-Edit / Nano
+  Banana = Google Gemini 2.5 Flash Image) parked
+  behind their own feature + privacy + billing design. Not pre-onboarding.
+
+================================================================================
+GATES SUMMARY (nothing skips)
+================================================================================
+- Offline-only build/run; fixture/owned garments until G2 extends to SAM3 endpoint.
+- Acceptance bar A1-A5 LOCKED here, pre-run.
+- A flip is proposed only AFTER the numbers return; the flip itself is Frank's
+  (CLAUDE.md §1/§3), gated G2 (privacy/sub-processor for the SAM3 endpoint) + G3
+  (this eval on fixed runners).
+================================================================================
+END — CC builds the P1 harness encoding A1-A5 + fresh SAM2 baseline, runs fixture-
+only, returns the numbers doc. P2 follows. Architect may adjust any A-threshold
+before the first run; otherwise the bar above is locked.
+================================================================================
