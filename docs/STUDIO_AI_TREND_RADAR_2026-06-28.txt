@@ -12,12 +12,14 @@ NOT an always-on autonomous bot, NOT per-page embedding, NOT self-implementing �
 every candidate lands as a normal gated PR after architect ratify). Re-run on a
 cadence or on request.
 
-GROUNDING: [GROUNDED/web 2026-06-28] = sourced below; [FIT] = CC's assessment of
-fit to OUR pipeline (inference — architect/eval to confirm). Sources at the end.
+GROUNDING: [GROUNDED/web] = web-sourced, all as of the radar date 2026-06-28, cited
+in §8 below; [FIT] = CC's assessment of fit to OUR pipeline (inference — architect/
+eval to confirm).
 
 GOVERNANCE: every candidate here is ARCHITECT-SCOPED — mask-provider / sub-processor
-changes (§2.4), money-path-adjacent, and several collide with our DETERMINISTIC-OP +
-count-based-billing contract. Nothing flips dark→live without Frank (§1/§3). Pilots
+changes (CLAUDE.md §2.4), money-path-adjacent, and several collide with our
+DETERMINISTIC-OP + count-based-billing contract. Nothing flips dark→live without
+Frank (CLAUDE.md §1/§3). Pilots
 run in the OFFLINE EVAL HARNESS first (no prod, no money path).
 
 --------------------------------------------------------------------------------
@@ -171,7 +173,8 @@ RE-RUN: this radar is re-runnable on a cadence (quarterly) or on request — tha
   approach" · RPDNet (PMC9414448) · translation-symmetry detection
 - Instruction edit: FLUX.1 Kontext / Qwen-Image-Edit (spheron.network deploy guide
   2026; mimicpc comparison) · Google Nano Banana = Gemini 2.5 Flash Image
-  (ai.google.dev/gemini-api/docs/models/gemini-2.5-flash-image; blog.google Nano Banana 2)
+  (ai.google.dev/gemini-api/docs/models/gemini-2.5-flash-image;
+  blog.google/innovation-and-ai/technology/ai/nano-banana-2/)
 ================================================================================
 END — A+B Round 1. CC scouted against the real pipeline; recommends the SAM3 eval
 pilot (P1) first. Held for architect ratify; no prod/flip; re-runnable on request.
