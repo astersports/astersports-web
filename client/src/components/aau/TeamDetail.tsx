@@ -35,14 +35,14 @@ function GameRow({ g }: { g: TeamGame }) {
   return (
     <div className="border-t border-[rgba(0,0,0,0.06)] px-[15px] py-[11px] first:border-t-0">
       <div className="flex items-center gap-3">
-        <div className="w-[56px] shrink-0 font-[var(--font-mono)] text-[11px] text-[#4A5568]">
+        <div className="w-[56px] shrink-0 font-[var(--font-mono)] text-[11px] text-[#374151]">
           {g.startAt ? DATE.format(new Date(g.startAt)) : "TBD"}
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[13px] font-semibold text-[#1A1D23]">
-            <span className="text-[#6B7280]">vs</span> {g.opponent || "TBD"}
+            <span className="text-[#4B5563]">vs</span> {g.opponent || "TBD"}
           </div>
-          {venueLine && <div className="mt-0.5 truncate font-[var(--font-mono)] text-[10px] text-[#6B7280]">{venueLine}</div>}
+          {venueLine && <div className="mt-0.5 truncate font-[var(--font-mono)] text-[10px] text-[#4B5563]">{venueLine}</div>}
         </div>
         {isFinal ? (
           <span className={`shrink-0 font-[var(--font-mono)] text-[12px] font-bold ${won ? "text-[#16A34A]" : "text-[#DC2626]"}`}>
@@ -56,8 +56,8 @@ function GameRow({ g }: { g: TeamGame }) {
       </div>
       {!isFinal && dirs && (
         <div className="mt-2 flex gap-2 pl-[68px]">
-          <a href={dirs.apple} target="_blank" rel="noopener noreferrer" className="as-press rounded-[9px] border border-[#E2E8F0] px-3 py-1 text-[11px] text-[#4A5568]">Apple</a>
-          <a href={dirs.google} target="_blank" rel="noopener noreferrer" className="as-press rounded-[9px] border border-[#E2E8F0] px-3 py-1 text-[11px] text-[#4A5568]">Google</a>
+          <a href={dirs.apple} target="_blank" rel="noopener noreferrer" className="as-press rounded-[9px] border border-[#E2E8F0] px-3 py-1 text-[11px] text-[#374151]">Apple</a>
+          <a href={dirs.google} target="_blank" rel="noopener noreferrer" className="as-press rounded-[9px] border border-[#E2E8F0] px-3 py-1 text-[11px] text-[#374151]">Google</a>
         </div>
       )}
     </div>
@@ -69,7 +69,7 @@ function Section({ title, count, children }: { title: string; count: number; chi
     <div className="mx-[18px] mt-4 overflow-hidden rounded-[16px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)]">
       <div className="flex items-center justify-between border-b border-[rgba(0,0,0,0.06)] px-[15px] py-[11px] font-[var(--font-mono)] text-[10px] uppercase tracking-[0.05em] text-[#8F6708]">
         <span>{title}</span>
-        <span className="text-[#6B7280]">{count}</span>
+        <span className="text-[#4B5563]">{count}</span>
       </div>
       {children}
     </div>
@@ -87,12 +87,12 @@ export default function TeamDetail({ team, games, onBack }: { team: TrackedTeam;
 
   return (
     <div className="as-fade-in pb-6">
-      <button type="button" onClick={onBack} className="as-press mx-[18px] mt-[14px] flex items-center gap-1.5 text-[12px] font-semibold text-[#4A5568]">
+      <button type="button" onClick={onBack} className="as-press mx-[18px] mt-[14px] flex items-center gap-1.5 text-[12px] font-semibold text-[#374151]">
         <ArrowLeft className="h-[15px] w-[15px]" /> My Teams
       </button>
       <div className="px-[18px] pb-1 pt-2">
         <h2 className="font-[var(--font-display)] text-[21px] font-bold text-[#1A1D23]">{team.name}</h2>
-        {meta && <div className="mt-0.5 font-[var(--font-mono)] text-[10.5px] text-[#6B7280]">{meta}</div>}
+        {meta && <div className="mt-0.5 font-[var(--font-mono)] text-[10.5px] text-[#4B5563]">{meta}</div>}
       </div>
 
       {next && <div className="mt-3"><NextGame games={mine} /></div>}
@@ -106,10 +106,10 @@ export default function TeamDetail({ team, games, onBack }: { team: TrackedTeam;
             <CalendarClock className="h-6 w-6 text-[#8F6708]" />
           </div>
           <div className="font-[var(--font-display)] text-[16px] font-bold text-[#1A1D23]">Bracket hasn't posted yet</div>
-          <div className="mx-auto mt-1.5 max-w-[280px] text-[12.5px] leading-[1.55] text-[#4A5568]">
+          <div className="mx-auto mt-1.5 max-w-[280px] text-[12.5px] leading-[1.55] text-[#374151]">
             The moment {team.tournamentName || "the tournament"} posts the bracket, every game lands here — with venue, one-tap directions, and a live countdown to tip.
           </div>
-          <div className="mx-auto mt-4 max-w-[260px] font-[var(--font-mono)] text-[10px] uppercase tracking-[0.06em] leading-[1.5] text-[#6B7280]">
+          <div className="mx-auto mt-4 max-w-[260px] font-[var(--font-mono)] text-[10px] uppercase tracking-[0.06em] leading-[1.5] text-[#4B5563]">
             Standings &amp; the predictor are live now under the Standings tab
           </div>
         </div>

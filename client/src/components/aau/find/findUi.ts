@@ -13,8 +13,8 @@ export const C = {
   s2: "#FFFFFF",                 // raised card
   s3: "#F1F3F5",                 // secondary surface
   ink: "#1A1D23",                // primary text
-  dim: "#4A5568",                // secondary text
-  mut: "#6B7280",                // muted text (AA on white)
+  dim: "#374151",                // secondary text
+  mut: "#4B5563",                // muted text (AA on white)
   faint: "#9CA3AF",              // faint text / icons / dividers
   line: "#E2E8F0",               // border
   hair: "rgba(0,0,0,0.06)",      // hairline
