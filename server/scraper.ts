@@ -271,15 +271,16 @@ export function parseGamesFromHtml(html: string, tournamentName: string): Game[]
     const isCompleted = hasScores && (new Date().getTime() - gameTime.getTime() > LIVE_WINDOW_MS);
     const status = getGameStatus(gameTime, hasScores, isCompleted);
 
-    // Determine Legacy's position
+    // Determine the tracked team's position. It matches TEAM_FILTER — the org's
+    // name as registered on TourneyMachine — and is displayed as "Aster AAU".
     const isLegacyTeam1 = team1.toLowerCase().includes(TEAM_FILTER);
-    
-    // Legacy's score and opponent's score
+
+    // Tracked team's score and opponent's score
     const legacyScore = isLegacyTeam1 ? score1 : score2;
     const opponentScore = isLegacyTeam1 ? score2 : score1;
     const opponent = isLegacyTeam1 ? team2 : team1;
 
-    // Calculate point differential from Legacy's perspective
+    // Point differential from the tracked team's perspective
     let pointDifferential: number | null = null;
     let legacyWon: boolean | null = null;
 
@@ -288,7 +289,7 @@ export function parseGamesFromHtml(html: string, tournamentName: string): Game[]
       legacyWon = legacyScore! > opponentScore!;
     }
 
-    // For display: Legacy is always "home" in our UI (listed first)
+    // For display: the tracked team (shown as "Aster AAU") is always "home" (listed first)
     const isLegacyHome = true;
 
     games.push({

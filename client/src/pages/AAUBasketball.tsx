@@ -150,7 +150,7 @@ export default function AAUBasketball() {
                 textTransform: "uppercase",
               }}
             >
-              AAU HUB
+              AAU Hub
             </span>
             <HubAccount user={user} />
           </div>

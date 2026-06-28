@@ -101,7 +101,7 @@ export const appRouter = router({
   // Invite Links (shareable signup/join links)
   inviteLinks: inviteLinksRouter,
 
-  // AAU HUB endpoints — public reads (the AAU section is a public showcase
+  // AAU Hub endpoints — public reads (the AAU section is a public showcase
   // per owner product decision 2026-06-25). Reads expose only the scoreboard +
   // schedule/venue data already surfaced on the page; the cache-invalidating
   // `refresh` mutation stays owner-only so the public can't force scraper egress.

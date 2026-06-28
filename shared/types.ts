@@ -6,7 +6,7 @@
 export type * from "../drizzle/schema";
 export * from "./_core/errors";
 
-// ─── AAU HUB Types ───
+// ─── AAU Hub Types ───
 
 export type GameStatus = 'live' | 'countdown' | 'upcoming' | 'completed';
 

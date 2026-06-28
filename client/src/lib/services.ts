@@ -82,7 +82,7 @@ export const PRODUCTS: ServiceEntry[] = [
   {
     id: "app",
     kind: "product",
-    name: "Sports Management App",
+    name: "Aster Sports App",
     tagline: "One platform for youth sports orgs",
     description:
       "Schedules, rosters, RSVPs, messaging, and financials for youth sports organizations — replacing spreadsheets, group texts, and LeagueApps with one mobile-first app.",
@@ -98,7 +98,7 @@ export const PRODUCTS: ServiceEntry[] = [
   {
     id: "aau",
     kind: "product",
-    name: "AAU HUB",
+    name: "AAU Hub",
     tagline: "Track any tournament — live scores & predictor",
     description:
       "Paste a TourneyMachine link and follow any AAU team — live scores, standings, the exact bracket predictor, and game-day directions. Free to browse; track your teams to unlock the dashboard, alerts, and navigation.",
@@ -113,7 +113,7 @@ export const PRODUCTS: ServiceEntry[] = [
   {
     id: "stpatrick",
     kind: "product",
-    name: "St. Patrick's of Armonk",
+    name: "St Patrick in Armonk",
     tagline: "Parish website & digital forms",
     description:
       "A full parish website — Mass times, bulletins, daily readings, calendar, and a digital forms suite for sacraments, CCD, and CYO registration. Rebuilt for the Armonk parish; preview live now, replacing the eCatholic site at cutover.",
