@@ -599,7 +599,7 @@ function AboutSection() {
 const faqs = [
   {
     question: "What does Aster Sports offer?",
-    answer: "Aster Sports is a platform with several products: Print Studio (AI print & pattern engineering for apparel), a Sports Management App for youth sports organizations, and AAU Hub for live AAU tournament tracking. We also take on bespoke web development, brand identity, and digital strategy engagements.",
+    answer: "Aster Sports is a platform with several products: Print Studio (AI print & pattern engineering for apparel), a Sports Management App for youth sports organizations, and the Aster Sports AAU Hub for live AAU tournament tracking. We also take on bespoke web development, brand identity, and digital strategy engagements.",
   },
   {
     question: "What is the Sports Management App?",

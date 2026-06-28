@@ -98,7 +98,7 @@ export const PRODUCTS: ServiceEntry[] = [
   {
     id: "aau",
     kind: "product",
-    name: "AAU Hub",
+    name: "Aster Sports AAU Hub",
     tagline: "Track any tournament — live scores & predictor",
     description:
       "Paste a TourneyMachine link and follow any AAU team — live scores, standings, the exact bracket predictor, and game-day directions. Free to browse; track your teams to unlock the dashboard, alerts, and navigation.",
