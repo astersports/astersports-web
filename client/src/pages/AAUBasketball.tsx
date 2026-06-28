@@ -141,16 +141,20 @@ export default function AAUBasketball() {
             Aster Sports
           </a>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 12 }}>
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: "0.08em",
-                color: "#F6CC55", // bright gold reads on navy
-                textTransform: "uppercase",
-              }}
-            >
-              AAU Hub
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              {/* Aster constellation mark — brand lockup with the AAU Hub badge */}
+              <img src="/aster-mark.png" alt="" aria-hidden="true" style={{ height: 18, width: "auto", display: "block" }} />
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  color: "#F6CC55", // bright gold reads on navy
+                  textTransform: "uppercase",
+                }}
+              >
+                AAU Hub
+              </span>
             </span>
             <HubAccount user={user} />
           </div>
