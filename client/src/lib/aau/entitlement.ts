@@ -1,11 +1,9 @@
 import type { HubUser } from "@/lib/aster";
 
-// Super-admin / operator accounts get FULL access to every gated hub surface — Plus features AND
-// child film — for testing + operations (operator-directed 2026-06-27: "all full access"). This is
-// the operator applying the gates to their OWN verified account; it never opens a gate for any other
-// viewer. Note the child-film case is still safe re: Copilot #159 — the verified Film state loads
-// reels from a gated server source (not yet wired) and carries ZERO child data in the bundle, so
-// unlocking it for the operator just shows the honest "no reels yet" state, not hardcoded minors.
+// Super-admin / operator accounts get Plus access (read-side) for testing + operations
+// (operator-directed 2026-06-27). The child-data gate is DELIBERATELY excluded — per the architect's
+// A5 ruling, Film stays locked until a genuine COPPA-grade guardian-verification + consent design
+// exists; the operator does NOT bypass it (it's minors, and a hardcoded-email bypass is not consent).
 // Email match is case-insensitive. (Move to a server-side role claim when auth roles are wired.)
 const SUPER_ADMIN_EMAILS = ["frank@astersports.co"];
 function isSuperAdmin(user?: HubUser | null): boolean {
@@ -27,10 +25,11 @@ export function isPlusEntitled(user?: HubUser | null): boolean {
 // Child-data access for Film (per-kid reels, named minors, AI review). can_access_child =
 // is_entitled AND verified_guardian, with consent + one-tap deletion (North Star §6 gate #3:
 // child-data exposure is owner-applied; auto mode never OPENS this gate). Neither entitlement nor
-// guardian verification is wired, so this is false for everyone EXCEPT the super-admin — Film
-// renders its locked state and exposes no named minor or reel to an unverified viewer. It flips
-// true for a normal account only when both are wired + consented.
-export function canAccessChild(user?: HubUser | null): boolean {
-  if (isSuperAdmin(user)) return true; // operator full access (own verified account)
-  return false; // verified-guardian + entitlement not wired — owner-applied child-data gate
+// guardian verification is wired, so this is false for EVERYONE — including the super-admin. Per the
+// architect's A5 ruling Film stays locked until a real COPPA-grade verification + consent design
+// exists; a hardcoded-email operator bypass is not consent and would expose minors, so we don't add
+// one. It flips true only when entitlement + guardian verification + consent are all wired.
+// (The `user` arg is kept for the future per-account check; intentionally unused today.)
+export function canAccessChild(_user?: HubUser | null): boolean {
+  return false; // child-data gate stays closed for all accounts until COPPA-grade verification lands
 }
