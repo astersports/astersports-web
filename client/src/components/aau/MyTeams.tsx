@@ -204,7 +204,7 @@ function GlanceCard({ value, label, grad = false }: { value: string; label: stri
   return (
     <div className="relative flex-1 overflow-hidden rounded-[14px] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(160deg,#13294d,#0b1c38)] px-[10px] py-3 text-center shadow-[0_2px_10px_rgba(11,28,58,0.30)]">
       {/* gold underline ties each tile to the brand gradient on the countdown below */}
-      <i className="pointer-events-none absolute inset-x-0 bottom-0 block h-[2px] bg-[linear-gradient(90deg,#E0631C,#E8902A,#F6CC55,#FBD56B)]" />
+      <i aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 block h-[2px] bg-[linear-gradient(90deg,#E0631C,#E8902A,#F6CC55,#FBD56B)]" />
       <div className={`font-[var(--font-mono)] text-[22px] font-bold leading-none tracking-[-0.5px] ${active ? "bg-[linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)] bg-clip-text text-transparent" : "text-[rgba(245,240,232,0.45)]"}`}>{value}</div>
       <div className="mt-[5px] font-[var(--font-mono)] text-[9px] font-semibold uppercase tracking-[0.08em] text-[rgba(246,204,85,0.85)]">{label}</div>
     </div>
