@@ -1,6 +1,6 @@
 ================================================================================
 CC WORK ORDER — P1 SAM3 vs SAM2 OFFLINE EVAL (+ P2 SCALE PROTOTYPE)
-astersports-web · 2026-06-28 · per architect ratify of STUDIO_AI_TREND_RADAR
+astersports-web · 2026-06-28 · per architect ratification of STUDIO_AI_TREND_RADAR
 ================================================================================
 AUTHORITY: architect ratified P1 build + P2 prototype, OFFLINE HARNESS ONLY. No
 provider flip — STUDIO_MASK_PROVIDER stays SAM2 in prod; the flip is Frank's (L99),
@@ -21,12 +21,15 @@ SCOPE / SAFETY (resolved guardrails)
   to the SAM3 endpoint as a flip-time gate, separately, before any real garment.)
 - ENDPOINT: `mattsays/sam3-image` (Replicate) — confirmed STILL-IMAGE SAM3 path
   (~$0.0013/run, ~2s, L40S), text + exemplar + box/point/mask prompts. Community-
-  published, but runs under Replicate's PLATFORM data-retention: API predictions'
-  inputs/outputs auto-delete after 1h (web-UI predictions kept indefinitely — we use
-  the API). This is PARITY with our existing SAM2-on-Replicate posture, not new
-  exposure. [GROUNDED/web 2026-06-28: replicate.com/mattsays/sam3-image;
+  published, but runs under Replicate's PLATFORM data-retention: prediction inputs/
+  outputs auto-delete after ~1h by default and we invoke via the API. This is PARITY
+  with our existing SAM2-on-Replicate posture, not new exposure. (Confirm the exact
+  retention terms for this community model against Replicate's policy at G2.)
+  [GROUNDED/web 2026-06-28: replicate.com/mattsays/sam3-image;
   replicate.com/docs/topics/predictions/data-retention]
-- Pin model VERSION (pinned Replicate version hash) + seed; record both in every row.
+- Pin the Replicate model VERSION hash (recorded in every row). Pin a seed ONLY IF
+  mattsays/sam3-image exposes one — it may not; where there is no seed parameter,
+  determinism is established EMPIRICALLY by A3/A4 below, never assumed.
 
 FIXED PROMPT STRATEGY (declared up front — no per-image cherry-picking)
 - ONE text-concept prompt per garment CLASS, set in the manifest BEFORE the run and
@@ -41,12 +44,14 @@ ACCEPTANCE BAR — SAM3 ships as the candidate ONLY IF ALL pass (locked):
        count MAE ≤ 0.75 × SAM2 count MAE (≥25% relative improvement) AND the gap
        exceeds the run-to-run noise band measured in A3. (A real margin, not noise.)
 [ ] A2 NO FAILURE-MODE REGRESSION — SAM3 does not regress the giant-instance / over-
-       segmentation mode: (giant-instance incidence = an instance > MAX_INSTANCE_
-       FRACTION 0.20 of fabric) and (over-segmentation rate = predicted/truth count
-       ratio) are each ≤ SAM2's on the same set.
-[ ] A3 COUNT STABILITY (billing-contract test) — under the pin (version+seed), K≥5
-       repeat inferences on each garment return the IDENTICAL instance count every
-       time (100% identical). Any count drift under pin = FAIL for the money path.
+       segmentation mode: (giant-instance incidence = an instance whose area exceeds
+       MAX_INSTANCE_FRACTION=0.20 of the CROP area, per sam2Provider.ts) and
+       (over-segmentation rate = predicted/truth count ratio) are each ≤ SAM2's on
+       the same set.
+[ ] A3 COUNT STABILITY (billing-contract test) — under the pin (version, + seed if
+       exposed), K≥5 repeat inferences on each garment return the IDENTICAL instance
+       count every time (100% identical). Any count drift under pin = FAIL for the
+       money path.
 [ ] A4 MASK STABILITY (cache-moat test) — under the same pin, repeat masks are
        pixel-stable: mean per-instance IoU across the K runs ≥ 0.99, and report the
        byte-identical rate. Determines the freeze-on-bill requirement (see RULING).
@@ -54,9 +59,15 @@ ACCEPTANCE BAR — SAM3 ships as the candidate ONLY IF ALL pass (locked):
        false-reject rate vs the current SAM2-fed detector (the CLAUDE.md §4 G3 gap).
 
 DETERMINISM RULING (the moat — architect-set)
-- SAM3 may be a MONEY-PATH provider only if it slots into the SAME reproducible-by-
-  cache pinning SAM2 uses: cache key MUST incorporate provider + model-version + seed,
-  and once a garment is billed its mask is FROZEN IN STORAGE, never recomputed.
+- GROUNDING: today's seg cache (segCache.ts) is an IN-MEMORY LRU keyed on
+  hash(imageUrl)+bbox+modelVersion — ephemeral (MAX_CACHE=4), NOT persisted, and NOT
+  provider/seed-tagged. So the "same cache pinning SAM2 uses" is NOT yet sufficient
+  for a money-path SAM3; TWO things must be BUILT before SAM3 could bill:
+  (1) EXTEND the cache key with provider (+ model-version, + seed if exposed) so SAM2
+      and SAM3 results never collide on the same (image, bbox);
+  (2) ADD PERSISTENT freeze-on-bill storage — once a garment is billed its mask is
+      frozen and NEVER recomputed (the current in-memory LRU evicts after 4 entries,
+      so it cannot guarantee this on its own).
 - If A3 passes but A4 fails (count-stable, not mask-stable): still viable ONLY GIVEN
   freeze-on-bill, AND the eval/design must prove the recompute-on-cache-miss path
   cannot silently change an ALREADY-BILLED customer's output (i.e. a cache miss after
@@ -100,7 +111,8 @@ P2 — SCALE REPEAT-DETECTION PROTOTYPE (sequenced AFTER P1)
 P3 / P4 — ratified as written (NO work this arc)
 ================================================================================
 - P3: LaMa stays; NO diffusion inpainting on the deterministic path.
-- P4: generative instruction-edit models (Flux Kontext / Qwen / Nano Banana) parked
+- P4: generative instruction-edit models (Flux Kontext / Qwen-Image-Edit / Nano
+  Banana = Google Gemini 2.5 Flash Image) parked
   behind their own feature + privacy + billing design. Not pre-onboarding.
 
 ================================================================================
