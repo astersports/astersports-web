@@ -77,7 +77,7 @@ export default function FrontierSection() {
   const current = TRENDS[active];
 
   return (
-    <section id="frontier" className="relative py-12 md:py-20 bg-[#0a0e1a]" aria-label="AI frontier trends">
+    <section id="frontier" className="relative py-12 md:py-20 bg-[#1a2133]" aria-label="AI frontier trends">
       <div className="container" ref={ref}>
         <div className="grid lg:grid-cols-[0.9fr_1.1fr] gap-10 lg:gap-14 items-start">
           {/* Left: intro + the agent scan console */}
