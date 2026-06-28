@@ -1,0 +1,115 @@
+HUB HOME V2 — P0 GROUNDING (§2 of the work order)
+Architect-ratified work order: rebuild Hub Home as hero + per-team accordion, dark behind
+HUB_HOME_V2. This doc cites the REAL data sources (file:line, verified against main) each
+section reads, per §2. [GROUNDED] = verified in source; [ABSENT] = not available, render the
+honest empty state per Rule H7.
+
+Build flag: VITE_HUB_HOME_V2 (dark by default; Frank owns the flip after sign-off + smoke).
+
+────────────────────────────────────────────────────────────────────────
+§2 SOURCE CITATIONS
+────────────────────────────────────────────────────────────────────────
+
+1. TRACKED TEAMS + per-team division/event/record  [GROUNDED]
+   - client/src/lib/aau/trackingStore.ts:11-22  TrackedTeam {teamKey,name,program,pool,
+     tournamentId,tournamentName,divisionId,divisionName,kid,addedAt}; getTracked() (63-65),
+     TRACKED_EVENT for live refresh.
+   - client/src/lib/aster.ts:251-270  TeamGame {gameId,trackedTeamId,trackedTeamName,opponent,
+     myScore,oppScore,status,startAt,court,division,tournamentId,tournament,venue,qkey};
+     getTrackedTeamSchedule(teamIds) → RPC get_public_aau_team_schedule.
+   - client/src/lib/aau/myTeamsModel.ts:39-144  MyTeamsModel {hero,glance{liveNow,today},
+     groups,totalRecord}; buildMyTeamsModel(tracked,games,now). Record is FINAL-only
+     (myTeamsModel.ts:60 — skip non-final / null-score). This is the spine V2 reuses.
+
+2. DIVISION STANDINGS + CUT LINE (shared with Browse — §5.3 / §8)  [GROUNDED]
+   - client/src/hooks/useAauStandings.ts:13-58  returns {standings:RankedRow[], advanceCount,
+     predictFor, bundle}; fetches getTournamentStandings(divisionId), polls 60s, computes via
+     computeStandings(). THIS is the single source; Home slice reuses it (no second compute).
+   - client/src/lib/standings/computeStandings.ts:27-72  computeStandings(); RankedRow.advances =
+     advanceCount==null ? null : idx < advanceCount (the cut line).
+   - client/src/components/aau/standings/DivisionStandings.tsx + StandingsTable.tsx — Browse's
+     full render. StandingsTable draws the "top N advance" divider after rank advanceCount
+     (StandingsTable.tsx:70-88). V2 adds variant='slice'.
+
+3. EXACT BRACKET-PATH / ADVANCEMENT  [GROUNDED]
+   - client/src/lib/standings/predictBracket.ts:84-149  predictBracket({...}) → Prediction
+     {available, status, posture, outcomes, advancing, scenarios, basis, decided, oddsPct?}.
+   - Posture (31-37): clinched | win_and_in | in_control | must_win | needs_help | eliminated,
+     derived from win/lose math (131-139) so in_control is impossible when loseEliminates (H3).
+   - SCENARIO ENUMERATION is exact: enumerates all 2^k remaining outcomes, counts `advancing`
+     of `outcomes`. THIS is what Home's BracketPath consumes.
+   - oddsPct EXISTS on Prediction (line 43) and is emitted (line 125) — the team-strength-
+     WEIGHTED %. Per H1 it is NOT shown on Home. The current BracketOdds.tsx already suppresses
+     it (leads with the exact count). V2's <BracketPath> takes NO probability prop at all
+     (structurally incapable — §8 / H1), so the un-earned % cannot leak onto Home.
+
+4. LIVE / SCORE SOURCE + POLL  [GROUNDED]
+   - TeamGame.status (aster.ts:257): 'scheduled'|'live'|'final'. FINAL-ONLY ingest: scores
+     populate on final (a live game commonly has no score yet) — confirmed by the score
+     re-ingest audit (every final has a score; live/scheduled may be null). H2: a live game
+     with null score renders "Live · score posts at final", never a bare dash.
+   - Poll cadence: TournamentDetail.tsx:96 polls 30s; useAauStandings.ts:42 polls 60s; the
+     server-side aau-live-score-poll pg_cron re-ingests live tournaments every 10 min.
+
+5. SCHEDULE / NEXT-GAME / RESULTS  [GROUNDED]
+   - client/src/lib/aau/nextGame.ts:9-38  pickNextGame(games,now) (skips finals, soonest
+     future/live), countdownLabel(targetMs,now).
+   - client/src/components/aau/TeamDetail.tsx  derives upcoming (live or future non-final,
+     past-dated scheduled excluded), results (finals, recent-first), record; FormGuide = last-5.
+
+6. WEATHER + TRAVEL + MAPS  [GROUNDED]
+   - client/src/components/aau/NextGame.tsx:4-8  composes @aster/weather getWeatherForEvent +
+     driveTime + buildDirections — the existing game-day brief.
+   - client/src/lib/aau/driveTime.ts:19-59  getOrigin() (geolocation), estimateDrive(venue,
+     origin) via OSRM (router.project-osrm.org) — the SINGLE drive-time source (H5), leaveByLabel.
+   - client/src/lib/aau/buildDirections.ts:28-63  buildDirections(venue) → {apple,google,waze,
+     label}; lat/lng first, address fallback. (NOTE: the work order's hero spec lists
+     [Apple][Google][Waze]; the builder returns all three. The aster-sports platform retired
+     Waze on a different surface — for THIS hub the builder still returns waze, so V2 follows
+     the work order and renders all three.)
+
+7. FORFEIT FLAG  [ABSENT — honest-state per H7; H4 needs a backend field]
+   - Forfeit LOGIC exists: client/src/lib/aau/advancement.ts:19-77,186-244 — ForfeitMode
+     (hard_out | recorded_loss), per-circuit config, TeamStanding.isForfeit.
+   - BUT the public RPC types TeamGame/TournamentGame (aster.ts:251-291) do NOT surface
+     is_forfeit/is_exhibition. The DB substrate has is_forfeit/is_exhibition columns
+     (aau_standings_substrate_correctness migration), but get_public_aau_team_schedule /
+     get_public_tournament_* do not return them to the client.
+   - CONSEQUENCE: Home cannot tag a forfeit it can't see. Per H7 it renders the final as the
+     RPC reports it and never FABRICATES a forfeit; it also never invents a 20-0. Full H4
+     ("render with a Forfeit tag") requires surfacing is_forfeit on the public RPC — a
+     body-only CREATE OR REPLACE (two jsonb keys), owner-applied, OUTSIDE this read-only build.
+     FLAGGED for the architect: ship V2 with H4 as honest-absent now, schedule the RPC field
+     so the Forfeit tag lights up when the data arrives. No fabrication either way.
+
+8. FEATURE FLAG MECHANISM  [GROUNDED]
+   - Idiom: const FLAG = import.meta.env.VITE_FLAG === "true"; (dark by default).
+     Examples: FrontierSection.tsx:13 (VITE_LANDING_AGENT_LIVE), studio CreateOrgDialog.tsx:33
+     (VITE_CREATE_ORG_LIVE). Vite inlines VITE_* at build; envDir = project root.
+   - V2: const HUB_HOME_V2 = import.meta.env.VITE_HUB_HOME_V2 === "true"; render
+     {HUB_HOME_V2 ? <HubHomeV2/> : <MyTeams/>} at the Home mount. Frank flips the env to go live.
+
+────────────────────────────────────────────────────────────────────────
+HONESTY-RULE STANDING (going into the build)
+────────────────────────────────────────────────────────────────────────
+H1  exact-count only on Home; <BracketPath> has no probability prop.            → enforced at type level
+H2  live + null score → "Live · score posts at final".                          → buildable now
+H3  state-aware ladder; never "in control" for a marginal team.                 → predictBracket posture already correct
+H4  forfeit → "Forfeit" tag.                                                     → HONEST-ABSENT now (needs RPC field; flagged)
+H5  one drive-time (OSRM), one weather source, surfaced everywhere.             → single source confirmed
+H6  no fabricated estimates / gauges / AI-insight templates / scouting prose.   → none built
+H7  missing data → honest empty/absent state.                                   → the rule for every section
+H8  NO live-claiming agent console on Home — omit it on Home V2.                → APPROVED (Frank): V2 omits the console
+H9  Film never auto-renders; guardian gate (canAccessChild=false) holds.        → deep-link only, no auto-render
+
+Note on H8: the AgentConsole shipped to the CURRENT Home (#201) is a live-claiming strip
+(pulse dot + "scanning N/M" + "live" status). Per H8 (operator-approved) Hub Home V2 does NOT
+carry it. The current Home keeps it until Frank flips HUB_HOME_V2; at flip, Home becomes the
+honest dashboard with no console. Approved — not re-litigated here.
+
+────────────────────────────────────────────────────────────────────────
+BUILD ORDER (each dark behind HUB_HOME_V2)
+P0 flag + this doc · P1 DivisionStandings variant='slice' · P3 urgency util + HeroSlot select +
+BracketPath (no %) · P2/P4/P5 TeamAccordionCard + hero render + status strip + game-day compose +
+smart defaults/day-boundary · P6 honesty + §10/§11/§12 acceptance. Return for architect review
+with §10 + §11 checklists. Frank owns the flip.
