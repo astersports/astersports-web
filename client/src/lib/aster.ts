@@ -3,7 +3,7 @@
  *
  * The AAU hub is a THIN PUBLIC CONSUMER of the Aster Sports platform Supabase (the
  * single backbone): it reads org-gated public data straight from the platform via the
- * publishable anon key — same pattern the Legacy Hoopers site uses. No server, no data
+ * publishable anon key — same pattern the Aster AAU site uses. No server, no data
  * clone. The URL + anon key are PUBLISHABLE (designed to ship in the browser); the data
  * is gated server-side by `org_is_public_listed` + RLS, so anon can only read what the
  * platform has explicitly published. Hardcoded (not VITE_ env) on purpose: a public read

@@ -52,7 +52,7 @@ function matchGrade(s: string): string | null {
   return null;
 }
 
-/** "Legacy Hoopers 11U" → "Legacy Hoopers"; "Gravity Force 5th Grade" → "Gravity Force".
+/** "Aster AAU 11U" → "Aster AAU"; "Gravity Force 5th Grade" → "Gravity Force".
  *  Strips a trailing age/grade qualifier so same-club teams group. No match → full name. */
 export function parseProgram(teamName: string): string {
   const stripped = teamName

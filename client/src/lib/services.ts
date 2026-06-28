@@ -98,7 +98,7 @@ export const PRODUCTS: ServiceEntry[] = [
   {
     id: "aau",
     kind: "product",
-    name: "AAU Basketball",
+    name: "AAU HUB",
     tagline: "Track any tournament — live scores & predictor",
     description:
       "Paste a TourneyMachine link and follow any AAU team — live scores, standings, the exact bracket predictor, and game-day directions. Free to browse; track your teams to unlock the dashboard, alerts, and navigation.",
@@ -127,10 +127,10 @@ export const PRODUCTS: ServiceEntry[] = [
   {
     id: "legacy-hoopers",
     kind: "product",
-    name: "Legacy Hoopers",
+    name: "Aster AAU",
     tagline: "Program site · beyond LeagueApps",
     description:
-      "A public program site for Legacy Hoopers — live scores, tournament history, season records, and film — powered by the Aster platform in place of LeagueApps. Early preview live now.",
+      "A public program site for Aster AAU — live scores, tournament history, season records, and film — powered by the Aster platform in place of LeagueApps. Early preview live now.",
     href: "https://legacy-hoopers-production.up.railway.app",
     external: true,
     status: "beta",
@@ -139,7 +139,7 @@ export const PRODUCTS: ServiceEntry[] = [
     cta: "Follow the Team",
   },
   {
-    // Productized site-building service. St. Patrick (Armonk) and Legacy Hoopers
+    // Productized site-building service. St. Patrick (Armonk) and Aster AAU
     // are the first concrete builds — each surfaced as its own node above.
     id: "websites",
     kind: "product",

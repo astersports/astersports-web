@@ -5,7 +5,7 @@ import type { TeamGame } from "@/lib/aster";
 
 const NOW = Date.parse("2026-06-27T12:00:00-04:00");
 const g = (over: Partial<TeamGame>): TeamGame => ({
-  gameId: "x", gameCode: "P1", trackedTeamId: "t1", trackedTeamName: "Legacy 11U",
+  gameId: "x", gameCode: "P1", trackedTeamId: "t1", trackedTeamName: "Aster 11U",
   isHome: true, opponent: "CT Hoops", myScore: null, oppScore: null,
   status: "scheduled", startAt: null, court: "Court 3", division: "Boys - 5th",
   tournamentId: "T", tournament: "Rumble", venue: null, ...over,

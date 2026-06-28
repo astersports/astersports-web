@@ -293,7 +293,7 @@ export function parseGamesFromHtml(html: string, tournamentName: string): Game[]
 
     games.push({
       id: `${tournamentName.replace(/\s/g, '-').toLowerCase()}-${gameId}`,
-      homeTeam: 'Legacy Hoopers',
+      homeTeam: 'Aster AAU',
       awayTeam: opponent,
       homeScore: legacyScore,
       awayScore: opponentScore,

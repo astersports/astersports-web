@@ -7,7 +7,7 @@ describe("grade parsing", () => {
     expect(parseTeamGrade("East Coast Storm 5th")).toBe(5);
   });
   it("does not treat age bands (11U) or plain names as grades", () => {
-    expect(parseTeamGrade("Legacy 11U")).toBeNull();
+    expect(parseTeamGrade("Aster 11U")).toBeNull();
     expect(parseTeamGrade("High Rise - Brie")).toBeNull();
     expect(parseTeamGrade("NYC Titans")).toBeNull();
   });

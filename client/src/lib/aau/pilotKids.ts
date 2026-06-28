@@ -60,7 +60,7 @@ export const PILOT_KIDS: PilotKid[] = [
     id: "charlie",
     name: "Charlie",
     jersey: "#5",
-    program: "Legacy Hoopers",
+    program: "Aster AAU",
     team: "11U Girls",
     gradeNow: "5th Grade",
     gradeNext: "6th in the fall",
