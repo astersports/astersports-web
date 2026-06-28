@@ -77,6 +77,13 @@ export const ENV = {
     Number(process.env.LANDING_AGENT_LEAD_PER_IP_DAY) > 0
       ? Number(process.env.LANDING_AGENT_LEAD_PER_IP_DAY)
       : 3,
+  /** Cloudflare Turnstile bot-gate secret (docs/SPEC_LANDING_AGENT.txt P5, Fork
+   *  D — required at the model boundary under A2). Verifies the client's token
+   *  before a session's first model turn. When the agent is LIVE the gate is
+   *  REQUIRED: an unset secret fails CLOSED (verifyTurnstile returns false → the
+   *  first turn is denied). Provision this + VITE_TURNSTILE_SITE_KEY (client)
+   *  BEFORE flipping LANDING_AGENT_LIVE. Inert while the agent is dark. */
+  turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY ?? "",
   /** Supabase Storage — customer image uploads + signed reads (server/storage.ts,
    *  server/_core/storageProxy.ts). Replaces the Manus Forge presigned-URL/S3 path.
    *  The bucket is PRIVATE; the browser never talks to Supabase directly — it goes

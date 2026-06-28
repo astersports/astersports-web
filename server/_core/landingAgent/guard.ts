@@ -88,6 +88,8 @@ function deny(reason: DenyReason): GuardDecision {
 
 /** How often the guard evicts expired limiter keys (memory bound). */
 const SWEEP_INTERVAL_MS = 60_000;
+/** How long a Turnstile-verified session stays verified (P5). */
+const VERIFIED_TTL_MS = 30 * 60_000;
 
 export class LandingAgentGuard {
   private readonly sessionLimiter: SlidingWindowLimiter;
@@ -95,6 +97,8 @@ export class LandingAgentGuard {
   private readonly leadLimiter: SlidingWindowLimiter;
   private readonly ledger: DailySpendLedger;
   private lastSweep = 0;
+  /** sessionId → expiry (ms): sessions that have cleared the Turnstile gate (P5). */
+  private readonly verifiedSessions = new Map<string, number>();
 
   constructor(cfg: GuardConfig, deps: GuardDeps = {}) {
     this.sessionLimiter = deps.sessionLimiter ?? new SlidingWindowLimiter(cfg.chatPerSession, SESSION_WINDOW_MS);
