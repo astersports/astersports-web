@@ -24,9 +24,14 @@ import {
   estimateTurnTokens,
 } from "../_core/landingAgent/scoutRequest";
 import { streamScout } from "../_core/landingAgent/scoutLlm";
+import { isTurnstileConfigured, verifyTurnstile } from "../_core/landingAgent/turnstile";
 import { buildScoutSystemPrompt } from "../../shared/landingAgentPrompt";
 import { validateRecommendSurface, validateCaptureLead } from "../../shared/landingAgentTools";
 import { emailLeadCaptured } from "../email";
+
+/** Kindness microcopy when the Turnstile bot gate rejects a turn (P5, Fork D). */
+const TURNSTILE_DENY_MESSAGE =
+  "We couldn't confirm you're human just yet — refresh the check and try again, or reach us on the contact form.";
 
 function sse(res: Response, data: Record<string, unknown>): void {
   try {
@@ -84,6 +89,22 @@ export function registerLandingScoutRoute(app: Express): void {
       sse(res, { type: "done", denied: true });
       res.end();
       return;
+    }
+
+    // Bot gate (P5, Fork D): a session must clear Cloudflare Turnstile before its
+    // first model turn. Verified sessions are cached (VERIFIED_TTL_MS) so later
+    // turns skip the round-trip. Only enforced when configured — an unset secret
+    // is surfaced as a boot warning (validateEnv) + a pre-flip blocker, not a hard
+    // block on dark testing. verifyTurnstile FAILS CLOSED on every error path.
+    if (isTurnstileConfigured() && !landingAgentGuard.isVerified(parsed.sessionId, now)) {
+      const ok = await verifyTurnstile(parsed.turnstileToken, ip);
+      if (!ok) {
+        sse(res, { type: "denied", reason: "turnstile", message: TURNSTILE_DENY_MESSAGE });
+        sse(res, { type: "done", denied: true });
+        res.end();
+        return;
+      }
+      landingAgentGuard.markVerified(parsed.sessionId, now);
     }
 
     // Abort the model stream if the visitor navigates away mid-turn.

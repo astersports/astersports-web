@@ -140,6 +140,47 @@ describe("LandingAgentGuard.evaluateLeadCapture", () => {
   });
 });
 
+describe("LandingAgentGuard Turnstile verified-session cache (P5)", () => {
+  const TTL = 30 * 60_000;
+
+  it("a fresh session is NOT verified", () => {
+    const g = new LandingAgentGuard(cfg());
+    expect(g.isVerified("sess-1", T0)).toBe(false);
+  });
+
+  it("marking a session verified makes isVerified true within the TTL", () => {
+    const g = new LandingAgentGuard(cfg());
+    g.markVerified("sess-1", T0);
+    expect(g.isVerified("sess-1", T0)).toBe(true);
+    expect(g.isVerified("sess-1", T0 + TTL - 1)).toBe(true);
+  });
+
+  it("verification expires at the TTL boundary", () => {
+    const g = new LandingAgentGuard(cfg());
+    g.markVerified("sess-1", T0);
+    // exp = T0 + TTL; isVerified requires exp > now, so exactly at the boundary it's stale
+    expect(g.isVerified("sess-1", T0 + TTL)).toBe(false);
+    expect(g.isVerified("sess-1", T0 + TTL + 1)).toBe(false);
+  });
+
+  it("verification is per-session — one verified session does not verify another", () => {
+    const g = new LandingAgentGuard(cfg());
+    g.markVerified("sess-1", T0);
+    expect(g.isVerified("sess-2", T0)).toBe(false);
+  });
+
+  it("the sweep evicts expired verifications (memory bound)", () => {
+    const g = new LandingAgentGuard(cfg());
+    g.markVerified("sess-1", T0);
+    // A later turn triggers maybeSweep (>60s since lastSweep); the expired entry
+    // is removed, and a still-valid one survives.
+    g.markVerified("sess-2", T0 + TTL); // expires at T0 + 2*TTL
+    g.evaluateChatTurn(turn({ now: T0 + TTL + 61_000 }));
+    expect(g.isVerified("sess-1", T0 + TTL + 61_000)).toBe(false);
+    expect(g.isVerified("sess-2", T0 + TTL + 61_000)).toBe(true);
+  });
+});
+
 describe("dailyTokenCeiling", () => {
   it("converts a $/day budget to a token budget via the $/Mtok knob", () => {
     // $5/day at $1.50/Mtok ≈ 3.33M tokens

@@ -8,6 +8,7 @@ export const MAX_MESSAGES = 16; // hard cap on transcript length the server acce
 export const MAX_CONTENT_LEN = 2000; // per-message char cap
 export const MAX_SESSION_ID_LEN = 100;
 export const MAX_OUTPUT_TOKENS = 512; // the model's max_tokens for a turn (small, by design)
+export const MAX_TURNSTILE_TOKEN_LEN = 2048; // Cloudflare tokens are ~<1KB; cap defensively
 
 export interface ScoutMessage {
   role: "user" | "assistant";
@@ -17,6 +18,8 @@ export interface ScoutMessage {
 export interface ScoutRequest {
   sessionId: string;
   messages: ScoutMessage[];
+  /** Cloudflare Turnstile token for the bot gate (P5). Absent on verified-session turns. */
+  turnstileToken?: string;
 }
 
 /**
@@ -51,7 +54,13 @@ export function parseScoutRequest(body: unknown): ScoutRequest {
   if (messages.length === 0 || !messages.some((m) => m.role === "user")) {
     throw new Error("at least one user message required");
   }
-  return { sessionId, messages };
+
+  // Optional Turnstile token: clamp length and reject non-strings silently (an
+  // absent/garbage token simply fails the gate downstream — fail closed there).
+  const rawToken = typeof b.turnstileToken === "string" ? b.turnstileToken.trim() : "";
+  const turnstileToken = rawToken ? rawToken.slice(0, MAX_TURNSTILE_TOKEN_LEN) : undefined;
+
+  return { sessionId, messages, turnstileToken };
 }
 
 /** Max textual length of an IPv6 address — anything longer is malicious. */

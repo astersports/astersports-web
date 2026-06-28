@@ -88,6 +88,8 @@ function deny(reason: DenyReason): GuardDecision {
 
 /** How often the guard evicts expired limiter keys (memory bound). */
 const SWEEP_INTERVAL_MS = 60_000;
+/** How long a Turnstile-verified session stays verified (P5). */
+const VERIFIED_TTL_MS = 30 * 60_000;
 
 export class LandingAgentGuard {
   private readonly sessionLimiter: SlidingWindowLimiter;
@@ -95,6 +97,8 @@ export class LandingAgentGuard {
   private readonly leadLimiter: SlidingWindowLimiter;
   private readonly ledger: DailySpendLedger;
   private lastSweep = 0;
+  /** sessionId → expiry (ms): sessions that have cleared the Turnstile gate (P5). */
+  private readonly verifiedSessions = new Map<string, number>();
 
   constructor(cfg: GuardConfig, deps: GuardDeps = {}) {
     this.sessionLimiter = deps.sessionLimiter ?? new SlidingWindowLimiter(cfg.chatPerSession, SESSION_WINDOW_MS);
@@ -119,6 +123,21 @@ export class LandingAgentGuard {
     this.sessionLimiter.sweep(now);
     this.ipLimiter.sweep(now);
     this.leadLimiter.sweep(now);
+    // Evict expired Turnstile verifications too (same memory bound).
+    this.verifiedSessions.forEach((exp, id) => {
+      if (exp <= now) this.verifiedSessions.delete(id);
+    });
+  }
+
+  /** P5: has this session cleared the Turnstile gate (and not yet expired)? */
+  isVerified(sessionId: string, now: number): boolean {
+    const exp = this.verifiedSessions.get(sessionId);
+    return exp !== undefined && exp > now;
+  }
+
+  /** P5: mark a session verified for VERIFIED_TTL_MS after a successful Turnstile check. */
+  markVerified(sessionId: string, now: number): void {
+    this.verifiedSessions.set(sessionId, now + VERIFIED_TTL_MS);
   }
 
   evaluateChatTurn(input: ChatTurnInput): GuardDecision {

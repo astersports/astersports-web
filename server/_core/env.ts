@@ -77,6 +77,13 @@ export const ENV = {
     Number(process.env.LANDING_AGENT_LEAD_PER_IP_DAY) > 0
       ? Number(process.env.LANDING_AGENT_LEAD_PER_IP_DAY)
       : 3,
+  /** Cloudflare Turnstile bot-gate secret (docs/SPEC_LANDING_AGENT.txt P5, Fork
+   *  D — required at the model boundary under A2). Verifies the client's token
+   *  before a session's first model turn. When the agent is LIVE the gate is
+   *  REQUIRED: an unset secret fails CLOSED (verifyTurnstile returns false → the
+   *  first turn is denied). Provision this + VITE_TURNSTILE_SITE_KEY (client)
+   *  BEFORE flipping LANDING_AGENT_LIVE. Inert while the agent is dark. */
+  turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY ?? "",
   /** Supabase Storage — customer image uploads + signed reads (server/storage.ts,
    *  server/_core/storageProxy.ts). Replaces the Manus Forge presigned-URL/S3 path.
    *  The bucket is PRIVATE; the browser never talks to Supabase directly — it goes
@@ -282,6 +289,17 @@ export function validateEnv(): { errors: string[]; warnings: string[] } {
   ) {
     errors.push(
       "STUDIO_SCALE_LIVE / STUDIO_DENSITY_LIVE / STUDIO_DENSITY_REDISTRIBUTE require STUDIO_MASK_PROVIDER=sam2 (deterministic ops need SAM2 rasters + instances)"
+    );
+  }
+
+  // Bot gate co-requirement (landing agent, P5/Fork D): flipping the agent live
+  // without a Turnstile secret leaves the concierge open to unmetered bot traffic.
+  // The route fails closed per-turn when configured, but an unset secret means NO
+  // gate at all — warn loudly. Kept a warning (not a boot error) so the agent can
+  // still be exercised dark in pre-flip testing; it is a §7 pre-flip blocker.
+  if (ENV.landingAgentLive && !ENV.turnstileSecretKey) {
+    warnings.push(
+      "LANDING_AGENT_LIVE=true without TURNSTILE_SECRET_KEY — the Aster Scout bot gate is OFF (pre-flip blocker; set the secret before going live)"
     );
   }
 
