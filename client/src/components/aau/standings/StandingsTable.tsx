@@ -68,12 +68,12 @@ function FragmentRow({ r, i, focusId, advanceCount }: { r: RankedRow; i: number;
   const wl = `${r.wins}–${r.losses}${r.ties ? `–${r.ties}` : ""}`;
   const diff = `${r.diff > 0 ? "+" : ""}${r.diff}`;
   const showAdvanceLine = advanceCount != null && i + 1 === advanceCount;
-  const cell = "border-t border-[rgba(0,0,0,0.06)] px-3 py-3 font-[var(--font-mono)] text-[20.8px]";
+  const cell = "border-t border-[rgba(0,0,0,0.06)] px-2.5 py-3 font-[var(--font-mono)] text-[20.8px] whitespace-nowrap tabular-nums";
   return (
     <>
       <tr className={me ? "bg-[rgba(95,160,230,0.10)]" : ""}>
         <td className={`w-[18px] ${cell} text-right text-[#4B5563]`}>{r.rank}</td>
-        <td className={`border-t border-[rgba(0,0,0,0.06)] px-3 py-3 text-left text-[20.8px] font-semibold ${me ? "text-[#bcd8f3]" : "text-[#1A1D23]"}`}>{r.name}</td>
+        <td className={`border-t border-[rgba(0,0,0,0.06)] px-3 py-3 text-left text-[20.8px] font-semibold ${me ? "text-[#1d4ed8]" : "text-[#1A1D23]"}`}>{r.name}</td>
         <td className={`${cell} text-right text-[#1A1D23]`}>{wl}</td>
         <td className={`${cell} text-right text-[#1A1D23]`}>{diff}</td>
       </tr>
