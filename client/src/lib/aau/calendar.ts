@@ -36,7 +36,7 @@ export function addLeaveReminder(r: LeaveReminder): boolean {
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Aster Sports//AAU Hub//EN",
+    "PRODID:-//Aster Sports//Aster Sports AAU Hub//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",
