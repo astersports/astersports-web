@@ -7,6 +7,7 @@ import ConflictRadar from "./ConflictRadar";
 import NextGame from "./NextGame";
 import TeamDetail from "./TeamDetail";
 import HomeGatedSections from "./HomeGatedSections";
+import AgentConsole, { type AgentStep } from "./AgentConsole";
 
 // Home command center — render-faithful. Header + "updating live" (only when a tracked team is in
 // progress), a live score hero, three glance stats (to-advance · live now · today), and tracked
@@ -52,6 +53,20 @@ export default function MyTeams() {
   const drop = (key: string) => setTeams(untrack(key));
   const liveActive = model.glance.liveNow > 0;
 
+  // The Aster agent narrates the user's real weekend state (no fabrication — every line is
+  // built from the live model). It cycles these as a scan, lighting the matching chip.
+  const consoleSteps = useMemo<AgentStep[]>(() => {
+    if (!teams.length) return [];
+    const g = model.glance;
+    return [
+      { tag: "Tracked", line: `${teams.length} team${teams.length === 1 ? "" : "s"}${programLabel ? ` · ${programLabel}` : ""}` },
+      { tag: "Live", line: g.liveNow > 0 ? `${g.liveNow} game${g.liveNow === 1 ? "" : "s"} live right now` : "no games live — watching for tip-off" },
+      { tag: "Today", line: g.today > 0 ? `${g.today} game${g.today === 1 ? "" : "s"} on today's slate` : "no games today — the slate's clear" },
+      { tag: "Advancement", line: "computes the moment pool play wraps" },
+      { tag: "Scores", line: "refreshing from the bracket every few minutes" },
+    ];
+  }, [teams.length, programLabel, model.glance]);
+
   // team detail drill-down (game-by-game schedule + results + directions)
   const sel = selected ? teams.find((t) => t.teamKey === selected) : null;
   if (sel) return <TeamDetail team={sel} games={games} onBack={() => setSelected(null)} />;
@@ -81,6 +96,18 @@ export default function MyTeams() {
           <Users className="h-5 w-5 text-[#4B5563]" aria-hidden="true" />
         )}
       </div>
+
+      {/* the Aster agent — live, on-brand scan of the user's tracked weekend */}
+      {teams.length > 0 && (
+        <div className="mx-[18px] mt-[10px]">
+          <AgentConsole
+            label="aster-agent · tracking"
+            verb="scanning"
+            status={liveActive ? "live" : "watching"}
+            steps={consoleSteps}
+          />
+        </div>
+      )}
 
       {/* live score hero — only when a tracked team is in progress */}
       {model.hero && (() => {

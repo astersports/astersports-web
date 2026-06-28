@@ -943,6 +943,22 @@
   font-weight: 700;
 }
 
+/* Light-surface variants of the agent console — the AAU hub runs the light Aster theme
+   (medium-gray base, white cards), so the dark-navy terminal would clash. Same motif:
+   white card, AA-safe gold border + warm inset glow; the scan shimmer + brand-grad chip
+   carry over unchanged (they read on either base). */
+.aster-terminal--light {
+  background: linear-gradient(180deg, #FFFFFF, #F9FAFB);
+  border: 1px solid rgba(232, 144, 42, .34);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .04), inset 0 0 60px -34px rgba(232, 144, 42, .42);
+}
+.aster-chip-idle--light {
+  color: #6B7280;
+  border-color: rgba(0, 0, 0, .10);
+  background: rgba(0, 0, 0, .02);
+}
+
 /* ─── Weather icon animations (wx-*) ─── */
 @keyframes wx-spin { to { transform: rotate(360deg); } }
 @keyframes wx-pulse {
