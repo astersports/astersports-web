@@ -35,6 +35,48 @@ export const ENV = {
    *  sub-processor + spend gate, so it ships dark and the flip is Frank's (§1
    *  human-on-flip). Nothing reads it yet (P0 scaffolding). */
   landingAgentLive: process.env.LANDING_AGENT_LIVE === "true",
+  /** P2 abuse/cost envelope for the landing agent (docs/SPEC_LANDING_AGENT.txt §5,
+   *  conditions C2/C3). All have safe defaults; Frank tunes the ceiling to his
+   *  daily $ budget at flip time. Read by server/_core/landingAgent/* — inert
+   *  until the agent endpoint ships (P3).
+   *
+   *  The global ceiling is a $/day budget converted to a token budget via a
+   *  blended $/million-tokens cost knob. That knob is an INTERNAL cost estimate,
+   *  not a customer-facing price (so it is outside condition C1). Metering is in
+   *  tokens (what the model bills); dollars are the operator-facing view. */
+  landingAgentDailyUsdCeiling:
+    Number(process.env.LANDING_AGENT_DAILY_USD_CEILING) > 0
+      ? Number(process.env.LANDING_AGENT_DAILY_USD_CEILING)
+      : 5,
+  /** Blended internal $/million-tokens estimate used only to convert the $ ceiling
+   *  into a token budget. Tune if Haiku pricing or the in/out mix changes. */
+  landingAgentUsdPerMtok:
+    Number(process.env.LANDING_AGENT_USD_PER_MTOK) > 0
+      ? Number(process.env.LANDING_AGENT_USD_PER_MTOK)
+      : 1.5,
+  /** Per-identity (per-IP) daily token cap — condition C3. No single actor can
+   *  consume more than this slice of the global budget, so one abuser can't trip
+   *  the global ceiling and deny every real visitor for the day. */
+  landingAgentIdentityTokenCap:
+    Number(process.env.LANDING_AGENT_IDENTITY_TOKEN_CAP) > 0
+      ? Number(process.env.LANDING_AGENT_IDENTITY_TOKEN_CAP)
+      : 30_000,
+  /** Chat rate limits — messages per session and per IP/hour (sliding window). */
+  landingAgentChatPerSession:
+    Number(process.env.LANDING_AGENT_CHAT_PER_SESSION) > 0
+      ? Number(process.env.LANDING_AGENT_CHAT_PER_SESSION)
+      : 8,
+  landingAgentChatPerIpHour:
+    Number(process.env.LANDING_AGENT_CHAT_PER_IP_HOUR) > 0
+      ? Number(process.env.LANDING_AGENT_CHAT_PER_IP_HOUR)
+      : 20,
+  /** Lead-capture cap — submissions per IP/day, SEPARATE from the chat limit
+   *  (condition C2a): capture_lead is a public email-send primitive, rate-limited
+   *  hard and independently so it can't be used to flood frank@. */
+  landingAgentLeadPerIpDay:
+    Number(process.env.LANDING_AGENT_LEAD_PER_IP_DAY) > 0
+      ? Number(process.env.LANDING_AGENT_LEAD_PER_IP_DAY)
+      : 3,
   /** Supabase Storage — customer image uploads + signed reads (server/storage.ts,
    *  server/_core/storageProxy.ts). Replaces the Manus Forge presigned-URL/S3 path.
    *  The bucket is PRIVATE; the browser never talks to Supabase directly — it goes
