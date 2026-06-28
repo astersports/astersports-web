@@ -1,0 +1,138 @@
+/**
+ * Route-level tests for the landing "Aster Scout" SSE endpoint, focused on the
+ * capture_lead path: the server must only emit `lead_ack` when the lead email
+ * ACTUALLY sent, and fall back to `lead_error` (contact form) otherwise — so it
+ * never tells a visitor "we'll be in touch" while silently dropping the lead.
+ *
+ * Mocks the heavy collaborators (model stream, guard, turnstile, email, env) and
+ * drives the captured Express handler directly, mirroring studioStream.test.ts.
+ */
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+vi.mock("../_core/env", () => ({ ENV: { landingAgentLive: true } }));
+
+vi.mock("../_core/landingAgent/guard", () => ({
+  landingAgentGuard: {
+    evaluateChatTurn: vi.fn(() => ({ allowed: true })),
+    settleChatTurn: vi.fn(),
+    evaluateLeadCapture: vi.fn(() => ({ allowed: true })),
+    isVerified: vi.fn(() => true),
+    markVerified: vi.fn(),
+  },
+}));
+
+vi.mock("../_core/landingAgent/turnstile", () => ({
+  isTurnstileConfigured: vi.fn(() => false),
+  verifyTurnstile: vi.fn(async () => true),
+}));
+
+vi.mock("../_core/landingAgent/scoutLlm", () => ({
+  streamScout: vi.fn(async () => ({
+    usage: { inputTokens: 10, outputTokens: 10 },
+    toolCalls: [
+      { name: "capture_lead", input: { name: "Frank", email: "frank@astersports.co", need: "a team site" } },
+    ],
+  })),
+}));
+
+vi.mock("../email", () => ({ emailLeadCaptured: vi.fn() }));
+
+vi.mock("../serverLog", () => ({ log: { info: vi.fn(), error: vi.fn(), warn: vi.fn() } }));
+
+import { registerLandingScoutRoute } from "./landingScout";
+import { emailLeadCaptured } from "../email";
+
+let routeHandler: (req: any, res: any) => Promise<void>;
+
+function createMockApp() {
+  return {
+    post: vi.fn((_path: string, handler: any) => {
+      routeHandler = handler;
+    }),
+  };
+}
+
+function createMockReq(body: any = {}) {
+  return {
+    body,
+    headers: { "x-forwarded-for": "1.2.3.4" },
+    socket: { remoteAddress: "1.2.3.4" },
+  };
+}
+
+function createMockRes() {
+  const chunks: string[] = [];
+  return {
+    status: vi.fn().mockReturnThis(),
+    json: vi.fn().mockReturnThis(),
+    writeHead: vi.fn(),
+    write: vi.fn((chunk: string) => {
+      chunks.push(chunk);
+      return true;
+    }),
+    on: vi.fn(),
+    end: vi.fn(),
+    writableEnded: false,
+    _chunks: chunks,
+  };
+}
+
+/** Parse the SSE `data: {...}` frames the route wrote into the res mock. */
+function sseEvents(res: { _chunks: string[] }): Array<Record<string, any>> {
+  return res._chunks
+    .join("")
+    .split("\n\n")
+    .map((f) => f.replace(/^data: /, "").trim())
+    .filter(Boolean)
+    .map((j) => JSON.parse(j));
+}
+
+const goodBody = { sessionId: "sess-1", messages: [{ role: "user", content: "I need a site" }] };
+
+describe("registerLandingScoutRoute — capture_lead acknowledgement honesty", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("emits lead_ack ONLY when the email actually sent", async () => {
+    (emailLeadCaptured as any).mockResolvedValue(true);
+    const app = createMockApp();
+    registerLandingScoutRoute(app as any);
+
+    const res = createMockRes();
+    await routeHandler(createMockReq(goodBody), res);
+
+    const types = sseEvents(res).map((e) => e.type);
+    expect(types).toContain("lead_ack");
+    expect(types).not.toContain("lead_error");
+  });
+
+  it("emits lead_error (not a false ack) when the email send returns false", async () => {
+    (emailLeadCaptured as any).mockResolvedValue(false);
+    const app = createMockApp();
+    registerLandingScoutRoute(app as any);
+
+    const res = createMockRes();
+    await routeHandler(createMockReq(goodBody), res);
+
+    const events = sseEvents(res);
+    const types = events.map((e) => e.type);
+    expect(types).toContain("lead_error");
+    expect(types).not.toContain("lead_ack");
+    // and the visitor is pointed at the contact form
+    expect(events.find((e) => e.type === "lead_error")?.message).toMatch(/contact form/i);
+  });
+
+  it("emits lead_error when the email send throws", async () => {
+    (emailLeadCaptured as any).mockRejectedValue(new Error("resend down"));
+    const app = createMockApp();
+    registerLandingScoutRoute(app as any);
+
+    const res = createMockRes();
+    await routeHandler(createMockReq(goodBody), res);
+
+    const types = sseEvents(res).map((e) => e.type);
+    expect(types).toContain("lead_error");
+    expect(types).not.toContain("lead_ack");
+  });
+});
