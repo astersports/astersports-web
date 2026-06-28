@@ -73,4 +73,49 @@ describe("findConflicts", () => {
     ];
     expect(findConflicts(tracked, games, NOW)).toHaveLength(0);
   });
+
+  it("does NOT flag two tracked teams playing EACH OTHER (same physical game, shared gameId)", () => {
+    // The schedule fans one game out once per tracked team: same gameId, two trackedTeamIds.
+    // That is one game, not a conflict — the head-to-head dedupe must drop it.
+    const tracked = [team("titans", "NYC Titans", "Mia"), team("highrise", "High Rise", "Bri")];
+    const games = [
+      game("titans", "2026-06-14T16:20:00Z", "1 - Truman HS - Court 3", { gameId: "G1", opponent: "High Rise" }),
+      game("highrise", "2026-06-14T16:20:00Z", "1 - Truman HS - Court 3", { gameId: "G1", opponent: "NYC Titans" }),
+    ];
+    expect(findConflicts(tracked, games, NOW)).toHaveLength(0);
+  });
+
+  it("reads the court from the structured field, not just the venue name", () => {
+    // The venue string has no "Court N"; the structured court field does. Name-parse alone would
+    // yield a false "court TBD" — toCG must prefer g.court.
+    const tracked = [team("a", "A", null), team("b", "B", null)];
+    const games = [
+      game("a", "2026-06-14T16:40:00Z", "Harry S. Truman High School", { court: "Court 4" }),
+      game("b", "2026-06-14T16:45:00Z", "House of Sports", { court: "Court 2" }),
+    ];
+    const res = findConflicts(tracked, games, NOW);
+    expect(res).toHaveLength(1);
+    const courts = res[0].games.map((g) => g.court).sort();
+    expect(courts).toEqual(["Court 2", "Court 4"]); // structured field wins; no "TBD"
+  });
+
+  it("tags a same-venue overlap so the UI can say 'both at once' instead of 'split up'", () => {
+    // Both games at the same building (same coords) → sameVenue true. Two different buildings → false.
+    const tracked = [team("a", "A", null), team("b", "B", null)];
+    const sameBuilding = [
+      game("a", "2026-06-14T16:40:00Z", "Truman HS - Court 3", { court: "Court 3", venue: { name: "Truman HS - Court 3", address: null, city: null, state: null, lat: 40.9, lng: -73.8 } }),
+      game("b", "2026-06-14T16:45:00Z", "Truman HS - Court 4", { court: "Court 4", venue: { name: "Truman HS - Court 4", address: null, city: null, state: null, lat: 40.9, lng: -73.8 } }),
+    ];
+    const same = findConflicts(tracked, sameBuilding, NOW);
+    expect(same).toHaveLength(1);
+    expect(same[0].overlaps[0].sameVenue).toBe(true);
+
+    const crossTown = [
+      game("a", "2026-06-14T16:40:00Z", "Truman HS", { court: "Court 3", venue: { name: "Truman HS", address: null, city: null, state: null, lat: 40.9, lng: -73.8 } }),
+      game("b", "2026-06-14T16:45:00Z", "House of Sports", { court: "Court 2", venue: { name: "House of Sports", address: null, city: null, state: null, lat: 41.1, lng: -73.7 } }),
+    ];
+    const cross = findConflicts(tracked, crossTown, NOW);
+    expect(cross).toHaveLength(1);
+    expect(cross[0].overlaps[0].sameVenue).toBe(false);
+  });
 });
