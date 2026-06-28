@@ -9,7 +9,11 @@ import StatusStrip from "./home/StatusStrip";
 import TeamAccordionCard from "./home/TeamAccordionCard";
 import TeamDetail from "./TeamDetail";
 import DivisionStandings from "./standings/DivisionStandings";
-import HomeGatedSections from "./HomeGatedSections";
+
+const norm = (s: string) => s.trim().toLowerCase();
+// "decision live" tiers (§5 Zone-3 sort) — a tracked team whose pool has wrapped into a decisive
+// bracket state floats above idle teams.
+const DECISION = new Set(["clinched", "must_win", "eliminated", "win_and_in"]);
 
 // Hub Home V2 (work order: hero + per-team accordion). The always-current dashboard for a parent
 // tracking one team or many: a fixed urgency-selected hero (§4), a derived status strip (§5/Zone 2),
@@ -48,11 +52,29 @@ export default function HubHomeV2({ onFindTeams }: { onFindTeams: () => void }) 
     return () => { live = false; };
   }, [teams]);
 
-  const ranked = useMemo(() => rankTeams(teams, games), [teams, games]);
-  const hero = mostUrgent(ranked);
   // one standings poll per unique division, shared by every card (no per-card fetch fan-out)
   const divisionIds = useMemo(() => teams.map((t) => t.divisionId), [teams]);
   const getDivision = useDivisionStandings(divisionIds);
+
+  // per-team bracket posture (from the shared division predictor) → drives the decision-tier sort,
+  // the exact TO-ADVANCE count (§5), and the hero's clinched-waiting-on-bracket framing.
+  const { decisionKeys, clinchedCount, postureByKey, anyResolved } = useMemo(() => {
+    const dk = new Set<string>(); const pm = new Map<string, string | undefined>(); let clinched = 0; let resolved = false;
+    for (const t of teams) {
+      const d = getDivision(t.divisionId);
+      const fid = d.standings.find((r) => r.id === t.teamKey || norm(r.name) === norm(t.name))?.id ?? null;
+      const p = fid ? d.predictFor(fid).posture : undefined;
+      pm.set(t.teamKey, p);
+      if (p) { resolved = true; if (p === "clinched") clinched++; if (DECISION.has(p)) dk.add(t.teamKey); }
+    }
+    return { decisionKeys: dk, clinchedCount: clinched, postureByKey: pm, anyResolved: resolved };
+  }, [teams, getDivision]);
+
+  const ranked = useMemo(() => rankTeams(teams, games, new Date(), decisionKeys), [teams, games, decisionKeys]);
+  const hero = mostUrgent(ranked);
+  const heroPosture = hero ? postureByKey.get(hero.team.teamKey) : undefined;
+  // §5: blank during pool play; once any tracked team's bracket resolves, show the exact clinched count.
+  const toAdvance = anyResolved ? clinchedCount : null;
   const model = useMemo(() => buildMyTeamsModel(teams, games), [teams, games]);
   const liveNow = ranked.filter((r) => r.kind === "live").length;
   const todayCount = ranked.filter((r) => r.kind === "live" || r.kind === "today").length;
@@ -93,11 +115,11 @@ export default function HubHomeV2({ onFindTeams }: { onFindTeams: () => void }) 
       </div>
 
       {/* ZONE 1 — hero (fixed, urgency-selected) */}
-      <div className="mx-[18px] mt-[10px]"><HeroSlot u={hero} onSearch={onFindTeams} /></div>
+      <div className="mx-[18px] mt-[10px]"><HeroSlot u={hero} posture={heroPosture} onSearch={onFindTeams} /></div>
 
       {/* ZONE 2 — status strip (only with teams) */}
       {teams.length > 0 && (
-        <div className="mx-[18px] mt-[12px]"><StatusStrip liveNow={liveNow} today={todayCount} toAdvance={null} /></div>
+        <div className="mx-[18px] mt-[12px]"><StatusStrip liveNow={liveNow} today={todayCount} toAdvance={toAdvance} /></div>
       )}
 
       {/* ZONE 3 — per-team accordion stack (urgency-sorted) */}
@@ -116,9 +138,6 @@ export default function HubHomeV2({ onFindTeams }: { onFindTeams: () => void }) 
           ))}
         </div>
       )}
-
-      {/* gated sections (Film stays guardian-gated — H9) */}
-      <div className="mt-5"><HomeGatedSections teamCount={teams.length} /></div>
     </div>
   );
 }

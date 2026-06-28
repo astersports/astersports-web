@@ -1,4 +1,4 @@
-import { Search, CalendarClock } from "lucide-react";
+import { Search, CalendarClock, Check } from "lucide-react";
 import type { TeamUrgency } from "@/lib/aau/hubHome/urgency";
 import NextGame from "../NextGame";
 
@@ -11,7 +11,7 @@ import NextGame from "../NextGame";
 //   no teams → first-run search prompt
 // No fabrication: every branch is real data or an honest absent state (H6/H7).
 
-export default function HeroSlot({ u, onSearch }: { u: TeamUrgency | null; onSearch: () => void }) {
+export default function HeroSlot({ u, posture, onSearch }: { u: TeamUrgency | null; posture?: string; onSearch: () => void }) {
   if (!u) {
     return (
       <button type="button" onClick={onSearch}
@@ -57,13 +57,25 @@ export default function HeroSlot({ u, onSearch }: { u: TeamUrgency | null; onSea
   // Has a next game (today or next-up) → the single game-day composition.
   if (u.nextGame) return <div className="-mt-1"><NextGame games={u.games} /></div>;
 
-  // Teams tracked, nothing upcoming — honest rest state.
+  // No next game in our data. Reframe by the team's bracket posture so a clinched team doesn't read
+  // like an error (architect review): clinched/alive but the championship game isn't posted to the
+  // schedule feed yet — say "waiting on the bracket", not "no game". (Root fix: surface bracket games.)
+  const clinchedAlive = posture === "clinched" || posture === "win_and_in" || posture === "in_control" || posture === "must_win" || posture === "needs_help";
+  const done = posture === "eliminated";
+  const title = posture === "clinched" ? "Clinched a bracket spot" : clinchedAlive ? "Still alive — pool play wrapped" : done ? "Season complete" : "No upcoming game on the board";
+  const sub = clinchedAlive
+    ? "Your bracket game posts here the moment the matchup + tip time are set."
+    : done
+      ? "A great run. Browse the bracket to see how the rest plays out."
+      : "The moment your next game posts, the countdown lands here.";
   return (
-    <div className="flex items-center gap-3 rounded-[18px] border border-[rgba(0,0,0,0.08)] bg-[#FFFFFF] px-[16px] py-[16px]">
-      <span className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full border border-[#E2C98A] bg-[rgba(246,204,85,0.10)] text-[#8F6708]"><CalendarClock className="h-[17px] w-[17px]" aria-hidden="true" /></span>
+    <div className="flex items-center gap-3 rounded-[18px] border border-[rgba(246,204,85,0.30)] bg-[radial-gradient(280px_120px_at_18%_0%,rgba(246,204,85,0.08),transparent),linear-gradient(180deg,#FFFFFF,#F9FAFB)] px-[16px] py-[16px]">
+      <span className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full border border-[#E2C98A] bg-[rgba(246,204,85,0.10)] text-[#8F6708]">
+        {posture === "clinched" ? <Check className="h-[18px] w-[18px]" aria-hidden="true" /> : <CalendarClock className="h-[17px] w-[17px]" aria-hidden="true" />}
+      </span>
       <span>
-        <span className="block font-[var(--font-display)] text-[15.5px] font-bold text-[#1A1D23]">No upcoming game on the board</span>
-        <span className="mt-0.5 block font-[var(--font-mono)] text-[12.1px] text-[#4B5563]">The moment the next bracket posts, your countdown lands here.</span>
+        <span className="block font-[var(--font-display)] text-[15.5px] font-bold text-[#1A1D23]">{title}</span>
+        <span className="mt-0.5 block font-[var(--font-mono)] text-[12.1px] text-[#4B5563]">{sub}</span>
       </span>
     </div>
   );

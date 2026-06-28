@@ -67,8 +67,10 @@ export default function TeamAccordionCard({ u, division, expanded, onToggle, onO
         className="as-press flex w-full items-center gap-3 px-[15px] py-[12px] text-left">
         {expanded ? <ChevronDown className="h-[17px] w-[17px] shrink-0 text-[#4B5563]" aria-hidden="true" /> : <ChevronRight className="h-[17px] w-[17px] shrink-0 text-[#4B5563]" aria-hidden="true" />}
         <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-2">
-            <span className="truncate font-[var(--font-display)] text-[15.5px] font-bold text-[#1A1D23]">{team.name}</span>
+          {/* name wraps rather than clips ("Empire State Sto…" → full name); record/chip wrap below
+              when tight instead of squeezing the name (architect review) */}
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span className="font-[var(--font-display)] text-[15.5px] font-bold leading-tight text-[#1A1D23]">{team.name}</span>
             {recLabel && <span className="shrink-0 font-[var(--font-mono)] text-[12.6px] text-[#374151]">{recLabel}</span>}
             {chip && <span className={`shrink-0 rounded-full px-2 py-[2px] font-[var(--font-mono)] text-[11px] font-bold ${chip.cls}`}>{chip.text}</span>}
           </span>

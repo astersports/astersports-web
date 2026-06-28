@@ -1,0 +1,71 @@
+DECISION REQUEST — surface bracket games on the hub (Hub Home V2 root fix)
+For architect + Frank. CC build = held for go (architect-scoped: changes the ingest contract).
+
+────────────────────────────────────────────────────────────────────────
+THE PROBLEM (grounded against prod, division Girls 5th/6th = bf16b329, tournament 9def04d1)
+────────────────────────────────────────────────────────────────────────
+Frank's tracked teams (Empire State Storm, High Rise-Brie, Legacy Hoopers) have all-final pool
+games; their NEXT real game is the CHAMPIONSHIP. On TourneyMachine that game shows as
+  "National Green 1st Place  vs  National Green 2nd Place · 6/28 2:30 PM · Court 1"
+(bracket link: tourneymachine.com/Public/BracketUpdated.aspx?IDTournament=h20260223...&IDDivision=h20260624...).
+
+We do NOT have it as a playable game:
+  • division_games for this division = 7 rows (P1–P7); the championship is NOT among them.
+  • bracket_slots HAS it as structure only: round "Final", two slots seed_source="National Green
+    1st Place"/"2nd Place", BOTH unresolved, NO start_at / court / linked game.
+Root cause: aau-ingest-tournament SKIPS any game whose side is a bracket placeholder
+(index.ts:318 — `if (g.homePlaceholder || g.awayPlaceholder) { skipped++; continue; }`). So the
+championship's time + court (which TM DOES carry on the Division.aspx schedule we already parse)
+are thrown away, and bracket_slots — which we keep — has no time/court column.
+
+DOWNSTREAM SYMPTOMS (all one cause):
+  • Hub Home hero reads "no upcoming game" for a clinched team (its next game = the unshown
+    championship). [mitigated now — see "shipped" below]
+  • The bracket/championship game is missing from every schedule/team view.
+  • "Last game of the day" is missing for the same reason.
+
+────────────────────────────────────────────────────────────────────────
+SHIPPED NOW (frontend, no backend dependency) — the honest interim
+────────────────────────────────────────────────────────────────────────
+  • Hero reframed: a clinched/alive team with no posted next game now reads "Clinched a bracket
+    spot · your bracket game posts here the moment the matchup + tip time are set" — not an error.
+  • TO ADVANCE shows the exact count of clinched tracked teams (was blank).
+  • Decision-tier sort (clinched/must-win/out float above idle).
+These make the screen HONEST about the gap; they do not fill it. Filling it needs the below.
+
+────────────────────────────────────────────────────────────────────────
+THE FORK — how to surface bracket games (REQUEST: pick an option, then CC builds)
+────────────────────────────────────────────────────────────────────────
+OPTION A — persist placeholder bracket games as first-class scheduled games (LEAN ✅)
+  Ingest: stop dropping placeholder-sided games; persist them into division_games with
+  start_at + court + venue + status, and store the PLACEHOLDER LABELS ("National Green 1st Place")
+  as home_placeholder_label / away_placeholder_label (new nullable text cols) instead of team FKs
+  (the FKs stay null until the seed resolves; the existing assert_division_game_external trigger and
+  computeStandings already ignore scoreless/￼non-resolved games, so standings are unaffected — VERIFY).
+  RPC: get_public_aau_team_schedule + get_public_tournament_games return the labels; a team sees its
+  bracket game once its seed resolves to it (or as "Championship · vs TBD" pre-resolution).
+  Honest render: "Championship · 2:30 · Court 1 · vs TBD (bracket)" — no fabricated opponent.
+  COST: 2 nullable cols (migration) + ~15 lines of ingest + RPC field-add. Owner-applied migration.
+  WHY LEAN: it puts the real time/court on screen (what Frank asked for), reuses the schedule
+  surfaces we already built, and stays no-fabrication (placeholder labels are TM's own text).
+
+OPTION B — add start_at/court to bracket_slots; render bracket games from bracket_slots
+  Keep skipping division_games; instead capture the bracket game's time/court onto bracket_slots and
+  surface a separate "bracket" read. COST: similar schema touch but a NEW read path + the Home/team
+  views must merge two sources (games + bracket_slots) — more surface area, two schedule sources.
+  WHY NOT: forks the schedule into two sources; the slice/Up-Next/Recent all assume one games feed.
+
+OPTION C — do nothing backend; leave the honest "waiting on the bracket" interim.
+  WHY NOT: Frank explicitly wants the bracket game shown; the interim only explains its absence.
+
+────────────────────────────────────────────────────────────────────────
+INVARIANTS HELD UNDER OPTION A (call out before build)
+  • No fabrication (H6/H7): placeholder labels are TM's literal seed text; opponent stays "TBD"
+    until the seed resolves — never invented.
+  • Standings unaffected: placeholder games are scoreless + non-resolved; computeStandings only
+    counts finals with scores. VERIFY with a fixture before ship.
+  • Money/child/Plus untouched; public-read RLS unchanged.
+  • Migration (2 nullable cols) is owner-applied per the apply-gate.
+
+REQUEST: ratify Option A (or pick B/C). On go, CC builds the migration + ingest + RPC + the
+"Championship · time · court · vs TBD" render, behind the same live V2.
