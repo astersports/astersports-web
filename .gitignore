@@ -115,3 +115,6 @@ client/public/__manus__/version.json
 
 # Eval output artifacts (generated, large PNGs)
 eval/out/*.png
+
+# Claude Code local state — agent worktrees, session config (never source)
+.claude/
