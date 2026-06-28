@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
 import { Bot, ScanSearch, Brush, Eye, Brain, Cpu, type LucideIcon } from "lucide-react";
 import { useInView } from "@/hooks/useInView";
+import { useScanCycle } from "@/hooks/useScanCycle";
 import SpotlightCard from "./SpotlightCard";
 import ScoutChat from "./ScoutChat";
 
@@ -71,18 +71,9 @@ const TRENDS: Trend[] = [
 
 export default function FrontierSection() {
   const { ref, isVisible } = useInView<HTMLDivElement>();
-  const [active, setActive] = useState(0);
-
-  useEffect(() => {
-    if (!isVisible) return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) return; // leave the first trend highlighted, no cycling
-    const id = window.setInterval(() => {
-      setActive((a) => (a + 1) % TRENDS.length);
-    }, 2400);
-    return () => window.clearInterval(id);
-  }, [isVisible]);
-
+  // Cycles the scanned trend; pauses under prefers-reduced-motion and reacts to
+  // the user toggling it mid-session (shared with the constellation scan).
+  const active = useScanCycle(TRENDS.length, isVisible, 2400);
   const current = TRENDS[active];
 
   return (
@@ -131,13 +122,11 @@ export default function FrontierSection() {
               </div>
 
               <div className="aster-scan-track rounded-lg bg-white/[0.02] border border-white/5 p-3.5 mb-3.5">
-                <div className="aster-mono text-[12px] text-slate-300 leading-relaxed">
+                <div className="aster-mono text-[12px] text-slate-300 leading-relaxed" aria-live="polite" aria-atomic="true">
                   <span className="text-[#F6CC55]">▸</span> identifying trend{" "}
                   <span className="text-white">{active + 1}</span>
                   <span className="text-slate-500"> / {TRENDS.length}</span> —{" "}
-                  <span className="aster-grad-text font-semibold" aria-live="polite">
-                    {current.name}
-                  </span>
+                  <span className="aster-grad-text font-semibold">{current.name}</span>
                 </div>
                 <div className="as-progress-bar mt-3" aria-hidden="true">
                   <div

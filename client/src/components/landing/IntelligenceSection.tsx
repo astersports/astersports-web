@@ -52,6 +52,7 @@ export default function IntelligenceSection() {
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
           >
+            <span className="aster-dot-live" />
             <span className="aster-stage-chip">AI · Machine learning</span>
           </div>
           <h2
