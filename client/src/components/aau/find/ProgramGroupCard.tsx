@@ -32,10 +32,10 @@ function GroupBlock({
           style={{ border: "1px solid rgba(246,204,85,.34)", background: "radial-gradient(160px 70px at 12% 0,rgba(246,204,85,.08),transparent),linear-gradient(180deg,#F9FAFB,#FFFFFF)" }}
         >
           <span className="min-w-0">
-            <span className="block truncate font-[var(--font-display)] text-[20.3px] font-bold" style={{ color: C.ink }}>
+            <span className="block truncate font-[var(--font-display)] text-[14.6px] font-bold" style={{ color: C.ink }}>
               {g.program}
             </span>
-            <span className="mt-[2px] block font-[var(--font-mono)] text-[16px]" style={{ color: C.mut }}>
+            <span className="mt-[2px] block font-[var(--font-mono)] text-[11.5px]" style={{ color: C.mut }}>
               club · {g.variants.length} team{g.variants.length === 1 ? "" : "s"} match
             </span>
           </span>
@@ -44,7 +44,7 @@ function GroupBlock({
             onClick={() => onTrackAll(g.variants)}
             disabled={allTracked}
             aria-label={`Track all ${g.variants.length} ${g.program} teams`}
-            className="as-press flex min-h-[44px] shrink-0 items-center gap-[5px] font-[var(--font-mono)] text-[17.6px] font-bold"
+            className="as-press flex min-h-[44px] shrink-0 items-center gap-[5px] font-[var(--font-mono)] text-[12.6px] font-bold"
             style={{ color: allTracked ? C.mut : C.g3 }}
           >
             <Plus className="h-[11px] w-[11px]" /> {allTracked ? "All tracked" : "Track all"}
@@ -87,7 +87,7 @@ export default function TeamsResults({
   return (
     <section className="mt-[6px]" aria-label="Team results">
       <div
-        className="flex items-center justify-between px-[18px] pb-[6px] pt-[9px] font-[var(--font-mono)] text-[16px] uppercase tracking-[0.08em]"
+        className="flex items-center justify-between px-[18px] pb-[6px] pt-[9px] font-[var(--font-mono)] text-[11.5px] uppercase tracking-[0.08em]"
         style={{ color: "#8F6708" }}
       >
         <span>Teams</span>

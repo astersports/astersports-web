@@ -22,21 +22,21 @@ export default function StandingsHub() {
   if (picked) {
     return (
       <div>
-        <button onClick={() => setPicked(null)} className="mb-4 font-[var(--font-mono)] text-[17.6px] text-[#374151] hover:text-[#1A1D23]">‹ all divisions</button>
+        <button onClick={() => setPicked(null)} className="mb-4 font-[var(--font-mono)] text-[12.6px] text-[#374151] hover:text-[#1A1D23]">‹ all divisions</button>
         <DivisionStandings divisionId={picked.div.id} divisionName={picked.div.name} />
       </div>
     );
   }
 
-  if (error) return <div className="rounded-xl border border-[#E2E8F0] bg-[#FFFFFF] p-6 text-center text-[19.2px] text-[#4B5563]">Couldn't reach the directory. Try again in a moment.</div>;
+  if (error) return <div className="rounded-xl border border-[#E2E8F0] bg-[#FFFFFF] p-6 text-center text-[13.8px] text-[#4B5563]">Couldn't reach the directory. Try again in a moment.</div>;
   if (!dir) return <div className="space-y-3">{[0, 1].map((i) => <div key={i} className="h-16 animate-pulse rounded-xl border border-[#E2E8F0] bg-[#FFFFFF]/60" />)}</div>;
 
   if (dir.length === 0) {
     return (
       <div className="rounded-xl border border-[#E2E8F0] bg-[#FFFFFF] p-8 text-center">
         <Trophy className="mx-auto mb-3 h-7 w-7 text-[#4B5563]" />
-        <div className="text-[20.3px] font-semibold text-[#1A1D23]">No tournament on the board yet</div>
-        <div className="mt-1 text-[19.2px] text-[#4B5563]">Standings, brackets, and odds appear here once a tournament link is uploaded.</div>
+        <div className="text-[14.6px] font-semibold text-[#1A1D23]">No tournament on the board yet</div>
+        <div className="mt-1 text-[13.8px] text-[#4B5563]">Standings, brackets, and odds appear here once a tournament link is uploaded.</div>
       </div>
     );
   }
@@ -46,8 +46,8 @@ export default function StandingsHub() {
       {dir.map((t) => (
         <div key={t.id}>
           <div className="mb-2 flex items-baseline gap-2">
-            <span className="font-[var(--font-display)] text-[23.2px] font-bold text-[#1A1D23]">{t.name}</span>
-            {t.circuit && <span className="font-[var(--font-mono)] text-[16.8px] text-[#4B5563]">{t.circuit}</span>}
+            <span className="font-[var(--font-display)] text-[18.4px] font-bold text-[#1A1D23]">{t.name}</span>
+            {t.circuit && <span className="font-[var(--font-mono)] text-[12.1px] text-[#4B5563]">{t.circuit}</span>}
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {t.divisions.map((d) => (
@@ -58,8 +58,8 @@ export default function StandingsHub() {
                 className="as-press flex min-h-[44px] items-center gap-3 rounded-xl border border-[#E2E8F0] bg-[#FFFFFF] px-4 py-3 text-left transition-colors hover:bg-[#F9FAFB]"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[19.6px] font-semibold text-[#1A1D23]">{d.name}</div>
-                  <div className="font-[var(--font-mono)] text-[16.8px] text-[#4B5563]">
+                  <div className="truncate text-[14.1px] font-semibold text-[#1A1D23]">{d.name}</div>
+                  <div className="font-[var(--font-mono)] text-[12.1px] text-[#4B5563]">
                     {[`${d.team_count} teams`, d.advance_count ? `top ${d.advance_count} advance` : null].filter(Boolean).join(" · ")}
                   </div>
                 </div>
@@ -67,7 +67,7 @@ export default function StandingsHub() {
               </button>
             ))}
             {t.divisions.length === 0 && (
-              <div className="text-[19.2px] text-[#4B5563]">Divisions load as the tournament is scraped.</div>
+              <div className="text-[13.8px] text-[#4B5563]">Divisions load as the tournament is scraped.</div>
             )}
           </div>
         </div>

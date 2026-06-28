@@ -17,10 +17,10 @@ export default function NoResults({ query, onPaste, onRequest }: { query: string
         >
           <Search className="h-[26px] w-[26px]" style={{ color: C.mut }} />
         </div>
-        <h4 className="m-0 font-[var(--font-display)] text-[23.2px] font-semibold" style={{ color: C.ink }}>
+        <h4 className="m-0 font-[var(--font-display)] text-[18.4px] font-semibold" style={{ color: C.ink }}>
           No team or tournament yet
         </h4>
-        <p className="mx-auto mt-[7px] max-w-[280px] text-[20px] leading-[1.55]" style={{ color: C.mut }}>
+        <p className="mx-auto mt-[7px] max-w-[280px] text-[14.4px] leading-[1.55]" style={{ color: C.mut }}>
           We don&apos;t have {query.trim() ? `“${query.trim()}”` : "that"} in the backbone. If you&apos;ve got the schedule link,
           paste it — we&apos;ll pull everything in.
         </p>
@@ -30,7 +30,7 @@ export default function NoResults({ query, onPaste, onRequest }: { query: string
         <button
           type="button"
           onClick={onPaste}
-          className="as-press flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[13px] border-none p-[14px] font-[var(--font-display)] text-[20.3px] font-semibold"
+          className="as-press flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[13px] border-none p-[14px] font-[var(--font-display)] text-[14.6px] font-semibold"
           style={{ background: C.grad, color: "#1a1206", boxShadow: "0 12px 28px -14px rgba(224,99,28,.6)" }}
         >
           <Link2 className="h-[16px] w-[16px]" /> Paste a tournament link
@@ -40,14 +40,14 @@ export default function NoResults({ query, onPaste, onRequest }: { query: string
         <button
           type="button"
           onClick={onRequest}
-          className="as-press flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[13px] p-[14px] font-[var(--font-display)] text-[20.3px] font-semibold"
+          className="as-press flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[13px] p-[14px] font-[var(--font-display)] text-[14.6px] font-semibold"
           style={{ background: C.s2, color: C.ink, border: `1px solid ${C.line}` }}
         >
           <Bell className="h-[16px] w-[16px]" /> Ask us to add this tournament
         </button>
       </div>
 
-      <div className="mt-5 px-[18px] text-center font-[var(--font-mono)] text-[16px] leading-[1.5]" style={{ color: C.mut }}>
+      <div className="mt-5 px-[18px] text-center font-[var(--font-mono)] text-[11.5px] leading-[1.5]" style={{ color: C.mut }}>
         No fabricated rows to pad an empty result — only the two real ways in.
       </div>
     </div>

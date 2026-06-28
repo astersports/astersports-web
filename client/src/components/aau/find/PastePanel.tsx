@@ -39,10 +39,10 @@ export default function PastePanel({
   return (
     <div className="as-fade-in">
       <div className="px-[18px] pt-[8px]">
-        <div className="font-[var(--font-mono)] text-[16px] uppercase tracking-[0.12em]" style={{ color: "#8F6708" }}>
+        <div className="font-[var(--font-mono)] text-[11.5px] uppercase tracking-[0.12em]" style={{ color: "#8F6708" }}>
           Got a link?
         </div>
-        <h2 className="mt-1 font-[var(--font-display)] text-[28.8px] font-bold tracking-[-0.3px]" style={{ color: C.ink }}>
+        <h2 className="mt-1 font-[var(--font-display)] text-[26.5px] font-bold tracking-[-0.3px]" style={{ color: C.ink }}>
           Paste it, we&apos;ll do the rest
         </h2>
       </div>
@@ -60,17 +60,17 @@ export default function PastePanel({
           value={url}
           onChange={(e) => onUrl(e.target.value)}
           inputMode="url"
-          placeholder="Paste any tournament link — TourneyMachine or not"
+          placeholder="Paste a TourneyMachine tournament link"
           aria-label="Paste a tournament link"
           disabled={disabled}
-          className="w-full bg-transparent font-[var(--font-mono)] text-[17.6px] outline-none disabled:opacity-60"
+          className="w-full bg-transparent font-[var(--font-mono)] text-[12.6px] outline-none disabled:opacity-60"
           style={{ color: C.dim }}
         />
         <button
           type="submit"
           disabled={disabled || !url.trim()}
           aria-label={working ? "Importing tournament" : "Import tournament from link"}
-          className="as-press flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[10px] px-[13px] font-[var(--font-display)] text-[19.2px] font-bold disabled:opacity-40"
+          className="as-press flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[10px] px-[13px] font-[var(--font-display)] text-[13.8px] font-bold disabled:opacity-40"
           style={{ background: C.grad, color: "#1a1206" }}
         >
           {working ? <Loader2 className="h-[13px] w-[13px] animate-spin motion-reduce:animate-none" /> : null}
@@ -79,9 +79,9 @@ export default function PastePanel({
       </form>
 
       {/* source line — labeled provenance (spec §5 / §7). Generic until the server resolves it. */}
-      <div className="mx-[18px] mt-[11px] inline-flex items-center gap-[6px] font-[var(--font-mono)] text-[16px]" style={{ color: C.dim }}>
+      <div className="mx-[18px] mt-[11px] inline-flex items-center gap-[6px] font-[var(--font-mono)] text-[11.5px]" style={{ color: C.dim }}>
         <span className="h-[7px] w-[7px] rounded-full" style={{ background: C.cobalt }} aria-hidden />
-        Any link ingests · source labeled, validated-or-held — never fabricated
+        TourneyMachine links for now · source labeled, validated-or-held — never fabricated
       </div>
 
       {working && (
@@ -90,7 +90,7 @@ export default function PastePanel({
           style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#F9FAFB,#FFFFFF)" }}
           aria-live="polite"
         >
-          <div className="flex items-center gap-[9px] font-[var(--font-display)] text-[20.3px] font-semibold" style={{ color: C.ink }}>
+          <div className="flex items-center gap-[9px] font-[var(--font-display)] text-[14.6px] font-semibold" style={{ color: C.ink }}>
             <span
               className="inline-block h-[16px] w-[16px] rounded-full motion-reduce:animate-none"
               style={{ border: "2px solid rgba(246,204,85,.25)", borderTopColor: C.g3, animation: "spin .8s linear infinite" }}
@@ -102,7 +102,7 @@ export default function PastePanel({
           <div className="mt-[11px] h-[5px] overflow-hidden rounded-[3px]" style={{ background: C.s3 }}>
             <span className="animate-shimmer block h-full w-1/3 rounded-[3px]" style={{ background: C.grad }} aria-hidden />
           </div>
-          <div className="mt-[11px] font-[var(--font-mono)] text-[16.8px] leading-[1.8]" style={{ color: C.dim }}>
+          <div className="mt-[11px] font-[var(--font-mono)] text-[12.1px] leading-[1.8]" style={{ color: C.dim }}>
             {STEPS.map((s, i) => {
               // Only step 0 is RPC-confirmable (the status RPC reports divisionCount). Once it
               // reports, step 0 is DONE and step 1 is the in-flight step; later steps stay pending.
@@ -123,18 +123,18 @@ export default function PastePanel({
       )}
 
       {ui.kind === "done" && (
-        <div className="mx-[18px] mt-[13px] flex items-center gap-2 text-[19.2px] font-semibold" style={{ color: C.pos }} aria-live="polite">
+        <div className="mx-[18px] mt-[13px] flex items-center gap-2 text-[13.8px] font-semibold" style={{ color: C.pos }} aria-live="polite">
           <Check className="h-[14px] w-[14px]" /> {ui.msg}
         </div>
       )}
       {ui.kind === "error" && (
-        <div className="mx-[18px] mt-[13px] text-[19.2px] leading-[1.45]" style={{ color: "#DC2626" }} aria-live="polite">
+        <div className="mx-[18px] mt-[13px] text-[13.8px] leading-[1.45]" style={{ color: "#DC2626" }} aria-live="polite">
           {ui.msg}
         </div>
       )}
 
-      <div className="mx-[18px] mt-[13px] text-center font-[var(--font-mono)] text-[16px] leading-[1.5]" style={{ color: C.mut }}>
-        A link we don&apos;t recognize? It still ingests — the generic adapter validates-or-holds, never fabricates.
+      <div className="mx-[18px] mt-[13px] text-center font-[var(--font-mono)] text-[11.5px] leading-[1.5]" style={{ color: C.mut }}>
+        TourneyMachine links for now — more sources are coming. We validate or hold what we ingest, never fabricate.
       </div>
     </div>
   );
