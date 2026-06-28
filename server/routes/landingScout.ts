@@ -33,6 +33,11 @@ import { emailLeadCaptured } from "../email";
 const TURNSTILE_DENY_MESSAGE =
   "We couldn't confirm you're human just yet — refresh the check and try again, or reach us on the contact form.";
 
+/** Single fallback shown whenever a lead can't be captured (send failed OR threw),
+ *  so the two branches never drift apart. */
+const LEAD_FALLBACK_MESSAGE =
+  "We couldn't capture that — please use the contact form and we'll reply by email.";
+
 function sse(res: Response, data: Record<string, unknown>): void {
   try {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
@@ -147,16 +152,10 @@ export function registerLandingScoutRoute(app: Express): void {
             if (sent) {
               sse(res, { type: "lead_ack", name: lead.name });
             } else {
-              sse(res, {
-                type: "lead_error",
-                message: "We couldn't capture that — please use the contact form and we'll reply by email.",
-              });
+              sse(res, { type: "lead_error", message: LEAD_FALLBACK_MESSAGE });
             }
           } catch {
-            sse(res, {
-              type: "lead_error",
-              message: "We couldn't capture that — please use the contact form.",
-            });
+            sse(res, { type: "lead_error", message: LEAD_FALLBACK_MESSAGE });
           }
         }
       }
