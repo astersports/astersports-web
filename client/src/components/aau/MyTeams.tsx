@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Users, X, Trophy, ChevronRight } from "lucide-react";
+import { Users, X, ChevronRight } from "lucide-react";
 import { getTracked, untrack, TRACKED_EVENT, type TrackedTeam } from "@/lib/aau/trackingStore";
 import { getTrackedTeamSchedule, type TeamGame } from "@/lib/aster";
 import { buildMyTeamsModel, type MyTeamsModel } from "@/lib/aau/myTeamsModel";
@@ -126,13 +126,15 @@ export default function MyTeams() {
 
       {/* empty state */}
       {teams.length === 0 && (
-        <div className="mx-[18px] mt-4 overflow-hidden rounded-[16px] border border-[rgba(0,0,0,0.06)] border-t-[rgba(0,0,0,0.10)] bg-[radial-gradient(240px_130px_at_50%_-10%,rgba(232,144,42,0.10),transparent),linear-gradient(180deg,#F9FAFB,#FFFFFF)] px-6 py-9 text-center">
-          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full border border-[#E2C98A] bg-[rgba(246,204,85,0.10)]">
-            <Trophy className="h-6 w-6 text-[#8F6708]" />
-          </div>
-          <div className="font-[var(--font-display)] text-[16px] font-bold text-[#1A1D23]">No teams tracked yet</div>
-          <div className="mx-auto mt-1.5 max-w-[280px] text-[12.5px] leading-[1.55] text-[#4A5568]">
-            Head to <span className="font-semibold text-[#1A1D23]">Browse</span>, open a tournament, and track your team — it'll live here and follow you to every tournament it plays.
+        <div className="mx-[18px] mt-4 overflow-hidden rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[radial-gradient(360px_180px_at_50%_-15%,rgba(232,144,42,0.20),transparent),linear-gradient(160deg,#151525,#0b1c38)] px-6 py-10 text-center shadow-[0_10px_30px_rgba(11,28,58,0.30)]">
+          {/* brand splash — shown whenever no teams are tracked (first run, or any visitor with an empty board) */}
+          <img src="/aster-mark.png" alt="" aria-hidden="true" className="mx-auto mb-3 h-[60px] w-auto" />
+          <div className="font-[var(--font-display)] text-[20px] font-bold tracking-[-0.01em] text-[#F5F0E8]">Aster Sports</div>
+          <div className="mt-1 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.14em] text-[rgba(246,204,85,0.85)]">Every team, every sport</div>
+          <div className="mx-auto mt-5 h-px w-16 bg-[rgba(255,255,255,0.12)]" />
+          <div className="mt-4 font-[var(--font-display)] text-[15px] font-bold text-[#F5F0E8]">No teams tracked yet</div>
+          <div className="mx-auto mt-1.5 max-w-[300px] text-[12.5px] leading-[1.55] text-[rgba(245,240,232,0.70)]">
+            Head to <span className="font-semibold text-[#F6CC55]">Browse</span>, open a tournament, and track your team — it'll live here and follow you to every tournament it plays.
           </div>
         </div>
       )}
