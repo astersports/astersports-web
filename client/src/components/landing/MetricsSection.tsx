@@ -19,7 +19,7 @@ const shipping = PRODUCTS.filter(
 
 const METRICS: Metric[] = [
   { value: PRODUCTS.length, label: "Surfaces in the constellation" },
-  { value: shipping, label: "Products live or in beta" },
+  { value: shipping, label: "Products shipping now" },
   { value: 10, prefix: "<", suffix: "s", label: "Average Studio render" },
   { value: 100, suffix: "%", label: "Designed & built in-house" },
 ];
@@ -64,7 +64,7 @@ export default function MetricsSection() {
             verb="reading"
             steps={[
               { tag: "Surfaces", line: `${PRODUCTS.length} in the constellation` },
-              { tag: "Shipping", line: `${shipping} live or in beta` },
+              { tag: "Shipping", line: `${shipping} shipping now` },
               { tag: "Render", line: "Studio renders in under 10s" },
               { tag: "Built", line: "100% designed + built in-house" },
             ]}
