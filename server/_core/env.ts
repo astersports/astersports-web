@@ -19,6 +19,22 @@ export const ENV = {
     process.env.ANTHROPIC_MODEL && process.env.ANTHROPIC_MODEL.trim().length > 0
       ? process.env.ANTHROPIC_MODEL.trim()
       : "claude-opus-4-8",
+  /** Landing "Aster Scout" agent model (docs/SPEC_LANDING_AGENT.txt, Fork B1).
+   *  Separate from anthropicModel (the vision default, Opus): the public-page
+   *  concierge does grounded FAQ + routing, which Haiku handles at a fraction of
+   *  the cost. Override via ANTHROPIC_AGENT_MODEL. Read only when the agent ships
+   *  (P3); inert today. */
+  anthropicAgentModel:
+    process.env.ANTHROPIC_AGENT_MODEL && process.env.ANTHROPIC_AGENT_MODEL.trim().length > 0
+      ? process.env.ANTHROPIC_AGENT_MODEL.trim()
+      : "claude-haiku-4-5",
+  /** Landing "Aster Scout" agent kill switch (docs/SPEC_LANDING_AGENT.txt).
+   *  Default DARK: the model-backed agent endpoint stays off until Frank flips
+   *  this on an Architect-verified SHA after the §5 abuse/cost envelope (P2) and
+   *  the bot gate (P5) land. NOT on the money/credit path, but it IS a
+   *  sub-processor + spend gate, so it ships dark and the flip is Frank's (§1
+   *  human-on-flip). Nothing reads it yet (P0 scaffolding). */
+  landingAgentLive: process.env.LANDING_AGENT_LIVE === "true",
   /** Supabase Storage — customer image uploads + signed reads (server/storage.ts,
    *  server/_core/storageProxy.ts). Replaces the Manus Forge presigned-URL/S3 path.
    *  The bucket is PRIVATE; the browser never talks to Supabase directly — it goes

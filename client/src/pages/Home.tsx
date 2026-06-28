@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { Mail, ArrowRight, ArrowUpRight, MapPin, Menu, X, ChevronDown, Send, Settings } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { PRODUCTS, SERVICES, NAV_PRODUCTS, STATUS_META, type ServiceEntry } from "@/lib/services";
+import { FAQ } from "@shared/landingKnowledge";
 import ScrollProgress from "@/components/landing/ScrollProgress";
 import MetricsSection from "@/components/landing/MetricsSection";
 import IntelligenceSection from "@/components/landing/IntelligenceSection";
@@ -611,37 +612,6 @@ function AboutSection() {
   );
 }
 
-const faqs = [
-  {
-    question: "What does Aster Sports offer?",
-    answer: "Aster Sports is a platform with several products: Print Studio (AI print & pattern engineering for apparel), a Sports Management App for youth sports organizations, and the Aster Sports AAU Hub for live AAU tournament tracking. We also take on bespoke web development, brand identity, and digital strategy engagements.",
-  },
-  {
-    question: "What is the Sports Management App?",
-    answer: "It's a mobile-first platform for youth sports organizations — schedules, rosters, RSVPs, team messaging, and financials in one place, replacing spreadsheets, group texts, and LeagueApps. It's live in beta with our pilot program and available at astersports.app.",
-  },
-  {
-    question: "How does the Print Studio work?",
-    answer: "Upload a garment photo, and our AI detects the print elements (florals, geometrics, textures). Then use controls to adjust density, scale, remove elements, or shift colorways. Results are generated in seconds.",
-  },
-  {
-    question: "What's your typical project timeline?",
-    answer: "Print Studio edits are instant. For web development and branding projects, most take 4–8 weeks from kickoff to launch. We'll give you a clear timeline during our discovery call.",
-  },
-  {
-    question: "How does billing work?",
-    answer: "Print Studio uses a credit-based system — each generation costs credits. For web and branding projects, we structure with a 50% deposit upfront and 50% upon completion. Monthly retainers available for ongoing work.",
-  },
-  {
-    question: "Do you work with clients outside of Westchester?",
-    answer: "Absolutely. While we're based in Westchester, NY, we work with fashion brands and organizations nationwide. Print Studio is available globally, and all collaboration happens digitally.",
-  },
-  {
-    question: "What technologies power your tools?",
-    answer: "Our Print Studio uses advanced AI image generation with textile-specific prompt engineering. Web projects use React, Node.js, and modern frameworks chosen for each client's needs.",
-  },
-];
-
 function FAQSection() {
   const { ref, isVisible } = useScrollReveal();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
@@ -672,7 +642,7 @@ function FAQSection() {
           </div>
 
           <div className="space-y-3">
-            {faqs.map((faq, i) => (
+            {FAQ.map((faq, i) => (
               <div
                 key={i}
                 className={`aster-panel overflow-hidden transition-all duration-500 ${
@@ -685,7 +655,7 @@ function FAQSection() {
                   onClick={() => setOpenIndex(openIndex === i ? null : i)}
                 >
                   <span className="text-base font-medium text-white pr-4" style={{ fontFamily: "var(--font-display)" }}>
-                    {faq.question}
+                    {faq.q}
                   </span>
                   <ChevronDown
                     className={`w-5 h-5 text-[#F6CC55] flex-shrink-0 transition-transform duration-200 ${
@@ -699,7 +669,7 @@ function FAQSection() {
                   }`}
                 >
                   <p className="px-5 pb-5 text-slate-400 leading-relaxed text-[15px]">
-                    {faq.answer}
+                    {faq.a}
                   </p>
                 </div>
               </div>
