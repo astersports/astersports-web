@@ -11,7 +11,9 @@ interface Props {
 }
 
 export default function TeamScores({ focusId, games, nameById }: Props) {
-  const mine = games.filter((g) => g.aId === focusId || g.bId === focusId);
+  const mine = games.filter(
+    (g) => (g.aId === focusId || g.bId === focusId) && Number.isFinite(g.aScore) && Number.isFinite(g.bScore),
+  );
   if (mine.length === 0) return null;
 
   return (

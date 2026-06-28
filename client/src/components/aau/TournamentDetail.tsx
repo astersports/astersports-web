@@ -26,7 +26,7 @@ import DivisionStandings from "./standings/DivisionStandings";
 // Division-first IA (architect IA review 2026-06-27): the division list is the front page of a
 // tournament — structured + scannable, every division a container with stakes. The flat scoreboard
 // is demoted to a secondary "Live glance" (raw scores without a team context are noise).
-const TAB_LABEL: Record<string, string> = { divisions: "Divisions", scoreboard: "Live glance" };
+const TAB_LABEL: Record<"divisions" | "scoreboard", string> = { divisions: "Divisions", scoreboard: "Live glance" };
 
 const ET = "America/New_York";
 const dayKeyET = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-CA", { timeZone: ET }) : "tbd");
