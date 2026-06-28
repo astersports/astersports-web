@@ -53,13 +53,17 @@ WEAK / HAND-ROLLED / UNDER-CALIBRATED (the scouting targets):
   W2 [GROUNDED] Seg cache is an IN-MEMORY LRU, MAX_CACHE=4, NOT persisted
      (segCache.ts:19-20,24). Evicts after 4 garments; lost on restart; not
      provider/seed-tagged. Blocks the SAM3 freeze-on-bill moat (#184 ruling).
-  W3 [GROUNDED] Replicate webhook is BUILT but UNWIRED (server/routes/
-     replicateWebhook.ts exists; completion runs via cron poll, N=1/tick,
-     routers.ts). Needs a public base URL + REPLICATE_WEBHOOK_SECRET.
+  W3 [GROUNDED] Replicate webhook is IMPLEMENTED + ENV-GATED, but DISABLED by
+     default. studio.ts:59 replicateWebhookUrl() returns undefined unless
+     REPLICATE_WEBHOOK_SECRET + a public base URL (PUBLIC_BASE_URL / VITE_APP_URL /
+     RAILWAY_PUBLIC_DOMAIN) are set; when unset, completion falls back to the cron
+     poll (N=1/tick). The wire-through exists (studio.ts:291 → sam2Provider.ts:323
+     startPrediction → replicateSam2.ts:257 registers webhook+events_filter). So the
+     remaining work is DEPLOY CONFIG + operational verification, NOT new wiring code.
   W4 [GROUNDED] Residual deps: mysql2 ^3.15 AND postgres ^3.4 both present
      (package.json:75,78) though the DB is Postgres; @aws-sdk/client-s3 +
-     s3-request-presigner (22-23) though storage is Supabase; vite-plugin-manus-
-     runtime devDep (120) though Manus is decommissioned (#103).
+     @aws-sdk/s3-request-presigner (22-23) though storage is Supabase; vite-plugin-
+     manus-runtime devDep (120) though Manus is decommissioned (#103).
   W5 [GROUNDED] No error-tracking / analytics dependency in package.json (no
      sentry/posthog). §7 onboarding gate lists "Error tracking … (verify)" as
      NOT-confirmed. Async worker / cron failures have no prod alerting surface
@@ -92,11 +96,13 @@ C1 — PERSISTENT SEGMENTATION CACHE + FREEZE-ON-BILL (the determinism moat)
     preserve byte-identical read-through.)
   LEAN: PROTOTYPE (highest leverage; unblocks SAM3 and saves cost standalone).
 
-C2 — WIRE THE REPLICATE WEBHOOK (latency)
-  WHAT [GROUNDED]: activate the built-but-unwired webhook (W3) so jobs complete on
-    Replicate's callback instead of the ≤poll-interval cron latency.
-  OUR CODE [FIT]: server/routes/replicateWebhook.ts (fail-closed HMAC already
-    built) + startPrediction to register the webhook URL.
+C2 — ACTIVATE THE REPLICATE WEBHOOK (latency — config, not code)
+  WHAT [GROUNDED]: the webhook code path is already implemented + env-gated (W3);
+    ACTIVATE it by setting REPLICATE_WEBHOOK_SECRET + a public base URL so jobs
+    complete on Replicate's callback instead of the ≤poll-interval cron latency.
+  OUR CODE [FIT]: already wired — studio.ts:59 replicateWebhookUrl() →
+    startSam2Segmentation → startPrediction; server/routes/replicateWebhook.ts is
+    the fail-closed HMAC handler. No new wiring; this is deploy config + verify.
   WIN: completion latency drops from "next poll tick" to "on inference done"; the
     cron stays as the backstop. Billing UNCHANGED.
   COST: low code; BLOCKED on a public base URL + REPLICATE_WEBHOOK_SECRET (the
@@ -108,8 +114,8 @@ C2 — WIRE THE REPLICATE WEBHOOK (latency)
     the domain is settled).
 
 C3 — DEPENDENCY / SUPPLY-CHAIN HYGIENE (prune residue)
-  WHAT [GROUNDED]: remove mysql2, @aws-sdk/client-s3 + s3-request-presigner, and
-    vite-plugin-manus-runtime IF a grep proves zero imports (W4).
+  WHAT [GROUNDED]: remove mysql2, @aws-sdk/client-s3 + @aws-sdk/s3-request-presigner,
+    and vite-plugin-manus-runtime IF a grep proves zero imports (W4).
   OUR CODE [FIT]: package.json + an import grep across server/ client/.
   WIN: smaller install + attack surface (airtight-build §6 Dependabot-at-0), less
     confusion (no MySQL driver in a Postgres app).
@@ -178,8 +184,8 @@ P3  C5 server observability (scrubbed) — closes a real §7 onboarding gap; mak
     money/async path debuggable in prod. 🟡.
 P4  C6 migration drift-guard — prevents the prod-schema-drift class (W6) that bit us
     this session; auto-apply stays owner's call. 🔴-aware (drift-guard is 🟢/🟡).
-P5  C2 webhook wiring — latency win; sequence AFTER the public-URL/domain is settled
-    (Frank-blocked). 🟡.
+P5  C2 webhook activation (config, not code) — latency win; sequence AFTER the
+    public-URL/domain is settled + the secret is set (Frank-blocked). 🟡.
 P6  C4 React Compiler pilot — client perf polish; lowest urgency. 🟡.
 (AI/ML pipeline: SAM3 P1 already in flight per #184; scale lattice next per #183.)
 
