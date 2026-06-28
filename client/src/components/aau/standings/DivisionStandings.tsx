@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAauStandings } from "@/hooks/useAauStandings";
 import StandingsTable from "./StandingsTable";
 import BracketOdds from "./BracketOdds";
+import TeamScores from "./TeamScores";
 
 /**
  * One division's live detail (R2): header + rule-driven standings + bracket odds for a
@@ -70,6 +71,15 @@ export default function DivisionStandings({ divisionId, divisionName }: Props) {
 
       {effectiveFocus && (
         <BracketOdds teamName={standings.find((r) => r.id === effectiveFocus)?.name ?? ""} prediction={predictFor(effectiveFocus)} />
+      )}
+
+      {/* the leaf: the focus team's REAL game scores, in context, below its odds (architect IA) */}
+      {effectiveFocus && bundle && (
+        <TeamScores
+          focusId={effectiveFocus}
+          games={bundle.games}
+          nameById={new Map(standings.map((r) => [r.id, r.name]))}
+        />
       )}
     </div>
   );

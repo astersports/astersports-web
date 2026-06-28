@@ -23,6 +23,11 @@ import DivisionStandings from "./standings/DivisionStandings";
 // next increment — STAGED and held for the owner's apply-go (build-go ≠ apply-go). Until then: no
 // dead tap affordance ships (render-minus-tap is the diff baseline for this increment).
 
+// Division-first IA (architect IA review 2026-06-27): the division list is the front page of a
+// tournament — structured + scannable, every division a container with stakes. The flat scoreboard
+// is demoted to a secondary "Live glance" (raw scores without a team context are noise).
+const TAB_LABEL: Record<"divisions" | "scoreboard", string> = { divisions: "Divisions", scoreboard: "Live glance" };
+
 const ET = "America/New_York";
 const dayKeyET = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-CA", { timeZone: ET }) : "tbd");
 const dayShortET = (iso: string) => new Date(iso).toLocaleDateString("en-US", { weekday: "short", timeZone: ET });
@@ -81,7 +86,7 @@ function Zone({ label, count }: { label: string; count?: string }) {
 export default function TournamentDetail({ tournament, onBack, onTrack }: { tournament: DirTournament; onBack: () => void; onTrack: () => void }) {
   const [games, setGames] = useState<TournamentGame[] | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  const [tab, setTab] = useState<"scoreboard" | "divisions">("scoreboard");
+  const [tab, setTab] = useState<"scoreboard" | "divisions">("divisions"); // division-first default
   const [divFilter, setDivFilter] = useState<string | null>(null); // division id, scoreboard chip filter
   const [division, setDivision] = useState<DirDivision | null>(null); // division drill-in (standings)
 
@@ -150,9 +155,9 @@ export default function TournamentDetail({ tournament, onBack, onTrack }: { tour
 
       {/* in-page tabs */}
       <div className="mb-1 mt-[14px] flex gap-[6px]" style={{ borderBottom: `1px solid ${C.hair}` }}>
-        {(["scoreboard", "divisions"] as const).map((t) => (
-          <button key={t} type="button" onClick={() => setTab(t)} className="as-press min-h-[40px] px-[11px] font-[var(--font-display)] text-[12.5px] font-semibold capitalize" style={{ color: tab === t ? C.g3 : C.mut, borderBottom: `2px solid ${tab === t ? C.g3 : "transparent"}`, marginBottom: -1 }}>
-            {t}
+        {(["divisions", "scoreboard"] as const).map((t) => (
+          <button key={t} type="button" onClick={() => setTab(t)} className="as-press min-h-[40px] px-[11px] font-[var(--font-display)] text-[12.5px] font-semibold" style={{ color: tab === t ? C.g3 : C.mut, borderBottom: `2px solid ${tab === t ? C.g3 : "transparent"}`, marginBottom: -1 }}>
+            {TAB_LABEL[t]}
           </button>
         ))}
       </div>
