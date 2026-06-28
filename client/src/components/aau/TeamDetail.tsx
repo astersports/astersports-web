@@ -76,6 +76,32 @@ function Section({ title, count, children }: { title: string; count: number; chi
   );
 }
 
+/** Last-5 form guide: most-recent-first W/L chips from posted finals. Engagement stat (not a
+ *  game stat — §16.12) derived purely from results; renders nothing if no final has posted. */
+function FormGuide({ results }: { results: TeamGame[] }) {
+  const last5 = results.slice(0, 5); // results already sorted most-recent-first
+  if (!last5.length) return null;
+  const wins = last5.filter((g) => (g.myScore as number) > (g.oppScore as number)).length;
+  // chips render oldest→newest left-to-right, so the freshest result sits at the right edge
+  const chips = last5.slice().reverse();
+  return (
+    <div className="flex items-center justify-between border-b border-[rgba(0,0,0,0.06)] bg-[rgba(0,0,0,0.015)] px-[15px] py-[9px]">
+      <span className="font-[var(--font-mono)] text-[9.5px] uppercase tracking-[0.08em] text-[#4B5563]">Last {last5.length}</span>
+      <span className="flex items-center gap-[5px]" role="img" aria-label={`Last ${last5.length}: ${wins} win${wins === 1 ? "" : "s"}, ${last5.length - wins} loss${last5.length - wins === 1 ? "" : "es"}`}>
+        {chips.map((g) => {
+          const won = (g.myScore as number) > (g.oppScore as number);
+          return (
+            <span key={g.gameId} aria-hidden="true"
+              className={`grid h-[18px] w-[18px] place-items-center rounded-[5px] font-[var(--font-mono)] text-[10px] font-bold ${won ? "bg-[rgba(22,163,74,0.12)] text-[#16A34A]" : "bg-[rgba(220,38,38,0.10)] text-[#DC2626]"}`}>
+              {won ? "W" : "L"}
+            </span>
+          );
+        })}
+      </span>
+    </div>
+  );
+}
+
 export default function TeamDetail({ team, games, onBack }: { team: TrackedTeam; games: TeamGame[]; onBack: () => void }) {
   const mine = gamesForTeam(games, team);
   const next = pickNextGame(mine);
@@ -87,8 +113,8 @@ export default function TeamDetail({ team, games, onBack }: { team: TrackedTeam;
 
   return (
     <div className="as-fade-in pb-6">
-      <button type="button" onClick={onBack} className="as-press mx-[18px] mt-[14px] flex items-center gap-1.5 text-[12px] font-semibold text-[#374151]">
-        <ArrowLeft className="h-[15px] w-[15px]" /> My Teams
+      <button type="button" onClick={onBack} aria-label="Back to My Teams" className="as-press mx-[18px] mt-[14px] flex min-h-[44px] items-center gap-1.5 text-[12px] font-semibold text-[#374151]">
+        <ArrowLeft className="h-[15px] w-[15px]" aria-hidden="true" /> My Teams
       </button>
       <div className="px-[18px] pb-1 pt-2">
         <h2 className="font-[var(--font-display)] text-[21px] font-bold text-[#1A1D23]">{team.name}</h2>
@@ -98,7 +124,7 @@ export default function TeamDetail({ team, games, onBack }: { team: TrackedTeam;
       {next && <div className="mt-3"><NextGame games={mine} /></div>}
 
       {upcoming.length > 0 && <Section title="Upcoming" count={upcoming.length}>{upcoming.map((g) => <GameRow key={g.gameId} g={g} />)}</Section>}
-      {results.length > 0 && <Section title="Results" count={results.length}>{results.map((g) => <GameRow key={g.gameId} g={g} />)}</Section>}
+      {results.length > 0 && <Section title="Results" count={results.length}><FormGuide results={results} />{results.map((g) => <GameRow key={g.gameId} g={g} />)}</Section>}
 
       {mine.length === 0 && (
         <div className="mx-[18px] mt-4 overflow-hidden rounded-[16px] border border-[rgba(0,0,0,0.06)] border-t-[rgba(0,0,0,0.10)] bg-[radial-gradient(240px_130px_at_50%_-10%,rgba(232,144,42,0.10),transparent),linear-gradient(180deg,#F9FAFB,#FFFFFF)] px-6 py-9 text-center">
