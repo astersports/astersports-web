@@ -14,6 +14,7 @@ import { serveStatic, setupVite } from "./vite";
 import { handleStripeWebhook } from "../webhook";
 import { registerStudioStreamRoutes } from "../routes/studioStream";
 import { registerStudioPostureRoute } from "../routes/studioPosture";
+import { registerLandingScoutRoute } from "../routes/landingScout";
 import { handleReplicateWebhook } from "../routes/replicateWebhook";
 import { assertEnvOrExit, ENV } from "./env";
 import { startScheduler } from "./scheduler";
@@ -77,6 +78,9 @@ async function startServer() {
   registerStudioStreamRoutes(app);
   // GET /api/studio/posture — operator G0 verification of the live flag/provider state
   registerStudioPostureRoute(app);
+  // POST /api/landing/scout-stream — public "Aster Scout" concierge (dark until
+  // LANDING_AGENT_LIVE; 404s while dark). docs/SPEC_LANDING_AGENT.txt P3b.
+  registerLandingScoutRoute(app);
 
   // tRPC API
   app.use(
