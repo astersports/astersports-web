@@ -657,7 +657,7 @@
   background:
     radial-gradient(900px 420px at 78% -10%, rgba(224,99,28,.12), transparent 60%),
     radial-gradient(700px 380px at 12% 0%, rgba(246,204,85,.07), transparent 60%),
-    #232d45;
+    #2b3652;
 }
 .aster-stars span {
   position: absolute;
@@ -680,7 +680,7 @@
 
 /* constellation registry nodes */
 .aster-node {
-  background: linear-gradient(180deg, #2b3552, #333e60);
+  background: linear-gradient(180deg, #333f5e, #3b4770);
   border: 1px solid rgba(255,255,255,.09);
   border-radius: 18px;
   transition: border-color .2s ease, transform .2s ease;
@@ -693,7 +693,7 @@
   width: 38px; height: 38px;
   border-radius: 11px;
   display: grid; place-items: center;
-  background: radial-gradient(circle at 50% 35%, #2c3656, #1f2840);
+  background: radial-gradient(circle at 50% 35%, #343f5e, #26304a);
   color: #9aa6c8;
   border: 1px solid rgba(150,175,235,.18);
   box-shadow: 0 0 18px -6px rgba(150,175,235,.34), inset 0 0 10px -6px rgba(150,175,235,.4);
@@ -708,7 +708,7 @@
 /* shared panel surface — unifies every card on the marketing page with the
    constellation nodes (one celestial system, not two card styles). */
 .aster-panel {
-  background: linear-gradient(180deg, #2b3552, #333e60);
+  background: linear-gradient(180deg, #333f5e, #3b4770);
   border: 1px solid rgba(255,255,255,.09);
   border-radius: 14px;
   transition: border-color .2s ease, transform .2s ease;
