@@ -59,11 +59,15 @@ export default function AAUBasketball() {
   // (--as-bg-page #0F1119); the AAU hub is light, so override the full --as-* set to the Aster
   // Sports light brand at the hub root — every var(--as-*) inside the hub resolves light. Gold stays
   // the house accent (darkened to #8F6708 so gold text passes AA on white).
+  // MEDIUM BASE (operator-directed 2026-06-28: "medium … light is too light, dark is too dark ·
+  // lighter base theme"). The page canvas is a comfortable cool mid-light gray (#E6EAF0) — NOT the
+  // old near-white #F7F8FA — so the white cards and their data points float and POP off the canvas
+  // (the iOS grouped-table / Linear pattern). Cards stay white; only the base steps down a tone.
   const goldTheme = {
     minHeight: "100vh",
     paddingBottom: "calc(64px + env(safe-area-inset-bottom))",
-    backgroundColor: "#F7F8FA",
-    "--as-bg-page": "#F7F8FA",
+    backgroundColor: "#E6EAF0",
+    "--as-bg-page": "#E6EAF0",
     "--as-bg-card": "#FFFFFF",
     "--as-bg-card-hover": "#F9FAFB",
     "--as-bg-secondary": "#F1F3F5",
