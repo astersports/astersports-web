@@ -178,6 +178,7 @@ export default function AAUBasketball() {
             />
           ) : (
             <FindDiscovery
+              user={user}
               onOpenTournament={(t) => {
                 // opening a tournament IS navigation into the detail flow — mark it so a late
                 // useHubAuth() resolve can't yank the visitor out to My Teams (Copilot #152).
@@ -186,7 +187,7 @@ export default function AAUBasketball() {
               }}
             />
           ))}
-        {activeSection === "film" && <FilmHighlights />}
+        {activeSection === "film" && <FilmHighlights user={user} />}
       </div>
 
       {/* track-confirmation toast */}

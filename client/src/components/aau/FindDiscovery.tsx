@@ -8,6 +8,7 @@ import {
   type DirTournament,
   type AauSearchResult,
   type AauTeamVariant,
+  type HubUser,
 } from "@/lib/aster";
 import { track, untrack, isTracked as storeIsTracked, getTracked, TRACKED_EVENT } from "@/lib/aau/trackingStore";
 import { isPlusEntitled } from "@/lib/aau/entitlement";
@@ -30,7 +31,7 @@ import PastePanel, { type PasteUi } from "./find/PastePanel";
 type Mode = "search" | "browse" | "paste";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export default function FindDiscovery({ onOpenTournament }: { onOpenTournament: (t: DirTournament) => void }) {
+export default function FindDiscovery({ user, onOpenTournament }: { user: HubUser | null; onOpenTournament: (t: DirTournament) => void }) {
   const [dir, setDir] = useState<DirTournament[] | null>(null);
   const [dirError, setDirError] = useState<Error | null>(null);
   const [q, setQ] = useState("");
@@ -200,11 +201,12 @@ export default function FindDiscovery({ onOpenTournament }: { onOpenTournament: 
 
   // Uploading a tournament is a Plus feature ("anyone who pays $20/mo can upload"). Entitled
   // accounts reach the paste/ingest flow; everyone else gets the Plus gate. Enforcement source is
-  // is_entitled (owner-applied billing) — until wired, isPlusEntitled() is false, so this gates.
+  // is_entitled (owner-applied billing) — until billing is wired, isPlusEntitled(user) is false for
+  // every account EXCEPT the super-admin, so this still gates normal accounts.
   const openUpload = useCallback(() => {
-    if (isPlusEntitled()) setMode("paste");
+    if (isPlusEntitled(user)) setMode("paste");
     else window.dispatchEvent(new Event(GO_PLUS_EVENT));
-  }, []);
+  }, [user]);
 
   // ─── what body to show ───
   const term = q.trim();

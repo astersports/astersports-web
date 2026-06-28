@@ -1,3 +1,4 @@
+import type { HubUser } from "@/lib/aster";
 import SectionHeading from "./SectionHeading";
 import FilmAiReviewGate from "./FilmAiReviewGate";
 import { canAccessChild } from "@/lib/aau/entitlement";
@@ -12,11 +13,14 @@ import { C } from "./find/findUi";
 // URL in source can be lifted straight out of the JS by an unverified viewer, defeating the gate. So
 // this component carries ZERO child data: the locked state shows only the jersey-not-face / AI-
 // review framing, and the verified state loads reels from a gated server source (not yet wired) —
-// never from constants in the bundle. canAccessChild() is owner-applied (false until verification +
-// entitlement land).
+// never from constants in the bundle. canAccessChild(user) is owner-applied — false for every account
+// until verification + entitlement land, EXCEPT the super-admin/operator, who gets full access for
+// testing. That bypass is still bundle-safe: it only flips the viewer into the verified state, which
+// loads reels from the gated (not-yet-wired) server source — so it shows the honest "no reels yet"
+// state, never hardcoded minors.
 
-export default function FilmHighlights() {
-  if (!canAccessChild()) {
+export default function FilmHighlights({ user }: { user: HubUser | null }) {
+  if (!canAccessChild(user)) {
     return (
       <div className="as-fade-in">
         <SectionHeading eyebrow="Film Room" title="Film" ghostText="FILM" />
