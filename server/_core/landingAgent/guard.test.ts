@@ -88,6 +88,16 @@ describe("LandingAgentGuard.evaluateChatTurn", () => {
     expect(g.evaluateChatTurn(turn({ estTokens: 1 })).reason).toBe("identity_cap");
   });
 
+  it.each([0, -50, NaN, Infinity, -Infinity])(
+    "fails closed on a malformed estTokens (%s) before touching the ledger",
+    (bad) => {
+      const g = new LandingAgentGuard(cfg());
+      const d = g.evaluateChatTurn(turn({ estTokens: bad as number }));
+      expect(d.allowed).toBe(false);
+      expect(d.reason).toBe("error");
+    },
+  );
+
   // ── Property 1: fail closed ───────────────────────────────────────────────
   it("fails CLOSED (deny) if an internal component throws", () => {
     const throwingLedger = {
@@ -139,5 +149,19 @@ describe("dailyTokenCeiling", () => {
 
   it("never returns below 1 (avoids a zero/negative ceiling locking everyone out incorrectly)", () => {
     expect(dailyTokenCeiling(0, 1.5)).toBe(1);
+  });
+
+  it.each([
+    [5, 0],
+    [5, -1],
+    [5, NaN],
+    [5, Infinity],
+    [NaN, 1.5],
+    [Infinity, 1.5],
+    [-5, 1.5],
+  ])("fails closed to a finite floor for invalid inputs (%s, %s)", (c, p) => {
+    const out = dailyTokenCeiling(c as number, p as number);
+    expect(Number.isFinite(out)).toBe(true);
+    expect(out).toBe(1); // never Infinity/NaN (which would disable the ceiling)
   });
 });

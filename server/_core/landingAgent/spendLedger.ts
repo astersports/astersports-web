@@ -53,15 +53,22 @@ export class DailySpendLedger {
    */
   tryConsume(identity: string, estTokens: number, now: number): SpendDecision {
     this.rollover(now);
+    // Defense in depth: a non-finite or non-positive estimate must never be
+    // recorded — a negative value would REDUCE the totals (bypassing the cap),
+    // and NaN makes every comparison false (allowing the turn and poisoning the
+    // counter with NaN). Treat any such value as infinitely expensive so it is
+    // always denied and never written. (The guard also validates upstream; this
+    // is the ledger's own backstop.)
+    const tokens = Number.isFinite(estTokens) && estTokens > 0 ? estTokens : Number.POSITIVE_INFINITY;
     const idUsed = this.identityTokens.get(identity) ?? 0;
-    if (idUsed + estTokens > this.identityCapTokens) {
+    if (idUsed + tokens > this.identityCapTokens) {
       return { allowed: false, reason: "identity_cap" };
     }
-    if (this.globalTokens + estTokens > this.globalCeilingTokens) {
+    if (this.globalTokens + tokens > this.globalCeilingTokens) {
       return { allowed: false, reason: "global_ceiling" };
     }
-    this.identityTokens.set(identity, idUsed + estTokens);
-    this.globalTokens += estTokens;
+    this.identityTokens.set(identity, idUsed + tokens);
+    this.globalTokens += tokens;
     return { allowed: true };
   }
 
@@ -71,6 +78,9 @@ export class DailySpendLedger {
    * below zero.
    */
   settle(identity: string, deltaTokens: number, now: number): void {
+    // Ignore garbage rather than let NaN/Infinity permanently poison a counter
+    // (Math.max(0, x + NaN) === NaN would break all future enforcement).
+    if (!Number.isFinite(deltaTokens)) return;
     this.rollover(now);
     this.globalTokens = Math.max(0, this.globalTokens + deltaTokens);
     const idUsed = this.identityTokens.get(identity) ?? 0;
