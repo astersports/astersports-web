@@ -251,7 +251,7 @@ function HeroSection() {
             }`}
           >
             <span className="aster-mono text-xs tracking-[0.32em] uppercase text-[#FBD56B]/85">
-              Celestial cartography · we map the work
+              Design &amp; technology studio · youth sports
             </span>
           </div>
 
@@ -271,7 +271,7 @@ function HeroSection() {
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
           >
-            One studio building the products youth sports actually run on — print, the app, and the programs we field ourselves. Every surface charted, every service lit as it comes online.
+            One studio, four things youth sports actually runs on: AI apparel print, the team app, live AAU tracking, and bespoke org sites.
           </p>
 
           <div
@@ -630,18 +630,13 @@ function AboutSection() {
             }`}
           >
             <p className="text-lg text-slate-300 leading-relaxed">
-              Aster Sports is a design and technology studio based in Westchester, NY. We work at
-              the intersection of creative design and technical engineering — from AI-powered print
-              pattern tools for fashion production to custom web platforms for sports and lifestyle brands.
-            </p>
-            <p className="text-lg text-slate-300 leading-relaxed">
-              We treat every project with the precision it deserves. Whether it's engineering a
-              textile print workflow, building a brand identity system, or developing a web application,
-              we bring the same care and craftsmanship to every detail.
+              A design and technology studio in Westchester, NY — working where creative
+              design meets engineering, from AI print tools for apparel to custom platforms
+              for sports and community organizations.
             </p>
             <p className="text-slate-400 leading-relaxed">
-              Currently serving fashion brands, sports organizations, and community-driven
-              institutions across the Northeast and beyond.
+              Same care and craft on every project, for fashion brands, sports organizations,
+              and community institutions across the Northeast and beyond.
             </p>
           </div>
 
@@ -932,8 +927,8 @@ export default function Home() {
       <ScrollProgress />
       <Header />
       <HeroSection />
-      <MetricsSection />
       <PlatformSection />
+      <MetricsSection />
       <IntelligenceSection />
       <FrontierSection />
       <TechMarquee />
