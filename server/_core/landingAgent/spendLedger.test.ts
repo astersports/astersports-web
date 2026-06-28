@@ -67,4 +67,28 @@ describe("DailySpendLedger", () => {
     led.settle("ip-a", -9999, T0); // clamp, never negative
     expect(led.snapshot(T0).globalTokens).toBe(0);
   });
+
+  // ── hardening: invalid token inputs must not corrupt the counters ──────────
+  it.each([0, -100, NaN, Infinity, -Infinity])(
+    "denies and records nothing for an invalid estTokens (%s)",
+    (bad) => {
+      const led = new DailySpendLedger(1000, 1000);
+      expect(led.tryConsume("ip-a", bad as number, T0).allowed).toBe(false);
+      // counters untouched — a full-budget request still fits afterwards
+      expect(led.snapshot(T0).globalTokens).toBe(0);
+      expect(led.tryConsume("ip-a", 1000, T0).allowed).toBe(true);
+    },
+  );
+
+  it.each([NaN, Infinity, -Infinity])(
+    "ignores a non-finite settle delta (%s) instead of poisoning the ledger",
+    (bad) => {
+      const led = new DailySpendLedger(1000, 1000);
+      led.tryConsume("ip-a", 500, T0);
+      led.settle("ip-a", bad as number, T0); // must be a no-op
+      expect(led.snapshot(T0).globalTokens).toBe(500);
+      // enforcement still works after the bad settle
+      expect(led.tryConsume("ip-a", 600, T0).reason).toBe("identity_cap");
+    },
+  );
 });
