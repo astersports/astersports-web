@@ -1,10 +1,14 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { TeamGame } from "@/lib/aster";
 import type { TeamUrgency } from "@/lib/aau/hubHome/urgency";
-import { useAauStandings } from "@/hooks/useAauStandings";
+import type { DivisionStanding } from "@/hooks/useDivisionStandings";
 import NextGame from "../NextGame";
 import DivisionSlice from "./DivisionSlice";
 import BracketPath from "./BracketPath";
+
+// "next:" line — Intl.DateTimeFormat (NOT toLocaleDateString, which can drop the time options on
+// some engines; Copilot review on #208).
+const NEXT_FMT = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "2-digit" });
 
 // Hub Home V2 — one collapsible card per tracked team (§5 Zone 3). ONE level of accordion: the
 // team. Inside, Up-Next / Division / Bracket-Path / Recent render INLINE; full schedule/results/
@@ -34,17 +38,19 @@ const CHIP: Record<string, { text: string; cls: string }> = {
 
 interface Props {
   u: TeamUrgency;
+  division: DivisionStanding; // shared per-division standings (one poll per division, lifted to parent)
   expanded: boolean;
   onToggle: () => void;
   onOpenTeam: () => void;
   onOpenDivision: () => void;
 }
 
-export default function TeamAccordionCard({ u, expanded, onToggle, onOpenTeam, onOpenDivision }: Props) {
+export default function TeamAccordionCard({ u, division, expanded, onToggle, onOpenTeam, onOpenDivision }: Props) {
   const { team, games, kind, nextGame } = u;
-  const { standings, advanceCount, predictFor, loading } = useAauStandings(team.divisionId);
+  const { standings, advanceCount, predictFor, loading } = division;
   const focusId = standings.find((r) => r.id === team.teamKey || norm(r.name) === norm(team.name))?.id ?? null;
-  const pred = focusId ? predictFor(focusId) : { available: false as const };
+  // H1: strip oddsPct before it can reach BracketPath — the % is un-passable past this point.
+  const { oddsPct: _oddsPct, ...pred } = focusId ? predictFor(focusId) : { available: false as const };
   const rec = record(games);
   const recLabel = rec.w || rec.l ? `${rec.w}–${rec.l}` : null;
   const chip = pred.available && pred.posture ? CHIP[pred.posture] : null;
@@ -52,7 +58,7 @@ export default function TeamAccordionCard({ u, expanded, onToggle, onOpenTeam, o
   const last5 = results.slice(0, 5);
 
   const nextLine = kind === "live" ? "live now"
-    : nextGame?.startAt ? `next: ${new Date(nextGame.startAt).toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "2-digit" })}`
+    : nextGame?.startAt ? `next: ${NEXT_FMT.format(new Date(nextGame.startAt))}`
     : "no game scheduled";
 
   return (

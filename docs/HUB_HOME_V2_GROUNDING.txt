@@ -4,7 +4,11 @@ HUB_HOME_V2. This doc cites the REAL data sources (file:line, verified against m
 section reads, per §2. [GROUNDED] = verified in source; [ABSENT] = not available, render the
 honest empty state per Rule H7.
 
-Build flag: VITE_HUB_HOME_V2 (dark by default; Frank owns the flip after sign-off + smoke).
+Mount: LIVE (operator-directed 2026-06-28 — "don't go dark and deploy in production so we see
+the progress"). The work order specced a dark VITE_HUB_HOME_V2 flag; Frank overrode it to ship
+LIVE so progress is visible. AAUBasketball mounts <HubHomeV2/> directly at the Home section (the
+old <MyTeams/> is kept in-repo for a one-line rollback). No env flag gates it. If a future rollback
+or A/B is wanted, re-introduce the VITE_HUB_HOME_V2 conditional at that mount.
 
 ────────────────────────────────────────────────────────────────────────
 §2 SOURCE CITATIONS
@@ -82,12 +86,13 @@ Build flag: VITE_HUB_HOME_V2 (dark by default; Frank owns the flip after sign-of
      FLAGGED for the architect: ship V2 with H4 as honest-absent now, schedule the RPC field
      so the Forfeit tag lights up when the data arrives. No fabrication either way.
 
-8. FEATURE FLAG MECHANISM  [GROUNDED]
-   - Idiom: const FLAG = import.meta.env.VITE_FLAG === "true"; (dark by default).
-     Examples: FrontierSection.tsx:13 (VITE_LANDING_AGENT_LIVE), studio CreateOrgDialog.tsx:33
-     (VITE_CREATE_ORG_LIVE). Vite inlines VITE_* at build; envDir = project root.
-   - V2: const HUB_HOME_V2 = import.meta.env.VITE_HUB_HOME_V2 === "true"; render
-     {HUB_HOME_V2 ? <HubHomeV2/> : <MyTeams/>} at the Home mount. Frank flips the env to go live.
+8. FEATURE FLAG MECHANISM  [GROUNDED — NOT USED; live per operator override]
+   - The repo idiom is const FLAG = import.meta.env.VITE_FLAG === "true" (dark by default; examples
+     FrontierSection.tsx:13 VITE_LANDING_AGENT_LIVE, studio CreateOrgDialog.tsx:33
+     VITE_CREATE_ORG_LIVE; Vite inlines VITE_* at build, envDir = project root).
+   - Per Frank's "deploy live so we see progress" directive, V2 is NOT flag-gated: AAUBasketball
+     renders <HubHomeV2 .../> directly at the Home section (MyTeams kept for rollback). To gate it
+     later, wrap the mount: {import.meta.env.VITE_HUB_HOME_V2 === "true" ? <HubHomeV2/> : <MyTeams/>}.
 
 ────────────────────────────────────────────────────────────────────────
 HONESTY-RULE STANDING (going into the build)
@@ -108,7 +113,7 @@ carry it. The current Home keeps it until Frank flips HUB_HOME_V2; at flip, Home
 honest dashboard with no console. Approved — not re-litigated here.
 
 ────────────────────────────────────────────────────────────────────────
-BUILD ORDER (each dark behind HUB_HOME_V2)
+BUILD ORDER (shipped LIVE per operator override — NOT dark-flagged)
 P0 flag + this doc · P1 DivisionStandings variant='slice' · P3 urgency util + HeroSlot select +
 BracketPath (no %) · P2/P4/P5 TeamAccordionCard + hero render + status strip + game-day compose +
 smart defaults/day-boundary · P6 honesty + §10/§11/§12 acceptance. Return for architect review
