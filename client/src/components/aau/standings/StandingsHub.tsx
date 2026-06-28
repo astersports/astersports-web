@@ -54,12 +54,13 @@ export default function StandingsHub() {
               <button
                 key={d.id}
                 onClick={() => setPicked({ div: d })}
-                className="flex items-center gap-3 rounded-xl border border-[#E2E8F0] bg-[#FFFFFF] px-4 py-3 text-left transition-colors hover:bg-[#F9FAFB]"
+                aria-label={`${d.name} standings — ${t.name}`}
+                className="as-press flex min-h-[44px] items-center gap-3 rounded-xl border border-[#E2E8F0] bg-[#FFFFFF] px-4 py-3 text-left transition-colors hover:bg-[#F9FAFB]"
               >
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[13.5px] font-semibold text-[#1A1D23]">{d.name}</div>
                   <div className="font-[var(--font-mono)] text-[10.5px] text-[#4B5563]">
-                    {d.team_count} teams · top {d.advance_count} advance
+                    {[`${d.team_count} teams`, d.advance_count ? `top ${d.advance_count} advance` : null].filter(Boolean).join(" · ")}
                   </div>
                 </div>
                 <ChevronRight className="h-4 w-4 shrink-0 text-[#4B5563]" />
