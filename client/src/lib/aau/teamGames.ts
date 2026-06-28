@@ -17,11 +17,12 @@ import type { TeamGame } from "@/lib/aster";
 // every team-detail page would read "no games scheduled" even though the RPC returned
 // games. See teamGames.test.ts.
 export function gamesForTeam(games: TeamGame[], team: { teamKey: string }): TeamGame[] {
-  const key = team.teamKey.trim().toLowerCase();
+  const raw = team.teamKey.trim();
+  const key = raw.toLowerCase();
   return games.filter(
     (g) =>
-      g.qkey === team.teamKey ||
+      g.qkey === raw ||
       g.trackedTeamName.trim().toLowerCase() === key ||
-      g.trackedTeamId === team.teamKey,
+      g.trackedTeamId === raw,
   );
 }
