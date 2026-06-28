@@ -63,14 +63,17 @@ export default function BracketOdds({ teamName, prediction: p }: Props) {
       <div className="flex items-center gap-4 p-4">
         {/* conic gauge — filled by the EXACT advancing fraction (not the suppressed weighted %) */}
         <div
+          role="img"
+          aria-label={p.decided ? `${label} — ${exactPct}% of scenarios` : `Advances in ${p.advancing} of ${p.outcomes} remaining scenarios`}
           className="relative grid h-[84px] w-[84px] shrink-0 place-items-center rounded-full"
           style={{
             background: `conic-gradient(from -90deg, #E0631C 0%, #F6CC55 ${exactPct}%, #E2E8F0 ${exactPct}% 100%)`,
             filter: "drop-shadow(0 0 14px rgba(246,204,85,0.25))",
           }}
         >
-          <span className="absolute inset-[8px] rounded-full bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)]" />
+          <span className="absolute inset-[8px] rounded-full bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)]" aria-hidden />
           <span
+            aria-hidden
             className="relative font-[var(--font-mono)] text-[15px] font-bold leading-none"
             style={{ background: "var(--brand-grad)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}
           >

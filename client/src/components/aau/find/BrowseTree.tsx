@@ -265,6 +265,11 @@ export default function BrowseTree({ dir, onOpen }: { dir: DirTournament[]; onOp
         </div>
       )}
 
+      {/* live result count — so a narrowing filter shows how many tournaments remain */}
+      <div className="px-[18px] pt-[8px] font-[var(--font-mono)] text-[10px]" style={{ color: C.mut }} aria-live="polite">
+        {filtered.length} tournament{filtered.length === 1 ? "" : "s"}
+      </div>
+
       {filtered.length === 0 ? (
         <div className="mx-[18px] mt-4 rounded-[15px] p-8 text-center" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#F9FAFB,#FFFFFF)" }}>
           <div className="text-[13px] font-semibold" style={{ color: C.ink }}>
@@ -311,7 +316,8 @@ export default function BrowseTree({ dir, onOpen }: { dir: DirTournament[]; onOp
                             key={t.id}
                             type="button"
                             onClick={() => onOpen(t)}
-                            className="as-press flex w-full items-center gap-[11px] py-[9px] pl-[32px] pr-[18px] text-left"
+                            aria-label={`Open ${t.name}`}
+                            className="as-press flex min-h-[44px] w-full items-center gap-[11px] py-[9px] pl-[32px] pr-[18px] text-left"
                             style={{ borderTop: `1px solid ${C.hair}` }}
                           >
                             <span className="self-stretch w-[3px] shrink-0 rounded-[2px]" style={{ background: C.g2 }} aria-hidden />

@@ -86,6 +86,7 @@ function Zone({ label, count }: { label: string; count?: string }) {
 export default function TournamentDetail({ tournament, onBack, onTrack }: { tournament: DirTournament; onBack: () => void; onTrack: () => void }) {
   const [games, setGames] = useState<TournamentGame[] | null>(null);
   const [error, setError] = useState<Error | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [tab, setTab] = useState<"scoreboard" | "divisions">("divisions"); // division-first default
   const [divFilter, setDivFilter] = useState<string | null>(null); // division id, scoreboard chip filter
   const [division, setDivision] = useState<DirDivision | null>(null); // division drill-in (standings)
@@ -95,7 +96,7 @@ export default function TournamentDetail({ tournament, onBack, onTrack }: { tour
     let active = true;
     const load = () =>
       getTournamentGames(tournament.id)
-        .then((g) => active && (setGames(g), setError(null)))
+        .then((g) => active && (setGames(g), setError(null), setUpdatedAt(new Date())))
         .catch((e) => active && setError(e as Error));
     load();
     const t = setInterval(load, 30_000);
@@ -154,12 +155,18 @@ export default function TournamentDetail({ tournament, onBack, onTrack }: { tour
       </div>
 
       {/* in-page tabs */}
-      <div className="mb-1 mt-[14px] flex gap-[6px]" style={{ borderBottom: `1px solid ${C.hair}` }}>
+      <div className="mb-1 mt-[14px] flex items-center gap-[6px]" style={{ borderBottom: `1px solid ${C.hair}` }} role="tablist" aria-label="Tournament view">
         {(["divisions", "scoreboard"] as const).map((t) => (
-          <button key={t} type="button" onClick={() => setTab(t)} className="as-press min-h-[40px] px-[11px] font-[var(--font-display)] text-[12.5px] font-semibold" style={{ color: tab === t ? C.g3 : C.mut, borderBottom: `2px solid ${tab === t ? C.g3 : "transparent"}`, marginBottom: -1 }}>
+          <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className="as-press min-h-[40px] px-[11px] font-[var(--font-display)] text-[12.5px] font-semibold" style={{ color: tab === t ? C.g3 : C.mut, borderBottom: `2px solid ${tab === t ? C.g3 : "transparent"}`, marginBottom: -1 }}>
             {TAB_LABEL[t]}
           </button>
         ))}
+        {/* live-poll freshness — only meaningful while a game is in progress (poll-driven) */}
+        {anyLive && updatedAt && (
+          <span className="ml-auto pr-[2px] font-[var(--font-mono)] text-[9.5px]" style={{ color: C.mut }} aria-live="polite">
+            Updated {updatedAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: ET })}
+          </span>
+        )}
       </div>
 
       {error && (
@@ -205,7 +212,7 @@ export default function TournamentDetail({ tournament, onBack, onTrack }: { tour
       {games && tab === "divisions" && (
         <div className="mt-2">
           {tournament.divisions.map((d) => (
-            <button key={d.id} type="button" onClick={() => setDivision(d)} className="as-press mb-[9px] flex w-full items-center gap-[11px] rounded-[14px] p-[12px] text-left" style={{ border: `1px solid ${C.hair}`, background: "#FFFFFF" }}>
+            <button key={d.id} type="button" onClick={() => setDivision(d)} aria-label={`${d.name} standings${liveDivisions.has(d.id) ? " — live now" : ""}`} className="as-press mb-[9px] flex min-h-[44px] w-full items-center gap-[11px] rounded-[14px] p-[12px] text-left" style={{ border: `1px solid ${C.hair}`, background: "#FFFFFF" }}>
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-[var(--font-display)] text-[14px] font-semibold" style={{ color: C.ink }}>{d.name}</span>
                 <span className="mt-[3px] block font-[var(--font-mono)] text-[11px]" style={{ color: C.mut }}>

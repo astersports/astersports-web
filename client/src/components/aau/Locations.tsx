@@ -62,21 +62,21 @@ export default function Locations() {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
-              {/* Icon column */}
+              {/* Icon column — tinted to the venue color (was a heavy dark-theme wash) */}
               <div style={{
                 flexShrink: 0, width: 56, display: 'flex', flexDirection: 'column',
                 alignItems: 'center', justifyContent: 'center',
-                backgroundColor: 'rgba(0,0,0,0.1)',
+                backgroundColor: `color-mix(in srgb, ${location.color} 10%, transparent)`,
               }}>
-                <MapPin size={20} strokeWidth={2} style={{ color: location.color }} />
+                <MapPin size={20} strokeWidth={2} style={{ color: location.color }} aria-hidden />
               </div>
 
               {/* Content */}
               <div style={{ flex: 1, padding: '14px 16px', minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--as-text-primary)' }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--as-text-primary)', margin: 0 }}>
                     {location.name}
-                  </span>
+                  </h3>
                   {location.note && (
                     <span style={{
                       fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
@@ -92,7 +92,7 @@ export default function Locations() {
                   {location.address}
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
-                  <Clock size={12} strokeWidth={2} style={{ color: 'var(--as-text-tertiary)' }} />
+                  <Clock size={12} strokeWidth={2} style={{ color: 'var(--as-text-secondary)' }} aria-hidden />
                   <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--as-text-secondary)' }}>
                     {location.day} · {location.time}
                   </span>

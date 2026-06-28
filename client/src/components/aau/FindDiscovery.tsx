@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import {
   getTournamentDirectory,
   submitTournament,
@@ -246,11 +246,28 @@ export default function FindDiscovery({ user, onOpenTournament }: { user: HubUse
             onChange={(e) => setQ(e.target.value)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && q) {
+                e.preventDefault();
+                setQ("");
+              }
+            }}
             placeholder="Search teams, tournaments…"
             aria-label="Search teams, tournaments, or divisions"
             className="w-full bg-transparent text-[14px] outline-none"
             style={{ color: C.ink }}
           />
+          {term.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setQ("")}
+              aria-label="Clear search"
+              className="as-press grid h-[28px] w-[28px] shrink-0 place-items-center rounded-full"
+              style={{ background: "rgba(0,0,0,0.05)", color: C.mut }}
+            >
+              <X className="h-[14px] w-[14px]" />
+            </button>
+          )}
         </div>
       )}
 

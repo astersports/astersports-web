@@ -60,7 +60,7 @@ export default function VariantRow({
               className="rounded-[6px] border px-[7px] py-[2px] font-[var(--font-mono)] text-[9px]"
               style={
                 c.kind === "g"
-                  ? { color: "#e7b6c8", borderColor: "#4a2f3a" }
+                  ? { color: C.cobalt, borderColor: "rgba(37,99,235,.3)" }
                   : c.kind === "tier"
                     ? { color: C.g3, borderColor: "#E2C98A" }
                     : { color: C.dim, borderColor: C.line }
