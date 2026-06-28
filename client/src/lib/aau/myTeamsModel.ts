@@ -11,6 +11,8 @@ export interface TeamSummary {
   name: string;
   program: string;
   divisionId: string;
+  divisionName: string; // disambiguator: gender·grade live here (e.g. "Girls - 5th/6th")
+  tournamentName: string; // disambiguator: which tournament this tracked team is in
   record: { w: number; l: number };
   /** today's pill: a clock for an upcoming game, "W/L SS–SS" for a final, null otherwise */
   todayPill: { text: string; won: boolean } | null;
@@ -108,6 +110,8 @@ export function buildMyTeamsModel(tracked: TrackedTeam[], games: TeamGame[], now
       name: t.name,
       program: t.program,
       divisionId: t.divisionId,
+      divisionName: t.divisionName,
+      tournamentName: t.tournamentName,
       record: recordOf(g),
       todayPill: todayPill(todays),
       todayCount: todays.length,

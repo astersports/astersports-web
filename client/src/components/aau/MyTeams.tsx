@@ -149,7 +149,16 @@ export default function MyTeams() {
               <div key={t.teamKey} className="flex items-center gap-[10px] border-t border-[rgba(0,0,0,0.06)] px-[15px] py-[12px] text-[13px] first:border-t-0">
                 <button type="button" onClick={() => setSelected(t.teamKey)} aria-label={`Open ${t.name}`}
                   className="as-press flex min-w-0 flex-1 items-center gap-[10px] text-left">
-                  <span className="min-w-0 flex-1 truncate font-semibold text-[#1A1D23]">{t.name}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold text-[#1A1D23]">{t.name}</span>
+                    {/* disambiguator (architect §1): division (gender·grade) · tournament — so five
+                        identically-named "Legacy Hoopers" rows are finally distinguishable + safe to remove */}
+                    {[t.divisionName, t.tournamentName].filter(Boolean).length > 0 && (
+                      <span className="mt-[2px] block truncate font-[var(--font-mono)] text-[10.5px] text-[#6B7280]">
+                        {[t.divisionName, t.tournamentName].filter(Boolean).join(" · ")}
+                      </span>
+                    )}
+                  </span>
                   {(t.record.w > 0 || t.record.l > 0) && (
                     <span className="shrink-0 font-[var(--font-mono)] text-[11px] text-[#4A5568]">{t.record.w}–{t.record.l}</span>
                   )}
