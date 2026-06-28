@@ -258,6 +258,10 @@ export interface TeamGame {
   startAt: string | null; court: string | null;
   division: string; tournamentId: string; tournament: string;
   venue: TeamGameVenue | null;
+  // Bracket/elimination game (vs pool play). The RPC sets it from division_games.is_bracket;
+  // the opponent may be a TM seed label ("Winner B2") until the other side resolves — honest
+  // "vs TBD" rather than a fabricated matchup. Optional for back-compat with cached payloads.
+  isBracket?: boolean;
 }
 
 /** Every game (past + upcoming) for the given tracked team ids (tournament_division_team

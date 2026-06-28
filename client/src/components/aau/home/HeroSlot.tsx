@@ -33,7 +33,7 @@ export default function HeroSlot({ u, posture, onSearch }: { u: TeamUrgency | nu
     return (
       <div className="overflow-hidden rounded-[18px] border border-[rgba(22,163,74,0.32)] bg-[radial-gradient(300px_130px_at_20%_0%,rgba(22,163,74,0.12),transparent),linear-gradient(180deg,#F1F3F5,#FFFFFF)] shadow-[0_16px_40px_-26px_rgba(22,163,74,0.4)]">
         <div className="flex items-center justify-between border-b border-[rgba(0,0,0,0.06)] px-[15px] py-[10px] font-[var(--font-mono)] text-[11.5px] text-[#16A34A]">
-          <span className="flex items-center gap-1.5"><span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-[#16A34A]" /> LIVE{g.court ? ` · ${g.court}` : ""}</span>
+          <span className="flex items-center gap-1.5"><span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-[#16A34A]" /> LIVE{g.isBracket ? " · BRACKET" : ""}{g.court ? ` · ${g.court}` : ""}</span>
           <span className="truncate pl-2 text-[#4B5563]">{u.team.name}</span>
         </div>
         {lit ? (
