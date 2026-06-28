@@ -4,6 +4,7 @@ import { getTournamentGames, type DirTournament, type DirDivision, type Tourname
 import { fmtRange } from "@/lib/aau/dates";
 import { C } from "./find/findUi";
 import DivisionStandings from "./standings/DivisionStandings";
+import AgentConsole from "./AgentConsole";
 
 // Tournament Detail — ONE public page per tournament (Plane A, free, no account): the live
 // scoreboard, the divisions (tap → live standings/bracket), and the Track action. This is where
@@ -105,7 +106,13 @@ export default function TournamentDetail({ tournament, onBack, onTrack }: { tour
 
   const all = games ?? [];
   const multiDay = useMemo(() => new Set(all.map((g) => dayKeyET(g.startAt))).size > 1, [all]);
-  const anyLive = all.some((g) => g.status === "live");
+  // single pass for the agent-console counts (re-renders on the 30s poll — avoid per-render filters)
+  const { liveN, finalN } = useMemo(() => {
+    let liveN = 0, finalN = 0;
+    for (const g of all) { if (g.status === "live") liveN++; else if (g.status === "final") finalN++; }
+    return { liveN, finalN };
+  }, [all]);
+  const anyLive = liveN > 0;
   // division ids that have a live game right now → "live" tag in the Divisions tab
   const liveDivisions = useMemo(() => new Set(all.filter((g) => g.status === "live").map((g) => g.divisionId)), [all]);
 
@@ -153,6 +160,22 @@ export default function TournamentDetail({ tournament, onBack, onTrack }: { tour
           <Plus className="h-[15px] w-[15px]" /> Track a team here
         </button>
       </div>
+
+      {games !== null && (
+        <div className="mt-[14px]">
+          <AgentConsole
+            label="aster-agent · tournament"
+            verb="scanning"
+            status={anyLive ? "live" : "watching"}
+            steps={[
+              { tag: "Divisions", line: `${tournament.divisions.length} in play` },
+              { tag: "Live", line: anyLive ? `${liveN} game(s) live now` : "no games live right now" },
+              { tag: "Final", line: `${finalN} result(s) posted` },
+              { tag: "Scores", line: "refreshing every 30 seconds" },
+            ]}
+          />
+        </div>
+      )}
 
       {/* in-page tabs */}
       <div className="mb-1 mt-[14px] flex items-center gap-[6px]" style={{ borderBottom: `1px solid ${C.hair}` }} role="tablist" aria-label="Tournament view">

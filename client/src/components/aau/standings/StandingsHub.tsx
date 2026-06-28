@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ChevronRight, Trophy } from "lucide-react";
 import { getTournamentDirectory, type DirTournament, type DirDivision } from "@/lib/aster";
 import DivisionStandings from "./DivisionStandings";
+import AgentConsole, { type AgentStep } from "../AgentConsole";
 
 /**
  * Standings hub (R1/R2 entry): browse the public tournament directory -> pick a division
@@ -41,8 +42,18 @@ export default function StandingsHub() {
     );
   }
 
+  const totalDivs = dir.reduce((n, t) => n + t.divisions.length, 0);
+  const withCut = dir.reduce((n, t) => n + t.divisions.filter((d) => d.advance_count).length, 0);
+  const standingsSteps: AgentStep[] = [
+    { tag: "Tournaments", line: `${dir.length} on the board` },
+    { tag: "Divisions", line: `${totalDivs} live bracket${totalDivs === 1 ? "" : "s"}` },
+    { tag: "Cut line", line: withCut ? `${withCut} with a top-N cut set` : "advancement rules resolving" },
+    { tag: "Standings", line: "rule-driven, recomputed on every result" },
+  ];
+
   return (
     <div className="space-y-5">
+      <AgentConsole label="aster-agent · standings" verb="computing" steps={standingsSteps} />
       {dir.map((t) => (
         <div key={t.id}>
           <div className="mb-2 flex items-baseline gap-2">

@@ -67,14 +67,18 @@ export default function AgentConsole({
   const idleChip = light ? "aster-chip-idle--light" : "aster-chip-idle";
 
   return (
-    <div className={`${frame} aster-scan-track p-4 ${className}`} role="status" aria-live="polite">
-      <div className="mb-3 flex items-center gap-2">
-        <span className="aster-dot-live" aria-hidden="true" />
+    // Ambient/decorative: it's a single labelled element to assistive tech — NOT a live region.
+    // The narration cycles visually every ~2.6s, so announcing each step would spam screen readers
+    // (Copilot a11y review #203). The substantive live data (scores, status) is announced by the
+    // real components on the page; here SR users get one static label naming the agent + its state.
+    <div className={`${frame} aster-scan-track p-4 ${className}`} role="img" aria-label={`${label.replace(/·/g, "—")} — ${status}`}>
+      <div className="mb-3 flex items-center gap-2" aria-hidden="true">
+        <span className="aster-dot-live" />
         <span className={`aster-mono text-[11px] uppercase tracking-[0.14em] ${labelCls}`}>{label}</span>
         <span className="aster-mono ml-auto text-[10px] text-[#16A34A]">{status}</span>
       </div>
 
-      <div className={`mb-3 rounded-lg border p-3.5 ${trackBg}`}>
+      <div className={`mb-3 rounded-lg border p-3.5 ${trackBg}`} aria-hidden="true">
         <div className={`aster-mono text-[12px] leading-relaxed ${lineCls}`}>
           <span className="text-[#E8902A]">▸</span> {verb} <span className={light ? "text-[#1A1D23]" : "text-white"}>{i + 1}</span>
           <span className={idxMuted}> / {n}</span> — <span className="aster-grad-text font-semibold">{current.line}</span>
