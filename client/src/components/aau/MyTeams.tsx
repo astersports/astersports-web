@@ -127,8 +127,8 @@ export default function MyTeams() {
       {/* empty state */}
       {teams.length === 0 && (
         <div className="mx-[18px] mt-4 overflow-hidden rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[radial-gradient(360px_180px_at_50%_-15%,rgba(232,144,42,0.20),transparent),linear-gradient(160deg,#151525,#0b1c38)] px-6 py-10 text-center shadow-[0_10px_30px_rgba(11,28,58,0.30)]">
-          {/* brand splash — the hub's landing lockup for first-run / signed-out visitors */}
-          <img src="/aster-mark.png" alt="Aster Sports" className="mx-auto mb-3 h-[60px] w-auto" />
+          {/* brand splash — shown whenever no teams are tracked (first run, or any visitor with an empty board) */}
+          <img src="/aster-mark.png" alt="" aria-hidden="true" className="mx-auto mb-3 h-[60px] w-auto" />
           <div className="font-[var(--font-display)] text-[20px] font-bold tracking-[-0.01em] text-[#F5F0E8]">Aster Sports</div>
           <div className="mt-1 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.14em] text-[rgba(246,204,85,0.85)]">Every team, every sport</div>
           <div className="mx-auto mt-5 h-px w-16 bg-[rgba(255,255,255,0.12)]" />
