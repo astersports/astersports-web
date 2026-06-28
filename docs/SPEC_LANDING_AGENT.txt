@@ -1,0 +1,310 @@
+SPEC — Live on-page "Aster Scout" agent (astersports.io landing)
+================================================================
+Status:   RATIFIED 2026-06-28 (Architect + Frank) — build order, Architect-scoped.
+          Forks resolved A2 / B1 / C1 / D-required (§7). Five binding conditions
+          added (§7.5) as acceptance checkboxes. Ships dark behind
+          LANDING_AGENT_LIVE; Frank owns the flip + key + daily $ ceiling +
+          transcript retention. Gate: money-path-adjacent + new public surface
+          => HUMAN flip.
+Author:   Claude Code
+Date:     2026-06-28
+Surface:  client/src/pages/Home.tsx  (public marketing page, no auth)
+Upgrades: client/src/components/landing/FrontierSection.tsx  (the simulated
+          "frontier-scan" agent shipped in PR #182 becomes the entry point to
+          a real, model-backed agent)
+
+--------------------------------------------------------------------
+0. ONE-LINE
+--------------------------------------------------------------------
+Turn the illustrative "frontier-scan" console on the landing page into a real,
+streaming, Claude-backed concierge agent ("Aster Scout") that answers visitor
+questions about Aster's products, recommends the right surface (Studio / App /
+AAU / a website build), and can capture a lead — grounded only in a curated
+knowledge pack, hard-capped for cost and abuse.
+
+--------------------------------------------------------------------
+1. WHY THIS IS ARCHITECT-SCOPED (read first)
+--------------------------------------------------------------------
+PR #182 was routine/cosmetic. This is NOT. Per CLAUDE.md §2.4 it crosses three
+Architect-scoped lines and therefore holds for Architect approval before any
+code merges:
+
+  (a) Sub-processor.  A public, unauthenticated surface would send visitor-typed
+      text to Anthropic (an external sub-processor). §6 (privacy) + the §7
+      onboarding gate ("sub-processor disclosure published") apply.
+  (b) Secret / cost path.  It spends real ANTHROPIC_API_KEY budget on every
+      visitor turn. An uncapped public LLM endpoint is a money/abuse path —
+      §2.4 "credentials/flips" guard.
+  (c) New always-on public endpoint.  Adds attack surface to a page that today
+      has zero server-side write/compute paths reachable without a session.
+
+CC prepares (this doc + the build); the Architect ratifies the design and the
+cost/abuse envelope; Frank owns the key + the go/no-go (§1 confirm). The agent
+ships behind a dark flag (LANDING_AGENT_LIVE) and stays dark until approved
+(§3 default posture).
+
+--------------------------------------------------------------------
+2. WHAT ALREADY EXISTS (grounding — we are NOT building the LLM layer from scratch)
+--------------------------------------------------------------------
+[GROUNDED against main @ 2026-06-28]
+
+  - LLM seam: server/_core/llm.ts — `invokeLLM(params)` wraps the official
+    Anthropic SDK (@anthropic-ai/sdk@0.105.0). Handles system+messages split,
+    structured output, image blocks, retries (maxRetries:4), and error masking
+    so upstream detail never leaks to the client (llm.ts ~line 150). It is
+    request/response (non-streaming) today.
+  - Config: server/_core/env.ts — ENV.anthropicApiKey (:14), ENV.anthropicModel
+    (default Claude Opus 4.8, :18), and validateEnv requires ANTHROPIC_API_KEY
+    at boot (:238). Adding a cheaper model id for the agent is a one-line env add.
+  - Procedures: server/_core/trpc.ts — publicProcedure (:11), protectedProcedure
+    (requireUser, :28), adminProcedure. The agent endpoint is the FIRST heavy
+    publicProcedure/public REST route — hence the abuse controls in §5.
+  - Streaming precedent: server/routes/studioStream.ts — POST
+    /api/studio/generate-stream is an existing SSE route (heartbeats + final
+    done/error event); client consumer pattern in
+    client/src/hooks/useGenerateStream.ts. The agent reuses this exact shape.
+  - Route registration: server/_core/index.ts (:49–84) — REST routes mounted on
+    the Express app (stripe webhook, replicate webhook, /api/studio/posture).
+    New route slots in here.
+  - SSRF guard: server/_core/net/ssrfGuard.ts + safeFetch.ts (not needed for the
+    agent itself, but the bar for new fetch paths).
+
+  Gap: there is NO general HTTP rate-limiter in the repo today (grep: rate-limit
+  hits are k-means/eval, not middleware). §5 must add one — it does not exist to
+  lean on.
+
+--------------------------------------------------------------------
+3. PRODUCT SCOPE — what "Aster Scout" does
+--------------------------------------------------------------------
+In scope (v1):
+  - Answer questions about Aster's products from a CURATED knowledge pack
+    (services.ts registry + a short hand-written FAQ/positioning doc). Same
+    facts the FAQ already states — no open-web, no hallucinated capabilities.
+  - Route the visitor: "sounds like you want the Print Studio → /studio", "your
+    league → astersports.app", "track a tournament → /aau", "you need a site →
+    here's how a build works → contact". Returns a suggested CTA the UI renders
+    as a real button (links from the services registry, not model-invented URLs).
+  - Capture a lead: if the visitor wants to talk, the agent collects name +
+    email + one-line need via a tool call → writes a lead row / emails
+    frank@astersports.co (Resend already wired). Replaces the mailto-only path.
+  - Live in the FrontierSection console: the simulated scan stays as the idle
+    state; a "Ask the scout" input expands it into a real streamed chat.
+
+Explicitly OUT of scope (v1):
+  - No access to tenant data, credits, jobs, or any authed surface. The agent is
+    marketing-only; it never touches the money path or the studio DB.
+  - No image generation / no Studio actions triggered from the page.
+  - No open-ended web browsing or tool use beyond {recommend_surface,
+    capture_lead}.
+  - No memory across sessions; no account creation.
+
+--------------------------------------------------------------------
+4. ARCHITECTURE
+--------------------------------------------------------------------
+Endpoint:  POST /api/landing/scout-stream  (SSE, mirrors studioStream.ts)
+           - publicProcedure-class (no session) — so §5 controls are mandatory.
+           - Request: { sessionId (client-minted uuid), messages: [{role,content}] }
+           - Response: SSE — token deltas, then a final event carrying any
+             tool result (suggested CTA / lead-captured ack).
+
+Model:     Claude Haiku 4.5 (new env: ANTHROPIC_AGENT_MODEL, default
+           claude-haiku-4-5-...). Cheap, fast, fully capable for grounded FAQ +
+           routing. NOT Opus (the vision default) — cost. Streaming via
+           client.messages.stream() (the SDK supports it; invokeLLM is currently
+           non-streaming, so the agent adds a thin streaming sibling rather than
+           bending invokeLLM's request/response contract).
+
+Prompt:    System prompt = fixed persona + the curated knowledge pack inlined +
+           hard guardrails ("only answer from the pack; if unknown, say so and
+           offer to connect them to Frank; never invent prices, dates, URLs, or
+           capabilities"). Tools: recommend_surface(serviceId) and
+           capture_lead(name,email,need) — both validated server-side against the
+           services registry / a zod schema before any effect.
+
+Knowledge: shared/landingKnowledge.ts — a typed, version-controlled pack built
+           from PRODUCTS/SERVICES (services.ts) + a short positioning section.
+           Single source of truth so the agent can't drift from the page copy
+           (same discipline as the metrics-from-registry rule in PR #182).
+
+Client:    FrontierSection gains an input + transcript; consumes the SSE stream
+           with the useGenerateStream pattern. Reduced-motion + a11y preserved;
+           the idle scan animation is the empty state.
+
+--------------------------------------------------------------------
+5. ABUSE & COST CONTROLS (the hard part — public, unauthenticated surface)
+--------------------------------------------------------------------
+This is the crux of Architect review. A naive public LLM endpoint is a wallet-
+drain / prompt-injection target. v1 ships ALL of:
+
+  (1) Per-IP + per-session rate limit (NEW middleware — none exists today).
+      e.g. 8 messages / session, 20 / IP / hour, sliding window. 429 with a
+      kind microcopy fallback ("Let's keep this short — email Frank directly").
+  (2) Global daily spend ceiling. A counter (in-process or a tiny tenant-less
+      table) caps total agent turns/tokens per day; over the cap the endpoint
+      returns a static "scout is resting" message and the UI falls back to the
+      existing contact form. Fail-closed, never fail-open into unbounded spend.
+  (3) Hard token caps. max_tokens small (≤512 out); input truncated; transcript
+      length capped server-side (model can't be coaxed into a 100-turn essay).
+  (4) Input hygiene. Length cap per message; strip/escape; the system prompt is
+      injection-resistant (knowledge pack is data, not instructions) and the two
+      tools are schema-validated server-side — a jailbroken model still can't do
+      anything except suggest a known serviceId or submit a lead.
+  (5) Bot/Turnstile gate (recommended) before the FIRST turn, or a lightweight
+      proof-of-work, to keep scripted abuse off the spend ceiling.
+  (6) Telemetry: log turns/tokens/cost per day (no PII beyond the lead the
+      visitor volunteers) so the spend envelope is observable.
+
+If the Architect deems the public-endpoint risk too high for v1, see Fork A.
+
+--------------------------------------------------------------------
+6. PRIVACY / SUB-PROCESSOR
+--------------------------------------------------------------------
+  - Disclose Anthropic as a sub-processor for the on-page assistant (privacy
+    policy + the §7 sub-processor list). The visitor sees a one-line notice
+    ("Replies are generated by Claude (Anthropic); don't share sensitive info").
+  - Minimize: only the visitor's typed text + the static knowledge pack go
+    upstream. No cookies, no auth identity, no tenant data. Lead PII (name/email)
+    is captured only when the visitor explicitly submits it via the tool.
+  - Retention: transcripts are not persisted by default (ephemeral per session);
+    only captured leads are stored/emailed. Confirm retention with Frank.
+
+--------------------------------------------------------------------
+7. FORKS — RATIFIED 2026-06-28 (Architect + Frank)
+--------------------------------------------------------------------
+Fork A — Public live vs. gated/canned.  => A2 (CONFIRMED).
+  Canned-first: deterministic FAQ/routing is the default public behavior with NO
+  model call; the live model engages ONLY after the bot gate (Fork D). Near-zero
+  public spend surface; upgrades to A1 later without rework.
+
+Fork B — Model.  => B1 Haiku 4.5 (CONFIRMED). Grounded FAQ + routing; not Opus.
+
+Fork C — Lead sink.  => C1 Resend email to frank@ (CONFIRMED for v1), WITH the
+  lead-abuse hardening in §7.5 condition 2. No schema change (not DB-scoped).
+
+Fork D — Bot gate.  => REQUIRED at the model boundary (resolved, not "optional").
+  A2's definition IS "model engages only post-gate," so Turnstile is not
+  optional — it is the control that protects the FIRST model token. Turnstile
+  fires before the first model turn regardless of A1/A2. The page itself needs
+  no gate (canned routing is free); the MODEL-ENGAGEMENT TRANSITION does. P5 is
+  therefore required, not conditional.
+
+--------------------------------------------------------------------
+7.5 BINDING CONDITIONS — acceptance checkboxes (Architect-ratified)
+--------------------------------------------------------------------
+These five are build-binding. No phase that touches them is "done" until its box
+is proven by a test (§9). They materially change the build from the draft.
+
+[ ] C1 — The model NEVER speaks a price, date, or URL. Structurally, not by
+        prompt. `recommend_surface(serviceId)` returns only an id; the CLIENT
+        renders a registry-sourced card (price/URL/dates from the SAME constant
+        the pricing card reads). The model ROUTES; the registry SPEAKS. If asked
+        outside the pack, the model says it doesn't know and hands to the contact
+        form — it does not improvise. Test: assert the model's output stream
+        never contains a raw price/URL string; the rendered card's values trace
+        to the registry constant.
+
+[ ] C2 — `capture_lead` is an unauthenticated, public email-send primitive —
+        treat it as one. (a) SEPARATE, hard per-IP/day cap on lead capture,
+        distinct from the chat rate limit (it's a spam vector into frank@).
+        (b) The free-text `need` is attacker-controlled content landing in a
+        human inbox: sanitize to plaintext, NO HTML render, treat as untrusted
+        before it touches the email body. Zod handles serviceId/email shape, NOT
+        body content safety. Test: lead-rate-limit fixtures + body-sanitization
+        fixtures (HTML/script in `need` renders inert).
+
+[ ] C3 — Per-identity spend cap, not just a global ceiling. Global-only
+        fail-closed is a DoS (one actor burns the pool, every real visitor gets
+        the form all day). Add a per-IP/session SHARE of the daily budget so no
+        single actor exhausts the global pool; the global ceiling stays as the
+        backstop (defense in depth). Rate != cost — this is separate from the
+        rate limiter. Test: per-identity cap math; one actor hitting its cap
+        does NOT trip the global ceiling for others.
+
+[ ] C4 — Knowledge pack version-pinned to the registry, INCLUDING the
+        FAQ/positioning half. `landingKnowledge.ts` derives from the registry;
+        confirm the FAQ/positioning portion is also registry-derived or
+        version-pinned, not a hand-maintained doc that drifts from page copy.
+        Pricing especially must trace to the same source the pricing card reads.
+        Test: pack-vs-registry sync (extends §9's sync test to the FAQ half).
+
+[ ] C5 — Idle-state honesty. The frontier-scan animation may become a real
+        agent on click, but the idle copy must not imply "always scanning" /
+        live capability that only exists on click (copy-contradicts-behavior
+        class). Decorative idle is fine; copy claiming live activity it isn't
+        doing is not. Test: idle-copy honesty assertion (no "live"/"scanning
+        now" claim in the un-engaged state).
+
+Minor-on-a-public-page (named, not over-rotated): a minor could plausibly talk
+to the scout and submit the form. This is a marketing contact form, not the film
+room — low stakes, nowhere near the child-data gate — but it is an explicit
+decision: frame the form for the account-holder/parent/coach, collect nothing
+beyond name+email+need, and the scout does not solicit personal data from someone
+presenting as a kid. One line in the system prompt; do not over-build.
+
+--------------------------------------------------------------------
+8. BUILD PLAN (phased, each independently shippable behind the dark flag)
+--------------------------------------------------------------------
+  P0  Flag + env. Add LANDING_AGENT_LIVE (dark default) + ANTHROPIC_AGENT_MODEL
+      to env.ts/validateEnv. No behavior change. (routine)
+  P1  Knowledge pack. shared/landingKnowledge.ts from the registry + a
+      registry-pinned FAQ/positioning half (condition C4). Sync test covers both
+      halves. (routine)
+  P2  SECURITY-CRITICAL. Rate-limit middleware + daily spend ceiling + per-
+      identity spend cap (condition C3) + separate hard lead-capture cap
+      (condition C2a). The ceiling MUST fail closed even if the limiter has a
+      bug. Heaviest test coverage in the build. (Architect-scoped — abuse/cost)
+  P3  /api/landing/scout-stream SSE route + streaming Haiku call + the two
+      tools: recommend_surface returns an id only (the model never emits
+      price/URL — condition C1); capture_lead sanitizes `need` to inert
+      plaintext (condition C2b). System prompt carries the minor-framing line.
+      (Architect-scoped — sub-processor/secret)
+  P4  FrontierSection UI: input + transcript + CLIENT-rendered registry CTA card
+      (condition C1 — client speaks the price/URL) + SSE consumer + privacy
+      notice + idle-copy honesty (condition C5). a11y + reduced-motion
+      preserved. (routine UI)
+  P5  Turnstile gate before the first model turn — REQUIRED under A2 (Fork D).
+      (Architect-scoped — sub-processor)
+  Flip P6 (Frank, not CC): set LANDING_AGENT_LIVE after Architect sign-off + a
+      smoke test against BOTH the per-identity cap and the global fail-closed
+      ceiling.
+
+--------------------------------------------------------------------
+9. TEST PLAN
+--------------------------------------------------------------------
+  - Unit: knowledge-pack/registry sync (BOTH halves — C4); tool input zod
+    validation rejects unknown serviceId + malformed lead; rate-limiter window
+    math; spend-ceiling fail-closed; prompt-injection fixtures (a "ignore your
+    instructions" turn still yields only a refusal + a known CTA, never a tool
+    misfire).
+  - Security-critical (heaviest coverage, condition-bound):
+      * C1 — model output stream never contains a raw price/URL string; the
+        rendered CTA card's price/URL trace to the registry constant.
+      * C2 — separate lead-capture rate limit fires independently of chat limit;
+        `need` body sanitization renders HTML/script inert in the email body.
+      * C3 — per-identity spend cap math; one actor at its cap does NOT trip the
+        global ceiling for other visitors; global ceiling still fails closed.
+      * C5 — idle-state copy carries no "live/scanning-now" claim.
+  - Stream: SSE route emits deltas + a terminal event; client consumer renders
+    incrementally and falls back on error (mirrors studioStream.test.ts).
+  - No env-coupled assertions in the unit suite (CLAUDE.md §5). Credential-
+    dependent tests self-skip.
+
+--------------------------------------------------------------------
+10. OUT OF SCOPE / NON-GOALS
+--------------------------------------------------------------------
+  - Any authed/tenant/credit/studio capability from the page.
+  - Open-web retrieval, RAG over external corpora, multi-turn memory.
+  - Replacing the existing FAQ/contact form (the agent augments; the form stays
+    as the always-available fallback and the spend-ceiling failover).
+
+--------------------------------------------------------------------
+11. STATUS / NEXT
+--------------------------------------------------------------------
+RATIFIED (Architect + Frank, 2026-06-28): A2 / B1 / C1 / D-required, plus the
+five binding conditions (§7.5). CC builds P0→P5 dark behind LANDING_AGENT_LIVE,
+each phase proven against its condition checkbox; P2 (rate-limit + per-identity
+cap + fail-closed ceiling) and the lead-capture cap get the heaviest coverage.
+Frank still owns, before any flip: the daily $ ceiling value, transcript
+retention policy, the ANTHROPIC_AGENT_MODEL/Turnstile keys, and the P6 flip
+itself. P0–P1 are routine and dark; P2–P5 are Architect-scoped and stay dark
+until Frank sets the flag.
