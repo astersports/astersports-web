@@ -3,7 +3,7 @@ import { ArrowLeft, Home as HomeIcon, Compass, Film, Check } from "lucide-react"
 import FindDiscovery from "../components/aau/FindDiscovery";
 import TournamentDetail from "../components/aau/TournamentDetail";
 import TrackTeams from "../components/aau/TrackTeams";
-import MyTeams from "../components/aau/MyTeams";
+import HubHomeV2 from "../components/aau/HubHomeV2";
 import FilmHighlights from "../components/aau/FilmHighlights";
 import PlusGate, { GO_PLUS_EVENT } from "../components/aau/PlusGate";
 import HubAccount from "../components/aau/HubAccount";
@@ -166,7 +166,7 @@ export default function AAUBasketball() {
 
       {/* Section content */}
       <div className="container" style={{ paddingTop: 18, paddingBottom: 32 }}>
-        {activeSection === "home" && <MyTeams />}
+        {activeSection === "home" && <HubHomeV2 onFindTeams={() => setActiveSection("browse")} />}
         {activeSection === "browse" &&
           (trackTournament ? (
             // Track flow opens FROM the tournament detail page; back lands on detail again
