@@ -38,8 +38,8 @@ export default function FilmHighlights({ user }: { user: HubUser | null }) {
         <div className="mx-auto grid h-[44px] w-[44px] place-items-center rounded-full" style={{ background: "rgba(124,58,237,.08)", color: "#7C3AED" }}>
           <Film className="h-[20px] w-[20px]" aria-hidden="true" />
         </div>
-        <div className="mt-3 text-[20.8px] font-semibold" style={{ color: C.ink }}>No reels yet</div>
-        <div className="mx-auto mt-1.5 max-w-[280px] text-[19.2px] leading-[1.5]" style={{ color: C.mut }}>
+        <div className="mt-3 text-[15px] font-semibold" style={{ color: C.ink }}>No reels yet</div>
+        <div className="mx-auto mt-1.5 max-w-[280px] text-[13.8px] leading-[1.5]" style={{ color: C.mut }}>
           Your verified film loads here once the film room is connected — reels are served per child, never embedded in the app.
         </div>
       </div>

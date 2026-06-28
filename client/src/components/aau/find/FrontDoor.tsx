@@ -24,7 +24,7 @@ export default function FrontDoor({ dir, onOpen, onBrowseAll, onAddTournament }:
     <button
       type="button"
       onClick={onBrowseAll}
-      className="as-press mx-[18px] mt-[14px] flex min-h-[44px] w-[calc(100%-36px)] items-center justify-center gap-[7px] rounded-[12px] text-[19.2px] font-semibold"
+      className="as-press mx-[18px] mt-[14px] flex min-h-[44px] w-[calc(100%-36px)] items-center justify-center gap-[7px] rounded-[12px] text-[13.8px] font-semibold"
       style={{ border: `1px solid ${C.line}`, background: C.s2, color: C.dim }}
     >
       <Grid3x3 className="h-[15px] w-[15px]" style={{ color: C.g2 }} /> Browse all tournaments
@@ -38,21 +38,21 @@ export default function FrontDoor({ dir, onOpen, onBrowseAll, onAddTournament }:
   const addTournament = (
     <div className="mx-[18px] mt-[16px] rounded-[14px] p-[13px]" style={{ border: `1px dashed ${C.hair2}`, background: "linear-gradient(160deg,rgba(224,99,28,.05),#FFFFFF)" }}>
       <div className="flex items-center justify-between gap-2">
-        <div className="font-[var(--font-display)] text-[19.6px] font-bold" style={{ color: C.ink }}>Don&apos;t see your tournament?</div>
-        <span className="shrink-0 rounded-[6px] px-[7px] py-[2px] font-[var(--font-mono)] text-[14.4px] font-bold tracking-[0.06em]" style={{ color: C.g3, border: "1px solid rgba(246,204,85,.35)", background: "rgba(246,204,85,.08)" }}>PLUS</span>
+        <div className="font-[var(--font-display)] text-[14.1px] font-bold" style={{ color: C.ink }}>Don&apos;t see your tournament?</div>
+        <span className="shrink-0 rounded-[6px] px-[7px] py-[2px] font-[var(--font-mono)] text-[11.5px] font-bold tracking-[0.06em]" style={{ color: C.g3, border: "1px solid rgba(246,204,85,.35)", background: "rgba(246,204,85,.08)" }}>PLUS</span>
       </div>
-      <div className="mt-[4px] text-[17.6px] leading-[1.45]" style={{ color: C.mut }}>Add it with Aster Plus — we&apos;ll ingest the schedule, divisions, and teams through the same pipeline the scraper uses.</div>
+      <div className="mt-[4px] text-[12.6px] leading-[1.45]" style={{ color: C.mut }}>Add it with Aster Plus — we&apos;ll ingest the schedule, divisions, and teams through the same pipeline the scraper uses.</div>
       <div className="mt-[11px] flex gap-[7px]">
-        <button type="button" onClick={onAddTournament} className="as-press flex flex-1 flex-col items-center gap-[4px] rounded-[10px] px-[6px] py-[9px] text-[16.8px] font-semibold" style={{ border: `1px solid ${C.line}`, background: "rgba(0,0,0,.2)", color: C.dim }}>
+        <button type="button" onClick={onAddTournament} className="as-press flex flex-1 flex-col items-center gap-[4px] rounded-[10px] px-[6px] py-[9px] text-[12.1px] font-semibold" style={{ border: `1px solid ${C.line}`, background: "rgba(0,0,0,.2)", color: C.dim }}>
           <Link2 className="h-[16px] w-[16px]" style={{ color: C.g2 }} /> Paste link
         </button>
-        <div className="flex flex-1 flex-col items-center gap-[4px] rounded-[10px] px-[6px] py-[9px] text-[16.8px] font-semibold" style={{ border: `1px solid ${C.hair}`, background: "rgba(0,0,0,.12)", color: C.faint }} aria-disabled>
+        <div className="flex flex-1 flex-col items-center gap-[4px] rounded-[10px] px-[6px] py-[9px] text-[12.1px] font-semibold" style={{ border: `1px solid ${C.hair}`, background: "rgba(0,0,0,.12)", color: C.faint }} aria-disabled>
           <FileUp className="h-[16px] w-[16px]" style={{ color: C.faint }} /> Upload file
-          <span className="font-[var(--font-mono)] text-[12.8px]" style={{ color: C.faint }}>soon</span>
+          <span className="font-[var(--font-mono)] text-[11.5px]" style={{ color: C.faint }}>soon</span>
         </div>
-        <div className="flex flex-1 flex-col items-center gap-[4px] rounded-[10px] px-[6px] py-[9px] text-[16.8px] font-semibold" style={{ border: `1px solid ${C.hair}`, background: "rgba(0,0,0,.12)", color: C.faint }} aria-disabled>
+        <div className="flex flex-1 flex-col items-center gap-[4px] rounded-[10px] px-[6px] py-[9px] text-[12.1px] font-semibold" style={{ border: `1px solid ${C.hair}`, background: "rgba(0,0,0,.12)", color: C.faint }} aria-disabled>
           <PencilLine className="h-[16px] w-[16px]" style={{ color: C.faint }} /> By hand
-          <span className="font-[var(--font-mono)] text-[12.8px]" style={{ color: C.faint }}>soon</span>
+          <span className="font-[var(--font-mono)] text-[11.5px]" style={{ color: C.faint }}>soon</span>
         </div>
       </div>
     </div>
@@ -61,7 +61,7 @@ export default function FrontDoor({ dir, onOpen, onBrowseAll, onAddTournament }:
   return (
     <div className="as-fade-in">
       <div
-        className="mx-[18px] mb-[9px] mt-[18px] flex items-center gap-[9px] font-[var(--font-mono)] text-[16px] uppercase tracking-[0.1em]"
+        className="mx-[18px] mb-[9px] mt-[18px] flex items-center gap-[9px] font-[var(--font-mono)] text-[11.5px] uppercase tracking-[0.1em]"
         style={{ color: C.mut }}
       >
         Live &amp; upcoming
@@ -75,7 +75,7 @@ export default function FrontDoor({ dir, onOpen, onBrowseAll, onAddTournament }:
           ))}
         </div>
       ) : liveUpcoming.length === 0 ? (
-        <div className="mx-[18px] rounded-[13px] p-6 text-center text-[19.2px]" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#F9FAFB,#FFFFFF)", color: C.mut }}>
+        <div className="mx-[18px] rounded-[13px] p-6 text-center text-[13.8px]" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#F9FAFB,#FFFFFF)", color: C.mut }}>
           Nothing live or upcoming on the board right now — browse past tournaments or paste a link to add one.
         </div>
       ) : (
@@ -89,7 +89,7 @@ export default function FrontDoor({ dir, onOpen, onBrowseAll, onAddTournament }:
             style={{ borderTop: `1px solid ${C.hair}` }}
           >
             <span
-              className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-[11px] font-[var(--font-display)] text-[21.8px] font-bold"
+              className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-[11px] font-[var(--font-display)] text-[17.3px] font-bold"
               style={{ background: "rgba(232,144,42,.13)", color: C.g3, border: "1px solid #E2C98A" }}
               aria-hidden
             >
@@ -98,20 +98,20 @@ export default function FrontDoor({ dir, onOpen, onBrowseAll, onAddTournament }:
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-[7px]">
                 <Trophy className="h-[13px] w-[13px] shrink-0" style={{ color: C.g3 }} aria-hidden />
-                <span className="truncate font-[var(--font-display)] text-[20.3px] font-semibold" style={{ color: C.ink }}>
+                <span className="truncate font-[var(--font-display)] text-[14.6px] font-semibold" style={{ color: C.ink }}>
                   {t.name}
                 </span>
                 {state === "live" && (
-                  <span className="inline-flex shrink-0 items-center gap-[5px] rounded-[6px] px-[6px] py-[2px] font-[var(--font-mono)] text-[14.4px] font-bold" style={{ color: C.live, border: "1px solid rgba(22,163,74,.35)", background: "rgba(22,163,74,.08)" }}>
+                  <span className="inline-flex shrink-0 items-center gap-[5px] rounded-[6px] px-[6px] py-[2px] font-[var(--font-mono)] text-[11.5px] font-bold" style={{ color: C.live, border: "1px solid rgba(22,163,74,.35)", background: "rgba(22,163,74,.08)" }}>
                     <span className="as-pulse inline-block h-[5px] w-[5px] rounded-full" style={{ background: C.live }} aria-hidden /> LIVE
                   </span>
                 )}
               </span>
-              <span className="mt-[3px] block truncate font-[var(--font-mono)] text-[17.6px]" style={{ color: C.mut }}>
+              <span className="mt-[3px] block truncate font-[var(--font-mono)] text-[12.6px]" style={{ color: C.mut }}>
                 {[t.circuit, fmtRange(t.start_date, t.end_date), `${t.divisions.length} division${t.divisions.length === 1 ? "" : "s"}`].filter(Boolean).join(" · ")}
               </span>
             </span>
-            <span className="shrink-0 rounded-[8px] px-[11px] py-[6px] font-[var(--font-mono)] text-[16px]" style={{ border: `1px solid ${C.line}`, color: C.dim }}>
+            <span className="shrink-0 rounded-[8px] px-[11px] py-[6px] font-[var(--font-mono)] text-[11.5px]" style={{ border: `1px solid ${C.line}`, color: C.dim }}>
               Open
             </span>
           </button>

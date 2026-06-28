@@ -67,7 +67,7 @@ export default function GradeBandPicker({
                   return next;
                 })
               }
-              className="as-press flex w-full items-center gap-[10px] px-[18px] py-[12px] text-left font-[var(--font-mono)] text-[16px] uppercase tracking-[0.1em]"
+              className="as-press flex w-full items-center gap-[10px] px-[18px] py-[12px] text-left font-[var(--font-mono)] text-[11.5px] uppercase tracking-[0.1em]"
               style={{ color: isOpen ? "#8F6708" : C.mut }}
             >
               <ChevronDown className="h-[10px] w-[10px] transition-transform" style={{ color: isOpen ? C.g3 : C.mut, transform: isOpen ? "none" : "rotate(-90deg)" }} />
@@ -79,7 +79,7 @@ export default function GradeBandPicker({
                   type="button"
                   aria-pressed={allOn}
                   onClick={() => onToggleBand(b.grades)}
-                  className="as-press rounded-[10px] px-[13px] py-[8px] font-[var(--font-mono)] text-[17.6px]"
+                  className="as-press rounded-[10px] px-[13px] py-[8px] font-[var(--font-mono)] text-[12.6px]"
                   style={allOn ? { background: C.grad, color: "#1a1206", fontWeight: 700 } : { border: `1px solid ${C.line}`, color: C.dim }}
                 >
                   All
@@ -92,7 +92,7 @@ export default function GradeBandPicker({
                       type="button"
                       aria-pressed={on}
                       onClick={() => onToggleGrade(g)}
-                      className="as-press rounded-[10px] px-[13px] py-[8px] font-[var(--font-mono)] text-[17.6px]"
+                      className="as-press rounded-[10px] px-[13px] py-[8px] font-[var(--font-mono)] text-[12.6px]"
                       style={on ? { background: C.grad, color: "#1a1206", fontWeight: 700 } : { border: `1px solid ${C.line}`, color: C.dim }}
                     >
                       {g}

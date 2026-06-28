@@ -21,7 +21,7 @@ const POSTURE_LABEL: Record<string, string> = {
   win_and_in: "Win and in", // controls own fate
   in_control: "In control", // a win clinches and a loss doesn't kill you
   must_win: "Must win", // alive only by winning
-  needs_help: "On the brink", // can't control it
+  needs_help: "On the bubble", // alive but can't control it — depends on other results
   eliminated: "Eliminated from the bracket",
 };
 
@@ -33,7 +33,7 @@ const CARD =
 export default function BracketOdds({ teamName, prediction: p }: Props) {
   if (!p.available) {
     return (
-      <div className="rounded-[16px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)] p-4 text-[19.2px] text-[#4B5563]">
+      <div className="rounded-[16px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)] p-4 text-[13.8px] text-[#4B5563]">
         Bracket odds appear once this division's advancement rule is confirmed.
       </div>
     );
@@ -42,7 +42,7 @@ export default function BracketOdds({ teamName, prediction: p }: Props) {
   // a precise % would be a coin-flip in disguise. Say so instead of faking confidence.
   if (p.basis === "even") {
     return (
-      <div className="rounded-[16px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)] p-4 text-[19.2px] text-[#4B5563]">
+      <div className="rounded-[16px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)] p-4 text-[13.8px] text-[#4B5563]">
         Odds appear once games tip off — there's no result or prior history to project from yet.
       </div>
     );
@@ -74,18 +74,18 @@ export default function BracketOdds({ teamName, prediction: p }: Props) {
           <span className="absolute inset-[8px] rounded-full bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)]" aria-hidden />
           <span
             aria-hidden
-            className="relative font-[var(--font-mono)] text-[21.8px] font-bold leading-none"
+            className="relative font-[var(--font-mono)] text-[17.3px] font-bold leading-none"
             style={{ background: "var(--brand-grad)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}
           >
             {p.decided ? `${exactPct}%` : `${p.advancing}/${p.outcomes}`}
           </span>
         </div>
         <div className="flex-1">
-          <div className="text-[19.2px] text-[#374151]">Advancement</div>
-          <div className="mt-[3px] font-[var(--font-display)] text-[26.1px] font-bold text-[#1A1D23]">
+          <div className="text-[13.8px] text-[#374151]">Advancement</div>
+          <div className="mt-[3px] font-[var(--font-display)] text-[20.7px] font-bold text-[#1A1D23]">
             {label}
           </div>
-          <div className="mt-1 font-[var(--font-mono)] text-[16.8px] text-[#4B5563]">
+          <div className="mt-1 font-[var(--font-mono)] text-[12.1px] text-[#4B5563]">
             {projected ? `projected · ${countLine} (no games yet)` : countLine}
           </div>
         </div>
@@ -104,7 +104,7 @@ export default function BracketOdds({ teamName, prediction: p }: Props) {
                   ? { cls: "bg-[rgba(246,204,85,0.14)] text-[#8F6708]", Icon: Minus }
                   : { cls: "bg-[rgba(94,203,143,0.16)] text-[#16A34A]", Icon: Check };
             return (
-              <div key={i} className="flex items-start gap-2.5 py-2 text-[20px] text-[#1A1D23]">
+              <div key={i} className="flex items-start gap-2.5 py-2 text-[14.4px] text-[#1A1D23]">
                 <span className={`mt-px grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[6px] ${tone.cls}`}>
                   <tone.Icon className="h-[11px] w-[11px]" />
                 </span>
@@ -115,7 +115,7 @@ export default function BracketOdds({ teamName, prediction: p }: Props) {
         </div>
       )}
 
-      <div className="flex items-center gap-[7px] border-t border-[rgba(0,0,0,0.06)] px-4 pb-[14px] pt-[10px] font-[var(--font-mono)] text-[16px] leading-[1.4] text-[#4B5563]">
+      <div className="flex items-center gap-[7px] border-t border-[rgba(0,0,0,0.06)] px-4 pb-[14px] pt-[10px] font-[var(--font-mono)] text-[11.5px] leading-[1.4] text-[#4B5563]">
         <Check className="h-[11px] w-[11px] shrink-0 text-[#16A34A]" />
         {projected
           ? "Projected from cross-tournament strength · wording AI"
