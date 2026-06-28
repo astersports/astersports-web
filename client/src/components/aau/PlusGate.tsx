@@ -52,7 +52,7 @@ export default function PlusGate({ onClose }: { onClose: () => void }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between">
-          <span className="inline-flex items-center gap-[6px] font-[var(--font-mono)] text-[10px] uppercase tracking-[0.1em]" style={{ color: C.g3 }}>
+          <span className="inline-flex items-center gap-[6px] font-[var(--font-mono)] text-[16px] uppercase tracking-[0.1em]" style={{ color: C.g3 }}>
             <Sparkles className="h-[13px] w-[13px]" aria-hidden="true" /> Aster Plus
           </span>
           <button ref={closeRef} type="button" onClick={onClose} aria-label="Close Aster Plus" className="as-press -m-[5px] grid h-[44px] w-[44px] place-items-center rounded-full" style={{ color: C.mut }}>
@@ -63,21 +63,21 @@ export default function PlusGate({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="mt-[12px] text-center">
-          <div id="plus-gate-title" className="font-[var(--font-display)] text-[30px] font-bold tracking-[-0.02em]">
+          <div id="plus-gate-title" className="font-[var(--font-display)] text-[33.6px] font-bold tracking-[-0.02em]">
             <span className="bg-[linear-gradient(95deg,#E8902A,#F6CC55,#FBD56B)] bg-clip-text text-transparent">$20</span>
-            <span className="text-[15px]" style={{ color: C.dim }}>/mo</span>
+            <span className="text-[21.8px]" style={{ color: C.dim }}>/mo</span>
           </div>
-          <div className="font-[var(--font-mono)] text-[10.5px] uppercase tracking-[0.06em]" style={{ color: C.mut }}>Per account — not per kid, not per team</div>
-          <div className="mt-[4px] font-[var(--font-display)] text-[14px] font-semibold" style={{ color: C.ink }}>One account. Every kid, every team.</div>
+          <div className="font-[var(--font-mono)] text-[16.8px] uppercase tracking-[0.06em]" style={{ color: C.mut }}>Per account — not per kid, not per team</div>
+          <div className="mt-[4px] font-[var(--font-display)] text-[20.3px] font-semibold" style={{ color: C.ink }}>One account. Every kid, every team.</div>
         </div>
 
         <div className="mt-[14px] space-y-[8px]">
           {FEATURES.map((f) => (
-            <div key={f} className="flex items-start gap-[9px] text-[12px] leading-[1.4]" style={{ color: C.dim }}>
+            <div key={f} className="flex items-start gap-[9px] text-[19.2px] leading-[1.4]" style={{ color: C.dim }}>
               <Check className="mt-[1px] h-[14px] w-[14px] shrink-0" style={{ color: C.pos }} /> {f}
             </div>
           ))}
-          <div className="flex items-start gap-[9px] text-[12px] leading-[1.4]" style={{ color: C.mut }}>
+          <div className="flex items-start gap-[9px] text-[19.2px] leading-[1.4]" style={{ color: C.mut }}>
             <span className="mt-[1px] shrink-0 font-bold" style={{ color: "#7C3AED" }}>◆</span> Film + AI review — verified, when it ships
           </div>
         </div>
@@ -85,15 +85,15 @@ export default function PlusGate({ onClose }: { onClose: () => void }) {
         <button
           type="button"
           onClick={onClose}
-          className="as-press mt-[16px] flex min-h-[46px] w-full items-center justify-center rounded-[12px] font-[var(--font-display)] text-[14px] font-bold"
+          className="as-press mt-[16px] flex min-h-[46px] w-full items-center justify-center rounded-[12px] font-[var(--font-display)] text-[20.3px] font-bold"
           style={{ background: C.grad, color: "#1a1206" }}
         >
           Start Aster Plus
         </button>
-        <div className="mt-[8px] text-center text-[10px]" style={{ color: C.mut }}>
+        <div className="mt-[8px] text-center text-[16px]" style={{ color: C.mut }}>
           Annual $200 <span style={{ color: C.g3, fontWeight: 600 }}>(save $40)</span> · cancel anytime · Browse, Live &amp; public pages stay free.
         </div>
-        <div className="mt-[6px] text-center font-[var(--font-mono)] text-[9px]" style={{ color: C.faint }}>
+        <div className="mt-[6px] text-center font-[var(--font-mono)] text-[14.4px]" style={{ color: C.faint }}>
           Checkout activates once billing is wired — it&apos;s owner-applied.
         </div>
       </div>

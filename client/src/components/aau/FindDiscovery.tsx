@@ -218,13 +218,13 @@ export default function FindDiscovery({ user, onOpenTournament }: { user: HubUse
       {/* header — varies by mode but the search box stays mounted in search mode */}
       {mode === "search" && term.length < 2 && (
         <div className="px-[18px] pt-[8px]">
-          <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em]" style={{ color: "#8F6708" }}>
+          <div className="font-[var(--font-mono)] text-[16px] uppercase tracking-[0.12em]" style={{ color: "#8F6708" }}>
             Find your team
           </div>
-          <h2 className="mt-1 font-[var(--font-display)] text-[23px] font-bold tracking-[-0.3px]" style={{ color: C.ink }}>
+          <h2 className="mt-1 font-[var(--font-display)] text-[28.8px] font-bold tracking-[-0.3px]" style={{ color: C.ink }}>
             Who are you following?
           </h2>
-          <div className="mt-[5px] text-[12.5px]" style={{ color: C.dim }}>
+          <div className="mt-[5px] text-[20px]" style={{ color: C.dim }}>
             A team, a tournament, a division — start typing.
           </div>
         </div>
@@ -254,7 +254,7 @@ export default function FindDiscovery({ user, onOpenTournament }: { user: HubUse
             }}
             placeholder="Search teams, tournaments…"
             aria-label="Search teams, tournaments, or divisions"
-            className="w-full bg-transparent text-[14px] outline-none"
+            className="w-full bg-transparent text-[20.3px] outline-none"
             style={{ color: C.ink }}
           />
           {term.length > 0 && (
@@ -276,7 +276,7 @@ export default function FindDiscovery({ user, onOpenTournament }: { user: HubUse
         <button
           type="button"
           onClick={() => setMode("search")}
-          className="as-press mx-[18px] mt-[2px] inline-flex min-h-[44px] items-center gap-1 font-[var(--font-mono)] text-[11px]"
+          className="as-press mx-[18px] mt-[2px] inline-flex min-h-[44px] items-center gap-1 font-[var(--font-mono)] text-[17.6px]"
           style={{ color: C.mut }}
         >
           ‹ Back to search
@@ -287,7 +287,7 @@ export default function FindDiscovery({ user, onOpenTournament }: { user: HubUse
       {mode === "browse" &&
         (dir === null ? (
           dirError ? (
-            <div className="mx-[18px] mt-4 rounded-[15px] p-6 text-center text-[12px]" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#F9FAFB,#FFFFFF)", color: C.mut }}>
+            <div className="mx-[18px] mt-4 rounded-[15px] p-6 text-center text-[19.2px]" style={{ border: `1px solid ${C.hair}`, background: "linear-gradient(180deg,#F9FAFB,#FFFFFF)", color: C.mut }}>
               Couldn&apos;t reach the directory. Try again in a moment.
             </div>
           ) : (

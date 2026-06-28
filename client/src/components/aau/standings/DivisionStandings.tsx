@@ -22,7 +22,7 @@ export default function DivisionStandings({ divisionId, divisionName }: Props) {
   const footNote = cap != null ? "2-way tie → head-to-head · 3-way → point differential" : null;
 
   if (error) {
-    return <div className="rounded-[16px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)] p-6 text-center text-[12px] text-[#4B5563]">Couldn't reach the standings. Try again in a moment.</div>;
+    return <div className="rounded-[16px] border border-[rgba(0,0,0,0.06)] bg-[linear-gradient(180deg,#F9FAFB,#FFFFFF)] p-6 text-center text-[19.2px] text-[#4B5563]">Couldn't reach the standings. Try again in a moment.</div>;
   }
   if (loading && !bundle) {
     return <div className="h-40 animate-pulse rounded-[16px] border border-[rgba(0,0,0,0.06)] bg-[#FFFFFF]/60" />;
@@ -31,8 +31,8 @@ export default function DivisionStandings({ divisionId, divisionName }: Props) {
   return (
     <div className="space-y-4">
       <div>
-        <div className="font-[var(--font-display)] text-[20px] font-bold tracking-tight text-[#1A1D23]">{divisionName}</div>
-        <div className="mt-1 flex flex-wrap gap-2 text-[11px]">
+        <div className="font-[var(--font-display)] text-[25px] font-bold tracking-tight text-[#1A1D23]">{divisionName}</div>
+        <div className="mt-1 flex flex-wrap gap-2 text-[17.6px]">
           {circuit && <span className="rounded-[7px] border border-[#E2E8F0] px-2 py-0.5 font-[var(--font-mono)] text-[#374151]">{circuit}</span>}
           {advanceCount != null && (
             <span className="rounded-[7px] border border-[#E2E8F0] px-2 py-0.5 font-[var(--font-mono)] text-[#374151]">top {advanceCount} → bracket</span>
@@ -59,7 +59,7 @@ export default function DivisionStandings({ divisionId, divisionName }: Props) {
             <button
               key={r.id}
               onClick={() => setFocusId(r.id)}
-              className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+              className={`rounded-full border px-3 py-1.5 text-[17.6px] font-semibold transition-colors ${
                 effectiveFocus === r.id ? "border-transparent bg-[linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)] text-[#1a1206]" : "border-[#E2E8F0] bg-[#F9FAFB] text-[#374151] hover:bg-[#F1F3F5]"
               }`}
             >

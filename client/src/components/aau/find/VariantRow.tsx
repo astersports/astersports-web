@@ -40,10 +40,10 @@ export default function VariantRow({
         </>
       )}
       <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-[7px] text-[13px] font-medium" style={{ color: C.ink }}>
+        <span className="flex items-center gap-[7px] text-[20.8px] font-medium" style={{ color: C.ink }}>
           <span className="truncate">{v.name}</span>
           {v.isLive && (
-            <span className="flex shrink-0 items-center gap-1 text-[10px]" style={{ color: C.live }}>
+            <span className="flex shrink-0 items-center gap-1 text-[16px]" style={{ color: C.live }}>
               <span
                 className="inline-block h-[7px] w-[7px] rounded-full"
                 style={{ background: C.live, boxShadow: `0 0 7px ${C.live}` }}
@@ -57,7 +57,7 @@ export default function VariantRow({
           {chips.map((c, i) => (
             <span
               key={i}
-              className="rounded-[6px] border px-[7px] py-[2px] font-[var(--font-mono)] text-[9px]"
+              className="rounded-[6px] border px-[7px] py-[2px] font-[var(--font-mono)] text-[14.4px]"
               style={
                 c.kind === "g"
                   ? { color: C.cobalt, borderColor: "rgba(37,99,235,.3)" }
@@ -70,10 +70,10 @@ export default function VariantRow({
             </span>
           ))}
           {/* value-in-row: record (real results) + rating (projection, basis-gated) */}
-          <span className="font-[var(--font-mono)] text-[9px]" style={{ color: hasRecord ? C.pos : C.mut }}>
+          <span className="font-[var(--font-mono)] text-[14.4px]" style={{ color: hasRecord ? C.pos : C.mut }}>
             {hasRecord ? `${v.record.w}–${v.record.l}` : "0–0"}
           </span>
-          <span className="font-[var(--font-mono)] text-[9px]" style={{ color: v.basis ? C.g3 : C.mut }} title="rating · a projection, distinct from the W–L record">
+          <span className="font-[var(--font-mono)] text-[14.4px]" style={{ color: v.basis ? C.g3 : C.mut }} title="rating · a projection, distinct from the W–L record">
             rtg {ratingLabel}
           </span>
         </span>
@@ -83,7 +83,7 @@ export default function VariantRow({
         onClick={() => onToggle(v)}
         aria-pressed={tracked}
         aria-label={`${tracked ? "Untrack" : "Track"} ${v.name} (${v.tournamentName})`}
-        className="as-press flex min-h-[44px] shrink-0 items-center gap-1 rounded-[8px] px-[11px] font-[var(--font-mono)] text-[10px] font-semibold"
+        className="as-press flex min-h-[44px] shrink-0 items-center gap-1 rounded-[8px] px-[11px] font-[var(--font-mono)] text-[16px] font-semibold"
         style={
           tracked
             ? { background: "rgba(95,160,230,.14)", border: "1px solid rgba(95,160,230,.4)", color: "#bcd8f6" }

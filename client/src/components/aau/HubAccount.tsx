@@ -25,7 +25,7 @@ export default function HubAccount({ user }: { user: HubUser | null }) {
         disabled={busy}
         onClick={() => { setBusy(true); signInWithGoogle().catch(() => setBusy(false)); }}
         aria-label={busy ? "Signing in" : "Sign in with Google"}
-        className="as-press inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-[#E2E8F0] bg-[#FFFFFF] px-3 py-[6px] text-[11px] font-semibold text-[#374151] disabled:opacity-60"
+        className="as-press inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-[#E2E8F0] bg-[#FFFFFF] px-3 py-[6px] text-[17.6px] font-semibold text-[#374151] disabled:opacity-60"
       >
         <LogIn className="h-[13px] w-[13px]" aria-hidden="true" /> {busy ? "Signing in…" : "Sign in"}
       </button>
@@ -44,7 +44,7 @@ export default function HubAccount({ user }: { user: HubUser | null }) {
         aria-expanded={open}
         className="as-press grid h-[44px] w-[44px] place-items-center rounded-full"
       >
-        <span className="grid h-7 w-7 place-items-center overflow-hidden rounded-full bg-[linear-gradient(135deg,#E8902A,#F6CC55)] text-[12px] font-bold text-[#1a1206]">
+        <span className="grid h-7 w-7 place-items-center overflow-hidden rounded-full bg-[linear-gradient(135deg,#E8902A,#F6CC55)] text-[19.2px] font-bold text-[#1a1206]">
           {user.avatar ? <img src={user.avatar} alt="" aria-hidden="true" className="h-7 w-7 rounded-full object-cover" /> : initial}
         </span>
       </button>
@@ -53,14 +53,14 @@ export default function HubAccount({ user }: { user: HubUser | null }) {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div role="menu" aria-label="Account" className="absolute right-0 top-[46px] z-50 w-48 overflow-hidden rounded-[12px] border border-[#E2E8F0] bg-[#FFFFFF] p-1 shadow-[0_12px_30px_-12px_rgba(0,0,0,0.18)]">
             <div className="px-3 py-2">
-              <div className="truncate text-[12px] font-semibold text-[#1A1D23]">{user.name ?? "Signed in"}</div>
-              {user.email && <div className="truncate text-[10px] text-[#4B5563]">{user.email}</div>}
+              <div className="truncate text-[19.2px] font-semibold text-[#1A1D23]">{user.name ?? "Signed in"}</div>
+              {user.email && <div className="truncate text-[16px] text-[#4B5563]">{user.email}</div>}
             </div>
             <button
               type="button"
               role="menuitem"
               onClick={() => { setOpen(false); void signOutHub(); }}
-              className="as-press min-h-[44px] w-full rounded-[8px] px-3 py-2 text-left text-[12px] text-[#DC2626] hover:bg-[rgba(255,107,94,0.08)]"
+              className="as-press min-h-[44px] w-full rounded-[8px] px-3 py-2 text-left text-[19.2px] text-[#DC2626] hover:bg-[rgba(255,107,94,0.08)]"
             >
               Sign out
             </button>

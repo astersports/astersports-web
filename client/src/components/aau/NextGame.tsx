@@ -97,39 +97,39 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
   return (
     <div className="mx-[18px] mb-4">
       {/* eyebrow */}
-      <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.12em] text-[#8F6708]">
+      <div className="font-[var(--font-mono)] text-[16px] uppercase tracking-[0.12em] text-[#8F6708]">
         Up next · {who}
       </div>
 
       {/* countdown hero card */}
       <div className="mt-1 overflow-hidden rounded-[20px] border border-[rgba(0,0,0,0.06)] border-t-[rgba(0,0,0,0.10)] bg-[radial-gradient(280px_160px_at_50%_-10%,rgba(232,144,42,0.12),transparent),linear-gradient(180deg,#F9FAFB,#FFFFFF)] px-4 pb-4 pt-[18px] text-center">
-        <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.14em] text-[#8F6708]">
+        <div className="font-[var(--font-mono)] text-[16px] uppercase tracking-[0.14em] text-[#8F6708]">
           {cd ? (soon ? `${who} tips soon · in` : `${who} plays in`) : "playing now"}
         </div>
         <div
           role="img"
           aria-label={cd ? `${who} plays in ${cd}` : "playing now"}
-          className={`mt-1.5 mb-0.5 bg-[linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)] bg-clip-text font-[var(--font-mono)] text-[52px] font-bold leading-none tracking-[-2px] text-transparent ${soon ? "as-pulse" : ""}`}
+          className={`mt-1.5 mb-0.5 bg-[linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)] bg-clip-text font-[var(--font-mono)] text-[58.2px] font-bold leading-none tracking-[-2px] text-transparent ${soon ? "as-pulse" : ""}`}
         >
           {cd ?? "LIVE"}
         </div>
-        <div className="text-[15px] font-semibold text-[#1A1D23]">
+        <div className="text-[21.8px] font-semibold text-[#1A1D23]">
           {who} <span className="font-normal text-[#4B5563]">vs</span> {game.opponent || "TBD"}
         </div>
-        <div className="mt-1 font-[var(--font-mono)] text-[12px] text-[#374151]">
+        <div className="mt-1 font-[var(--font-mono)] text-[19.2px] text-[#374151]">
           {venueLine || "Venue TBD"}
         </div>
 
         {(driveMin !== null || weather) && (
           <div className="mt-[13px] flex flex-col items-center gap-[9px] border-t border-[rgba(0,0,0,0.06)] pt-[13px]">
             {driveMin !== null && (
-              <div className="flex items-center gap-2 text-[13px] text-[#374151]">
+              <div className="flex items-center gap-2 text-[20.8px] text-[#374151]">
                 <Car className="h-[15px] w-[15px] text-[#4B5563]" />
                 ~{driveMin} min drive · <span className="font-semibold text-[#ffb648]">leave by {leaveBy}</span>
               </div>
             )}
             {weather && (
-              <div className="flex items-center gap-1.5 text-[11.5px] text-[#374151]">
+              <div className="flex items-center gap-1.5 text-[18.4px] text-[#374151]">
                 <ColorfulWeatherIcon icon={weather.icon} isDay={weather.isDay} className="h-[14px] w-[14px]" />
                 {Math.round(weather.temperature)}°F · {weather.description.toLowerCase()}{advice ? ` — ${advice}` : ""}
               </div>
@@ -142,15 +142,15 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
       {dirs && (
         <div className="mt-[13px] flex gap-[9px]">
           <a href={dirs.apple} target="_blank" rel="noopener noreferrer"
-            className="as-press flex flex-1 items-center justify-center gap-1.5 rounded-[11px] border border-[#E2E8F0] bg-[#F9FAFB] py-[9px] text-[11.5px] font-semibold text-[#374151]">
+            className="as-press flex flex-1 items-center justify-center gap-1.5 rounded-[11px] border border-[#E2E8F0] bg-[#F9FAFB] py-[9px] text-[18.4px] font-semibold text-[#374151]">
             <Navigation className="h-[14px] w-[14px]" /> Apple
           </a>
           <a href={dirs.google} target="_blank" rel="noopener noreferrer"
-            className="as-press flex flex-1 items-center justify-center gap-1.5 rounded-[11px] border border-[#E2E8F0] bg-[#F9FAFB] py-[9px] text-[11.5px] font-semibold text-[#6ea2ff]">
+            className="as-press flex flex-1 items-center justify-center gap-1.5 rounded-[11px] border border-[#E2E8F0] bg-[#F9FAFB] py-[9px] text-[18.4px] font-semibold text-[#6ea2ff]">
             <Navigation className="h-[14px] w-[14px]" /> Google
           </a>
           <a href={dirs.waze} target="_blank" rel="noopener noreferrer"
-            className="as-press flex flex-1 items-center justify-center gap-1.5 rounded-[11px] border border-[#E2E8F0] bg-[#F9FAFB] py-[9px] text-[11.5px] font-semibold text-[#2fd0ff]">
+            className="as-press flex flex-1 items-center justify-center gap-1.5 rounded-[11px] border border-[#E2E8F0] bg-[#F9FAFB] py-[9px] text-[18.4px] font-semibold text-[#2fd0ff]">
             <Navigation className="h-[14px] w-[14px]" /> Waze
           </a>
         </div>
@@ -160,7 +160,7 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
       {leaveBy && (
         <button type="button" onClick={remind} disabled={reminded}
           aria-label={reminded ? `Reminder set to leave by ${leaveBy}` : `Remind me to leave by ${leaveBy}`}
-          className={`as-press mt-[11px] flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[13px] border py-[13px] font-[var(--font-display)] text-[13.5px] font-semibold transition-colors ${reminded ? "border-[rgba(22,163,74,0.35)] bg-[rgba(22,163,74,0.06)] text-[#16A34A]" : "border-[#E2E8F0] bg-[#F9FAFB] text-[#1A1D23]"}`}>
+          className={`as-press mt-[11px] flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[13px] border py-[13px] font-[var(--font-display)] text-[19.6px] font-semibold transition-colors ${reminded ? "border-[rgba(22,163,74,0.35)] bg-[rgba(22,163,74,0.06)] text-[#16A34A]" : "border-[#E2E8F0] bg-[#F9FAFB] text-[#1A1D23]"}`}>
           {reminded ? (
             <><Check className="h-[16px] w-[16px]" aria-hidden="true" /> Reminder set</>
           ) : (
@@ -170,7 +170,7 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
       )}
       {reminded && <span role="status" aria-live="polite" className="sr-only">Reminder set to leave by {leaveBy}</span>}
 
-      <div className="px-[18px] pb-1 pt-[11px] text-center font-[var(--font-mono)] text-[10.5px] leading-[1.5] text-[#4B5563]">
+      <div className="px-[18px] pb-1 pt-[11px] text-center font-[var(--font-mono)] text-[16.8px] leading-[1.5] text-[#4B5563]">
         Countdown + drive time from venue lat/lng. Weather via aster-weather.
       </div>
     </div>
