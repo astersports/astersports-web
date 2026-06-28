@@ -99,9 +99,17 @@ export function useScoutChat() {
           buf = rest;
           for (const ev of events) handle(ev);
         }
+        // Flush any final frame that arrived without a trailing blank line.
+        if (buf.trim()) {
+          for (const ev of parseSseBuffer(buf + "\n\n").events) handle(ev);
+        }
       } catch {
         setNotice("Something hiccuped on our end — the contact form will reach us directly.");
       } finally {
+        // Drop the pre-allocated assistant bubble if the turn produced no text
+        // (offline 404, error, or a tool-only reply) so the transcript never
+        // shows a blank bubble — the CTA / notice carries the response instead.
+        if (!assistant) setBubbles(base);
         setStreaming(false);
       }
     },
