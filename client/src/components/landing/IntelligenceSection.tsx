@@ -44,7 +44,7 @@ export default function IntelligenceSection() {
   const { ref, isVisible } = useInView<HTMLDivElement>();
 
   return (
-    <section id="intelligence" className="relative py-12 md:py-20 bg-[#0d1220]">
+    <section id="intelligence" className="relative py-12 md:py-20 bg-[#20283d]">
       <div className="container" ref={ref}>
         <div className="max-w-2xl mb-10 md:mb-14">
           <div

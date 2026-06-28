@@ -30,7 +30,7 @@ function Group({ hidden }: { hidden?: boolean }) {
 
 export default function TechMarquee() {
   return (
-    <section className="relative py-8 md:py-10 bg-[#0a0e1a] border-y border-white/5">
+    <section className="relative py-8 md:py-10 bg-[#1a2133] border-y border-white/5">
       <div className="container">
         <p
           className="text-center text-[11px] tracking-[0.28em] uppercase text-slate-500 mb-5"

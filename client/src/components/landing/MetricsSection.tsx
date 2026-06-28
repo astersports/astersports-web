@@ -49,7 +49,7 @@ export default function MetricsSection() {
   const { ref, isVisible } = useInView<HTMLDivElement>();
 
   return (
-    <section className="relative py-10 md:py-14 bg-[#0a0e1a]">
+    <section className="relative py-10 md:py-14 bg-[#1a2133]">
       <div className="container" ref={ref}>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
           {METRICS.map((metric, i) => (
