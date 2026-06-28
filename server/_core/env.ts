@@ -292,6 +292,17 @@ export function validateEnv(): { errors: string[]; warnings: string[] } {
     );
   }
 
+  // Bot gate co-requirement (landing agent, P5/Fork D): flipping the agent live
+  // without a Turnstile secret leaves the concierge open to unmetered bot traffic.
+  // The route fails closed per-turn when configured, but an unset secret means NO
+  // gate at all — warn loudly. Kept a warning (not a boot error) so the agent can
+  // still be exercised dark in pre-flip testing; it is a §7 pre-flip blocker.
+  if (ENV.landingAgentLive && !ENV.turnstileSecretKey) {
+    warnings.push(
+      "LANDING_AGENT_LIVE=true without TURNSTILE_SECRET_KEY — the Aster Scout bot gate is OFF (pre-flip blocker; set the secret before going live)"
+    );
+  }
+
   // Feature-degrading: present-but-empty means that feature is dark. Warn only.
   const optional: Array<[string, string, string]> = [
     ["STRIPE_SECRET_KEY", ENV.stripeSecretKey, "billing/checkout"],

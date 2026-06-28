@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Send, Sparkles, CheckCircle2 } from "lucide-react";
 import { useScoutChat } from "@/hooks/useScoutChat";
+import { useTurnstile } from "@/hooks/useTurnstile";
 import ScoutCtaCard from "./ScoutCtaCard";
 
 /**
@@ -12,6 +13,7 @@ import ScoutCtaCard from "./ScoutCtaCard";
  */
 export default function ScoutChat() {
   const { bubbles, streaming, cta, leadAck, notice, send } = useScoutChat();
+  const { configured: turnstileOn, containerRef, token, reset: resetTurnstile } = useTurnstile();
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -23,7 +25,10 @@ export default function ScoutChat() {
     e.preventDefault();
     const text = draft;
     setDraft("");
-    void send(text);
+    // Attach the single-use Turnstile token (server verifies the first turn,
+    // then caches the session). Refresh the widget so a retry has a fresh token.
+    void send(text, token ?? undefined);
+    if (turnstileOn) resetTurnstile();
   };
 
   return (
@@ -67,6 +72,9 @@ export default function ScoutChat() {
 
         {notice && <p className="text-[12.5px] text-slate-400 leading-snug mt-1">{notice}</p>}
       </div>
+
+      {/* Cloudflare Turnstile bot gate — renders only when VITE_TURNSTILE_SITE_KEY is set */}
+      {turnstileOn && <div ref={containerRef} className="mb-2.5" aria-label="Human verification" />}
 
       <form onSubmit={submit} className="flex items-center gap-2">
         <input

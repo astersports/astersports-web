@@ -123,6 +123,21 @@ export class LandingAgentGuard {
     this.sessionLimiter.sweep(now);
     this.ipLimiter.sweep(now);
     this.leadLimiter.sweep(now);
+    // Evict expired Turnstile verifications too (same memory bound).
+    this.verifiedSessions.forEach((exp, id) => {
+      if (exp <= now) this.verifiedSessions.delete(id);
+    });
+  }
+
+  /** P5: has this session cleared the Turnstile gate (and not yet expired)? */
+  isVerified(sessionId: string, now: number): boolean {
+    const exp = this.verifiedSessions.get(sessionId);
+    return exp !== undefined && exp > now;
+  }
+
+  /** P5: mark a session verified for VERIFIED_TTL_MS after a successful Turnstile check. */
+  markVerified(sessionId: string, now: number): void {
+    this.verifiedSessions.set(sessionId, now + VERIFIED_TTL_MS);
   }
 
   evaluateChatTurn(input: ChatTurnInput): GuardDecision {

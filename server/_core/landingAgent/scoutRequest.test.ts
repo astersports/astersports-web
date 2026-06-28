@@ -7,6 +7,7 @@ import {
   MAX_MESSAGES,
   MAX_CONTENT_LEN,
   MAX_OUTPUT_TOKENS,
+  MAX_TURNSTILE_TOKEN_LEN,
 } from "./scoutRequest";
 
 describe("parseScoutRequest", () => {
@@ -51,6 +52,36 @@ describe("parseScoutRequest", () => {
     });
     expect(parsed.messages).toHaveLength(1);
     expect(parsed.messages[0].content.length).toBe(MAX_CONTENT_LEN);
+  });
+
+  it("omits turnstileToken when absent (verified-session turns)", () => {
+    const parsed = parseScoutRequest({ sessionId: "s", messages: [{ role: "user", content: "hi" }] });
+    expect(parsed.turnstileToken).toBeUndefined();
+  });
+
+  it("carries a trimmed turnstileToken when present", () => {
+    const parsed = parseScoutRequest({
+      sessionId: "s",
+      messages: [{ role: "user", content: "hi" }],
+      turnstileToken: "  cf-token-abc  ",
+    });
+    expect(parsed.turnstileToken).toBe("cf-token-abc");
+  });
+
+  it("clamps an over-long turnstileToken and ignores a non-string one", () => {
+    const long = parseScoutRequest({
+      sessionId: "s",
+      messages: [{ role: "user", content: "hi" }],
+      turnstileToken: "t".repeat(MAX_TURNSTILE_TOKEN_LEN + 100),
+    });
+    expect(long.turnstileToken?.length).toBe(MAX_TURNSTILE_TOKEN_LEN);
+
+    const nonString = parseScoutRequest({
+      sessionId: "s",
+      messages: [{ role: "user", content: "hi" }],
+      turnstileToken: 12345,
+    });
+    expect(nonString.turnstileToken).toBeUndefined();
   });
 });
 

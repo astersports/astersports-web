@@ -36,7 +36,7 @@ export function useScoutChat() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const send = useCallback(
-    async (raw: string) => {
+    async (raw: string, turnstileToken?: string) => {
       const text = raw.trim();
       if (!text || streaming) return;
 
@@ -80,6 +80,7 @@ export function useScoutChat() {
           body: JSON.stringify({
             sessionId: sessionId.current,
             messages: base.map((b) => ({ role: b.role, content: b.text })),
+            ...(turnstileToken ? { turnstileToken } : {}),
           }),
         });
 

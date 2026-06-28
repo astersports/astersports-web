@@ -308,3 +308,52 @@ Frank still owns, before any flip: the daily $ ceiling value, transcript
 retention policy, the ANTHROPIC_AGENT_MODEL/Turnstile keys, and the P6 flip
 itself. P0–P1 are routine and dark; P2–P5 are Architect-scoped and stay dark
 until Frank sets the flag.
+
+--------------------------------------------------------------------
+12. BUILD LOG — P5 (Turnstile bot gate, Fork D)
+--------------------------------------------------------------------
+SHIPPED (dark, HELD as Architect-scoped — sub-processor: Cloudflare Turnstile):
+
+  Server
+  - server/_core/env.ts: TURNSTILE_SECRET_KEY → ENV.turnstileSecretKey.
+    validateEnv() now WARNS (not boot-error) when LANDING_AGENT_LIVE=true &&
+    !TURNSTILE_SECRET_KEY — a §7 pre-flip blocker, surfaced loudly, but dark
+    testing still runs (the route only enforces when the secret is present).
+  - server/_core/landingAgent/turnstile.ts: parseTurnstileResult (only an
+    explicit success:true passes), isTurnstileConfigured(), verifyTurnstile()
+    POSTs to Cloudflare siteverify and FAILS CLOSED on every path (no secret /
+    no token / non-OK / parse / network / non-success → false).
+  - server/_core/landingAgent/guard.ts: a per-session verified cache —
+    isVerified()/markVerified(), VERIFIED_TTL_MS = 30min, swept with the
+    rate-limiter keys (memory bound). Verify once per session, then skip the
+    round-trip for TTL.
+  - server/_core/landingAgent/scoutRequest.ts: optional turnstileToken on the
+    request (trimmed, clamped to MAX_TURNSTILE_TOKEN_LEN, non-string ignored).
+  - server/routes/landingScout.ts: before the FIRST model turn, if configured
+    && !isVerified → verifyTurnstile(token, ip); deny SSE { reason:"turnstile" }
+    on failure, else markVerified. The model never engages pre-gate (A2/Fork D).
+
+  Client
+  - client/src/hooks/useTurnstile.ts: loads the Turnstile script once, renders a
+    managed widget (dark/flexible), exposes { configured, containerRef, token,
+    reset }. Inert when VITE_TURNSTILE_SITE_KEY is unset.
+  - useScoutChat.send(text, turnstileToken?) attaches the single-use token.
+  - ScoutChat.tsx mounts the widget (only when configured) and resets it after
+    each send so a retry has a fresh token.
+
+  Tests (66 in the three touched files; full suite 827 green)
+  - turnstile.test.ts: parse coverage + every fail-closed path + success verdict
+    + remoteip omission for unknown IP.
+  - guard.test.ts: verified-session TTL boundary, per-session isolation, sweep
+    eviction.
+  - scoutRequest.test.ts: turnstileToken trim/clamp/absent/non-string.
+
+PRE-FLIP BLOCKERS (Frank/§3 — the flip stays Frank's, P5 ships dark):
+  1. Set TURNSTILE_SECRET_KEY (server) + VITE_TURNSTILE_SITE_KEY (client build).
+     Until both are set the gate is OFF and the boot warning fires.
+  2. Set Express `trust proxy` to the exact Railway hop count so X-Forwarded-For
+     can't be spoofed to evade the per-IP cap (see scoutRequest.ts note). The
+     global fail-closed ceiling + Turnstile bound the residual risk, but the
+     per-IP cap is only sound once trust proxy is correct.
+  3. Architect sign-off on the sub-processor (Cloudflare) disclosure before the
+     gate processes real visitor challenges.
