@@ -56,19 +56,25 @@ export default function GameWeather({ latitude, longitude, gameTime, compact = t
 
   if (!inWindow || !slot) return null;
 
+  const label = `Game-time forecast: ${describeWeather(slot.code)}, ${slot.temp}°F${slot.precip >= 10 ? `, ${slot.precip}% chance of precipitation` : ""}`;
+
   return (
     <span
-      title={`Game-time forecast: ${describeWeather(slot.code)}, ${slot.temp}°F${slot.precip >= 10 ? `, ${slot.precip}% precip` : ""}`}
+      role="img"
+      aria-label={label}
+      title={label}
       style={{
         display: "inline-flex", alignItems: "center", gap: 4,
         padding: compact ? "2px 7px" : "4px 9px", borderRadius: 999,
         backgroundColor: "var(--as-bg-tertiary)", border: "1px solid var(--as-border-subtle)",
       }}
     >
-      <WeatherIcon code={slot.code} isDay={slot.isDay} size={compact ? 16 : 20} animate={false} />
-      <span style={{ fontSize: compact ? 11 : 12, fontWeight: 700, color: "var(--as-text-primary)" }}>{slot.temp}°</span>
+      <span aria-hidden="true" style={{ display: "inline-flex" }}>
+        <WeatherIcon code={slot.code} isDay={slot.isDay} size={compact ? 16 : 20} animate={false} />
+      </span>
+      <span aria-hidden="true" style={{ fontSize: compact ? 11 : 12, fontWeight: 700, color: "var(--as-text-primary)" }}>{slot.temp}°</span>
       {slot.precip >= 10 && (
-        <span style={{ fontSize: 9, fontWeight: 600, color: "var(--as-accent)" }}>{slot.precip}%</span>
+        <span aria-hidden="true" style={{ fontSize: 9, fontWeight: 600, color: "var(--as-accent)" }}>{slot.precip}%</span>
       )}
     </span>
   );

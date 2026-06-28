@@ -10,22 +10,18 @@ export default function Mission() {
         </h2>
       </div>
 
-      {/* Philosophy statement — blockquote style */}
-      <div className="as-fade-in as-stagger-1" style={{
-        padding: '20px 24px', borderRadius: 12, marginBottom: 24,
+      {/* Philosophy statement — blockquote */}
+      <blockquote className="as-fade-in as-stagger-1" style={{
+        padding: '20px 24px', borderRadius: 12, marginBottom: 24, margin: '0 0 24px',
         backgroundColor: 'var(--as-bg-card)',
         borderLeft: '4px solid var(--as-team-primary)',
         boxShadow: 'var(--as-shadow-sm)',
+        fontSize: 16, lineHeight: 1.7, color: 'var(--as-text-primary)', fontWeight: 400,
       }}>
-        <p style={{
-          fontSize: 16, lineHeight: 1.7, color: 'var(--as-text-primary)',
-          margin: 0, fontWeight: 400,
-        }}>
-          Aster AAU develops competitive young athletes through high-level basketball training,
-          tournament competition, and team-first culture. We believe in building players who are
-          skilled, disciplined, and fearless on the court.
-        </p>
-      </div>
+        Aster AAU develops competitive young athletes through high-level basketball training,
+        tournament competition, and team-first culture. We believe in building players who are
+        skilled, disciplined, and fearless on the court.
+      </blockquote>
 
       {/* Core values — 2x2 grid */}
       <div style={{
@@ -57,7 +53,7 @@ export default function Mission() {
           icon={<Award size={18} strokeWidth={2} />}
           title="Nationals Qualified"
           description="In our first full AAU season, the 11U Girls qualified for Nationals — going 3-0 in pool play at the ZG National Finals. This is just the beginning."
-          accent="#FFD700"
+          accent="var(--as-gold)"
           delay={4}
         />
       </div>
