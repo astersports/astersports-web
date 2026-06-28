@@ -86,11 +86,15 @@ function deny(reason: DenyReason): GuardDecision {
   return { allowed: false, reason, message: DENY_MESSAGE[reason] };
 }
 
+/** How often the guard evicts expired limiter keys (memory bound). */
+const SWEEP_INTERVAL_MS = 60_000;
+
 export class LandingAgentGuard {
   private readonly sessionLimiter: SlidingWindowLimiter;
   private readonly ipLimiter: SlidingWindowLimiter;
   private readonly leadLimiter: SlidingWindowLimiter;
   private readonly ledger: DailySpendLedger;
+  private lastSweep = 0;
 
   constructor(cfg: GuardConfig, deps: GuardDeps = {}) {
     this.sessionLimiter = deps.sessionLimiter ?? new SlidingWindowLimiter(cfg.chatPerSession, SESSION_WINDOW_MS);
@@ -104,8 +108,22 @@ export class LandingAgentGuard {
    * is evaluated independently of the limiters (property 2), and the whole body
    * is wrapped so any throw fails closed (property 1).
    */
+  /**
+   * Evict expired limiter keys at most once per SWEEP_INTERVAL_MS. Called on the
+   * request path (the only entry point) so the in-memory maps can't grow without
+   * bound from a flood of unique sessionIds/IPs — no global timer needed.
+   */
+  private maybeSweep(now: number): void {
+    if (now - this.lastSweep < SWEEP_INTERVAL_MS) return;
+    this.lastSweep = now;
+    this.sessionLimiter.sweep(now);
+    this.ipLimiter.sweep(now);
+    this.leadLimiter.sweep(now);
+  }
+
   evaluateChatTurn(input: ChatTurnInput): GuardDecision {
     try {
+      this.maybeSweep(input.now);
       if (!input.live) return deny("disabled");
 
       // Reject a malformed token estimate up front (fail closed) so a bad/forwarded

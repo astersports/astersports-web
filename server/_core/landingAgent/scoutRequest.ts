@@ -43,8 +43,8 @@ export function parseScoutRequest(body: unknown): ScoutRequest {
   for (const raw of b.messages) {
     const m = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
     const role = m.role === "assistant" ? "assistant" : m.role === "user" ? "user" : null;
-    const content = typeof m.content === "string" ? m.content : "";
-    if (!role || content.trim().length === 0) continue;
+    const content = (typeof m.content === "string" ? m.content : "").trim();
+    if (!role || content.length === 0) continue;
     messages.push({ role, content: content.slice(0, MAX_CONTENT_LEN) });
   }
 
@@ -54,19 +54,41 @@ export function parseScoutRequest(body: unknown): ScoutRequest {
   return { sessionId, messages };
 }
 
+/** Max textual length of an IPv6 address — anything longer is malicious. */
+const IP_MAX = 45;
+
+/**
+ * Clamp + sanitize a candidate IP token before it becomes a limiter/ledger key.
+ * An attacker-supplied X-Forwarded-For can be arbitrarily long or hold control
+ * chars; restrict to the IP charset and cap the length so a malicious header
+ * can't inflate memory or pollute logs. Never returns an empty string.
+ */
+function sanitizeIp(token: string): string {
+  const cleaned = token.replace(/[^0-9a-fA-F:.]/g, "").slice(0, IP_MAX);
+  return cleaned || "unknown";
+}
+
 /**
  * Best-effort client IP. Railway/most proxies set X-Forwarded-For (client is the
- * FIRST hop); fall back to the socket address. Used as the per-identity key for
- * the spend cap + lead cap, so prefer the left-most XFF entry.
+ * FIRST hop); fall back to x-real-ip then the socket address. Used as the
+ * per-identity key for the spend + lead caps.
+ *
+ * NOTE (pre-flip, docs/SPEC_LANDING_AGENT.txt): X-Forwarded-For is
+ * client-spoofable unless Express `trust proxy` is configured to the exact
+ * number of proxy hops in front of the app. Before LANDING_AGENT_LIVE is
+ * flipped, confirm the Railway hop count and set `trust proxy` so a forged XFF
+ * can't evade the per-IP cap. The global fail-closed ceiling bounds total spend
+ * regardless, and Turnstile (P5) gates the first model token — so the residual
+ * pre-flip risk is bounded cardinality, which the clamp + sweep contain.
  */
 export function clientIpFromHeaders(headers: Record<string, unknown>, socketAddr?: string): string {
   const xff = headers["x-forwarded-for"];
   const raw = Array.isArray(xff) ? xff[0] : typeof xff === "string" ? xff : "";
   const first = raw.split(",")[0]?.trim();
-  if (first) return first;
+  if (first) return sanitizeIp(first);
   const real = headers["x-real-ip"];
-  if (typeof real === "string" && real.trim()) return real.trim();
-  return (socketAddr || "unknown").trim() || "unknown";
+  if (typeof real === "string" && real.trim()) return sanitizeIp(real.trim());
+  return sanitizeIp((socketAddr || "unknown").trim());
 }
 
 /** ~4 chars/token heuristic; never an under-estimate the cap could be gamed by. */

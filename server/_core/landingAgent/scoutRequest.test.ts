@@ -66,6 +66,14 @@ describe("clientIpFromHeaders", () => {
     expect(clientIpFromHeaders({}, "7.7.7.7")).toBe("7.7.7.7");
     expect(clientIpFromHeaders({})).toBe("unknown");
   });
+
+  it("clamps + sanitizes a malicious X-Forwarded-For (length + charset)", () => {
+    const evil = "1.2.3.4" + "Z".repeat(500) + "\n<script>";
+    const out = clientIpFromHeaders({ "x-forwarded-for": evil });
+    expect(out.length).toBeLessThanOrEqual(45);
+    expect(out).not.toMatch(/[<>\nZ]/); // Z + angle brackets + newline stripped
+    expect(out.startsWith("1.2.3.4")).toBe(true);
+  });
 });
 
 describe("token estimation", () => {
