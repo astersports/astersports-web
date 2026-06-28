@@ -2,6 +2,7 @@ import { useCountUp } from "@/hooks/useCountUp";
 import { useInView } from "@/hooks/useInView";
 import { PRODUCTS } from "@/lib/services";
 import SpotlightCard from "./SpotlightCard";
+import AgentConsole from "../aau/AgentConsole";
 
 interface Metric {
   value: number;
@@ -51,18 +52,23 @@ export default function MetricsSection() {
   return (
     <section className="relative py-10 md:py-14 bg-[#1a2133]">
       <div className="container" ref={ref}>
-        {/* agent eyebrow — ties the metrics into the live-scan motif */}
+        {/* the agent reads the constellation's live metrics — same scan motif as the hub */}
         <div
-          className={`flex items-center gap-2 mb-4 transition-all duration-500 ${
+          className={`mb-5 max-w-xl transition-all duration-500 ${
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
           }`}
         >
-          <span className="aster-dot-live" />
-          <span className="aster-mono text-[11px] tracking-[0.14em] uppercase text-slate-400">
-            aster-agent · live metrics
-          </span>
-          <span className="flex-1 h-px bg-white/10" />
-          <span className="aster-mono text-[10px] text-[#34d399]">live</span>
+          <AgentConsole
+            tone="dark"
+            label="aster-agent · metrics"
+            verb="reading"
+            steps={[
+              { tag: "Surfaces", line: `${PRODUCTS.length} in the constellation` },
+              { tag: "Shipping", line: `${shipping} live or in beta` },
+              { tag: "Render", line: "Studio renders in under 10s" },
+              { tag: "Built", line: "100% designed + built in-house" },
+            ]}
+          />
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
           {METRICS.map((metric, i) => (

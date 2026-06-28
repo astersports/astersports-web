@@ -1,6 +1,7 @@
 import { Scan, Gauge, Wand2, Sparkles } from "lucide-react";
 import { useInView } from "@/hooks/useInView";
 import SpotlightCard from "./SpotlightCard";
+import AgentConsole from "../aau/AgentConsole";
 
 /**
  * "Intelligence under the hood" — a marketing-side look at the Print Studio
@@ -71,6 +72,25 @@ export default function IntelligenceSection() {
             A four-stage vision pipeline — segment, read, transform, finish. Real
             models doing real production work, in the time it takes to blink.
           </p>
+        </div>
+
+        {/* the agent traces the live vision pipeline — scanning into the stage cards below */}
+        <div
+          className={`mb-6 max-w-xl transition-all duration-700 delay-300 ${
+            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+          }`}
+        >
+          <AgentConsole
+            tone="dark"
+            label="aster-agent · pipeline"
+            verb="tracing"
+            steps={[
+              { tag: "Segment", line: "SAM2 isolates every print element" },
+              { tag: "Read", line: "density + scale, measured" },
+              { tag: "Transform", line: "deterministic raster — same in, same out" },
+              { tag: "Finish", line: "LaMa inpaint closes the seams" },
+            ]}
+          />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
