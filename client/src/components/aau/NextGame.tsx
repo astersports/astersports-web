@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Car, Bell, Navigation } from "lucide-react";
+import { Car, Bell, Navigation, Check } from "lucide-react";
 import { ColorfulWeatherIcon } from "@aster/weather/icons";
 import { getWeatherForEvent, type EventWeather } from "@aster/weather";
 import { type TeamGame } from "@/lib/aster";
@@ -30,6 +30,7 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
   const [tick, setTick] = useState(Date.now());
   const [weather, setWeather] = useState<EventWeather | null>(null);
   const [driveMin, setDriveMin] = useState<number | null>(null);
+  const [reminded, setReminded] = useState(false); // optimistic "Reminder set ✓" feedback
 
   const game = useMemo(() => pickNextGame(games), [games]);
 
@@ -38,6 +39,10 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
     const id = setInterval(() => setTick(Date.now()), 30_000);
     return () => clearInterval(id);
   }, []);
+
+  // a reminder belongs to ONE game — reset the optimistic flag whenever the chosen next
+  // game changes, so the button doesn't stay disabled (with a stale leave-by) for the next.
+  useEffect(() => { setReminded(false); }, [game?.gameId]);
 
   // weather + drive for the chosen game
   const venue = game?.venue;
@@ -60,6 +65,9 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
   if (!game || !game.startAt) return null;
   const startMs = new Date(game.startAt).getTime();
   const cd = countdownLabel(startMs, tick);
+  // urgency: tip is within the hour — emphasize the countdown so families don't miss it
+  const minsToTip = Math.floor((startMs - tick) / 60000);
+  const soon = cd !== null && minsToTip <= 60;
   const who = game.trackedTeamName;
   const dirs = buildDirections(venue ?? null);
   const venueLine = [game.court, venue?.name].filter(Boolean).join(" · ");
@@ -68,13 +76,22 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
   const advice = weather ? weatherAdvice(weather) : null; // computed once (Copilot #159)
   const remind = () => {
     if (driveMin === null) return;
-    addLeaveReminder({
-      title: `Leave for ${who} vs ${game.opponent || "TBD"}`,
-      leaveAtMs: startMs - (driveMin + 10) * 60_000, // mirror leaveByLabel's 10-min buffer
-      gameStartMs: startMs,
-      location: venueLine || venue?.name || null,
-      url: dirs?.google ?? null,
-    });
+    // Honest optimistic UI: only announce "Reminder set" when the calendar drop actually
+    // happened. addLeaveReminder returns false with no DOM (SSR) and can throw in rare envs —
+    // on either, keep the button actionable and stay silent.
+    let ok = false;
+    try {
+      ok = addLeaveReminder({
+        title: `Leave for ${who} vs ${game.opponent || "TBD"}`,
+        leaveAtMs: startMs - (driveMin + 10) * 60_000, // mirror leaveByLabel's 10-min buffer
+        gameStartMs: startMs,
+        location: venueLine || venue?.name || null,
+        url: dirs?.google ?? null,
+      });
+    } catch {
+      ok = false;
+    }
+    if (ok) setReminded(true);
   };
 
   return (
@@ -87,9 +104,13 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
       {/* countdown hero card */}
       <div className="mt-1 overflow-hidden rounded-[20px] border border-[rgba(0,0,0,0.06)] border-t-[rgba(0,0,0,0.10)] bg-[radial-gradient(280px_160px_at_50%_-10%,rgba(232,144,42,0.12),transparent),linear-gradient(180deg,#F9FAFB,#FFFFFF)] px-4 pb-4 pt-[18px] text-center">
         <div className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.14em] text-[#8F6708]">
-          {cd ? `${who} plays in` : "playing now"}
+          {cd ? (soon ? `${who} tips soon · in` : `${who} plays in`) : "playing now"}
         </div>
-        <div className="mt-1.5 mb-0.5 bg-[linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)] bg-clip-text font-[var(--font-mono)] text-[52px] font-bold leading-none tracking-[-2px] text-transparent">
+        <div
+          role="img"
+          aria-label={cd ? `${who} plays in ${cd}` : "playing now"}
+          className={`mt-1.5 mb-0.5 bg-[linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)] bg-clip-text font-[var(--font-mono)] text-[52px] font-bold leading-none tracking-[-2px] text-transparent ${soon ? "as-pulse" : ""}`}
+        >
           {cd ?? "LIVE"}
         </div>
         <div className="text-[15px] font-semibold text-[#1A1D23]">
@@ -137,11 +158,17 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
 
       {/* remind me to leave — drops a calendar event at the leave-by time */}
       {leaveBy && (
-        <button type="button" onClick={remind}
-          className="as-press mt-[11px] flex w-full items-center justify-center gap-2 rounded-[13px] border border-[#E2E8F0] bg-[#F9FAFB] py-[13px] font-[var(--font-display)] text-[13.5px] font-semibold text-[#1A1D23]">
-          <Bell className="h-[16px] w-[16px] text-[#8F6708]" /> Remind me to leave
+        <button type="button" onClick={remind} disabled={reminded}
+          aria-label={reminded ? `Reminder set to leave by ${leaveBy}` : `Remind me to leave by ${leaveBy}`}
+          className={`as-press mt-[11px] flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[13px] border py-[13px] font-[var(--font-display)] text-[13.5px] font-semibold transition-colors ${reminded ? "border-[rgba(22,163,74,0.35)] bg-[rgba(22,163,74,0.06)] text-[#16A34A]" : "border-[#E2E8F0] bg-[#F9FAFB] text-[#1A1D23]"}`}>
+          {reminded ? (
+            <><Check className="h-[16px] w-[16px]" aria-hidden="true" /> Reminder set</>
+          ) : (
+            <><Bell className="h-[16px] w-[16px] text-[#8F6708]" aria-hidden="true" /> Remind me to leave</>
+          )}
         </button>
       )}
+      {reminded && <span role="status" aria-live="polite" className="sr-only">Reminder set to leave by {leaveBy}</span>}
 
       <div className="px-[18px] pb-1 pt-[11px] text-center font-[var(--font-mono)] text-[10.5px] leading-[1.5] text-[#4B5563]">
         Countdown + drive time from venue lat/lng. Weather via aster-weather.

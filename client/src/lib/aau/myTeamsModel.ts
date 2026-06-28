@@ -40,6 +40,9 @@ export interface MyTeamsModel {
   hero: LiveHero | null;
   glance: { liveNow: number; today: number };
   groups: ProgramGroup[];
+  /** Aggregate W–L across every tracked team's finals — null when no final has posted yet
+   *  (so the header shows the team-count line instead of a fabricated 0–0). */
+  totalRecord: { w: number; l: number } | null;
 }
 
 const DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" });
@@ -132,5 +135,10 @@ export function buildMyTeamsModel(tracked: TrackedTeam[], games: TeamGame[], now
   const liveNow = games.filter((g) => g.status === "live").length;
   const todayTotal = games.filter((g) => g.startAt && dayKey(g.startAt) === today).length;
 
-  return { hero, glance: { liveNow, today: todayTotal }, groups };
+  // aggregate W–L across all tracked teams (sum of per-team final records). null when no
+  // final has posted, so the header degrades to the team-count line rather than "0–0".
+  const agg = summaries.reduce((acc, s) => ({ w: acc.w + s.record.w, l: acc.l + s.record.l }), { w: 0, l: 0 });
+  const totalRecord = agg.w + agg.l > 0 ? agg : null;
+
+  return { hero, glance: { liveNow, today: todayTotal }, groups, totalRecord };
 }

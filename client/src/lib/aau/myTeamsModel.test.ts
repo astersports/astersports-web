@@ -51,4 +51,29 @@ describe("buildMyTeamsModel", () => {
     ], NOW);
     expect(m.groups[0].teams[0].todayPill).toEqual({ text: "W 52–47", won: true });
   });
+
+  it("totalRecord is null when no team has any finals", () => {
+    const teams = [team({})];
+    const games = [game({ status: "scheduled", startAt: "2026-06-28T10:00:00-04:00" })];
+    const m = buildMyTeamsModel(teams, games, NOW);
+    expect(m.totalRecord).toBeNull();
+  });
+
+  it("totalRecord sums W–L across multiple tracked teams with finals", () => {
+    const teams = [
+      team({ teamKey: "t1", name: "10U Girls" }),
+      team({ teamKey: "t2", name: "11U Boys" }),
+    ];
+    const games = [
+      // t1: 1–1
+      game({ gameId: "a", trackedTeamId: "t1", status: "final", myScore: 50, oppScore: 40 }),
+      game({ gameId: "b", trackedTeamId: "t1", status: "final", myScore: 30, oppScore: 44 }),
+      // t2: 2–0 (a final with missing scores must NOT count toward either tally)
+      game({ gameId: "c", trackedTeamId: "t2", trackedTeamName: "11U Boys", status: "final", myScore: 61, oppScore: 55 }),
+      game({ gameId: "d", trackedTeamId: "t2", trackedTeamName: "11U Boys", status: "final", myScore: 48, oppScore: 39 }),
+      game({ gameId: "e", trackedTeamId: "t2", trackedTeamName: "11U Boys", status: "final", myScore: null, oppScore: null }),
+    ];
+    const m = buildMyTeamsModel(teams, games, NOW);
+    expect(m.totalRecord).toEqual({ w: 3, l: 1 });
+  });
 });
