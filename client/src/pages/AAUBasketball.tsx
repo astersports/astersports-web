@@ -148,12 +148,11 @@ export default function AAUBasketball() {
                 style={{
                   fontSize: 11,
                   fontWeight: 700,
-                  letterSpacing: "0.08em",
+                  letterSpacing: "0.04em",
                   color: "#F6CC55", // bright gold reads on navy
-                  textTransform: "uppercase",
                 }}
               >
-                AAU Hub
+                Aster Sports AAU Hub
               </span>
             </span>
             <HubAccount user={user} />
