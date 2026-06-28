@@ -1,0 +1,261 @@
+ASTER — NEXT-LEVEL TECH SCOUTING PASS
+Pillar: Aster Sports Hub (AAU parent / tourney visibility)
+Repo/branch: astersports/astersports-web @ main
+Date: 2026-06-28   ·   Type: Architect-scoped RESEARCH (no build; nothing flips dark→live)
+Author: CC. Re-runnable per pillar on cadence/request.
+
+WHAT THIS PILLAR IS FOR (one line): the public, mobile-first parent/coach surface for
+finding AAU tournaments, tracking a kid's team across events, and seeing schedules /
+standings / live scores / advancement — a thin public read-consumer of the aster-sports
+Supabase backbone.
+
+HARD INVARIANTS THIS PILLAR MUST NEVER BREAK (the ones that apply here):
+  · Honest claims — labels/copy/UI must never contradict the data (the exact-vs-estimate
+    constitution: no model likelihood shown before it earns calibration; a clinched team
+    never shows a probability; null → graceful absence, never a fabricated value).
+  · Guardian-verified COPPA gate on Film — canAccessChild stays false for everyone; no
+    minor-face recognition; child video AI is always its own gated, privacy-designed path.
+  · Stripe webhook is the sole writer of is_entitled (Aster Plus). The hub never writes
+    entitlement; the paywall is read-side only.
+  · Schema migrations are owner-applied only (the backbone is aster-sports).
+  · Public reads are RLS- + org_is_public_listed-gated; the anon key is publishable.
+
+═══════════════════════════════════════════════════════════════════════════════════════
+STEP 1 — GROUNDING (against the real code; [GROUNDED]=verified file/db, [FIT]=inference)
+═══════════════════════════════════════════════════════════════════════════════════════
+
+STACK [GROUNDED package.json]
+  · React 19 + TypeScript + Vite + Tailwind 4. @supabase/supabase-js ^2.108, TanStack
+    Query 5, tRPC 11, Radix UI, Stripe JS. @anthropic-ai/sdk ^0.105 is in the repo (used
+    by the Studio app, not the hub). @aster/weather (private dep) powers Up-Next weather.
+  · The hub (`client/src/**/aau`, `client/src/pages/AAUBasketball.tsx`) is a THIN PUBLIC
+    CONSUMER: it reads org-public data straight from the aster-sports Supabase via the
+    publishable anon key (`client/src/lib/aster.ts:14-23`). No hub server, no data clone.
+  · An OFFLINE EVAL HARNESS already exists (`eval/run.ts`, `npm run eval`,
+    `package.json:13`) — built for the Studio's scale/density models, but the pattern
+    (synthetic + fixed runners, acceptance bar) is reusable for hub model pilots.
+
+CORE FLOWS [GROUNDED]
+  · Discovery/search: `search_public_aau` / `search_public_teams` RPCs use
+    `lower(display_name) LIKE '%q%'` substring matching — no ranking, no typo tolerance,
+    no FTS/trigram/vector [GROUNDED aster-sports …regrain_c.sql:122,196,207,249].
+  · Team identity: the qualified key `qkey = resolved_key:gender:grade` is the INTERIM
+    de-dup (ruling C; applied this session). It strictly refines a name-slug but is NOT a
+    canonical entity — "High Rise - Brie" vs "High Rise (CT) - Brie" stay separate by luck
+    of the slug, and one real team across tournaments is grouped only because program·
+    grade·gender happens to be stable. Canonical team entity = the explicitly-planned next
+    substrate (B) [GROUNDED migration header …regrain_c.sql:23-25].
+  · Advancement predictor: `client/src/lib/standings/predictBracket.ts` — deterministic,
+    enumerates every remaining win/loss combo, computeStandings per combo. Each game is
+    strength-weighted by `eff` (a logistic of opponent-adjusted margin ratings,
+    RATING_SCALE=0.1, predictBracket.ts:71-75). The strength-weighted oddsPct is
+    DELIBERATELY SUPPRESSED in the UI until calibration on real results ("A4"); the card
+    leads with the exact count (BracketOdds.tsx:50-60). Flagged limitation: simulated
+    games use a nominal 1-0 margin, so margin-dependent tiebreaks resolve only at
+    win/loss granularity (predictBracket.ts:16-17).
+  · Strength rating `eff`: opponent-adjusted average capped margin (the standings
+    substrate). A hand-rolled SRS-lite, not a principled rating system [GROUNDED
+    aster-sports standings RPCs + predictBracket].
+  · Live scores: `NextGame` polls on a 30s interval (setInterval 30_000); the data source
+    is a TourneyMachine ingest that is effectively FINAL-ONLY, so a game can read "live"
+    with no score for its whole duration [GROUNDED NextGame.tsx; this-session review].
+  · Ingest: a TourneyMachine HTML scrape (edge function). The "generic adapter / any link"
+    capability is NOT built — non-TourneyMachine links hard-reject (copy fixed this session
+    to stop overpromising). Live coverage gap, not just architectural [GROUNDED PastePanel +
+    validator].
+  · Film: verified-guardian COPPA gate, canAccessChild=false for all, AI-review gated
+    [GROUNDED FilmAiReviewGate / entitlement.ts].
+  · Money: paywall CTA opens the Plus gate; checkout not wired; is_entitled is
+    Stripe-webhook-only [GROUNDED].
+
+WEAKEST / MOST HAND-ROLLED (the scouting targets)
+  1. Search = LIKE substring (no typo tolerance, no ranking). [GROUNDED]
+  2. Team identity = interim qkey, no canonical entity. [GROUNDED]
+  3. Strength rating = hand-rolled avg-margin; predictor margin limitation. [GROUNDED]
+  4. Calibrated advancement % suppressed (un-earned). [GROUNDED — by design, the right gate]
+  5. Live scores = 30s poll, bounded by final-only ingest. [GROUNDED]
+  6. Ingest = single-source scrape; brittle to layout change; no generic adapter. [GROUNDED]
+  7. SPA with no SSR/meta → weak SEO for a public discovery surface. [FIT — Vite SPA]
+  8. Bundle: entry chunk ~468 KB gz, build warns >500 KB chunks [GROUNDED build output
+     this session]; hub + Studio ship together. Mobile parents on gym wifi pay for it.
+
+═══════════════════════════════════════════════════════════════════════════════════════
+STEP 2/3 — CANDIDATES (each: what · where it fits · win · cost · privacy · GATE · invariant
+collision · lean). Gates: 🔴 HUMAN (Frank flips) · 🟡 BENCH (offline eval first) · 🟢 ROUTINE
+═══════════════════════════════════════════════════════════════════════════════════════
+
+C1 — Route/app code-splitting + manualChunks (separate the hub from the Studio bundle)
+  · What: Vite manualChunks + React.lazy route splitting so the AAU hub loads only its
+    own JS, not the Studio + Radix + Stripe + tRPC graph. [GROUNDED — standard Vite/Rollup]
+  · Fits: the single >500 KB entry chunk [GROUNDED build output]; `AAUBasketball.tsx` and
+    the Studio pages share one bundle.
+  · Win: FCP/TTI on 4G (§16.10 budgets the hub already declares). Concrete, measurable.
+  · Cost: build-config only; no dep, no latency, $0, no runtime risk.
+  · Privacy: none (no data leaves).
+  · GATE: 🟢 ROUTINE. Collision: none.
+  · Lean: PROTOTYPE → ship. Highest ROI / lowest risk in the set.
+
+C2 — Typo-tolerant + ranked search via Postgres pg_trgm (replace LIKE substring)
+  · What: pg_trgm trigram similarity + GIN index; rank by similarity(); keep LIKE as a
+    fast-path. Supabase ships pg_trgm. [GROUNDED — pg_trgm is core Postgres contrib;
+    Supabase-native. VERIFY the extension is enabled on the project before pilot.]
+  · Fits: `search_public_aau` / `search_public_teams` LIKE arms [GROUNDED …regrain_c.sql].
+  · Win: "highrise"/"hi rise"/"High Rize" all find "High Rise"; results ranked, not
+    arbitrary. Directly attacks the architect's "search disambiguation is thin" finding.
+  · Cost: one migration (extension + index) on the backbone (owner-applied); no new dep,
+    no sub-processor, on-DB latency only.
+  · Privacy: none (no data leaves; public team names).
+  · GATE: 🔴 HUMAN (changes user-visible search results + a schema migration on the
+    backbone → owner-applied). Low-risk 🔴. Collision: none — deterministic, on-DB.
+  · Lean: PROTOTYPE the migration + bench recall on real queries vs the LIKE baseline.
+  · NOTE: pgvector/embedding *semantic* search is PARK — overkill for 2–4-word team names,
+    and it adds an embedding sub-processor (privacy surface) for little gain over trigram.
+
+C3 — Canonical team-identity entity resolution (qkey interim → stable team entity)
+  · What: a real entity-resolution pass — deterministic blocking (gender·grade·circuit) +
+    trigram/Jaccard similarity on normalized names, with conservative clustering that
+    ERRS TOWARD SPLIT (never merges two distinct programs). Optional: small text-embedding
+    similarity ONLY for the residual hard cases, computed batch/offline, not per-request.
+  · Fits: the interim qkey [GROUNDED …regrain_c.sql:23-25]; unblocks `get_public_aau_team_
+    schedule`, cross-tournament rating, the planned by-kid layer, film attribution, and
+    5th→6th cross-season aging.
+  · Win: one stable identity per real team across tournaments/seasons → fixes the
+    "tracked teams indistinguishable" + cross-season problems at the root.
+  · Cost: scraper/backbone-side resolution + a canonical_team table + backfill. Moderate.
+    Deterministic+trgm path = no external service. Embedding path = batch embeddings
+    (sub-processor) only if trgm is insufficient.
+  · Privacy: deterministic/trgm path = none. Embedding path = team NAMES (not PII) to an
+    embedding provider; still warrants a sub-processor note.
+  · GATE: 🔴 HUMAN (changes user-visible grouping + schema; architect-scoped fork —
+    already the "B" substrate). Collision with honest-claims IF it ever merges two real
+    teams → hard rule: precision-over-recall, err toward split (matches ruling C).
+  · Lean: PROTOTYPE deterministic+trgm; PILOT embeddings only if the residual justifies a
+    sub-processor. This is the architect's already-named next substrate — sequence it.
+
+C4 — Principled strength rating (Glicko-2 / TrueSkill) to replace hand-rolled `eff`
+  · What: swap the avg-margin `eff` for a rating system with uncertainty (Glicko-2 or
+    TrueSkill-style), updated from real results, feeding both standings rating and the
+    predictor's win-prob. [GROUNDED — Glicko-2 (Glickman) and TrueSkill (Herbrich et al.)
+    are published, well-established; no benchmark asserted here — to be measured.]
+  · Fits: `eff` in predictBracket.ts:71-75 + the standings rating substrate.
+  · Win: better-calibrated win probabilities (handles small samples + opponent strength +
+    uncertainty), which is the prerequisite for ever un-suppressing the odds %.
+  · Cost: pure-function rating module + an eval; no external service, negligible latency.
+  · Privacy: none.
+  · GATE: 🟡 BENCH — model swap; must beat the current eff in the offline harness BEFORE
+    proposal. Un-suppressing any UI % remains a separate 🔴.
+  · ACCEPTANCE BAR (declare before run): on a held-out set of completed AAU divisions,
+    the new rating's game-level win prediction must beat current-eff on log-loss AND not
+    regress accuracy; re-run the current eff baseline in the SAME pass (no stale numbers).
+  · Lean: PILOT in `eval/`.
+
+C5 — Calibrate the advancement probability (earn the suppressed % — the "A4" work)
+  · What: Platt scaling / isotonic regression on the strength-weighted oddsPct against
+    realized advancement, with a reliability diagram. ONLY un-suppress the % once it's
+    demonstrably calibrated. [GROUNDED — Platt/isotonic are standard calibration methods.]
+  · Fits: the suppressed oddsPct (predictBracket.ts:148; BracketOdds suppression).
+  · Win: the hub can finally show an honest "% to advance" — the headline feature that's
+    deliberately dark today.
+  · Cost: calibration fit + storage of the calibrator; small.
+  · Privacy: none.
+  · GATE: 🟡 BENCH to fit/measure; 🔴 HUMAN to un-suppress (changes user-visible output and
+    touches the exact-vs-estimate constitution head-on — Frank flips, after the bar).
+  · ACCEPTANCE BAR (declare before run): expected calibration error (ECE) below a
+    pre-set threshold AND Brier score beats the exact-count-only baseline, on held-out
+    tournaments; if it can't calibrate, it STAYS suppressed (the failure mode is "remain
+    honest," which is acceptable, not a regression).
+  · Collision: this is the SANCTIONED path to satisfy honest-claims, not break it. Depends
+    on C4. Lean: PILOT after C4.
+
+C6 — Margin-aware bracket tiebreak simulation (fix the nominal-1-0 limitation)
+  · What: when a remaining game feeds a margin-dependent tiebreak, sample/model a plausible
+    margin (from the rating gap) instead of a flat 1-0, so the enumerated scenarios respect
+    capped-PD tiebreaks. [GROUNDED — the limitation is flagged predictBracket.ts:16-17.]
+  · Fits: predictBracket enumeration.
+  · Win: correct if/then scenarios in divisions decided by point-diff tiebreak.
+  · Cost: moderate (enumeration becomes a small Monte-Carlo on tiebreak-relevant games).
+  · GATE: 🟡 BENCH (changes the displayed exact counts → also 🔴 to ship). Collision: must
+    stay HONEST — if margins are modeled, the card's "outcomes enumerated exactly" copy
+    must change to reflect sampling, or keep exact counts and only refine ordering. Declare
+    which before building. Lean: PROTOTYPE + bench; lower priority than C4/C5.
+
+C7 — Real-time scores via Supabase Realtime (replace the 30s poll)
+  · What: subscribe to division_games changes over Supabase Realtime instead of polling.
+    [GROUNDED — Supabase Realtime is native to the stack.]
+  · Fits: NextGame 30s poll.
+  · Win: instant score/status updates, fewer requests/battery. BUT bounded — the ingest is
+    final-only today, so realtime only pays off once ingest pushes live scores (couples to
+    the ingest roadmap).
+  · Cost: low (native); no sub-processor.
+  · GATE: 🟢/🔴 — transport is routine; "live" liveness is mildly user-visible. Collision:
+    none. Lean: PROTOTYPE, but sequence AFTER a live-score ingest exists, else it's a
+    faster path to the same stale data. Pair with the "Live · score posts at final" copy
+    fix from the architect review.
+
+C8 — SSR/prerender + structured data for public tournament/team pages (SEO/discovery)
+  · What: server-render or build-time prerender the PUBLIC tournament/division/team pages
+    (the hub already runs on a Railway server) + schema.org SportsEvent/JSON-LD. [FIT — the
+    hub is a client SPA today; the Studio has a Node server that could prerender.]
+  · Fits: the "tourney visibility" mandate — today a parent Googling "Zero Gravity NY Grand
+    Finale standings" finds nothing (SPA, no meta).
+  · Win: organic discovery — the cheapest growth lever for a visibility product.
+  · Cost: moderate (a prerender/SSR path for public routes); no sub-processor.
+  · Privacy: public data only — keep tracked/account/child surfaces OUT of prerender.
+  · GATE: 🔴 (public-facing output) but no private data. Collision: none if scoped to
+    public, org_is_public_listed rows. Lean: PROTOTYPE for the top public routes.
+
+C9 — Generic ingest adapter w/ LLM-assisted extraction — QUARANTINED, validate-or-hold
+  · What: parse non-TourneyMachine tournament pages into the schema. An LLM (the repo has
+    @anthropic-ai/sdk) could extract from arbitrary layouts. [GROUNDED dep present.]
+  · Fits: the live coverage gap (TourneyMachine-only).
+  · Win: more tournaments ingestible → the partnership-independent path.
+  · Cost: high; external page fetch (SSRF surface) + LLM inference $/page + a strict
+    validation layer.
+  · Privacy: fetches third-party sites; if an LLM sub-processor is used, disclose it.
+  · GATE: 🔴 HUMAN + privacy. COLLISION (loud): LLM extraction is NONDETERMINISTIC and would
+    feed DISPLAYED schedule/score data — it collides head-on with honest-claims + no-
+    fabrication. RECOMMEND AGAINST wiring any generative extraction directly onto the
+    displayed-data path. If pursued, it must be VALIDATE-OR-HOLD: strict schema validation
+    + confidence gate + human/owner confirmation before anything renders; unverified
+    extraction is HELD, never shown. Lean: PROTOTYPE the validate-or-hold harness only;
+    REJECT auto-display. Lower priority than the partnership route Frank already weighs.
+
+C10 — Grounded NL assistant ("when does my kid play next?") — QUARANTINED behind a gate
+  · What: a natural-language answer grounded STRICTLY in the user's already-loaded tracked
+    schedule (retrieval over their own games), via @anthropic-ai/sdk. [GROUNDED dep present.]
+  · Fits: Home/Browse — a parent-friendly entry over the exact schedule data.
+  · Win: friction-free "what court, what time, when next."
+  · Cost: LLM $/query; latency; a new sub-processor for prompt text.
+  · Privacy: would send the user's tracked-team context to an LLM provider → disclosure/DPA
+    + minimization FIRST. NEVER on child-film data.
+  · GATE: 🔴 HUMAN + privacy. COLLISION: nondeterministic + user-facing → must be grounded-
+    only (answers strictly from retrieved rows; refuse if not in data; never fabricate a
+    time). Quarantine as its own gated feature. Lean: PARK until C1–C5 land; PROTOTYPE
+    later behind a gate, grounded-only.
+
+═══════════════════════════════════════════════════════════════════════════════════════
+STEP 4 — PRIORITIZATION (highest ROI / lowest risk first; what each gates/unblocks)
+═══════════════════════════════════════════════════════════════════════════════════════
+  P1  C1  Code-split hub vs Studio        🟢  ship now; immediate mobile perf win, zero risk.
+  P2  C2  pg_trgm typo-tolerant search    🔴(low) fixes the core discovery weakness; on-DB,
+                                              no sub-processor; unblocks "find my tournament".
+  P3  C8  SSR/prerender public pages       🔴(public) the cheapest growth lever for a
+                                              visibility product; no private data.
+  P4  C3  Canonical team entity            🔴 the architect's named "B" substrate; unblocks
+                                              by-kid, film attribution, cross-season, and
+                                              cleaner search/tracking. Sequence deliberately.
+  P5  C4  Glicko-2/TrueSkill rating        🟡 BENCH; prerequisite for honest odds. Eval first.
+  P6  C5  Calibrate + earn the odds %      🟡→🔴 depends on P5; the sanctioned path to un-
+                                              suppress the headline %. Bar declared up front.
+  P7  C7  Realtime scores                  🟢/🔴 sequence AFTER a live-score ingest exists.
+  P8  C6  Margin-aware tiebreaks           🟡→🔴 correctness refinement; honest-copy caveat.
+  P9  C9  Generic ingest (validate-or-hold)🔴 quarantine only; REJECT auto-display. Weigh vs
+                                              partnership timeline (Frank's business call).
+  P10 C10 Grounded NL assistant            🔴 PARK; grounded-only, gated, post-P1–P5.
+
+RULES HONORED: every candidate is architect-scoped (CC prepares; architect ratifies; Frank
+owns key/flip/spend). Model candidates (C4/C5/C6) run in the OFFLINE EVAL HARNESS with the
+acceptance bar DECLARED before the run and the current baseline re-run in the same pass.
+Nothing here proposes a UI claim the data doesn't support; generative/nondeterministic items
+(C9/C10) are quarantined off the deterministic + honest-claims path. Nothing flips in this
+pass — code lands later as a dark-flagged gated PR after ratify.

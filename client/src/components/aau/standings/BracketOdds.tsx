@@ -21,7 +21,7 @@ const POSTURE_LABEL: Record<string, string> = {
   win_and_in: "Win and in", // controls own fate
   in_control: "In control", // a win clinches and a loss doesn't kill you
   must_win: "Must win", // alive only by winning
-  needs_help: "On the brink", // can't control it
+  needs_help: "On the bubble", // alive but can't control it — depends on other results
   eliminated: "Eliminated from the bracket",
 };
 
