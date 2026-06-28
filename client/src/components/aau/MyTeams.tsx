@@ -145,17 +145,21 @@ export default function MyTeams() {
               <span>{grp.program}{grp.todayCount > 0 ? " · today" : ""}</span>
               <span className="text-[#6B7280]">{grp.todayCount > 0 ? `${grp.todayCount} game${grp.todayCount === 1 ? "" : "s"}` : `${grp.teams.length} team${grp.teams.length === 1 ? "" : "s"}`}</span>
             </div>
-            {grp.teams.map((t) => (
+            {grp.teams.map((t) => {
+              // disambiguator (architect §1): division (gender·grade) · tournament — so five
+              // identically-named "Legacy Hoopers" rows are distinguishable + safe to remove. Threaded
+              // into the aria-labels too, or screen-reader users still hear five identical labels.
+              const qual = [t.divisionName, t.tournamentName].filter(Boolean).join(" · ");
+              const labelName = qual ? `${t.name} · ${qual}` : t.name;
+              return (
               <div key={t.teamKey} className="flex items-center gap-[10px] border-t border-[rgba(0,0,0,0.06)] px-[15px] py-[12px] text-[13px] first:border-t-0">
-                <button type="button" onClick={() => setSelected(t.teamKey)} aria-label={`Open ${t.name}`}
+                <button type="button" onClick={() => setSelected(t.teamKey)} aria-label={`Open ${labelName}`}
                   className="as-press flex min-w-0 flex-1 items-center gap-[10px] text-left">
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-semibold text-[#1A1D23]">{t.name}</span>
-                    {/* disambiguator (architect §1): division (gender·grade) · tournament — so five
-                        identically-named "Legacy Hoopers" rows are finally distinguishable + safe to remove */}
-                    {[t.divisionName, t.tournamentName].filter(Boolean).length > 0 && (
+                    {qual && (
                       <span className="mt-[2px] block truncate font-[var(--font-mono)] text-[10.5px] text-[#6B7280]">
-                        {[t.divisionName, t.tournamentName].filter(Boolean).join(" · ")}
+                        {qual}
                       </span>
                     )}
                   </span>
@@ -167,12 +171,13 @@ export default function MyTeams() {
                   )}
                   <ChevronRight className="h-[15px] w-[15px] shrink-0 text-[#9CA3AF]" />
                 </button>
-                <button type="button" onClick={() => drop(t.teamKey)} aria-label={`Stop tracking ${t.name}`}
+                <button type="button" onClick={() => drop(t.teamKey)} aria-label={`Stop tracking ${labelName}`}
                   className="as-press grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#E2E8F0] text-[#6B7280] hover:text-[#DC2626]">
                   <X className="h-[13px] w-[13px]" />
                 </button>
               </div>
-            ))}
+              );
+            })}
           </div>
         ))}
       </div>
