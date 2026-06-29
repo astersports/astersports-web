@@ -262,6 +262,10 @@ export interface TeamGame {
   // the opponent may be a TM seed label ("Winner B2") until the other side resolves — honest
   // "vs TBD" rather than a fabricated matchup. Optional for back-compat with cached payloads.
   isBracket?: boolean;
+  // Forfeit/default. The W/L still counts, but the awarded 20-0 cap-score is NOT a played
+  // result — surfaces render "forfeit" instead of "20–0"/"0–20" so a forfeit win isn't shown
+  // as a blowout and a forfeit loss isn't shown as one either (H6/H7). Optional for back-compat.
+  isForfeit?: boolean;
 }
 
 /** Every game (past + upcoming) for the given tracked team ids (tournament_division_team
@@ -284,6 +288,10 @@ export interface TournamentGame {
   home: string; homeScore: number | null;
   away: string; awayScore: number | null;
   venue: TournamentGameVenue | null;
+  isBracket?: boolean;
+  // Forfeit/default — the awarded 20-0 isn't a played score; the scoreboard reads "FORFEIT"
+  // and suppresses the numbers rather than showing a fabricated blowout (H6/H7).
+  isForfeit?: boolean;
 }
 
 /** Every game in a public tournament (display names + scores + court + venue + status),

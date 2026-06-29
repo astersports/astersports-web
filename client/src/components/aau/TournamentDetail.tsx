@@ -46,11 +46,13 @@ function GameCard({ g, multiDay }: { g: TournamentGame; multiDay: boolean }) {
   const lit = g.homeScore != null && g.awayScore != null;
   const homeWon = final && lit && (g.homeScore ?? 0) > (g.awayScore ?? 0);
   const awayWon = final && lit && (g.awayScore ?? 0) > (g.homeScore ?? 0);
+  // Forfeit: the awarded 20-0 isn't a played score — show W / FF, not the numbers (H6/H7).
+  const forfeit = final && !!g.isForfeit;
 
   const teamRow = (name: string, score: number | null, won: boolean, lost: boolean) => (
     <div className="flex items-center justify-between gap-2 py-[3px]">
       <span className="truncate font-[var(--font-display)] text-[14.1px]" style={{ color: won ? C.ink : lost ? C.mut : C.dim, fontWeight: 600 }}>{name}</span>
-      <span className="shrink-0 font-[var(--font-mono)] text-[19.6px] font-bold" style={{ color: live ? C.live : won ? C.pos : lit ? C.mut : C.faint }}>{score ?? "—"}</span>
+      <span className="shrink-0 font-[var(--font-mono)] text-[19.6px] font-bold" style={{ color: live ? C.live : won ? C.pos : lit ? C.mut : C.faint }}>{forfeit ? (won ? "W" : "FF") : (score ?? "—")}</span>
     </div>
   );
 
@@ -59,7 +61,7 @@ function GameCard({ g, multiDay }: { g: TournamentGame; multiDay: boolean }) {
       <div className="mb-[9px] flex items-center justify-between gap-2">
         <span className="inline-flex items-center gap-[6px] font-[var(--font-mono)] text-[11.5px] font-bold tracking-[0.06em]" style={{ color: live ? C.live : final ? C.mut : "#ffb648" }}>
           {live && <span className="as-pulse inline-block h-[6px] w-[6px] rounded-full" style={{ background: C.live, boxShadow: `0 0 6px ${C.live}` }} aria-hidden />}
-          {live ? "LIVE" : final ? "FINAL" : upcomingLabel(g.startAt, multiDay)}
+          {live ? "LIVE" : forfeit ? "FORFEIT" : final ? "FINAL" : upcomingLabel(g.startAt, multiDay)}
         </span>
         <span className="shrink-0 truncate font-[var(--font-mono)] text-[11.5px]" style={{ color: C.mut, border: `1px solid ${C.hair}`, background: "rgba(0,0,0,0.04)", padding: "2px 7px", borderRadius: 6 }}>{g.divisionName}</span>
       </div>
