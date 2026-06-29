@@ -9,7 +9,7 @@ import Stripe from "stripe";
  * present, so behavior is unchanged.
  */
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_unconfigured_placeholder", {
-  apiVersion: "2026-05-27.dahlia",
+  apiVersion: "2026-06-24.dahlia",
   typescript: true,
 });
 
