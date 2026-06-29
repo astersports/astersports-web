@@ -53,7 +53,7 @@ export default function DivisionSlice({ rows, advanceCount, focusId, focusName, 
                     </td>
                   </tr>
                 )}
-                <tr className={me ? "bg-[rgba(95,160,230,0.10)]" : ""}>
+                <tr className={me ? "bg-[rgba(201,149,46,0.10)]" : ""}>
                   <td className="w-[20px] border-t border-[rgba(0,0,0,0.05)] px-2.5 py-2 text-right font-[var(--font-mono)] text-[12.6px] text-[#4B5563]">{r.rank}</td>
                   <td className={`border-t border-[rgba(0,0,0,0.05)] px-2 py-2 text-left text-[13.2px] font-semibold ${me ? "text-[#1d4ed8]" : "text-[#1A1D23]"}`}>
                     {r.name}{me && <span className="ml-1.5 font-[var(--font-mono)] text-[11px] font-normal text-[#1d4ed8]">← you</span>}

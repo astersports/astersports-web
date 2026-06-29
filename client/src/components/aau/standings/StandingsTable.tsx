@@ -4,7 +4,7 @@ import type { RankedRow } from "@/lib/standings/computeStandings";
 /**
  * Division/pool standings table — best-in-class render 05. Rule-driven rows from the
  * engine; the "advance to bracket" line is drawn after rank `advanceCount`; the focus
- * team is tinted cobalt. `capLabel` (e.g. "cap +20") shows when the circuit caps the
+ * team is tinted gold. `capLabel` (e.g. "cap +20") shows when the circuit caps the
  * differential. Tokens are the best-in-class palette (§1, do not eyeball).
  */
 interface Props {
@@ -71,7 +71,7 @@ function FragmentRow({ r, i, focusId, advanceCount }: { r: RankedRow; i: number;
   const cell = "border-t border-[rgba(0,0,0,0.06)] px-2.5 py-3 font-[var(--font-mono)] text-[15px] whitespace-nowrap tabular-nums";
   return (
     <>
-      <tr className={me ? "bg-[rgba(95,160,230,0.10)]" : ""}>
+      <tr className={me ? "bg-[rgba(201,149,46,0.10)]" : ""}>
         <td className={`w-[18px] ${cell} text-right text-[#4B5563]`}>{r.rank}</td>
         <td className={`border-t border-[rgba(0,0,0,0.06)] px-3 py-3 text-left text-[15px] font-semibold ${me ? "text-[#1d4ed8]" : "text-[#1A1D23]"}`}>{r.name}</td>
         <td className={`${cell} text-right text-[#1A1D23]`}>{wl}</td>

@@ -57,7 +57,7 @@ export function weatherAccent(code: number, isDay = true): string {
       return isDay ? "#FFB22E" : "#4B5563";
     case "rain":
     case "drizzle":
-      return "#4a8fd4";
+      return "#C9952E";
     case "snow":
       return "#9CC9F0";
     case "thunder":
