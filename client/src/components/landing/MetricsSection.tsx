@@ -41,7 +41,7 @@ function MetricTile({ metric, start, index }: { metric: Metric; start: boolean; 
         {Math.round(value)}
         {metric.suffix}
       </div>
-      <div className="mt-2.5 text-[12.5px] text-slate-400 leading-snug">{metric.label}</div>
+      <div className="mt-2.5 text-[12.5px] text-slate-500 leading-snug">{metric.label}</div>
     </SpotlightCard>
   );
 }
@@ -50,7 +50,7 @@ export default function MetricsSection() {
   const { ref, isVisible } = useInView<HTMLDivElement>();
 
   return (
-    <section className="relative py-10 md:py-14 bg-[#1a2133]">
+    <section className="relative py-10 md:py-14 bg-[#E6EAF0]">
       <div className="container" ref={ref}>
         {/* the agent reads the constellation's live metrics — same scan motif as the hub */}
         <div

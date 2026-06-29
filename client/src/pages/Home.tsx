@@ -96,7 +96,7 @@ function Header() {
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled
-          ? "bg-[#2b3652]/90 backdrop-blur-xl border-b border-white/5"
+          ? "bg-[#E6EAF0]/90 backdrop-blur-xl border-b border-black/5"
           : "bg-transparent"
       }`}
     >
@@ -107,7 +107,7 @@ function Header() {
             alt="Aster Sports"
             className="h-10 w-auto md:h-12"
           />
-          <span className="text-lg md:text-xl font-semibold tracking-tight text-white" style={{ fontFamily: "var(--font-display)" }}>
+          <span className="text-lg md:text-xl font-semibold tracking-tight text-[#1c2230]" style={{ fontFamily: "var(--font-display)" }}>
             Aster Sports
           </span>
         </a>
@@ -119,21 +119,21 @@ function Header() {
               key={p.id}
               href={p.href}
               {...(p.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-              className="text-sm text-slate-300 hover:text-[#F6CC55] transition-colors"
+              className="text-sm text-slate-600 hover:text-[#F6CC55] transition-colors"
               style={{ fontFamily: "var(--font-display)" }}
             >
               {p.navLabel ?? p.name}
             </a>
           ))}
           {isOwner && (
-            <a href="/admin/billing" className="text-sm text-slate-300 hover:text-[#F6CC55] transition-colors flex items-center gap-1" style={{ fontFamily: "var(--font-display)" }}>
+            <a href="/admin/billing" className="text-sm text-slate-600 hover:text-[#F6CC55] transition-colors flex items-center gap-1" style={{ fontFamily: "var(--font-display)" }}>
               <Settings className="w-3.5 h-3.5" />
               Billing
             </a>
           )}
           <a
             href="#contact"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#F6CC55] to-[#E0631C] text-[#2b3652] font-medium text-sm transition-transform duration-160 hover:scale-[1.03] active:scale-[0.97]"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#F6CC55] to-[#E0631C] text-[#1c2230] font-medium text-sm transition-transform duration-160 hover:scale-[1.03] active:scale-[0.97]"
             style={{ fontFamily: "var(--font-display)" }}
           >
             <Mail className="w-4 h-4" />
@@ -143,7 +143,7 @@ function Header() {
 
         {/* Mobile menu button */}
         <button
-          className="sm:hidden p-2 text-white"
+          className="sm:hidden p-2 text-[#1c2230]"
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="Toggle menu"
         >
@@ -157,13 +157,13 @@ function Header() {
           mobileOpen ? "max-h-[34rem] opacity-100" : "max-h-0 opacity-0"
         }`}
       >
-        <nav className="container pt-2 pb-6 flex flex-col gap-4 bg-[#2b3652] border-b border-white/10 shadow-2xl">
+        <nav className="container pt-2 pb-6 flex flex-col gap-4 bg-[#E6EAF0] border-b border-black/10 shadow-2xl">
           {NAV_PRODUCTS.map((p) => (
             <a
               key={p.id}
               href={p.href}
               {...(p.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-              className="text-base text-slate-300 hover:text-[#F6CC55] transition-colors py-2"
+              className="text-base text-slate-600 hover:text-[#F6CC55] transition-colors py-2"
               style={{ fontFamily: "var(--font-display)" }}
               onClick={() => setMobileOpen(false)}
             >
@@ -171,14 +171,14 @@ function Header() {
             </a>
           ))}
           {isOwner && (
-            <a href="/admin/billing" className="text-base text-slate-300 hover:text-[#F6CC55] transition-colors py-2 flex items-center gap-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
+            <a href="/admin/billing" className="text-base text-slate-600 hover:text-[#F6CC55] transition-colors py-2 flex items-center gap-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
               <Settings className="w-4 h-4" />
               Billing
             </a>
           )}
           <a
             href="#contact"
-            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-gradient-to-r from-[#F6CC55] to-[#E0631C] text-[#2b3652] font-medium text-sm transition-transform duration-160 active:scale-[0.97]"
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-gradient-to-r from-[#F6CC55] to-[#E0631C] text-[#1c2230] font-medium text-sm transition-transform duration-160 active:scale-[0.97]"
             style={{ fontFamily: "var(--font-display)" }}
             onClick={() => setMobileOpen(false)}
           >
@@ -234,7 +234,7 @@ function HeroSection() {
           <AgentEyebrow tag="systems online" isVisible={isVisible} />
 
           <h1
-            className={`text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.02] tracking-tight text-white mb-3 transition-all duration-700 delay-100 ${
+            className={`text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.02] tracking-tight text-[#1c2230] mb-3 transition-all duration-700 delay-100 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
             style={{ fontFamily: "var(--font-display)" }}
@@ -255,7 +255,7 @@ function HeroSection() {
           </div>
 
           <p
-            className={`text-lg md:text-xl text-slate-300 max-w-xl leading-relaxed mb-6 transition-all duration-700 delay-200 ${
+            className={`text-lg md:text-xl text-slate-600 max-w-xl leading-relaxed mb-6 transition-all duration-700 delay-200 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
           >
@@ -277,7 +277,7 @@ function HeroSection() {
             </a>
             <a
               href="#platform"
-              className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full border border-white/15 text-white font-medium text-base transition-all duration-200 hover:border-[#F6CC55]/40 hover:text-[#F6CC55]"
+              className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full border border-black/15 text-[#1c2230] font-medium text-base transition-all duration-200 hover:border-[#F6CC55]/40 hover:text-[#F6CC55]"
               style={{ fontFamily: "var(--font-display)" }}
             >
               Explore the constellation
@@ -285,7 +285,7 @@ function HeroSection() {
           </div>
 
           <div
-            className={`flex items-center gap-2 text-slate-400 text-sm transition-all duration-700 delay-400 ${
+            className={`flex items-center gap-2 text-slate-500 text-sm transition-all duration-700 delay-400 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
           >
@@ -323,7 +323,7 @@ function AgentEyebrow({ tag, isVisible, center = false }: { tag: string; isVisib
       <span className="aster-mono text-[11px] tracking-[0.14em] uppercase text-slate-400">
         aster-agent · {tag}
       </span>
-      <span className="flex-1 h-px bg-white/10" />
+      <span className="flex-1 h-px bg-black/10" />
       <span className="aster-mono text-[10px] text-[#34d399]">live</span>
     </div>
   );
@@ -367,10 +367,10 @@ function ConstellationNode({ product, index, isVisible, active }: { product: Ser
       <div className={`aster-star ${lit || active ? "on" : ""} mb-2.5 transition-all duration-300`}>
         <Icon className="w-5 h-5" />
       </div>
-      <h3 className="text-base font-semibold text-white mb-1" style={{ fontFamily: "var(--font-display)" }}>
+      <h3 className="text-base font-semibold text-[#1c2230] mb-1" style={{ fontFamily: "var(--font-display)" }}>
         {product.name}
       </h3>
-      <p className="text-[12.5px] text-slate-400 leading-snug mb-2.5">{product.tagline}</p>
+      <p className="text-[12.5px] text-slate-500 leading-snug mb-2.5">{product.tagline}</p>
       {product.status && <NodePill status={product.status} />}
       {product.external && (
         <ArrowUpRight className="absolute top-4 right-4 w-4 h-4 text-slate-500 group-hover:text-[#F6CC55] transition-colors" />
@@ -413,7 +413,7 @@ function PlatformSection() {
             </span>
             <span className="aster-mono text-[10px] text-[#34d399] ml-auto">live</span>
           </div>
-          <div className="aster-scan-track rounded-lg bg-white/[0.02] border border-white/5 px-3.5 py-3">
+          <div className="aster-scan-track rounded-lg bg-white/[0.02] border border-black/5 px-3.5 py-3">
             <div className="aster-mono text-[12px] text-slate-300 leading-relaxed">
               <span className="text-[#F6CC55]">▸</span> charting node{" "}
               <span className="text-white">{active + 1}</span>
@@ -470,12 +470,12 @@ function AskScoutSection() {
   const { ref, isVisible } = useScrollReveal();
   if (!AGENT_LIVE) return null;
   return (
-    <section id="scout" className="relative py-10 md:py-14 bg-[#2b3652]">
+    <section id="scout" className="relative py-10 md:py-14 bg-[#E6EAF0]">
       <div className="container" ref={ref}>
         <div className="max-w-2xl mx-auto">
           <AgentEyebrow tag="concierge online" isVisible={isVisible} center />
           <h2
-            className={`text-3xl md:text-4xl font-bold text-white text-center tracking-tight mb-3 transition-all duration-700 ${
+            className={`text-3xl md:text-4xl font-bold text-[#1c2230] text-center tracking-tight mb-3 transition-all duration-700 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
             style={{ fontFamily: "var(--font-display)" }}
@@ -483,7 +483,7 @@ function AskScoutSection() {
             Ask <span className="aster-grad-text">Aster Scout</span>
           </h2>
           <p
-            className={`text-center text-slate-300 leading-relaxed mb-6 transition-all duration-700 delay-100 ${
+            className={`text-center text-slate-600 leading-relaxed mb-6 transition-all duration-700 delay-100 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
           >
@@ -540,7 +540,7 @@ function ContactSection() {
             >
               <AgentEyebrow tag="open channel" isVisible={isVisible} />
               <h2
-                className="text-3xl md:text-4xl font-bold text-white mb-6 tracking-tight"
+                className="text-3xl md:text-4xl font-bold text-[#1c2230] mb-6 tracking-tight"
                 style={{ fontFamily: "var(--font-display)" }}
               >
                 Ready to create something
@@ -549,11 +549,11 @@ function ContactSection() {
                   that stands apart?
                 </span>
               </h2>
-              <p className="text-lg text-slate-300 mb-8 leading-relaxed">
+              <p className="text-lg text-slate-600 mb-8 leading-relaxed">
                 Let's discuss your project. No pressure, no jargon — just a straightforward
                 conversation about what you need.
               </p>
-              <div className="space-y-3 text-slate-400">
+              <div className="space-y-3 text-slate-500">
                 <div className="flex items-center gap-3">
                   <Mail className="w-4 h-4 text-[#F6CC55]/60" />
                   <a href="mailto:frank@astersports.co" className="hover:text-[#F6CC55] transition-colors">
@@ -574,7 +574,7 @@ function ContactSection() {
               }`}
             >
               {submitted ? (
-                <div className="aster-terminal p-6 md:p-8 text-center">
+                <div className="aster-terminal--light p-6 md:p-8 text-center">
                   <div className="flex items-center gap-2 mb-5">
                     <span className="aster-dot-live" />
                     <span className="aster-mono text-[11px] tracking-[0.14em] uppercase text-slate-400">
@@ -583,10 +583,10 @@ function ContactSection() {
                     <span className="aster-mono text-[10px] text-[#34d399] ml-auto">live</span>
                   </div>
                   <StarAccent className="mx-auto mb-4 w-6 h-6" />
-                  <h3 className="text-xl font-semibold text-white mb-2" style={{ fontFamily: "var(--font-display)" }}>
+                  <h3 className="text-xl font-semibold text-[#1c2230] mb-2" style={{ fontFamily: "var(--font-display)" }}>
                     Message ready to send
                   </h3>
-                  <p className="text-slate-400 text-sm">
+                  <p className="text-slate-500 text-sm">
                     Your email client should have opened with your message. If not, email us directly at{" "}
                     <a href="mailto:frank@astersports.co" className="text-[#F6CC55]">frank@astersports.co</a>.
                   </p>
@@ -598,7 +598,7 @@ function ContactSection() {
                   </button>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="aster-terminal p-6 md:p-8">
+                <form onSubmit={handleSubmit} className="aster-terminal--light p-6 md:p-8">
                   <div className="flex items-center gap-2 mb-5">
                     <span className="aster-dot-live" />
                     <span className="aster-mono text-[11px] tracking-[0.14em] uppercase text-slate-400">
@@ -608,7 +608,7 @@ function ContactSection() {
                   </div>
                   <div className="space-y-5">
                   <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-slate-300 mb-2" style={{ fontFamily: "var(--font-display)" }}>
+                    <label htmlFor="name" className="block text-sm font-medium text-slate-600 mb-2" style={{ fontFamily: "var(--font-display)" }}>
                       Name
                     </label>
                     <input
@@ -617,12 +617,12 @@ function ContactSection() {
                       required
                       value={formState.name}
                       onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-                      className="w-full px-4 py-3 rounded-lg bg-[#2d3855] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all"
+                      className="w-full px-4 py-3 rounded-lg bg-[#F4F6FA] border border-black/10 text-[#1c2230] placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all"
                       placeholder="Your name"
                     />
                   </div>
                   <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-2" style={{ fontFamily: "var(--font-display)" }}>
+                    <label htmlFor="email" className="block text-sm font-medium text-slate-600 mb-2" style={{ fontFamily: "var(--font-display)" }}>
                       Email
                     </label>
                     <input
@@ -631,12 +631,12 @@ function ContactSection() {
                       required
                       value={formState.email}
                       onChange={(e) => setFormState({ ...formState, email: e.target.value })}
-                      className="w-full px-4 py-3 rounded-lg bg-[#2d3855] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all"
+                      className="w-full px-4 py-3 rounded-lg bg-[#F4F6FA] border border-black/10 text-[#1c2230] placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all"
                       placeholder="your@email.com"
                     />
                   </div>
                   <div>
-                    <label htmlFor="message" className="block text-sm font-medium text-slate-300 mb-2" style={{ fontFamily: "var(--font-display)" }}>
+                    <label htmlFor="message" className="block text-sm font-medium text-slate-600 mb-2" style={{ fontFamily: "var(--font-display)" }}>
                       Message
                     </label>
                     <textarea
@@ -645,13 +645,13 @@ function ContactSection() {
                       rows={4}
                       value={formState.message}
                       onChange={(e) => setFormState({ ...formState, message: e.target.value })}
-                      className="w-full px-4 py-3 rounded-lg bg-[#2d3855] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all resize-none"
+                      className="w-full px-4 py-3 rounded-lg bg-[#F4F6FA] border border-black/10 text-[#1c2230] placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all resize-none"
                       placeholder="Tell us about your project..."
                     />
                   </div>
                   <button
                     type="submit"
-                    className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-gradient-to-r from-[#F6CC55] to-[#E0631C] text-[#2b3652] font-semibold text-base transition-transform duration-160 hover:scale-[1.02] active:scale-[0.97] shadow-lg shadow-[#F6CC55]/20"
+                    className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-gradient-to-r from-[#F6CC55] to-[#E0631C] text-[#1c2230] font-semibold text-base transition-transform duration-160 hover:scale-[1.02] active:scale-[0.97] shadow-lg shadow-[#F6CC55]/20"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     <Send className="w-4 h-4" />
@@ -670,18 +670,18 @@ function ContactSection() {
 
 function Footer() {
   return (
-    <footer className="py-12 bg-[#232d45] border-t border-white/5">
+    <footer className="py-12 bg-[#FFFFFF] border-t border-black/5">
       <div className="container">
         <div className="flex flex-col gap-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
               <img src={LOGO_URL} alt="Aster Sports" className="h-8 w-auto" />
-              <span className="text-base font-semibold text-white" style={{ fontFamily: "var(--font-display)" }}>
+              <span className="text-base font-semibold text-[#1c2230]" style={{ fontFamily: "var(--font-display)" }}>
                 Aster Sports
               </span>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 text-sm text-slate-400">
+            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 text-sm text-slate-500">
               <span>Design, Technology & Sports</span>
               {NAV_PRODUCTS.map((p) => (
                 <a
@@ -699,15 +699,15 @@ function Footer() {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-white/5">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-black/5">
             <p className="text-xs text-slate-500">
               &copy; {new Date().getFullYear()} Aster Sports. All rights reserved.
             </p>
             <div className="flex items-center gap-6 text-xs text-slate-500">
-              <a href="/privacy" className="hover:text-slate-300 transition-colors">
+              <a href="/privacy" className="hover:text-slate-600 transition-colors">
                 Privacy Policy
               </a>
-              <a href="/terms" className="hover:text-slate-300 transition-colors">
+              <a href="/terms" className="hover:text-slate-600 transition-colors">
                 Terms of Service
               </a>
               <span className="flex items-center gap-1">
@@ -724,7 +724,7 @@ function Footer() {
 
 export default function Home() {
   return (
-    <div className="relative min-h-screen bg-[#2b3652] overflow-x-hidden">
+    <div className="relative min-h-screen bg-[#E6EAF0] overflow-x-hidden">
       <div className="aster-grain" aria-hidden="true" />
       <ScrollProgress />
       <Header />

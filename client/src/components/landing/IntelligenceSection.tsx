@@ -45,7 +45,7 @@ export default function IntelligenceSection() {
   const { ref, isVisible } = useInView<HTMLDivElement>();
 
   return (
-    <section id="intelligence" className="relative py-12 md:py-20 bg-[#20283d]">
+    <section id="intelligence" className="relative py-12 md:py-20 bg-[#FFFFFF]">
       <div className="container" ref={ref}>
         <div className="max-w-2xl mb-10 md:mb-14">
           <div
@@ -57,7 +57,7 @@ export default function IntelligenceSection() {
             <span className="aster-stage-chip">AI · Machine learning</span>
           </div>
           <h2
-            className={`text-3xl md:text-4xl font-bold text-white tracking-tight mb-4 transition-all duration-700 delay-100 ${
+            className={`text-3xl md:text-4xl font-bold text-[#1c2230] tracking-tight mb-4 transition-all duration-700 delay-100 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
             style={{ fontFamily: "var(--font-display)" }}
@@ -65,7 +65,7 @@ export default function IntelligenceSection() {
             Intelligence under <span className="aster-grad-text">the hood.</span>
           </h2>
           <p
-            className={`text-lg text-slate-300 leading-relaxed transition-all duration-700 delay-200 ${
+            className={`text-lg text-slate-600 leading-relaxed transition-all duration-700 delay-200 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
           >
@@ -111,12 +111,12 @@ export default function IntelligenceSection() {
                     </div>
                   </div>
                   <h3
-                    className="text-lg font-semibold text-white mb-1.5"
+                    className="text-lg font-semibold text-[#1c2230] mb-1.5"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     {stage.title}
                   </h3>
-                  <p className="text-[13px] text-slate-400 leading-snug mb-3.5 flex-1">{stage.body}</p>
+                  <p className="text-[13px] text-slate-500 leading-snug mb-3.5 flex-1">{stage.body}</p>
                   <span className="aster-stage-chip self-start">{stage.model}</span>
                 </SpotlightCard>
 

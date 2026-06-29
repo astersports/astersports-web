@@ -56,7 +56,7 @@
 
 :root {
   --radius: 0.5rem;
-  --background: oklch(0.12 0.02 260);
+  --background: oklch(0.925 0.012 260);
   --foreground: oklch(0.95 0.005 80);
   --card: oklch(0.17 0.02 260);
   --card-foreground: oklch(0.95 0.005 80);
@@ -658,13 +658,13 @@
   background:
     radial-gradient(900px 420px at 78% -10%, rgba(224,99,28,.12), transparent 60%),
     radial-gradient(700px 380px at 12% 0%, rgba(246,204,85,.07), transparent 60%),
-    #2b3652;
+    #E6EAF0;
 }
 .aster-stars span {
   position: absolute;
   width: 2px; height: 2px;
   border-radius: 50%;
-  background: #cdd6f5;
+  background: rgba(28,34,48,0.22);
   opacity: .5;
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -684,7 +684,7 @@
   /* Deep-navy tile that pops as an elevated, tappable card on the light
      products band (Aster Sports Hub look). Subtle gold edge + drop shadow read
      as "open me"; both strengthen on hover. */
-  background: linear-gradient(180deg, #1e2440, #151525);
+  background: linear-gradient(180deg, #FFFFFF, #F4F6FA);
   border: 1px solid rgba(201,149,46,.20);
   border-radius: 18px;
   box-shadow: 0 10px 28px -12px rgba(21,21,37,.45), 0 2px 6px -2px rgba(21,21,37,.22);
@@ -713,7 +713,7 @@
   width: 38px; height: 38px;
   border-radius: 11px;
   display: grid; place-items: center;
-  background: radial-gradient(circle at 50% 35%, #343f5e, #26304a);
+  background: radial-gradient(circle at 50% 35%, #DCE1EA, #F4F6FA);
   color: #9aa6c8;
   border: 1px solid rgba(150,175,235,.18);
   box-shadow: 0 0 18px -6px rgba(150,175,235,.34), inset 0 0 10px -6px rgba(150,175,235,.4);
@@ -728,8 +728,8 @@
 /* shared panel surface — unifies every card on the marketing page with the
    constellation nodes (one celestial system, not two card styles). */
 .aster-panel {
-  background: linear-gradient(180deg, #333f5e, #3b4770);
-  border: 1px solid rgba(255,255,255,.09);
+  background: linear-gradient(180deg, #FFFFFF, #F4F6FA);
+  border: 1px solid rgba(28,34,48,.10);
   border-radius: 14px;
   transition: border-color .2s ease, transform .2s ease;
 }

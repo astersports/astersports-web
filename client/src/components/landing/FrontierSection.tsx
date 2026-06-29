@@ -74,7 +74,7 @@ export default function FrontierSection() {
   const current = TRENDS[active];
 
   return (
-    <section id="frontier" className="relative py-12 md:py-20 bg-[#1a2133]" aria-label="AI frontier trends">
+    <section id="frontier" className="relative py-12 md:py-20 bg-[#E6EAF0]" aria-label="AI frontier trends">
       <div className="container" ref={ref}>
         <div className="grid lg:grid-cols-[0.9fr_1.1fr] gap-10 lg:gap-14 items-start">
           {/* Left: intro + the agent scan console */}
@@ -87,7 +87,7 @@ export default function FrontierSection() {
               <span className="aster-stage-chip">Agentic AI · Live frontier scan</span>
             </div>
             <h2
-              className={`text-3xl md:text-4xl font-bold text-white tracking-tight mb-4 transition-all duration-700 delay-100 ${
+              className={`text-3xl md:text-4xl font-bold text-[#1c2230] tracking-tight mb-4 transition-all duration-700 delay-100 ${
                 isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
               }`}
               style={{ fontFamily: "var(--font-display)" }}
@@ -95,7 +95,7 @@ export default function FrontierSection() {
               Agents charting <span className="aster-grad-text">what's next.</span>
             </h2>
             <p
-              className={`text-[15px] md:text-base text-slate-300 leading-relaxed mb-6 transition-all duration-700 delay-200 ${
+              className={`text-[15px] md:text-base text-slate-600 leading-relaxed mb-6 transition-all duration-700 delay-200 ${
                 isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
               }`}
             >
@@ -118,7 +118,7 @@ export default function FrontierSection() {
                 <span className="aster-mono text-[10px] text-[#34d399] ml-auto">live</span>
               </div>
 
-              <div className="aster-scan-track rounded-lg bg-white/[0.02] border border-white/5 p-3.5 mb-3.5">
+              <div className="aster-scan-track rounded-lg bg-white/[0.02] border border-black/5 p-3.5 mb-3.5">
                 <div className="aster-mono text-[12px] text-slate-300 leading-relaxed" aria-live="polite" aria-atomic="true">
                   <span className="text-[#F6CC55]">▸</span> identifying trend{" "}
                   <span className="text-white">{active + 1}</span>
@@ -171,12 +171,12 @@ export default function FrontierSection() {
                     <span className="aster-stage-chip">{trend.tag}</span>
                   </div>
                   <h3
-                    className="text-[15px] font-semibold text-white mb-1"
+                    className="text-[15px] font-semibold text-[#1c2230] mb-1"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     {trend.name}
                   </h3>
-                  <p className="text-[12.5px] text-slate-400 leading-snug">{trend.line}</p>
+                  <p className="text-[12.5px] text-slate-500 leading-snug">{trend.line}</p>
                 </SpotlightCard>
               );
             })}
