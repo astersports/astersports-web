@@ -11,24 +11,48 @@ import ScoutCtaCard from "./ScoutCtaCard";
  * denial/error. Gated by VITE_LANDING_AGENT_LIVE at the call site — this only
  * mounts when the agent is live, so it never implies a capability that isn't on.
  */
+/** Tappable starter questions shown before the first turn — makes "how do I use
+ *  this?" answer itself. Each routes a real question through the same send path. */
+const EXAMPLE_PROMPTS = [
+  "I run an AAU program — what's for me?",
+  "What can Print Studio do?",
+  "Can you build our team a website?",
+];
+
 export default function ScoutChat() {
   const { bubbles, streaming, cta, leadAck, notice, send } = useScoutChat();
   const { configured: turnstileOn, containerRef, token, reset: resetTurnstile } = useTurnstile();
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Synchronous in-flight guard: `send` closes over the previous `streaming`, so
+  // two taps in the same tick (double-click a chip) would both pass its check and
+  // fire overlapping requests. This ref blocks the second call before any render.
+  const inFlight = useRef(false);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [bubbles, cta, leadAck, notice]);
 
+  // Clear the guard once a turn finishes (streaming flips back to false).
+  useEffect(() => {
+    if (!streaming) inFlight.current = false;
+  }, [streaming]);
+
+  // Send a question (typed or tapped). Attach the single-use Turnstile token
+  // (server verifies the first turn, then caches the session), then refresh the
+  // widget so a retry has a fresh token.
+  const ask = (text: string) => {
+    if (inFlight.current || !text.trim()) return;
+    inFlight.current = true;
+    void send(text, token ?? undefined);
+    if (turnstileOn) resetTurnstile();
+  };
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const text = draft;
     setDraft("");
-    // Attach the single-use Turnstile token (server verifies the first turn,
-    // then caches the session). Refresh the widget so a retry has a fresh token.
-    void send(text, token ?? undefined);
-    if (turnstileOn) resetTurnstile();
+    ask(text);
   };
 
   return (
@@ -42,10 +66,25 @@ export default function ScoutChat() {
 
       <div ref={scrollRef} className="max-h-72 overflow-y-auto as-no-scrollbar space-y-2.5 mb-3" aria-live="polite">
         {bubbles.length === 0 && (
-          <p className="text-[13px] text-slate-400 leading-relaxed">
-            Ask about Print Studio, the app, the AAU hub, or a site build — the scout will point you
-            the right way.
-          </p>
+          <div>
+            <p className="text-[13px] text-slate-400 leading-relaxed mb-3">
+              Ask about Print Studio, the app, the AAU hub, or a site build — the scout will point you
+              the right way. Tap a question to start:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {EXAMPLE_PROMPTS.map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => ask(q)}
+                  disabled={streaming}
+                  className="aster-mono text-left text-[11.5px] text-slate-300 border border-white/12 rounded-full px-3 py-1.5 hover:border-[#F6CC55]/45 hover:text-[#F6CC55] transition-colors disabled:opacity-50"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
         {bubbles.map((b, i) => (
           <div key={i} className={b.role === "user" ? "text-right" : "text-left"}>

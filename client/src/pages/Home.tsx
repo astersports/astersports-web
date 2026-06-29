@@ -13,6 +13,11 @@ import { PRODUCTS, NAV_PRODUCTS, STATUS_META, type ServiceEntry } from "@/lib/se
 import ScrollProgress from "@/components/landing/ScrollProgress";
 import IntelligenceSection from "@/components/landing/IntelligenceSection";
 import FrontierSection from "@/components/landing/FrontierSection";
+import ScoutChat from "@/components/landing/ScoutChat";
+
+/** Client build-time flag — the live concierge chat only renders when this is
+ *  "true" at build (paired with the server LANDING_AGENT_LIVE flag). */
+const AGENT_LIVE = import.meta.env.VITE_LANDING_AGENT_LIVE === "true";
 
 const LOGO_URL = "/aster-mark.png";
 
@@ -456,6 +461,48 @@ function PlatformSection() {
   );
 }
 
+/**
+ * Prominent "Ask Aster Scout" block — the live AI concierge, lifted to the top
+ * of the page so it's the obvious thing to use. Renders only when the agent is
+ * live at build (AGENT_LIVE); otherwise nothing shows (no dead box).
+ */
+function AskScoutSection() {
+  const { ref, isVisible } = useScrollReveal();
+  if (!AGENT_LIVE) return null;
+  return (
+    <section id="scout" className="relative py-10 md:py-14 bg-[#2b3652]">
+      <div className="container" ref={ref}>
+        <div className="max-w-2xl mx-auto">
+          <AgentEyebrow tag="concierge online" isVisible={isVisible} center />
+          <h2
+            className={`text-3xl md:text-4xl font-bold text-white text-center tracking-tight mb-3 transition-all duration-700 ${
+              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+            }`}
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Ask <span className="aster-grad-text">Aster Scout</span>
+          </h2>
+          <p
+            className={`text-center text-slate-300 leading-relaxed mb-6 transition-all duration-700 delay-100 ${
+              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+            }`}
+          >
+            Tell our AI concierge what you're working on — it points you to the right product or
+            service in seconds. Tap a question below to try it.
+          </p>
+          <div
+            className={`transition-all duration-700 delay-200 ${
+              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+            }`}
+          >
+            <ScoutChat />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ContactSection() {
   const { ref, isVisible } = useScrollReveal();
   const [formState, setFormState] = useState({ name: "", email: "", message: "" });
@@ -682,6 +729,7 @@ export default function Home() {
       <ScrollProgress />
       <Header />
       <HeroSection />
+      <AskScoutSection />
       <PlatformSection />
       <IntelligenceSection />
       <FrontierSection />
