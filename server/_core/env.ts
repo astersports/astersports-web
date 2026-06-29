@@ -77,12 +77,13 @@ export const ENV = {
     Number(process.env.LANDING_AGENT_LEAD_PER_IP_DAY) > 0
       ? Number(process.env.LANDING_AGENT_LEAD_PER_IP_DAY)
       : 3,
-  /** Cloudflare Turnstile bot-gate secret (docs/SPEC_LANDING_AGENT.txt P5, Fork
-   *  D — required at the model boundary under A2). Verifies the client's token
-   *  before a session's first model turn. When the agent is LIVE the gate is
-   *  REQUIRED: an unset secret fails CLOSED (verifyTurnstile returns false → the
-   *  first turn is denied). Provision this + VITE_TURNSTILE_SITE_KEY (client)
-   *  BEFORE flipping LANDING_AGENT_LIVE. Inert while the agent is dark. */
+  /** Cloudflare Turnstile bot-gate secret (docs/SPEC_LANDING_AGENT.txt P5, Fork D).
+   *  Verifies the client's token before a session's first model turn; a pass caches
+   *  the session. The gate is BEST-EFFORT by default — a present token is verified,
+   *  but a missing/failed token (incl. an unset secret) does NOT block unless
+   *  LANDING_AGENT_TURNSTILE_REQUIRED=true, in which case it FAILS CLOSED (denies)
+   *  even when the secret is absent. Provision this + VITE_TURNSTILE_SITE_KEY
+   *  (client) alongside LANDING_AGENT_LIVE. Inert while the agent is dark. */
   turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY ?? "",
   /** Hard-require a passing Turnstile token before the first model turn. Default
    *  FALSE (best-effort): a present token is still verified + caches the session,

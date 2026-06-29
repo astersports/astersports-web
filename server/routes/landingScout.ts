@@ -138,8 +138,11 @@ export function registerLandingScoutRoute(app: Express): void {
     // keeps the agent usable when the widget can't load (blocked/misconfigured)
     // without removing the bot signal where it does work. verifyTurnstile FAILS
     // CLOSED on every error path.
-    if (isTurnstileConfigured() && !landingAgentGuard.isVerified(parsed.sessionId, now)) {
-      const ok = await verifyTurnstile(parsed.turnstileToken, ip);
+    if (!landingAgentGuard.isVerified(parsed.sessionId, now)) {
+      // Verify only when the secret is present; an unset secret can't produce a
+      // pass. In REQUIRED mode that (and any failed/missing token) FAILS CLOSED —
+      // a missing secret must not silently open the gate.
+      const ok = isTurnstileConfigured() ? await verifyTurnstile(parsed.turnstileToken, ip) : false;
       if (ok) {
         landingAgentGuard.markVerified(parsed.sessionId, now);
       } else if (ENV.landingAgentTurnstileRequired) {
@@ -148,7 +151,7 @@ export function registerLandingScoutRoute(app: Express): void {
         res.end();
         return;
       }
-      // soft-fail: not required → fall through and let the turn run.
+      // soft-fail (default): not required → fall through and let the turn run.
     }
 
     // Abort the model stream if the visitor navigates away mid-turn.

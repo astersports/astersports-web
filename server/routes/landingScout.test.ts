@@ -7,7 +7,7 @@
  * Mocks the heavy collaborators (model stream, guard, turnstile, email, env) and
  * drives the captured Express handler directly, mirroring studioStream.test.ts.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("../_core/env", () => ({ ENV: { landingAgentLive: true } }));
 
@@ -42,6 +42,9 @@ vi.mock("../serverLog", () => ({ log: { info: vi.fn(), error: vi.fn(), warn: vi.
 import { registerLandingScoutRoute } from "./landingScout";
 import { emailLeadCaptured } from "../email";
 import { ENV } from "../_core/env";
+import { landingAgentGuard } from "../_core/landingAgent/guard";
+import { isTurnstileConfigured, verifyTurnstile } from "../_core/landingAgent/turnstile";
+import { streamScout } from "../_core/landingAgent/scoutLlm";
 
 let routeHandler: (req: any, res: any) => Promise<void>;
 let optionsHandler: (req: any, res: any) => void;
@@ -203,5 +206,67 @@ describe("registerLandingScoutRoute — CORS for cross-origin surfaces (AAU hub)
 
     expect(res._headers["Access-Control-Allow-Origin"]).toBe(AAU_ORIGIN);
     expect(res._headers["Vary"]).toBe("Origin");
+  });
+});
+
+describe("registerLandingScoutRoute — Turnstile required vs best-effort", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (emailLeadCaptured as any).mockResolvedValue(true);
+    // Exercise the gate: pretend the session isn't verified yet.
+    (landingAgentGuard.isVerified as any).mockReturnValue(false);
+    (landingAgentGuard.evaluateChatTurn as any).mockReturnValue({ allowed: true });
+    (landingAgentGuard.evaluateLeadCapture as any).mockReturnValue({ allowed: true });
+  });
+
+  afterEach(() => {
+    // Restore the module defaults so other suites in this file are unaffected.
+    (landingAgentGuard.isVerified as any).mockReturnValue(true);
+    (isTurnstileConfigured as any).mockReturnValue(false);
+    (verifyTurnstile as any).mockResolvedValue(true);
+    (ENV as { landingAgentTurnstileRequired?: boolean }).landingAgentTurnstileRequired = false;
+  });
+
+  const run = async () => {
+    const app = createMockApp();
+    registerLandingScoutRoute(app as any);
+    const res = createMockRes();
+    await routeHandler(createMockReq(goodBody), res);
+    return sseEvents(res).map((e) => e.type);
+  };
+
+  it("REQUIRED + secret unset → fails closed (denies, model never runs)", async () => {
+    (ENV as { landingAgentTurnstileRequired?: boolean }).landingAgentTurnstileRequired = true;
+    (isTurnstileConfigured as any).mockReturnValue(false);
+    const types = await run();
+    expect(types).toContain("denied");
+    expect(verifyTurnstile).not.toHaveBeenCalled(); // no secret → never even calls Cloudflare
+    expect(streamScout).not.toHaveBeenCalled();
+  });
+
+  it("REQUIRED + token fails verification → denies", async () => {
+    (ENV as { landingAgentTurnstileRequired?: boolean }).landingAgentTurnstileRequired = true;
+    (isTurnstileConfigured as any).mockReturnValue(true);
+    (verifyTurnstile as any).mockResolvedValue(false);
+    const types = await run();
+    expect(types).toContain("denied");
+    expect(streamScout).not.toHaveBeenCalled();
+  });
+
+  it("best-effort (required=false) + failed/missing token → soft-fails (turn runs, not verified)", async () => {
+    (ENV as { landingAgentTurnstileRequired?: boolean }).landingAgentTurnstileRequired = false;
+    (isTurnstileConfigured as any).mockReturnValue(true);
+    (verifyTurnstile as any).mockResolvedValue(false);
+    const types = await run();
+    expect(types).not.toContain("denied");
+    expect(streamScout).toHaveBeenCalled();
+    expect(landingAgentGuard.markVerified).not.toHaveBeenCalled(); // only verify-success marks it
+  });
+
+  it("a valid token marks the session verified", async () => {
+    (isTurnstileConfigured as any).mockReturnValue(true);
+    (verifyTurnstile as any).mockResolvedValue(true);
+    await run();
+    expect(landingAgentGuard.markVerified).toHaveBeenCalled();
   });
 });
