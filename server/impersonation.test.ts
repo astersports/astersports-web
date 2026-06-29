@@ -20,13 +20,15 @@ vi.mock("cookie", () => ({
 // Mock jose
 const mockSign = vi.fn().mockResolvedValue("mock.jwt.token");
 vi.mock("jose", () => ({
-  SignJWT: vi.fn().mockImplementation(() => ({
-    setProtectedHeader: vi.fn().mockReturnThis(),
-    setExpirationTime: vi.fn().mockReturnThis(),
-    setIssuedAt: vi.fn().mockReturnThis(),
-    setSubject: vi.fn().mockReturnThis(),
-    sign: mockSign,
-  })),
+  SignJWT: vi.fn().mockImplementation(function () {
+    return {
+      setProtectedHeader: vi.fn().mockReturnThis(),
+      setExpirationTime: vi.fn().mockReturnThis(),
+      setIssuedAt: vi.fn().mockReturnThis(),
+      setSubject: vi.fn().mockReturnThis(),
+      sign: mockSign,
+    };
+  }),
   jwtVerify: vi.fn().mockResolvedValue({
     payload: { tenantId: 42, tenantName: "Test Firm", adminId: 1 },
   }),

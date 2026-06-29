@@ -8,7 +8,9 @@ vi.mock("@anthropic-ai/sdk", () => {
   class APIError extends Error {
     status?: number;
   }
-  const Anthropic = vi.fn(() => ({ messages: { create: mockCreate } })) as unknown as {
+  const Anthropic = vi.fn(function () {
+    return { messages: { create: mockCreate } };
+  }) as unknown as {
     new (): unknown;
     APIError: typeof APIError;
   };
