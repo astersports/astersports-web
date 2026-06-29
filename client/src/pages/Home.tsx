@@ -9,9 +9,8 @@ import { useEffect, useRef, useState } from "react";
 import { Mail, ArrowRight, ArrowUpRight, MapPin, Menu, X, Send, Settings } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useScanCycle } from "@/hooks/useScanCycle";
-import { PRODUCTS, SERVICES, NAV_PRODUCTS, STATUS_META, type ServiceEntry } from "@/lib/services";
+import { PRODUCTS, NAV_PRODUCTS, STATUS_META, type ServiceEntry } from "@/lib/services";
 import ScrollProgress from "@/components/landing/ScrollProgress";
-import MetricsSection from "@/components/landing/MetricsSection";
 import IntelligenceSection from "@/components/landing/IntelligenceSection";
 import FrontierSection from "@/components/landing/FrontierSection";
 
@@ -121,10 +120,6 @@ function Header() {
               {p.navLabel ?? p.name}
             </a>
           ))}
-          <a href="#services" className="text-sm text-slate-300 hover:text-[#F6CC55] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
-            Services
-          </a>
-
           {isOwner && (
             <a href="/admin/billing" className="text-sm text-slate-300 hover:text-[#F6CC55] transition-colors flex items-center gap-1" style={{ fontFamily: "var(--font-display)" }}>
               <Settings className="w-3.5 h-3.5" />
@@ -170,10 +165,6 @@ function Header() {
               {p.navLabel ?? p.name}
             </a>
           ))}
-          <a href="#services" className="text-base text-slate-300 hover:text-[#F6CC55] transition-colors py-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
-            Services
-          </a>
-
           {isOwner && (
             <a href="/admin/billing" className="text-base text-slate-300 hover:text-[#F6CC55] transition-colors py-2 flex items-center gap-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
               <Settings className="w-4 h-4" />
@@ -216,7 +207,7 @@ function HeroSection() {
   };
 
   return (
-    <section ref={sectionRef} onMouseMove={handleGlow} className="relative flex items-center overflow-hidden md:min-h-[100svh]">
+    <section ref={sectionRef} onMouseMove={handleGlow} className="relative flex items-center overflow-hidden">
       <div className="aster-sky" />
       <div className="aster-hero-glow" aria-hidden="true" />
       <div className="aster-stars absolute inset-0" aria-hidden="true">
@@ -288,31 +279,6 @@ function HeroSection() {
             </a>
           </div>
 
-          {/* agent boot console — the system initializing + mapping the four products, live */}
-          <div
-            className={`aster-terminal p-3.5 md:p-4 mb-6 max-w-md transition-all duration-700 delay-[350ms] ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
-          >
-            <div className="aster-scan-track rounded-lg bg-white/[0.02] border border-white/5 px-3.5 py-3">
-              <div className="aster-mono text-[11.5px] leading-relaxed space-y-1">
-                <div className="text-slate-400">
-                  <span className="text-[#F6CC55]">▸</span> initializing aster-agent
-                </div>
-                <div className="text-slate-300">
-                  <span className="text-[#F6CC55]">▸</span> {PRODUCTS.length} systems online —{" "}
-                  <span className="aster-grad-text font-semibold">mapping the constellation</span>
-                </div>
-              </div>
-              <div className="as-progress-bar mt-2.5" aria-hidden="true">
-                <div
-                  className="as-progress-fill"
-                  style={{ width: "100%", background: "var(--brand-grad)" }}
-                />
-              </div>
-            </div>
-          </div>
-
           <div
             className={`flex items-center gap-2 text-slate-400 text-sm transition-all duration-700 delay-400 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
@@ -323,8 +289,6 @@ function HeroSection() {
           </div>
         </div>
       </div>
-
-      <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-[#2b3652] to-transparent" />
     </section>
   );
 }
@@ -419,7 +383,7 @@ function PlatformSection() {
   const current = PRODUCTS[active];
 
   return (
-    <section id="platform" className="relative py-10 md:py-20 bg-[#2b3652]">
+    <section id="platform" className="relative pt-2 pb-10 md:pt-4 md:pb-16 bg-[#2b3652]">
       <div className="container aster-constellation" ref={ref}>
         <h2
           className={`flex items-center gap-3 text-[13px] font-semibold tracking-[0.2em] uppercase text-slate-400 mb-4 transition-all duration-500 ${
@@ -485,106 +449,6 @@ function PlatformSection() {
                 {t}
               </span>
             ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function ServicesSection() {
-  const { ref, isVisible } = useScrollReveal();
-  // The agent cycles through the capabilities it has online — same live-scan
-  // motif as the constellation console. Pauses under prefers-reduced-motion.
-  const active = useScanCycle(SERVICES.length, isVisible);
-  const current = SERVICES[active];
-
-  return (
-    <section id="services" className="relative py-10 md:py-16 bg-[#323d5c]">
-      <div className="container" ref={ref}>
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          <div>
-            <AgentEyebrow tag="capabilities online" isVisible={isVisible} />
-
-            <h2
-              className={`text-3xl md:text-4xl font-bold text-white mb-8 tracking-tight transition-all duration-700 delay-100 ${
-                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
-              }`}
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              Every connection intentional.
-              <br />
-              <span className="text-slate-400">Every node purposeful.</span>
-            </h2>
-
-            <div className="space-y-3.5">
-              {SERVICES.map((service, i) => {
-                const Icon = service.icon;
-                return (
-                  <div
-                    key={service.id}
-                    className={`aster-node group flex items-start gap-4 p-4 transition-all duration-500 ${
-                      i === active ? "border-[rgba(246,204,85,.32)]" : ""
-                    } ${isVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-4"}`}
-                    style={{ transitionDelay: `${150 + i * 100}ms` }}
-                  >
-                    <span className="aster-mono text-[11px] tracking-[0.14em] text-slate-500 pt-1.5 tabular-nums">
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <div
-                      className="flex-shrink-0 w-11 h-11 rounded-lg flex items-center justify-center border transition-all duration-200"
-                      style={{
-                        backgroundColor: `color-mix(in srgb, ${service.accent} 10%, transparent)`,
-                        borderColor: `color-mix(in srgb, ${service.accent} 22%, transparent)`,
-                      }}
-                    >
-                      <Icon className="w-5 h-5" style={{ color: service.accent }} />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-white mb-1" style={{ fontFamily: "var(--font-display)" }}>
-                        {service.name}
-                      </h3>
-                      <p className="text-slate-400 leading-relaxed text-[14.5px]">
-                        {service.description}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* agent console — capabilities coming online, live (stacks below on mobile) */}
-          <div
-            className={`aster-terminal p-4 transition-all duration-700 delay-300 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
-          >
-            <div className="flex items-center gap-2 mb-3">
-              <span className="aster-dot-live" />
-              <span className="aster-mono text-[11px] tracking-[0.14em] uppercase text-slate-400">
-                aster-agent · capabilities online
-              </span>
-              <span className="aster-mono text-[10px] text-[#34d399] ml-auto">live</span>
-            </div>
-            <div className="aster-scan-track rounded-lg bg-white/[0.02] border border-white/5 px-3.5 py-3">
-              <div className="aster-mono text-[12px] text-slate-300 leading-relaxed">
-                <span className="text-[#F6CC55]">▸</span> capability{" "}
-                <span className="text-white">{active + 1}</span>
-                <span className="text-slate-500"> / {SERVICES.length}</span> —{" "}
-                <span className="aster-grad-text font-semibold">{current.name}</span>
-              </div>
-              <div className="as-progress-bar mt-2.5" aria-hidden="true">
-                <div
-                  className="as-progress-fill"
-                  style={{
-                    width: `${((active + 1) / SERVICES.length) * 100}%`,
-                    background: "var(--brand-grad)",
-                    transition: "width .5s cubic-bezier(0.23,1,0.32,1)",
-                  }}
-                />
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -819,8 +683,6 @@ export default function Home() {
       <Header />
       <HeroSection />
       <PlatformSection />
-      <ServicesSection />
-      <MetricsSection />
       <IntelligenceSection />
       <FrontierSection />
       <ContactSection />
