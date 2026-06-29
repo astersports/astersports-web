@@ -1,0 +1,203 @@
+ARCHITECT DECISION REQUEST — AAU Hub × Platform: placement, tiers, functionality
+CC lane · 2026-06-29 · for architect ratification (per §11.8 rule 6)
+Repo of record: astersports-web · companion to docs/aau/AAU_HUB_UNIFIED_PLAN_2026-06-29.txt
+
+=====================================================================
+0. WHAT THIS DOC DECIDES
+=====================================================================
+Frank's "ultimate question": should the AAU Hub be the parent's main page as a
+standalone free service, and then — once their program is onboarded — unlock additional
+services? This doc turns that into ratifiable decisions. It carries:
+  • the unifying RECOMMENDATION (one product, progressive tiers),
+  • a TIER BLUEPRINT (what functionality lives in the free Hub vs the onboarded app),
+    mined from the live AAU site (legacy-hoopers) + the two codebases,
+  • a DECISION REGISTER (DR-1…DR-9): request · evidence (file:line) · options · CC lean.
+Build-level workstreams (WS/phases) live in the UNIFIED_PLAN; this doc is the
+product-architecture layer above it.
+
+GROUNDING: [G] verified in source · [UX] design judgment · [V] to verify.
+Method: 6 code-grounding agents this session across astersports-web (Hub),
+aster-sports (platform), aster-weather, and legacy-hoopers (the live AAU site), plus
+CC grep of st-patricks-armonk. Live-browser screenshots were NOT possible (sandbox
+egress closes headless Chromium to the prod hosts); validation was done against source +
+the live production JS bundle + Frank's device screenshots.
+
+=====================================================================
+1. THE DECISIVE GROUND TRUTH (why this is a frontend question, not a data one)
+=====================================================================
+G1 [G] ONE shared backend. All three frontends read the SAME Supabase project
+   `vrwwpsbfbnveawqwbdmj`: the Hub (astersports-web `client/src/lib/aster.ts`), the
+   platform (aster-sports, CLAUDE.md project ref), and the live AAU site (legacy-hoopers
+   `client/src/lib/aster.ts:17-25`, org `e3e95e21-…`).
+G2 [G] The AAU INGEST already lives in the platform repo: aster-sports
+   `supabase/functions/aau-{scrape,ingest,submit}-tournament` write the tournament data
+   the Hub reads. Data + ingest are already unified; only the parent UI is split.
+G3 [G] THREE frontends, one backend, overlapping surfaces (schedule, records, standings).
+   The Hub is tournament-agnostic (any AAU team via TourneyMachine); the legacy site is
+   the org's public face (org-scoped public RPCs, no login); the platform is the authed
+   org product. → consolidation is an integration, not a migration.
+G4 [G] The legacy AAU site is mostly a DESIGN SPEC, not a feature source: only Schedule,
+   Records, and AskAsterScout read live data; the Dashboard, the Highlights film room,
+   and every "AI" surface except the Scout are cosmetic mock with "preview" disclaimers.
+   Mine its UX; build its data.
+
+=====================================================================
+2. THE RECOMMENDATION (one product, progressive tiers)
+=====================================================================
+The AAU Hub is NOT a separate product from the platform — it is the FREE TIER of the
+same product. A parent should never choose between two apps. The Hub is the permanent,
+login-free home and the acquisition wedge; onboarding the program ADDS an org-scoped
+service layer on the same home. Concretely, a 3-rung ladder:
+
+  TIER 0 — PUBLIC (no login; the wedge; indexable):  any AAU parent, any team.
+  TIER 1 — SIGNED IN (Google):                       sync + push + saved kids.
+  TIER 2 — ONBOARDED PROGRAM:                         the org-native command center.
+
+The "additional services on onboarding" Frank described = the Tier-0→Tier-2 jump.
+
+=====================================================================
+3. TIER BLUEPRINT — functionality per tier (the recommendation, grounded)
+=====================================================================
+Tags: HAVE (in Hub today) · WIRE (built but unmounted — Phase 3) · PORT (from
+legacy-hoopers, file:line) · BUILD (new) · BORROW (from platform/st-patricks).
+
+TIER 0 — FREE PUBLIC HUB (the parent's main page)
+  Weekend JTBD:
+   • Up-next countdown · game-time weather · directions · leave-by ............ HAVE
+   • Conflict/"babysitter" radar + travel-time conflicts ..................... WIRE+BUILD
+   • Whole-weekend agenda across kids (chronological) ........................ BUILD (WS1-B)
+  Schedule/standings depth (PORT from legacy site):
+   • Multi-slicer filtering Team/Age/Date + Type/Gender ... `scheduleView.ts:21-152` PORT
+   • Adaptive live-score poll + "updated Ns ago" ......... `useSchedule.ts:14-64`   PORT
+   • Tournament grouping w/ running record · practice-collapse `scheduleView.ts:78-108` PORT
+   • Form-dots / streaks / hottest-team / win-rate viz ... `recordsUtils.ts:37-71`  PORT
+   • Expandable per-team game log + program totals (team-level only, §16.12) ...
+       `TeamCard.tsx:91-104`, `aster.ts:131-137` ........................... PORT
+  Acquisition + identity:
+   • Constellation home (tools as nodes + status pills) .. `Home.tsx:59,227`        PORT
+   • AskAsterScout — "ask anything about any AAU team" (real SSE Claude + Turnstile +
+       lead capture) ....................................... `AskAsterScout.tsx`, `useScoutChat.ts` PORT(real)
+   • Program catalog + matcher quiz + REGISTER bridge .... `content.ts:23-85`,
+       `AiProgramMatcher.scoreMatch`, `brand.ts:24` ........................ PORT → see DR-5
+   • Mission/coach story + social proof (wire metrics to real `programTotals()`) PORT
+   • Calendar export → REAL webcal subscribe (their .ics overpromises "auto-update") BORROW/BUILD
+   • Agent-console motif — brand only, on entry surfaces; do NOT crowd the functional
+       command center (see DR-?, and UNIFIED_PLAN D2) ....................... PORT(brand)
+
+TIER 1 — SIGNED IN (Google; the Hub already has Google-auth tracking)
+   • Cross-device tracked-team sync ......................................... HAVE (extend)
+   • Web-push: score-follow, schedule-change/cancellation alerts ............ BORROW (S1)
+   • Saved kids → agenda grouped by kid ..................................... BUILD (WS1-D)
+   • Share the weekend (read-only) .......................................... BORROW (S4)
+
+TIER 2 — ONBOARDED PROGRAM (the app; needs auth + org membership)
+   The legacy `/dashboard` is the cosmetic BLUEPRINT (`Dashboard.tsx` — hardcoded
+   Samaritano family). Real versions, behind org login:
+   • Parent command center: athlete switcher + date range ... `Dashboard.tsx:13`   BUILD
+   • ENGAGEMENT KPIs ONLY (sessions, attendance, streak, RSVP timeliness) — NOT
+       per-player game stats (shooting%/points) per §16.12 .. `KpiCards Dashboard.tsx:24` BUILD(gated)
+   • Official org layer: RSVPs · team comms/announcements · attendance · coach roster BORROW (aster-sports)
+   • Payments (PaymentsCard) → wire Stripe ................. `Dashboard.tsx` PaymentsCard BUILD → DR-9
+   • Quick actions: RSVP · message coach · book 1:1 · pay · film · directions BUILD
+   • Premium AI (real versions of the Hub teasers): development insights, growth
+       projection, training plan, "ask about your athlete", AI Film Lab auto-clip
+       ........................................................ `ai/dashboard/*`, `ai/highlights/*` BUILD(paywalled)
+   • Surface latent platform fields already fetched, unrendered: `point_differential`,
+       `coach_highlight` ..................................... `aster.ts:47-48`        BUILD(quick)
+
+THE BRIDGE (Tier 0 → Tier 2): own the conversion funnel — replace the external
+LeagueApps interest-list (`brand.ts:24`, the single CTA target across the whole legacy
+site) with in-app register/pay; the Scout's `cta`/`lead_ack` SSE events give a second
+conversational lead path; the matcher quiz self-qualifies. (DR-5.)
+
+THE "STAYS FOREVER" SEQUENCE: cheap retention first — Scout (built) + push (borrow) +
+season recap (engagement data); the FAMILY FILM ROOM is the big evergreen bet but is a
+from-scratch media pipeline (no storage/serving exists anywhere — `Highlights.tsx` is a
+facade over 6 hardcoded strings, `HighlightCard.tsx:28-33`). Stage it after the cheap
+loops prove out. (DR-6.)
+
+=====================================================================
+4. DECISION REGISTER (request · evidence · options · CC lean)
+=====================================================================
+DR-1 · WHERE does the unified parent home live?
+  Request: pick the consolidation target for the parent product.
+  Evidence: shared Supabase (G1); onboarded services + parent role/RLS live in
+    aster-sports; astersports-web is fundamentally the Print Studio repo with the Hub
+    bolted on; the legacy site proves a no-login public reader works (G3/G4).
+  Options:
+    (a) Consolidate the parent home into the PLATFORM (aster-sports / astersports.app),
+        keep a public login-free AAU route as the wedge.
+    (b) Keep the Hub in astersports-web; light up Tier-2 via the shared Supabase +
+        entitlement (no repo move).
+    (c) New dedicated parent-app repo.
+  CC LEAN: (a) over time — but stage it (DR-2 first). The onboarded services already
+    live in the platform; do not rebuild them in the Studio repo. Non-negotiable
+    constraint: the public tier stays anonymous, fast, and indexable wherever it serves.
+
+DR-2 · IDENTITY + ENTITLEMENT linking (the core join)
+  Request: how does a Tier-0/1 Google user become a Tier-2 onboarded parent, and how does
+    a tracked team map to an onboarded org to trigger the unlock?
+  Evidence: Hub uses Google OAuth via Supabase (anon public reads); platform uses
+    `user_roles` + org-scoped RLS; AAU teams are tournament-grain (qkey), org teams are
+    org-grain — the join is non-trivial.
+  Options: (a) build an entitlement bridge first (thin: tracked-team→org match +
+    role grant) and PROVE the unlock in place; (b) full identity merge up front.
+  CC LEAN: (a) — cheapest test of the whole thesis; one bridge risked, not a migration.
+
+DR-3 · COPPA / CHILD-DATA boundary
+  Request: confirm the boundary when a public Hub and org child PII share one home.
+  Evidence: the Hub deliberately keeps `entitlement.canAccessChild = false`; the platform
+    holds real rosters/players. Merging makes this boundary load-bearing.
+  CC LEAN: keep the gate HARD — Tier 0/1 never touch child PII; child data appears only
+    in Tier 2 behind org membership + the existing COPPA gate. (Architect owns wording.)
+
+DR-4 · DOMAIN / SEO
+  Request: where does the indexable public wedge live?
+  CC LEAN: keep `astersports.io/aau` public + indexable as the acquisition surface even
+    if the authed app home is `astersports.app`. Don't bury the wedge behind the app.
+
+DR-5 · CONVERSION FUNNEL ownership
+  Request: replace the external LeagueApps interest-list with in-app register/pay?
+  Evidence: every CTA on the live site funnels to one LeagueApps link (`brand.ts:24`);
+    `Programs.tsx:3` says "checkout wires to Aster later."
+  CC LEAN: YES — own the funnel; it's the free→paid bridge. Pair with the Scout lead path.
+
+DR-6 · FAMILY FILM ROOM (the retention bet)
+  Request: build the media pipeline now, or stage after cheap retention?
+  Evidence: no storage/serving/capture exists; `Highlights.tsx:123` self-labels a template.
+  CC LEAN: STAGE — ship Scout + push + season recap first; film room is the big bet after
+    the loop is proven. (Tier-2 / premium when built.)
+
+DR-7 · TRAFFIC vendor (= UNIFIED_PLAN D6)
+  Request: TomTom vs Google Routes vs Mapbox vs stay-OSRM+qualifier.
+  Evidence: OSRM is trafficless (`driveTime.ts:8`) — the one real ETA gap (Q3).
+  CC LEAN: add a real provider (TomTom, or Google Routes to reuse the platform's existing
+    Google geocoding billing); the WS3-T qualifier is only the stopgap. One provider also
+    covers POI (food/parking) + geocoding.
+
+DR-8 · REUSE MODEL (= UNIFIED_PLAN D7)
+  Request: call aster-sports edge functions cross-app, or PORT push/ICS/share into the
+    parent app?
+  CC LEAN: PORT (same vendors: Resend, web-push VAPID, Open-Meteo) for deploy
+    independence; revisit once DR-1 picks the consolidation target.
+
+DR-9 · MONETIZATION (= UNIFIED_PLAN D8)
+  Request: wire Aster Plus / Stripe now or stay free pre-onboarding?
+  Evidence: Stripe is present in astersports-web but AAU Plus is INERT (`PlusGate.tsx`
+    cosmetic; `entitlement.ts` false for all); the platform records payments by hand (no
+    Stripe API).
+  CC LEAN: stay free until Tier-2 proves retention; then gate premium services
+    (traffic / push / film AI / multi-kid agenda) behind Plus.
+
+=====================================================================
+5. WHAT CC NEEDS FROM THE ARCHITECT
+=====================================================================
+Ratify DR-1 (placement) + DR-2 (entitlement bridge) first — they unblock everything.
+DR-3 (COPPA wording) is architect-owned. DR-5/DR-6/DR-7/DR-9 are build-or-stage calls
+CC will execute on ruling. On a "go", CC's cheapest proof-of-thesis step is the DR-2
+entitlement bridge + the Tier-0 PORT batch (filtering, form/streak viz, scout, program
+catalog) — no repo migration required, all on the shared Supabase.
+
+=====================================================================
+END — single artifact. Decisions above; build plan in AAU_HUB_UNIFIED_PLAN.
+=====================================================================
