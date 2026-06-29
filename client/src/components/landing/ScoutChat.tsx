@@ -46,10 +46,10 @@ export default function ScoutChat() {
     if (inFlight.current || !text.trim()) return;
     inFlight.current = true;
     void send(text, token ?? undefined);
-    // Turnstile tokens are single-use — refresh so the next turn doesn't re-send
-    // an already-consumed token (repeated server-side verify failures). A verified
-    // session skips the check anyway, so a not-yet-ready token is harmless.
-    if (turnstileOn) resetTurnstile();
+    // Refresh ONLY when we actually attached a token — it's now single-use/spent.
+    // Resetting when no token was ready would cancel the widget's in-progress
+    // solve and delay getting one. (A verified session skips the check anyway.)
+    if (turnstileOn && token) resetTurnstile();
   };
 
   const submit = (e: React.FormEvent) => {
