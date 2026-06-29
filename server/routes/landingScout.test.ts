@@ -41,6 +41,7 @@ vi.mock("../serverLog", () => ({ log: { info: vi.fn(), error: vi.fn(), warn: vi.
 
 import { registerLandingScoutRoute } from "./landingScout";
 import { emailLeadCaptured } from "../email";
+import { ENV } from "../_core/env";
 
 let routeHandler: (req: any, res: any) => Promise<void>;
 let optionsHandler: (req: any, res: any) => void;
@@ -176,6 +177,21 @@ describe("registerLandingScoutRoute — CORS for cross-origin surfaces (AAU hub)
 
     expect(res.status).toHaveBeenCalledWith(204);
     expect(res._headers["Access-Control-Allow-Origin"]).toBeUndefined();
+  });
+
+  it("stays dark: the OPTIONS preflight 404s when the agent flag is off", () => {
+    const app = createMockApp();
+    registerLandingScoutRoute(app as any);
+
+    (ENV as { landingAgentLive: boolean }).landingAgentLive = false;
+    try {
+      const res = createMockRes();
+      optionsHandler(createMockReq({}, { origin: AAU_ORIGIN }), res);
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.status).not.toHaveBeenCalledWith(204);
+    } finally {
+      (ENV as { landingAgentLive: boolean }).landingAgentLive = true;
+    }
   });
 
   it("echoes the allowed origin on the POST response too", async () => {

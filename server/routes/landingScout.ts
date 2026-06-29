@@ -72,6 +72,13 @@ export function registerLandingScoutRoute(app: Express): void {
   // JSON POST from an allowlisted external surface like the AAU hub).
   app.options("/api/landing/scout-stream", (req: Request, res: Response) => {
     applyScoutCors(req, res);
+    // Stay dark by default: while the flag is off the route 404s for POST, so the
+    // preflight must 404 too — otherwise a 204 would advertise the route exists
+    // before the flip.
+    if (!ENV.landingAgentLive) {
+      res.status(404).end();
+      return;
+    }
     res.status(204).end();
   });
 
