@@ -1,3 +1,4 @@
+import "./instrument"; // ← MUST be first: installs Sentry's global handlers before app code
 import { trpc } from "@/lib/trpc";
 import { UNAUTHED_ERR_MSG } from '@shared/const';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -73,3 +74,15 @@ createRoot(document.getElementById("root")!).render(
     </QueryClientProvider>
   </trpc.Provider>
 );
+
+// Sentry pipeline self-test: append `?sentrytest=1` to any URL to emit one test error.
+// Gated + non-user-facing (no visible "Break the world" button shipped to the public site);
+// used to verify ingestion after a deploy, harmless otherwise.
+if (
+  typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).get("sentrytest") === "1"
+) {
+  setTimeout(() => {
+    throw new Error("Sentry verification: Break the world (sentrytest=1)");
+  }, 1200);
+}

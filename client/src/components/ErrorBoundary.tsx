@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
+import * as Sentry from "@sentry/react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
-import { Component, ReactNode } from "react";
+import { Component, ErrorInfo, ReactNode } from "react";
 
 interface Props {
   children: ReactNode;
@@ -19,6 +20,15 @@ class ErrorBoundary extends Component<Props, State> {
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    // Report to Sentry. Static import (not lazy) so capture never depends on a chunk loading at
+    // the exact moment the app is already failing — the same reliability rationale the org uses
+    // for its last-resort error boundary.
+    Sentry.captureException(error, {
+      contexts: { react: { componentStack: info.componentStack } },
+    });
   }
 
   render() {
