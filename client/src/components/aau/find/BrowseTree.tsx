@@ -344,7 +344,7 @@ export default function BrowseTree({ dir, onOpen }: { dir: DirTournament[]; onOp
       )}
 
       <div className="mt-5 px-[18px] text-center font-[var(--font-mono)] text-[11.5px] leading-[1.5]" style={{ color: C.mut }}>
-        Filters read structured columns — no name-parsing. Past seasons collapse; tap to browse for records.
+        Past seasons are grouped — open a tournament to see its records.
       </div>
     </div>
   );

@@ -22,6 +22,10 @@ const NAV = [
   { id: "film", label: "Film", Icon: Film },
 ] as const;
 
+// Single source for the space the fixed bottom nav needs (nav height + iOS safe area).
+// Reserved once on the scroll region so no screen's content hides under the nav (WS2-H2).
+const NAV_RESERVE = "calc(72px + env(safe-area-inset-bottom))";
+
 type SectionId = (typeof NAV)[number]["id"];
 
 export default function AAUBasketball() {
@@ -65,7 +69,7 @@ export default function AAUBasketball() {
   // (the iOS grouped-table / Linear pattern). Cards stay white; only the base steps down a tone.
   const goldTheme = {
     minHeight: "100vh",
-    paddingBottom: "calc(64px + env(safe-area-inset-bottom))",
+    paddingBottom: NAV_RESERVE,
     backgroundColor: "#E6EAF0",
     "--as-bg-page": "#E6EAF0",
     "--as-bg-card": "#FFFFFF",

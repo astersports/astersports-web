@@ -107,7 +107,7 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
       {/* countdown hero card */}
       <div className="mt-1 overflow-hidden rounded-[20px] border border-[rgba(0,0,0,0.06)] border-t-[rgba(0,0,0,0.10)] bg-[radial-gradient(280px_160px_at_50%_-10%,rgba(232,144,42,0.12),transparent),linear-gradient(180deg,#F9FAFB,#FFFFFF)] px-4 pb-4 pt-[18px] text-center">
         <div className="font-[var(--font-mono)] text-[11.5px] uppercase tracking-[0.14em] text-[#8F6708]">
-          {cd ? (soon ? `${who} tips soon · in` : `${who} plays in`) : "playing now"}
+          {cd ? (soon ? "Tips soon · in" : "Plays in") : "Playing now"}
         </div>
         <div
           role="img"
@@ -126,35 +126,34 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
         {(driveMin !== null || weather) && (
           <div className="mt-[13px] flex flex-col items-center gap-[9px] border-t border-[rgba(0,0,0,0.06)] pt-[13px]">
             {driveMin !== null && (
-              <div className="flex items-center gap-2 text-[15px] text-[#374151]">
-                <Car className="h-[15px] w-[15px] text-[#4B5563]" />
-                ~{driveMin} min drive · <span className="font-semibold text-[#ffb648]">leave by {leaveBy}</span>
+              <div className="flex flex-col items-center gap-[2px]">
+                <div className="flex items-center gap-2 text-[15px] text-[#374151]">
+                  <Car className="h-[15px] w-[15px] text-[#4B5563]" />
+                  ~{driveMin} min drive · <span className="font-semibold text-[#ffb648]">leave by {leaveBy}</span>
+                </div>
+                <span className="font-[var(--font-mono)] text-[10.5px] text-[#9CA3AF]">typical drive — no live traffic</span>
               </div>
             )}
             {weather && (
               <div className="flex items-center gap-1.5 text-[13.2px] text-[#374151]">
                 <ColorfulWeatherIcon icon={weather.icon} isDay={weather.isDay} className="h-[14px] w-[14px]" />
-                {Math.round(weather.temperature)}°F · {weather.description.toLowerCase()}{advice ? ` — ${advice}` : ""}
+                {Math.round(weather.temperature)}°F · {(weather.isSevereWarning || weather.isRainWarning) && advice ? advice : `${weather.description.toLowerCase()}${advice ? ` — ${advice}` : ""}`}
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* directions — Apple / Google / Waze */}
+      {/* directions — Apple / Google (Waze removed: name-search mis-routes, per operator directive) */}
       {dirs && (
         <div className="mt-[13px] flex gap-[9px]">
           <a href={dirs.apple} target="_blank" rel="noopener noreferrer"
-            className="as-press flex flex-1 items-center justify-center gap-1.5 rounded-[11px] border border-[#E2E8F0] bg-[#F9FAFB] py-[9px] text-[13.2px] font-semibold text-[#374151]">
+            className="as-press flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-[11px] border border-[#E2E8F0] bg-[#F9FAFB] py-[9px] text-[13.2px] font-semibold text-[#374151]">
             <Navigation className="h-[14px] w-[14px]" /> Apple
           </a>
           <a href={dirs.google} target="_blank" rel="noopener noreferrer"
-            className="as-press flex flex-1 items-center justify-center gap-1.5 rounded-[11px] border border-[#E2E8F0] bg-[#F9FAFB] py-[9px] text-[13.2px] font-semibold text-[#6ea2ff]">
+            className="as-press flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-[11px] border border-[#E2E8F0] bg-[#F9FAFB] py-[9px] text-[13.2px] font-semibold text-[#6ea2ff]">
             <Navigation className="h-[14px] w-[14px]" /> Google
-          </a>
-          <a href={dirs.waze} target="_blank" rel="noopener noreferrer"
-            className="as-press flex flex-1 items-center justify-center gap-1.5 rounded-[11px] border border-[#E2E8F0] bg-[#F9FAFB] py-[9px] text-[13.2px] font-semibold text-[#2fd0ff]">
-            <Navigation className="h-[14px] w-[14px]" /> Waze
           </a>
         </div>
       )}
@@ -172,10 +171,6 @@ export default function NextGame({ games }: { games: TeamGame[] }) {
         </button>
       )}
       {reminded && <span role="status" aria-live="polite" className="sr-only">Reminder set to leave by {leaveBy}</span>}
-
-      <div className="px-[18px] pb-1 pt-[11px] text-center font-[var(--font-mono)] text-[12.1px] leading-[1.5] text-[#4B5563]">
-        Countdown + drive time from venue lat/lng. Weather via aster-weather.
-      </div>
     </div>
   );
 }

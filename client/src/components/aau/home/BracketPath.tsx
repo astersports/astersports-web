@@ -60,9 +60,13 @@ export default function BracketPath({ p }: { p: BracketPathInput }) {
       : { cls: "text-[#8F6708]", chip: "bg-[rgba(246,204,85,0.16)] text-[#8F6708]" };
 
   const count =
-    p.decided || p.outcomes == null
+    p.decided || p.outcomes == null || p.advancing == null
       ? null
-      : `advances in ${p.advancing} of ${p.outcomes} remaining scenario${p.outcomes === 1 ? "" : "s"}`;
+      : p.advancing <= 0
+        ? "out in every remaining scenario"
+        : Math.round(p.outcomes / p.advancing) <= 1
+          ? `advances in most remaining scenarios (${p.advancing} of ${p.outcomes})`
+          : `advances in about 1 of every ${Math.round(p.outcomes / p.advancing)} remaining scenarios`;
 
   return (
     <div className="rounded-[12px] border border-[rgba(0,0,0,0.06)] bg-[#FFFFFF] p-3">
@@ -73,9 +77,6 @@ export default function BracketPath({ p }: { p: BracketPathInput }) {
         <span className={`font-[var(--font-display)] text-[14.4px] font-bold ${tone.cls}`}>{label}</span>
       </div>
       {count && <div className="mt-1.5 font-[var(--font-mono)] text-[12.1px] text-[#374151]">{count}</div>}
-      <div className="mt-1.5 flex items-center gap-1.5 font-[var(--font-mono)] text-[11.5px] text-[#4B5563]">
-        <Check className="h-[11px] w-[11px] shrink-0 text-[#16A34A]" aria-hidden="true" /> Outcomes enumerated exactly
-      </div>
     </div>
   );
 }
