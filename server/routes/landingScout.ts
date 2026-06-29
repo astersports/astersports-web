@@ -25,6 +25,7 @@ import {
 } from "../_core/landingAgent/scoutRequest";
 import { streamScout } from "../_core/landingAgent/scoutLlm";
 import { isTurnstileConfigured, verifyTurnstile } from "../_core/landingAgent/turnstile";
+import { allowedOrigin } from "../_core/landingAgent/cors";
 import { buildScoutSystemPrompt } from "../../shared/landingAgentPrompt";
 import { validateRecommendSurface, validateCaptureLead } from "../../shared/landingAgentTools";
 import { emailLeadCaptured } from "../email";
@@ -38,6 +39,23 @@ const TURNSTILE_DENY_MESSAGE =
 const LEAD_FALLBACK_MESSAGE =
   "We couldn't capture that — please use the contact form and we'll reply by email.";
 
+/**
+ * Apply CORS headers when the request comes from an allowlisted cross-origin
+ * surface (e.g. the AAU hub). Echoes the exact Origin — never `*` — and is a
+ * no-op for same-origin / disallowed origins. Called on every response path
+ * (incl. the dark 404, the 400, the SSE stream, and the OPTIONS preflight) so
+ * the header is present whatever the outcome.
+ */
+function applyScoutCors(req: Request, res: Response): void {
+  const origin = allowedOrigin(req.headers.origin as string | undefined);
+  if (!origin) return;
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Max-Age", "86400");
+}
+
 function sse(res: Response, data: Record<string, unknown>): void {
   try {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
@@ -50,7 +68,16 @@ function sse(res: Response, data: Record<string, unknown>): void {
 }
 
 export function registerLandingScoutRoute(app: Express): void {
+  // CORS preflight for cross-origin callers (the browser sends this before a
+  // JSON POST from an allowlisted external surface like the AAU hub).
+  app.options("/api/landing/scout-stream", (req: Request, res: Response) => {
+    applyScoutCors(req, res);
+    res.status(204).end();
+  });
+
   app.post("/api/landing/scout-stream", async (req: Request, res: Response) => {
+    applyScoutCors(req, res);
+
     // Dark by default: behave as if the route does not exist until the flip.
     if (!ENV.landingAgentLive) {
       res.status(404).json({ error: "Not found" });
