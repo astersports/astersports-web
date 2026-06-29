@@ -1,4 +1,5 @@
 import "./instrument"; // ← MUST be first: installs Sentry's global handlers before app code
+import * as Sentry from "@sentry/react";
 import { trpc } from "@/lib/trpc";
 import { UNAUTHED_ERR_MSG } from '@shared/const';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -75,14 +76,14 @@ createRoot(document.getElementById("root")!).render(
   </trpc.Provider>
 );
 
-// Sentry pipeline self-test: append `?sentrytest=1` to any URL to emit one test error.
-// Gated + non-user-facing (no visible "Break the world" button shipped to the public site);
-// used to verify ingestion after a deploy, harmless otherwise.
+// Sentry pipeline self-test: append `?sentrytest=1` to emit ONE captured test event. Reported via
+// captureException (not an uncaught throw, so it never breaks the page) and throttled to once per
+// browser session (so it cannot be used to spam the project). Used to verify ingestion post-deploy.
 if (
   typeof window !== "undefined" &&
-  new URLSearchParams(window.location.search).get("sentrytest") === "1"
+  new URLSearchParams(window.location.search).get("sentrytest") === "1" &&
+  sessionStorage.getItem("sentry-selftest") !== "done"
 ) {
-  setTimeout(() => {
-    throw new Error("Sentry verification: Break the world (sentrytest=1)");
-  }, 1200);
+  sessionStorage.setItem("sentry-selftest", "done");
+  Sentry.captureException(new Error("Sentry connectivity self-test"));
 }

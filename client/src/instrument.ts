@@ -19,9 +19,14 @@
  */
 import * as Sentry from "@sentry/react";
 
+// The baked production DSN is used ONLY in production builds. Local dev / preview builds never
+// report to the production project unless a developer explicitly opts in via VITE_SENTRY_DSN —
+// this keeps dev errors + replays out of the production Sentry project.
+const PROD_DSN =
+  "https://8a928b2fba9d3d6b71710b48cb64cbdb@o4511255144103936.ingest.us.sentry.io/4511649199947776";
 const DSN =
   (import.meta.env.VITE_SENTRY_DSN as string | undefined) ??
-  "https://8a928b2fba9d3d6b71710b48cb64cbdb@o4511255144103936.ingest.us.sentry.io/4511649199947776";
+  (import.meta.env.PROD ? PROD_DSN : undefined);
 
 if (DSN) {
   Sentry.init({
@@ -42,8 +47,9 @@ if (DSN) {
     replaysSessionSampleRate: 0.1,
     replaysOnErrorSampleRate: 1.0,
 
-    // Propagate traces only to our own (same-origin) tRPC/API backend.
-    tracePropagationTargets: ["localhost", /^\//, /astersports\.(io|app)$/],
+    // Propagate traces only to our own backend: relative (same-origin) URLs + absolute
+    // astersports.io/app URLs (no `$` anchor, so paths like /api/trpc still match).
+    tracePropagationTargets: ["localhost", /^\//, /astersports\.(io|app)/],
 
     // No PII by default; strip IP/geo defensively even if something upstream re-adds it.
     sendDefaultPii: false,
