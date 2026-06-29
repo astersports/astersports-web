@@ -1,0 +1,31 @@
+AAU HUB CONSOLIDATION — POINTER (this repo's AAU Hub is moving)
+CC lane · 2026-06-29
+
+WHY THIS FILE: The AAU Hub currently lives in THIS repo (astersports-web,
+client/src/components/aau, served at astersports.io/aau on Railway). Per the
+operator-ratified consolidation strategy, it is being folded INTO the platform app
+(aster-sports / astersports.app) as the FREE parent gateway, with a tiered roll-out.
+Print Studio stays here and is OUT of scope (possible future independent module).
+
+CANONICAL DECISION RECORD lives in the aster-sports repo (the build target):
+- aster-sports/docs/CONSOLIDATION_AUDIT_2026-06-29.txt
+    The grounded audit + decision register (DR-1..DR-AI).
+- aster-sports/docs/CONSOLIDATION_TIERS_AND_FUNCTIONALITY_2026-06-29.txt
+    Architect ratification record, parent + program tier ladders + charging, and the
+    COMPLETE functionality migration map (AAU Hub / legacy-hoopers / existing app →
+    MIGRATE / EXPAND / IN-APP / NEW / RETIRE, per tier).
+- aster-sports/docs/AAU_FAMILY_HUB_BUILD_SPEC_2026-06-26.txt + PUBLIC_RPC_CONTRACT.md
+    The prior ratified family-hub spec + the frozen anon public-RPC contract this consumes.
+- PR: astersports/aster-sports#1154 (held for architect; approved to proceed steps 1-2).
+
+WHAT THIS MEANS FOR THIS REPO:
+- The AAU Hub UI (components/aau, lib/aau) PORTS to aster-sports (TS .tsx → JS .jsx) over
+  the public RPCs the platform already owns. Do not deepen Hub features here; build in
+  aster-sports.
+- Studio + landing remain here. After the port + 301 cutover, the AAU route/dir here is
+  retired and this app slims to Studio + landing.
+- The studio Stripe/trial code (server/{stripe,billing,webhook,shadowBilling}.ts) is the
+  reusable TEMPLATE for the new Supabase edge-function money-path in aster-sports — read
+  it, don't couple to it.
+
+Tracked on both sides so no detail is lost.
