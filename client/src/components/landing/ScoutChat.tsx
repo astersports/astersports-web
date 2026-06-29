@@ -51,6 +51,19 @@ export default function ScoutChat() {
   // what stops a too-early tap from hitting the server with no token → denial.
   const awaitingHuman = turnstileOn && !token;
 
+  // If the check never completes (script blocked by an extension, network, etc.)
+  // the token stays null forever — surface an actionable fallback instead of an
+  // indefinite "verifying…" spinner.
+  const [verifyStalled, setVerifyStalled] = useState(false);
+  useEffect(() => {
+    if (!awaitingHuman) {
+      setVerifyStalled(false);
+      return;
+    }
+    const t = setTimeout(() => setVerifyStalled(true), 12_000);
+    return () => clearTimeout(t);
+  }, [awaitingHuman]);
+
   // Send a question (typed or tapped). Attaches the single-use Turnstile token.
   const ask = (text: string) => {
     if (inFlight.current || !text.trim() || awaitingHuman) return;
@@ -125,10 +138,16 @@ export default function ScoutChat() {
       {/* Cloudflare Turnstile bot gate — renders only when VITE_TURNSTILE_SITE_KEY is set */}
       {turnstileOn && <div ref={containerRef} className="mb-2.5" aria-label="Human verification" />}
 
-      {awaitingHuman && (
+      {awaitingHuman && !verifyStalled && (
         <p className="aster-mono text-[11px] text-slate-400 mb-2 flex items-center gap-2">
           <span className="aster-dot-live" />
           verifying you're human…
+        </p>
+      )}
+      {awaitingHuman && verifyStalled && (
+        <p className="text-[12px] text-slate-400 leading-snug mb-2">
+          The human-check didn't load — disable any ad/script blocker and refresh, or reach us on the{" "}
+          <a href="#contact" className="text-[#F6CC55] hover:underline">contact form</a>.
         </p>
       )}
 
