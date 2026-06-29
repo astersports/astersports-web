@@ -57,10 +57,11 @@ const trpcClient = trpc.createClient({
 // observed on astersports.io). No-op when the env vars are absent.
 const ANALYTICS_SRC = import.meta.env.VITE_ANALYTICS_ENDPOINT;
 const ANALYTICS_ID = import.meta.env.VITE_ANALYTICS_WEBSITE_ID;
-if (ANALYTICS_SRC && ANALYTICS_ID) {
+if (ANALYTICS_SRC && ANALYTICS_ID && !document.getElementById("umami-analytics")) {
   const s = document.createElement("script");
+  s.id = "umami-analytics"; // dedupe — avoids a second tag on HMR re-eval
   s.defer = true;
-  s.src = `${ANALYTICS_SRC}/umami`;
+  s.src = `${ANALYTICS_SRC.replace(/\/+$/, "")}/umami`; // normalize trailing slash(es)
   s.setAttribute("data-website-id", ANALYTICS_ID);
   document.head.appendChild(s);
 }

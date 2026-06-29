@@ -695,6 +695,17 @@
   transform: translateY(-4px);
   box-shadow: 0 20px 40px -14px rgba(21,21,37,.55), 0 4px 10px -2px rgba(21,21,37,.28);
 }
+/* The scan-cycle's active tile carries `.aster-trend-card.active` (defined
+   later), whose gold-ring shadow would otherwise win on equal specificity and
+   cancel the hover lift. This higher-specificity rule combines the active ring
+   WITH the hover lift so hovering the active tile still pops. */
+.aster-node.active:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 0 0 1px rgba(246,204,85,.4),
+    0 20px 40px -14px rgba(21,21,37,.55),
+    0 4px 10px -2px rgba(21,21,37,.28);
+}
 /* the "star" tile — lit (gradient + glow) when the service is live;
    unlit tiles still read as faint stars in the same sky (soft glow + ring),
    never flat grey cards. */

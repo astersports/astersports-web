@@ -16,12 +16,20 @@ import { Button } from "@/components/ui/button";
 import { Loader2, CreditCard, CheckCircle2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
-// Gate Stripe init behind a PRESENT publishable key. `loadStripe("")` throws a
-// console pageerror ("call Stripe() with your publishable key…") on every route
-// that bundles this module — including the landing. Publishable (frontend) key
-// only; secret key / webhook / entitlement writer are untouched.
+// Gate Stripe init behind a PRESENT publishable key, AND init lazily. A bare
+// module-level `loadStripe("")` throws the "call Stripe() with your publishable
+// key" pageerror on every route that bundles this module (studio pages are
+// eagerly imported in App.tsx, so that includes the landing). The lazy singleton
+// below means Stripe.js is only fetched the first time the billing UI actually
+// renders. Publishable (frontend) key only; secret key / webhook / entitlement
+// writer are untouched.
 const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-const stripePromise = STRIPE_PUBLISHABLE_KEY ? loadStripe(STRIPE_PUBLISHABLE_KEY) : null;
+let _stripePromise: ReturnType<typeof loadStripe> | null = null;
+function getStripePromise() {
+  if (!STRIPE_PUBLISHABLE_KEY) return null;
+  if (!_stripePromise) _stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
+  return _stripePromise;
+}
 
 interface CardOnFileFormProps {
   tenantId: number;
@@ -57,6 +65,8 @@ export function CardOnFileForm({ tenantId, onSuccess }: CardOnFileFormProps) {
     onSuccess?.();
   }, [onSuccess]);
 
+  // Resolve the (lazily-created) Stripe singleton on first billing render.
+  const stripePromise = getStripePromise();
   // No publishable key configured → Stripe can't initialize. Render a graceful
   // fallback instead of mounting <Elements stripe={null}> (which would throw).
   if (!stripePromise) {
