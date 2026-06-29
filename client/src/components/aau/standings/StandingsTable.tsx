@@ -73,7 +73,7 @@ function FragmentRow({ r, i, focusId, advanceCount }: { r: RankedRow; i: number;
     <>
       <tr className={me ? "bg-[rgba(201,149,46,0.10)]" : ""}>
         <td className={`w-[18px] ${cell} text-right text-[#4B5563]`}>{r.rank}</td>
-        <td className={`border-t border-[rgba(0,0,0,0.06)] px-3 py-3 text-left text-[15px] font-semibold ${me ? "text-[#1d4ed8]" : "text-[#1A1D23]"}`}>{r.name}</td>
+        <td className={`border-t border-[rgba(0,0,0,0.06)] px-3 py-3 text-left text-[15px] font-semibold ${me ? "text-[#8f6708]" : "text-[#1A1D23]"}`}>{r.name}</td>
         <td className={`${cell} text-right text-[#1A1D23]`}>{wl}</td>
         <td className={`${cell} text-right text-[#1A1D23]`}>{diff}</td>
       </tr>

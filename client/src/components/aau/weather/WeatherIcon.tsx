@@ -75,7 +75,7 @@ const MOON = "#E8EEF7";
 const CLOUD_LIGHT = "#E2E8F0";
 const CLOUD_MID = "#4B5563"; // names track luminance: LIGHT > MID > DARK
 const CLOUD_DARK = "#374151";
-const RAIN = "#5BA0E0";
+const RAIN = "#C9952E";
 const SNOW = "#DCEcFF";
 const BOLT = "#FFD43B";
 
