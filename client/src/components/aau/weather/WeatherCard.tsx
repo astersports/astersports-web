@@ -201,7 +201,7 @@ export function WeatherCardView({ venueName, forecast, eyebrow = "Weather Hub", 
                 <div style={{ flex: 1, position: "relative", height: 5, borderRadius: 3, backgroundColor: "var(--as-bg-tertiary)" }}>
                   <div style={{
                     position: "absolute", top: 0, bottom: 0, left: `${leftPct}%`, width: `${Math.max(8, widthPct)}%`,
-                    borderRadius: 3, background: "linear-gradient(90deg, #5BA0E0, #FFB22E)",
+                    borderRadius: 3, background: "linear-gradient(90deg, #C9952E, #FFB22E)",
                   }} />
                 </div>
                 <span style={{ width: 26, fontSize: 12, fontWeight: 700, color: "var(--as-text-primary)" }}>{d.tempMaxF}°</span>
