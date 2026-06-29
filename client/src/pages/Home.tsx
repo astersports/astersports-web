@@ -6,9 +6,10 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Mail, ArrowRight, MapPin, Menu, X, Send, Settings } from "lucide-react";
+import { Mail, ArrowRight, ArrowUpRight, MapPin, Menu, X, Send, Settings } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { SERVICES, NAV_PRODUCTS } from "@/lib/services";
+import { useScanCycle } from "@/hooks/useScanCycle";
+import { PRODUCTS, SERVICES, NAV_PRODUCTS, STATUS_META, type ServiceEntry } from "@/lib/services";
 import ScrollProgress from "@/components/landing/ScrollProgress";
 import MetricsSection from "@/components/landing/MetricsSection";
 import IntelligenceSection from "@/components/landing/IntelligenceSection";
@@ -279,11 +280,11 @@ function HeroSection() {
               <ArrowRight className="w-4 h-4" />
             </a>
             <a
-              href="#services"
+              href="#platform"
               className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full border border-white/15 text-white font-medium text-base transition-all duration-200 hover:border-[#F6CC55]/40 hover:text-[#F6CC55]"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              See what we do
+              Explore the constellation
             </a>
           </div>
 
@@ -331,6 +332,138 @@ function AgentEyebrow({ tag, isVisible, center = false }: { tag: string; isVisib
       <span className="flex-1 h-px bg-white/10" />
       <span className="aster-mono text-[10px] text-[#34d399]">live</span>
     </div>
+  );
+}
+
+function NodePill({ status }: { status: NonNullable<ServiceEntry["status"]> }) {
+  const meta = STATUS_META[status];
+  if (status === "live" || status === "members") {
+    return (
+      <span className="aster-grad-bg aster-mono self-start mt-auto text-[10.5px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full text-[#1a0e05] font-bold">
+        {meta.label}
+      </span>
+    );
+  }
+  return (
+    <span
+      className="aster-mono self-start mt-auto text-[10.5px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full border"
+      style={{ color: meta.color, borderColor: `color-mix(in srgb, ${meta.color} 45%, transparent)` }}
+    >
+      {meta.label}
+    </span>
+  );
+}
+
+function ConstellationNode({ product, index, isVisible, active }: { product: ServiceEntry; index: number; isVisible: boolean; active: boolean }) {
+  const Icon = product.icon;
+  const lit = product.status === "live" || product.status === "members";
+  return (
+    <a
+      href={product.href}
+      {...(product.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+      className={`aster-node aster-trend-card group relative flex flex-col p-4 min-h-[124px] transition-all duration-500 ${
+        active ? "active" : ""
+      } ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+      style={{ transitionDelay: `${120 + index * 100}ms` }}
+    >
+      {/* the scout's scan sweeps the node it's currently charting */}
+      {active && (
+        <span className="aster-scan-track absolute inset-0 rounded-[18px] pointer-events-none" aria-hidden="true" />
+      )}
+      <div className={`aster-star ${lit || active ? "on" : ""} mb-2.5 transition-all duration-300`}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <h3 className="text-base font-semibold text-white mb-1" style={{ fontFamily: "var(--font-display)" }}>
+        {product.name}
+      </h3>
+      <p className="text-[12.5px] text-slate-400 leading-snug mb-2.5">{product.tagline}</p>
+      {product.status && <NodePill status={product.status} />}
+      {product.external && (
+        <ArrowUpRight className="absolute top-4 right-4 w-4 h-4 text-slate-500 group-hover:text-[#F6CC55] transition-colors" />
+      )}
+    </a>
+  );
+}
+
+function PlatformSection() {
+  const { ref, isVisible } = useScrollReveal();
+  // The agent "maps the constellation" — a scout cycles through and charts each
+  // node in turn (same live-scan motif as the frontier section). The hook pauses
+  // under prefers-reduced-motion and reacts to the user toggling it mid-session.
+  const active = useScanCycle(PRODUCTS.length, isVisible);
+  const current = PRODUCTS[active];
+
+  return (
+    <section id="platform" className="relative py-10 md:py-20 bg-[#2b3652]">
+      <div className="container aster-constellation" ref={ref}>
+        <h2
+          className={`flex items-center gap-3 text-[13px] font-semibold tracking-[0.2em] uppercase text-slate-400 mb-4 transition-all duration-500 ${
+            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+          }`}
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          The constellation
+          <span className="flex-1 h-px bg-white/10" />
+        </h2>
+
+        {/* agent console — the scout charting the platform map, live */}
+        <div
+          className={`aster-terminal p-4 md:p-4 mb-5 transition-all duration-700 ${
+            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <span className="aster-dot-live" />
+            <span className="aster-mono text-[11px] tracking-[0.14em] uppercase text-slate-400">
+              aster-agent · mapping the constellation
+            </span>
+            <span className="aster-mono text-[10px] text-[#34d399] ml-auto">live</span>
+          </div>
+          <div className="aster-scan-track rounded-lg bg-white/[0.02] border border-white/5 px-3.5 py-3">
+            <div className="aster-mono text-[12px] text-slate-300 leading-relaxed" aria-live="polite" aria-atomic="true">
+              <span className="text-[#F6CC55]">▸</span> charting node{" "}
+              <span className="text-white">{active + 1}</span>
+              <span className="text-slate-500"> / {PRODUCTS.length}</span> —{" "}
+              <span className="aster-grad-text font-semibold">{current.name}</span>
+            </div>
+            <div className="as-progress-bar mt-2.5" aria-hidden="true">
+              <div
+                className="as-progress-fill"
+                style={{
+                  width: `${((active + 1) / PRODUCTS.length) * 100}%`,
+                  background: "var(--brand-grad)",
+                  transition: "width .5s cubic-bezier(0.23,1,0.32,1)",
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {PRODUCTS.map((product, i) => (
+            <ConstellationNode key={product.id} product={product} index={i} isVisible={isVisible} active={i === active} />
+          ))}
+        </div>
+
+        <div
+          className={`mt-4 flex items-center gap-4 flex-wrap rounded-2xl border border-white/10 bg-white/[0.02] px-5 py-4 text-slate-400 text-[13.5px] transition-all duration-700 delay-300 ${
+            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+          }`}
+        >
+          <b className="text-white font-semibold tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
+            We also build
+          </b>
+          <span>agency work for brands &amp; orgs</span>
+          <div className="flex gap-2 flex-wrap sm:ml-auto">
+            {["Brand", "Web", "Apps", "Print"].map((t) => (
+              <span key={t} className="text-xs text-slate-400 border border-white/10 rounded-md px-2.5 py-1">
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -622,6 +755,7 @@ export default function Home() {
       <ScrollProgress />
       <Header />
       <HeroSection />
+      <PlatformSection />
       <ServicesSection />
       <MetricsSection />
       <IntelligenceSection />
