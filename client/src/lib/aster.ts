@@ -102,7 +102,7 @@ export interface StandingsTeam {
   /** completed games behind the rating (0 = no history) */
   gp?: number;
 }
-export interface StandingsGame { aId: string; bId: string; aScore: number; bScore: number }
+export interface StandingsGame { aId: string; bId: string; aScore: number; bScore: number; isForfeit?: boolean }
 export interface RemainingGame { aId: string; bId: string }
 export interface StandingsRules { pointDiffCap: number | null; tiebreakers: string[] }
 export interface StandingsDivision { id: string; name: string; circuit: string | null; advance_count: number }

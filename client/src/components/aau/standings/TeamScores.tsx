@@ -41,7 +41,7 @@ export default function TeamScores({ focusId, games, nameById }: Props) {
                 </span>
               </span>
               <span className="shrink-0 font-[var(--font-mono)] text-[14.6px] font-bold text-[#1A1D23]">
-                {my}<span className="text-[#9CA3AF]">–</span>{opp}
+                {g.isForfeit ? <span className="text-[12.6px] font-normal text-[#4B5563]">forfeit</span> : <>{my}<span className="text-[#9CA3AF]">–</span>{opp}</>}
               </span>
             </div>
           );
