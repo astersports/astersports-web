@@ -41,31 +41,40 @@ vi.mock("../serverLog", () => ({ log: { info: vi.fn(), error: vi.fn(), warn: vi.
 
 import { registerLandingScoutRoute } from "./landingScout";
 import { emailLeadCaptured } from "../email";
+import { ENV } from "../_core/env";
 
 let routeHandler: (req: any, res: any) => Promise<void>;
+let optionsHandler: (req: any, res: any) => void;
 
 function createMockApp() {
   return {
     post: vi.fn((_path: string, handler: any) => {
       routeHandler = handler;
     }),
+    options: vi.fn((_path: string, handler: any) => {
+      optionsHandler = handler;
+    }),
   };
 }
 
-function createMockReq(body: any = {}) {
+function createMockReq(body: any = {}, headers: Record<string, any> = {}) {
   return {
     body,
-    headers: { "x-forwarded-for": "1.2.3.4" },
+    headers: { "x-forwarded-for": "1.2.3.4", ...headers },
     socket: { remoteAddress: "1.2.3.4" },
   };
 }
 
 function createMockRes() {
   const chunks: string[] = [];
+  const headers: Record<string, string> = {};
   return {
     status: vi.fn().mockReturnThis(),
     json: vi.fn().mockReturnThis(),
     writeHead: vi.fn(),
+    setHeader: vi.fn((k: string, v: string) => {
+      headers[k] = v;
+    }),
     write: vi.fn((chunk: string) => {
       chunks.push(chunk);
       return true;
@@ -74,6 +83,7 @@ function createMockRes() {
     end: vi.fn(),
     writableEnded: false,
     _chunks: chunks,
+    _headers: headers,
   };
 }
 
@@ -134,5 +144,64 @@ describe("registerLandingScoutRoute — capture_lead acknowledgement honesty", (
     const types = sseEvents(res).map((e) => e.type);
     expect(types).toContain("lead_error");
     expect(types).not.toContain("lead_ack");
+  });
+});
+
+const AAU_ORIGIN = "https://legacy-hoopers-production.up.railway.app";
+
+describe("registerLandingScoutRoute — CORS for cross-origin surfaces (AAU hub)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (emailLeadCaptured as any).mockResolvedValue(true);
+  });
+
+  it("answers the OPTIONS preflight with 204 + CORS headers for an allowed origin", () => {
+    const app = createMockApp();
+    registerLandingScoutRoute(app as any);
+
+    const res = createMockRes();
+    optionsHandler(createMockReq({}, { origin: AAU_ORIGIN }), res);
+
+    expect(res.status).toHaveBeenCalledWith(204);
+    expect(res._headers["Access-Control-Allow-Origin"]).toBe(AAU_ORIGIN);
+    expect(res._headers["Access-Control-Allow-Methods"]).toMatch(/POST/);
+    expect(res._headers["Access-Control-Allow-Headers"]).toMatch(/Content-Type/i);
+  });
+
+  it("does NOT set CORS headers on the preflight for a disallowed origin", () => {
+    const app = createMockApp();
+    registerLandingScoutRoute(app as any);
+
+    const res = createMockRes();
+    optionsHandler(createMockReq({}, { origin: "https://evil.example" }), res);
+
+    expect(res.status).toHaveBeenCalledWith(204);
+    expect(res._headers["Access-Control-Allow-Origin"]).toBeUndefined();
+  });
+
+  it("stays dark: the OPTIONS preflight 404s when the agent flag is off", () => {
+    const app = createMockApp();
+    registerLandingScoutRoute(app as any);
+
+    (ENV as { landingAgentLive: boolean }).landingAgentLive = false;
+    try {
+      const res = createMockRes();
+      optionsHandler(createMockReq({}, { origin: AAU_ORIGIN }), res);
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.status).not.toHaveBeenCalledWith(204);
+    } finally {
+      (ENV as { landingAgentLive: boolean }).landingAgentLive = true;
+    }
+  });
+
+  it("echoes the allowed origin on the POST response too", async () => {
+    const app = createMockApp();
+    registerLandingScoutRoute(app as any);
+
+    const res = createMockRes();
+    await routeHandler(createMockReq(goodBody, { origin: AAU_ORIGIN }), res);
+
+    expect(res._headers["Access-Control-Allow-Origin"]).toBe(AAU_ORIGIN);
+    expect(res._headers["Vary"]).toBe("Origin");
   });
 });
