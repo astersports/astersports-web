@@ -300,8 +300,8 @@ function HeroSection() {
                   <span className="text-[#F6CC55]">▸</span> initializing aster-agent
                 </div>
                 <div className="text-slate-300">
-                  <span className="text-[#F6CC55]">▸</span> 4 systems online —{" "}
-                  <span className="aster-grad-text font-semibold">Print Studio · Team App · AAU Hub · Org Sites</span>
+                  <span className="text-[#F6CC55]">▸</span> {PRODUCTS.length} systems online —{" "}
+                  <span className="aster-grad-text font-semibold">mapping the constellation</span>
                 </div>
               </div>
               <div className="as-progress-bar mt-2.5" aria-hidden="true">
@@ -445,7 +445,7 @@ function PlatformSection() {
             <span className="aster-mono text-[10px] text-[#34d399] ml-auto">live</span>
           </div>
           <div className="aster-scan-track rounded-lg bg-white/[0.02] border border-white/5 px-3.5 py-3">
-            <div className="aster-mono text-[12px] text-slate-300 leading-relaxed" aria-live="polite" aria-atomic="true">
+            <div className="aster-mono text-[12px] text-slate-300 leading-relaxed">
               <span className="text-[#F6CC55]">▸</span> charting node{" "}
               <span className="text-white">{active + 1}</span>
               <span className="text-slate-500"> / {PRODUCTS.length}</span> —{" "}
@@ -568,7 +568,7 @@ function ServicesSection() {
               <span className="aster-mono text-[10px] text-[#34d399] ml-auto">live</span>
             </div>
             <div className="aster-scan-track rounded-lg bg-white/[0.02] border border-white/5 px-3.5 py-3">
-              <div className="aster-mono text-[12px] text-slate-300 leading-relaxed" aria-live="polite" aria-atomic="true">
+              <div className="aster-mono text-[12px] text-slate-300 leading-relaxed">
                 <span className="text-[#F6CC55]">▸</span> capability{" "}
                 <span className="text-white">{active + 1}</span>
                 <span className="text-slate-500"> / {SERVICES.length}</span> —{" "}
