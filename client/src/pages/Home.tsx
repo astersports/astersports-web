@@ -6,16 +6,13 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Mail, ArrowRight, ArrowUpRight, MapPin, Menu, X, ChevronDown, Send, Settings } from "lucide-react";
+import { Mail, ArrowRight, MapPin, Menu, X, Send, Settings } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { useScanCycle } from "@/hooks/useScanCycle";
-import { PRODUCTS, SERVICES, NAV_PRODUCTS, STATUS_META, type ServiceEntry } from "@/lib/services";
-import { FAQ } from "@shared/landingKnowledge";
+import { SERVICES, NAV_PRODUCTS } from "@/lib/services";
 import ScrollProgress from "@/components/landing/ScrollProgress";
 import MetricsSection from "@/components/landing/MetricsSection";
 import IntelligenceSection from "@/components/landing/IntelligenceSection";
 import FrontierSection from "@/components/landing/FrontierSection";
-import TechMarquee from "@/components/landing/TechMarquee";
 
 const LOGO_URL = "/aster-mark.png";
 const SERVICES_VISUAL_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663756289268/4gGAtBP2vWCBU9FC7zDMWA/services-visual-iD7nJ76bKWcPDDk2JN8BYh.webp";
@@ -128,9 +125,6 @@ function Header() {
           <a href="#services" className="text-sm text-slate-300 hover:text-[#F6CC55] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
             Services
           </a>
-          <a href="#about" className="text-sm text-slate-300 hover:text-[#F6CC55] transition-colors" style={{ fontFamily: "var(--font-display)" }}>
-            About
-          </a>
 
           {isOwner && (
             <a href="/admin/billing" className="text-sm text-slate-300 hover:text-[#F6CC55] transition-colors flex items-center gap-1" style={{ fontFamily: "var(--font-display)" }}>
@@ -179,9 +173,6 @@ function Header() {
           ))}
           <a href="#services" className="text-base text-slate-300 hover:text-[#F6CC55] transition-colors py-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
             Services
-          </a>
-          <a href="#about" className="text-base text-slate-300 hover:text-[#F6CC55] transition-colors py-2" style={{ fontFamily: "var(--font-display)" }} onClick={() => setMobileOpen(false)}>
-            About
           </a>
 
           {isOwner && (
@@ -288,11 +279,11 @@ function HeroSection() {
               <ArrowRight className="w-4 h-4" />
             </a>
             <a
-              href="#platform"
+              href="#services"
               className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full border border-white/15 text-white font-medium text-base transition-all duration-200 hover:border-[#F6CC55]/40 hover:text-[#F6CC55]"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              Explore the constellation
+              See what we do
             </a>
           </div>
 
@@ -340,138 +331,6 @@ function AgentEyebrow({ tag, isVisible, center = false }: { tag: string; isVisib
       <span className="flex-1 h-px bg-white/10" />
       <span className="aster-mono text-[10px] text-[#34d399]">live</span>
     </div>
-  );
-}
-
-function NodePill({ status }: { status: NonNullable<ServiceEntry["status"]> }) {
-  const meta = STATUS_META[status];
-  if (status === "live" || status === "members") {
-    return (
-      <span className="aster-grad-bg aster-mono self-start mt-auto text-[10.5px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full text-[#1a0e05] font-bold">
-        {meta.label}
-      </span>
-    );
-  }
-  return (
-    <span
-      className="aster-mono self-start mt-auto text-[10.5px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full border"
-      style={{ color: meta.color, borderColor: `color-mix(in srgb, ${meta.color} 45%, transparent)` }}
-    >
-      {meta.label}
-    </span>
-  );
-}
-
-function ConstellationNode({ product, index, isVisible, active }: { product: ServiceEntry; index: number; isVisible: boolean; active: boolean }) {
-  const Icon = product.icon;
-  const lit = product.status === "live" || product.status === "members";
-  return (
-    <a
-      href={product.href}
-      {...(product.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-      className={`aster-node aster-trend-card group relative flex flex-col p-4 min-h-[124px] transition-all duration-500 ${
-        active ? "active" : ""
-      } ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
-      style={{ transitionDelay: `${120 + index * 100}ms` }}
-    >
-      {/* the scout's scan sweeps the node it's currently charting */}
-      {active && (
-        <span className="aster-scan-track absolute inset-0 rounded-[18px] pointer-events-none" aria-hidden="true" />
-      )}
-      <div className={`aster-star ${lit || active ? "on" : ""} mb-2.5 transition-all duration-300`}>
-        <Icon className="w-5 h-5" />
-      </div>
-      <h3 className="text-base font-semibold text-white mb-1" style={{ fontFamily: "var(--font-display)" }}>
-        {product.name}
-      </h3>
-      <p className="text-[12.5px] text-slate-400 leading-snug mb-2.5">{product.tagline}</p>
-      {product.status && <NodePill status={product.status} />}
-      {product.external && (
-        <ArrowUpRight className="absolute top-4 right-4 w-4 h-4 text-slate-500 group-hover:text-[#F6CC55] transition-colors" />
-      )}
-    </a>
-  );
-}
-
-function PlatformSection() {
-  const { ref, isVisible } = useScrollReveal();
-  // The agent "maps the constellation" — a scout cycles through and charts each
-  // node in turn (same live-scan motif as the frontier section). The hook pauses
-  // under prefers-reduced-motion and reacts to the user toggling it mid-session.
-  const active = useScanCycle(PRODUCTS.length, isVisible);
-  const current = PRODUCTS[active];
-
-  return (
-    <section id="platform" className="relative py-10 md:py-20 bg-[#2b3652]">
-      <div className="container aster-constellation" ref={ref}>
-        <h2
-          className={`flex items-center gap-3 text-[13px] font-semibold tracking-[0.2em] uppercase text-slate-400 mb-4 transition-all duration-500 ${
-            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
-          }`}
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          The constellation
-          <span className="flex-1 h-px bg-white/10" />
-        </h2>
-
-        {/* agent console — the scout charting the platform map, live */}
-        <div
-          className={`aster-terminal p-4 md:p-4 mb-5 transition-all duration-700 ${
-            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-          }`}
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <span className="aster-dot-live" />
-            <span className="aster-mono text-[11px] tracking-[0.14em] uppercase text-slate-400">
-              aster-agent · mapping the constellation
-            </span>
-            <span className="aster-mono text-[10px] text-[#34d399] ml-auto">live</span>
-          </div>
-          <div className="aster-scan-track rounded-lg bg-white/[0.02] border border-white/5 px-3.5 py-3">
-            <div className="aster-mono text-[12px] text-slate-300 leading-relaxed" aria-live="polite" aria-atomic="true">
-              <span className="text-[#F6CC55]">▸</span> charting node{" "}
-              <span className="text-white">{active + 1}</span>
-              <span className="text-slate-500"> / {PRODUCTS.length}</span> —{" "}
-              <span className="aster-grad-text font-semibold">{current.name}</span>
-            </div>
-            <div className="as-progress-bar mt-2.5" aria-hidden="true">
-              <div
-                className="as-progress-fill"
-                style={{
-                  width: `${((active + 1) / PRODUCTS.length) * 100}%`,
-                  background: "var(--brand-grad)",
-                  transition: "width .5s cubic-bezier(0.23,1,0.32,1)",
-                }}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {PRODUCTS.map((product, i) => (
-            <ConstellationNode key={product.id} product={product} index={i} isVisible={isVisible} active={i === active} />
-          ))}
-        </div>
-
-        <div
-          className={`mt-4 flex items-center gap-4 flex-wrap rounded-2xl border border-white/10 bg-white/[0.02] px-5 py-4 text-slate-400 text-[13.5px] transition-all duration-700 delay-300 ${
-            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-          }`}
-        >
-          <b className="text-white font-semibold tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
-            We also build
-          </b>
-          <span>agency work for brands &amp; orgs</span>
-          <div className="flex gap-2 flex-wrap sm:ml-auto">
-            {["Brand", "Web", "Apps", "Print"].map((t) => (
-              <span key={t} className="text-xs text-slate-400 border border-white/10 rounded-md px-2.5 py-1">
-                {t}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -543,170 +402,6 @@ function ServicesSection() {
               />
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-[#323d5c] via-transparent to-transparent" />
             </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function ProcessSection() {
-  const { ref, isVisible } = useScrollReveal();
-
-  const steps = [
-    { number: "01", title: "Discovery", description: "We learn your goals, audience, and technical requirements." },
-    { number: "02", title: "Design & Build", description: "Custom development with regular check-ins and previews." },
-    { number: "03", title: "Launch", description: "Thorough testing, deployment, and handoff documentation." },
-    { number: "04", title: "Maintain", description: "Ongoing support, updates, and performance monitoring." },
-  ];
-
-  return (
-    <section className="relative py-10 md:py-16 bg-[#2b3652]">
-      <div className="container" ref={ref}>
-        <div className="text-center mb-16">
-          <AgentEyebrow tag="workflow" isVisible={isVisible} center />
-          <h2
-            className={`text-3xl md:text-4xl font-bold text-white tracking-tight transition-all duration-700 delay-100 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
-            }`}
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            From concept to constellation.
-          </h2>
-        </div>
-
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-          {steps.map((step, i) => (
-            <div
-              key={step.number}
-              className={`aster-panel relative p-6 hover:-translate-y-1 group ${
-                isVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-8 scale-95"
-              }`}
-              style={{
-                transitionDelay: `${200 + i * 120}ms`,
-                transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)",
-              }}
-            >
-              <span className="text-4xl font-bold bg-gradient-to-b from-[#F6CC55] to-[#E0631C] bg-clip-text text-transparent group-hover:scale-110 inline-block transition-transform duration-200" style={{ fontFamily: "var(--font-display)" }}>
-                {step.number}
-              </span>
-              <h3 className="text-lg font-semibold text-white mt-3 mb-2" style={{ fontFamily: "var(--font-display)" }}>
-                {step.title}
-              </h3>
-              <p className="text-slate-400 text-sm leading-relaxed">
-                {step.description}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function AboutSection() {
-  const { ref, isVisible } = useScrollReveal();
-
-  return (
-    <section id="about" className="relative py-10 md:py-16 bg-[#323d5c]">
-      <div className="container" ref={ref}>
-        <div className="max-w-3xl mx-auto">
-          <AgentEyebrow tag="profile" isVisible={isVisible} />
-
-          <h2
-            className={`text-3xl md:text-4xl font-bold text-white mb-8 tracking-tight transition-all duration-700 delay-100 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
-            }`}
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            Built on precision.
-            <br />
-            <span className="text-slate-400">Driven by craft.</span>
-          </h2>
-
-          <div
-            className={`space-y-5 transition-all duration-700 delay-200 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
-            }`}
-          >
-            <p className="text-lg text-slate-300 leading-relaxed">
-              A design and technology studio in Westchester, NY — working where creative
-              design meets engineering, from AI print tools for apparel to custom platforms
-              for sports and community organizations.
-            </p>
-            <p className="text-slate-400 leading-relaxed">
-              Same care and craft on every project, for fashion brands, sports organizations,
-              and community institutions across the Northeast and beyond.
-            </p>
-          </div>
-
-          <div
-            className={`mt-8 flex items-center gap-2 text-slate-400 text-sm transition-all duration-700 delay-300 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
-            }`}
-          >
-            <MapPin className="w-4 h-4 text-[#F6CC55]/60" />
-            <span>Westchester, NY</span>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function FAQSection() {
-  const { ref, isVisible } = useScrollReveal();
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
-
-  return (
-    <section id="faq" className="relative py-10 md:py-16 bg-[#2b3652]">
-      <div className="container" ref={ref}>
-        <div className="max-w-3xl mx-auto">
-          <div className="text-center mb-12">
-            <AgentEyebrow tag="knowledge base" isVisible={isVisible} center />
-            <h2
-              className={`text-3xl md:text-4xl font-bold text-white tracking-tight transition-all duration-700 delay-100 ${
-                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
-              }`}
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              Common questions, straight answers.
-            </h2>
-          </div>
-
-          <div className="space-y-3">
-            {FAQ.map((faq, i) => (
-              <div
-                key={i}
-                className={`aster-panel overflow-hidden transition-all duration-500 ${
-                  openIndex === i ? "shadow-[0_0_0_1px_rgba(246,204,85,0.35)]" : ""
-                } ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
-                style={{ transitionDelay: `${200 + i * 60}ms` }}
-              >
-                <button
-                  className="w-full flex items-center justify-between p-5 text-left"
-                  onClick={() => setOpenIndex(openIndex === i ? null : i)}
-                >
-                  <span className="text-base font-medium text-white pr-4" style={{ fontFamily: "var(--font-display)" }}>
-                    {faq.q}
-                  </span>
-                  <ChevronDown
-                    className={`w-5 h-5 text-[#F6CC55] flex-shrink-0 transition-transform duration-200 ${
-                      openIndex === i ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
-                <div
-                  className={`overflow-hidden transition-all duration-300 ease-out ${
-                    openIndex === i ? "max-h-48 opacity-100" : "max-h-0 opacity-0"
-                  }`}
-                >
-                  <p className="px-5 pb-5 text-slate-400 leading-relaxed text-[15px]">
-                    {faq.a}
-                  </p>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </div>
@@ -927,15 +622,10 @@ export default function Home() {
       <ScrollProgress />
       <Header />
       <HeroSection />
-      <PlatformSection />
+      <ServicesSection />
       <MetricsSection />
       <IntelligenceSection />
       <FrontierSection />
-      <TechMarquee />
-      <ServicesSection />
-      <ProcessSection />
-      <AboutSection />
-      <FAQSection />
       <ContactSection />
       <Footer />
     </div>
