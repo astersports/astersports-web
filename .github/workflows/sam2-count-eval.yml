@@ -32,7 +32,7 @@ jobs:
       STUDIO_MASK_PROVIDER: sam2
       SAM2_EVAL_STAMP: "run ${{ github.run_id }} @ ${{ github.sha }}"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Guard — require Replicate token
         env:
@@ -44,10 +44,10 @@ jobs:
           fi
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
