@@ -363,7 +363,7 @@ function MembersList({ tenantId, isOwner }: { tenantId: number; isOwner: boolean
                           ? "bg-amber-500/20 text-amber-500 border-amber-500/30"
                           : isAdminRow
                           ? "bg-amber-500/10 text-amber-400"
-                          : "bg-[#4a8fd4]/10 text-[#4a8fd4]"
+                          : "bg-[#c9952e]/10 text-[#8f6708]"
                       }`}
                     >
                       {m.role}

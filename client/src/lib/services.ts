@@ -57,7 +57,7 @@ export const STATUS_META: Record<
   { label: string; color: string; bg: string }
 > = {
   live: { label: "Live", color: "#34d399", bg: "rgba(52, 211, 153, 0.12)" },
-  beta: { label: "Beta", color: "#4a9fff", bg: "rgba(74, 159, 255, 0.12)" },
+  beta: { label: "Beta", color: "#F6CC55", bg: "rgba(246, 204, 85, 0.12)" },
   members: { label: "Members", color: "#a78bfa", bg: "rgba(167, 139, 250, 0.14)" },
   soon: { label: "Coming soon", color: "#94a3b8", bg: "rgba(148, 163, 184, 0.12)" },
 };
@@ -90,7 +90,7 @@ export const PRODUCTS: ServiceEntry[] = [
     external: true,
     status: "beta",
     icon: Smartphone,
-    accent: "#4a9fff",
+    accent: "#F6CC55",
     cta: "Explore the App",
     inNav: true,
     navLabel: "App",
@@ -177,7 +177,7 @@ export const SERVICES: ServiceEntry[] = [
       "Custom websites and web applications built from the ground up — clean code, modern frameworks, pixel-perfect execution.",
     href: "#contact",
     icon: Code,
-    accent: "#4a9fff",
+    accent: "#F6CC55",
   },
   {
     id: "brand",

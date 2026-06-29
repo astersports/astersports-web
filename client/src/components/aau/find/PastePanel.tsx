@@ -81,7 +81,7 @@ export default function PastePanel({
       {/* source line — labeled provenance (spec §5 / §7). TourneyMachine-only for now; copy + the
           aria-label both say so. We label the source, validate-or-hold what we ingest, never fabricate. */}
       <div className="mx-[18px] mt-[11px] inline-flex items-center gap-[6px] font-[var(--font-mono)] text-[11.5px]" style={{ color: C.dim }}>
-        <span className="h-[7px] w-[7px] rounded-full" style={{ background: C.cobalt }} aria-hidden />
+        <span className="h-[7px] w-[7px] rounded-full" style={{ background: C.g2 }} aria-hidden />
         TourneyMachine links for now · source labeled, validated-or-held — never fabricated
       </div>
 
