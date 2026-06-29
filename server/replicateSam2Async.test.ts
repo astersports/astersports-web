@@ -16,7 +16,9 @@ const { mockCreate, mockGet, mockSafeFetch } = vi.hoisted(() => ({
 
 vi.mock("replicate", () => ({
   // `new Replicate(...)` returns this object (a constructor returning an object wins over `new`).
-  default: vi.fn().mockImplementation(() => ({ predictions: { create: mockCreate, get: mockGet } })),
+  default: vi.fn().mockImplementation(function () {
+    return { predictions: { create: mockCreate, get: mockGet } };
+  }),
 }));
 vi.mock("./_core/net/safeFetch", () => ({ safeFetchBuffer: mockSafeFetch }));
 vi.mock("./_core/env", () => ({
