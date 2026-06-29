@@ -60,7 +60,7 @@ export default function VariantRow({
               className="rounded-[6px] border px-[7px] py-[2px] font-[var(--font-mono)] text-[11.5px]"
               style={
                 c.kind === "g"
-                  ? { color: C.cobalt, borderColor: "rgba(37,99,235,.3)" }
+                  ? { color: C.g3, borderColor: "rgba(201,149,46,.3)" }
                   : c.kind === "tier"
                     ? { color: C.g3, borderColor: "#E2C98A" }
                     : { color: C.dim, borderColor: C.line }
@@ -86,7 +86,7 @@ export default function VariantRow({
         className="as-press flex min-h-[44px] shrink-0 items-center gap-1 rounded-[8px] px-[11px] font-[var(--font-mono)] text-[11.5px] font-semibold"
         style={
           tracked
-            ? { background: "rgba(95,160,230,.14)", border: "1px solid rgba(95,160,230,.4)", color: "#bcd8f6" }
+            ? { background: "rgba(201,149,46,.14)", border: "1px solid rgba(201,149,46,.4)", color: "#8F6708" }
             : { background: C.grad, border: "none", color: "#1a1206" }
         }
       >

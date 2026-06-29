@@ -5,7 +5,7 @@
 // (the AAU hub wears its own dark palette).
 
 // LIGHT MODE (operator-directed 2026-06-27, one-way) — aligned to the Aster Sports light brand:
-// cool-gray/white surfaces, dark text ranks, gold + cobalt accents, semantic status colors. Keys
+// cool-gray/white surfaces, dark text ranks, gold accents, semantic status colors. Keys
 // are unchanged so every consumer flips automatically; values map each token to its light role.
 export const C = {
   bg: "#F7F8FA",                 // page surface
@@ -23,7 +23,6 @@ export const C = {
   g3: "#8F6708",                 // gold TEXT (AA on white) — was bright #F6CC55 on dark
   live: "#16A34A",               // live / success (reads on white)
   pos: "#16A34A",                // positive
-  cobalt: "#2563eb",             // info / cobalt (AA)
   grad: "linear-gradient(100deg,#E0631C,#E8902A,#F6CC55,#FBD56B)", // gold gradient (dark text on it)
 } as const;
 

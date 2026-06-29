@@ -55,8 +55,8 @@ export default function FilmAiReviewGate() {
         <div className="mt-[4px] text-[13.2px] leading-[1.55]" style={{ color: C.dim }}>
           When a reel is available, the model breaks down what it can see — the steal, the transition, the left-hand finish under contact — as a development note that exists because it&apos;s in the video, not to flatter. It describes only visible on-court actions, never intent or anything off-frame.
         </div>
-        <div className="mt-[10px] flex items-center gap-[7px] rounded-[10px] px-[10px] py-[8px]" style={{ background: "rgba(95,160,230,.06)", border: "1px solid rgba(95,160,230,.2)" }}>
-          <ShieldCheck className="h-[14px] w-[14px] shrink-0" style={{ color: C.cobalt }} aria-hidden="true" />
+        <div className="mt-[10px] flex items-center gap-[7px] rounded-[10px] px-[10px] py-[8px]" style={{ background: "rgba(201,149,46,.06)", border: "1px solid rgba(201,149,46,.2)" }}>
+          <ShieldCheck className="h-[14px] w-[14px] shrink-0" style={{ color: C.g3 }} aria-hidden="true" />
           <span className="text-[12.1px] leading-[1.45]" style={{ color: C.dim }}>Tracked by <span style={{ color: C.ink, fontWeight: 600 }}>jersey number, not face</span> — no facial recognition.</span>
         </div>
       </div>

@@ -30,8 +30,8 @@ export default function HomeGatedSections({ teamCount }: { teamCount: number }) 
   return (
     <div className="mt-5 space-y-3 px-[18px]">
       {/* what-changed — gated on the §2.D diff feed */}
-      <div className="flex items-start gap-[9px] rounded-[13px] px-[12px] py-[11px]" style={{ border: `1px solid ${C.hair2}`, background: "rgba(95,160,230,.05)" }}>
-        <Bell className="mt-[1px] h-[15px] w-[15px] shrink-0" style={{ color: C.cobalt }} aria-hidden />
+      <div className="flex items-start gap-[9px] rounded-[13px] px-[12px] py-[11px]" style={{ border: `1px solid ${C.hair2}`, background: "rgba(201,149,46,.05)" }}>
+        <Bell className="mt-[1px] h-[15px] w-[15px] shrink-0" style={{ color: C.g3 }} aria-hidden />
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <div className="font-[var(--font-display)] text-[14.4px] font-semibold" style={{ color: C.ink }}>Schedule-change watch</div>
