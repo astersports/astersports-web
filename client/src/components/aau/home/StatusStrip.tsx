@@ -26,7 +26,7 @@ export default function StatusStrip({ liveNow, today, toAdvance }: Props) {
       </div>
       {toAdvance == null && (
         <div className="mt-1.5 px-1 text-center font-[var(--font-mono)] text-[11px] text-[#4B5563]">
-          To-advance computes when pool play wraps — no estimate before the model earns it.
+          We'll show who's advancing once pool play wraps.
         </div>
       )}
     </div>
