@@ -24,15 +24,26 @@ export default function ScoutChat() {
   const { configured: turnstileOn, containerRef, token, reset: resetTurnstile } = useTurnstile();
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Synchronous in-flight guard: `send` closes over the previous `streaming`, so
+  // two taps in the same tick (double-click a chip) would both pass its check and
+  // fire overlapping requests. This ref blocks the second call before any render.
+  const inFlight = useRef(false);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [bubbles, cta, leadAck, notice]);
 
+  // Clear the guard once a turn finishes (streaming flips back to false).
+  useEffect(() => {
+    if (!streaming) inFlight.current = false;
+  }, [streaming]);
+
   // Send a question (typed or tapped). Attach the single-use Turnstile token
   // (server verifies the first turn, then caches the session), then refresh the
   // widget so a retry has a fresh token.
   const ask = (text: string) => {
+    if (inFlight.current || !text.trim()) return;
+    inFlight.current = true;
     void send(text, token ?? undefined);
     if (turnstileOn) resetTurnstile();
   };
