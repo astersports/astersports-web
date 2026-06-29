@@ -47,7 +47,9 @@ function GameCard({ g, multiDay }: { g: TournamentGame; multiDay: boolean }) {
   const homeWon = final && lit && (g.homeScore ?? 0) > (g.awayScore ?? 0);
   const awayWon = final && lit && (g.awayScore ?? 0) > (g.homeScore ?? 0);
   // Forfeit: the awarded 20-0 isn't a played score — show W / FF, not the numbers (H6/H7).
-  const forfeit = final && !!g.isForfeit;
+  // Gate on `lit` so the winner is determinable; without scores we can't tell W from FF, so
+  // fall back to the normal render rather than showing FF/FF for both sides (Copilot review).
+  const forfeit = final && lit && !!g.isForfeit;
 
   const teamRow = (name: string, score: number | null, won: boolean, lost: boolean) => (
     <div className="flex items-center justify-between gap-2 py-[3px]">
