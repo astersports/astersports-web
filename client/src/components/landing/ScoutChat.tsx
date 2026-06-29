@@ -38,14 +38,6 @@ export default function ScoutChat() {
     if (!streaming) inFlight.current = false;
   }, [streaming]);
 
-  // After any denial/error, fetch a fresh Turnstile token so a retry can pass
-  // (the failed token was consumed server-side). On success we DON'T reset — the
-  // server has cached the session as verified, so later turns need no new token
-  // and aren't blocked waiting for one.
-  useEffect(() => {
-    if (notice && turnstileOn) resetTurnstile();
-  }, [notice, turnstileOn, resetTurnstile]);
-
   // Send a question (typed or tapped). Turnstile is BEST-EFFORT: we attach the
   // token if the widget has produced one (server verifies + caches the session),
   // but we never block sending on it — the server soft-fails a missing token, so
@@ -54,6 +46,10 @@ export default function ScoutChat() {
     if (inFlight.current || !text.trim()) return;
     inFlight.current = true;
     void send(text, token ?? undefined);
+    // Turnstile tokens are single-use — refresh so the next turn doesn't re-send
+    // an already-consumed token (repeated server-side verify failures). A verified
+    // session skips the check anyway, so a not-yet-ready token is harmless.
+    if (turnstileOn) resetTurnstile();
   };
 
   const submit = (e: React.FormEvent) => {
