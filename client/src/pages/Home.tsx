@@ -16,8 +16,6 @@ import IntelligenceSection from "@/components/landing/IntelligenceSection";
 import FrontierSection from "@/components/landing/FrontierSection";
 
 const LOGO_URL = "/aster-mark.png";
-const SERVICES_VISUAL_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663756289268/4gGAtBP2vWCBU9FC7zDMWA/services-visual-iD7nJ76bKWcPDDk2JN8BYh.webp";
-const CTA_BG_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663756289268/4gGAtBP2vWCBU9FC7zDMWA/cta-bg-MXeCiZ4GFgLGRGyvD68mXc.webp";
 
 function StarAccent({ className }: { className?: string }) {
   return (
@@ -237,18 +235,10 @@ function HeroSection() {
 
       <div className="container relative z-10 pt-24 pb-8 md:pt-28 md:pb-16" ref={ref}>
         <div className="max-w-2xl">
-          <div
-            className={`mb-3 transition-all duration-500 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
-            }`}
-          >
-            <span className="aster-mono text-xs tracking-[0.32em] uppercase text-[#FBD56B]/85">
-              Design &amp; technology studio · youth sports
-            </span>
-          </div>
+          <AgentEyebrow tag="systems online" isVisible={isVisible} />
 
           <h1
-            className={`text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.02] tracking-tight text-white mb-4 transition-all duration-700 delay-100 ${
+            className={`text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.02] tracking-tight text-white mb-3 transition-all duration-700 delay-100 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
             }`}
             style={{ fontFamily: "var(--font-display)" }}
@@ -257,6 +247,16 @@ function HeroSection() {
             <br />
             program <span className="aster-grad-text">orbits.</span>
           </h1>
+
+          <div
+            className={`mb-4 transition-all duration-500 delay-150 ${
+              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+            }`}
+          >
+            <span className="aster-mono text-xs tracking-[0.32em] uppercase text-[#FBD56B]/85">
+              Design &amp; technology studio · youth sports
+            </span>
+          </div>
 
           <p
             className={`text-lg md:text-xl text-slate-300 max-w-xl leading-relaxed mb-6 transition-all duration-700 delay-200 ${
@@ -286,6 +286,31 @@ function HeroSection() {
             >
               Explore the constellation
             </a>
+          </div>
+
+          {/* agent boot console — the system initializing + mapping the four products, live */}
+          <div
+            className={`aster-terminal p-3.5 md:p-4 mb-6 max-w-md transition-all duration-700 delay-[350ms] ${
+              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+            }`}
+          >
+            <div className="aster-scan-track rounded-lg bg-white/[0.02] border border-white/5 px-3.5 py-3">
+              <div className="aster-mono text-[11.5px] leading-relaxed space-y-1">
+                <div className="text-slate-400">
+                  <span className="text-[#F6CC55]">▸</span> initializing aster-agent
+                </div>
+                <div className="text-slate-300">
+                  <span className="text-[#F6CC55]">▸</span> 4 systems online —{" "}
+                  <span className="aster-grad-text font-semibold">Print Studio · Team App · AAU Hub · Org Sites</span>
+                </div>
+              </div>
+              <div className="as-progress-bar mt-2.5" aria-hidden="true">
+                <div
+                  className="as-progress-fill"
+                  style={{ width: "100%", background: "var(--brand-grad)" }}
+                />
+              </div>
+            </div>
           </div>
 
           <div
@@ -469,16 +494,20 @@ function PlatformSection() {
 
 function ServicesSection() {
   const { ref, isVisible } = useScrollReveal();
+  // The agent cycles through the capabilities it has online — same live-scan
+  // motif as the constellation console. Pauses under prefers-reduced-motion.
+  const active = useScanCycle(SERVICES.length, isVisible);
+  const current = SERVICES[active];
 
   return (
     <section id="services" className="relative py-10 md:py-16 bg-[#323d5c]">
       <div className="container" ref={ref}>
-        <div className="grid lg:grid-cols-2 gap-16 items-center">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <div>
             <AgentEyebrow tag="capabilities online" isVisible={isVisible} />
 
             <h2
-              className={`text-3xl md:text-4xl font-bold text-white mb-12 tracking-tight transition-all duration-700 delay-100 ${
+              className={`text-3xl md:text-4xl font-bold text-white mb-8 tracking-tight transition-all duration-700 delay-100 ${
                 isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
               }`}
               style={{ fontFamily: "var(--font-display)" }}
@@ -488,19 +517,22 @@ function ServicesSection() {
               <span className="text-slate-400">Every node purposeful.</span>
             </h2>
 
-            <div className="space-y-8">
+            <div className="space-y-3.5">
               {SERVICES.map((service, i) => {
                 const Icon = service.icon;
                 return (
                   <div
                     key={service.id}
-                    className={`flex gap-4 group transition-all duration-500 ${
-                      isVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-4"
-                    }`}
+                    className={`aster-node group flex items-start gap-4 p-4 transition-all duration-500 ${
+                      i === active ? "border-[rgba(246,204,85,.32)]" : ""
+                    } ${isVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-4"}`}
                     style={{ transitionDelay: `${150 + i * 100}ms` }}
                   >
+                    <span className="aster-mono text-[11px] tracking-[0.14em] text-slate-500 pt-1.5 tabular-nums">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
                     <div
-                      className="flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center border transition-all duration-200"
+                      className="flex-shrink-0 w-11 h-11 rounded-lg flex items-center justify-center border transition-all duration-200"
                       style={{
                         backgroundColor: `color-mix(in srgb, ${service.accent} 10%, transparent)`,
                         borderColor: `color-mix(in srgb, ${service.accent} 22%, transparent)`,
@@ -512,7 +544,7 @@ function ServicesSection() {
                       <h3 className="text-lg font-semibold text-white mb-1" style={{ fontFamily: "var(--font-display)" }}>
                         {service.name}
                       </h3>
-                      <p className="text-slate-400 leading-relaxed text-[15px]">
+                      <p className="text-slate-400 leading-relaxed text-[14.5px]">
                         {service.description}
                       </p>
                     </div>
@@ -522,18 +554,36 @@ function ServicesSection() {
             </div>
           </div>
 
+          {/* agent console — capabilities coming online, live (stacks below on mobile) */}
           <div
-            className={`hidden lg:block transition-all duration-1000 delay-300 ${
-              isVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"
+            className={`aster-terminal p-4 transition-all duration-700 delay-300 ${
+              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             }`}
           >
-            <div className="relative">
-              <img
-                src={SERVICES_VISUAL_URL}
-                alt="Network visualization"
-                className="w-full rounded-2xl opacity-80"
-              />
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-[#323d5c] via-transparent to-transparent" />
+            <div className="flex items-center gap-2 mb-3">
+              <span className="aster-dot-live" />
+              <span className="aster-mono text-[11px] tracking-[0.14em] uppercase text-slate-400">
+                aster-agent · capabilities online
+              </span>
+              <span className="aster-mono text-[10px] text-[#34d399] ml-auto">live</span>
+            </div>
+            <div className="aster-scan-track rounded-lg bg-white/[0.02] border border-white/5 px-3.5 py-3">
+              <div className="aster-mono text-[12px] text-slate-300 leading-relaxed" aria-live="polite" aria-atomic="true">
+                <span className="text-[#F6CC55]">▸</span> capability{" "}
+                <span className="text-white">{active + 1}</span>
+                <span className="text-slate-500"> / {SERVICES.length}</span> —{" "}
+                <span className="aster-grad-text font-semibold">{current.name}</span>
+              </div>
+              <div className="as-progress-bar mt-2.5" aria-hidden="true">
+                <div
+                  className="as-progress-fill"
+                  style={{
+                    width: `${((active + 1) / SERVICES.length) * 100}%`,
+                    background: "var(--brand-grad)",
+                    transition: "width .5s cubic-bezier(0.23,1,0.32,1)",
+                  }}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -560,16 +610,13 @@ function ContactSection() {
 
   return (
     <section id="contact" className="relative py-10 md:py-16 overflow-hidden">
-      {/* Background */}
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundImage: `url(${CTA_BG_URL})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      />
-      <div className="absolute inset-0 bg-[#2b3652]/70" />
+      {/* Background — same navy/starfield motif as the hero */}
+      <div className="aster-sky" />
+      <div className="aster-stars absolute inset-0" aria-hidden="true">
+        {STARS.map((s, i) => (
+          <span key={i} className={s.tw ? "tw" : ""} style={{ top: s.top, left: s.left }} />
+        ))}
+      </div>
 
       <div className="container relative z-10" ref={ref}>
         <div className="max-w-4xl mx-auto">
@@ -616,7 +663,14 @@ function ContactSection() {
               }`}
             >
               {submitted ? (
-                <div className="aster-panel p-8 text-center shadow-[0_0_0_1px_rgba(246,204,85,0.35)]">
+                <div className="aster-terminal p-6 md:p-8 text-center">
+                  <div className="flex items-center gap-2 mb-5">
+                    <span className="aster-dot-live" />
+                    <span className="aster-mono text-[11px] tracking-[0.14em] uppercase text-slate-400">
+                      aster-agent · open channel
+                    </span>
+                    <span className="aster-mono text-[10px] text-[#34d399] ml-auto">live</span>
+                  </div>
                   <StarAccent className="mx-auto mb-4 w-6 h-6" />
                   <h3 className="text-xl font-semibold text-white mb-2" style={{ fontFamily: "var(--font-display)" }}>
                     Message ready to send
@@ -633,7 +687,15 @@ function ContactSection() {
                   </button>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="aster-panel p-6 md:p-8 space-y-5">
+                <form onSubmit={handleSubmit} className="aster-terminal p-6 md:p-8">
+                  <div className="flex items-center gap-2 mb-5">
+                    <span className="aster-dot-live" />
+                    <span className="aster-mono text-[11px] tracking-[0.14em] uppercase text-slate-400">
+                      aster-agent · open channel
+                    </span>
+                    <span className="aster-mono text-[10px] text-[#34d399] ml-auto">live</span>
+                  </div>
+                  <div className="space-y-5">
                   <div>
                     <label htmlFor="name" className="block text-sm font-medium text-slate-300 mb-2" style={{ fontFamily: "var(--font-display)" }}>
                       Name
@@ -684,6 +746,7 @@ function ContactSection() {
                     <Send className="w-4 h-4" />
                     Send Message
                   </button>
+                  </div>
                 </form>
               )}
             </div>
