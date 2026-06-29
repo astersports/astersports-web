@@ -1,0 +1,272 @@
+AAU HUB — UNIFIED BUILD PLAN (one plan)
+For architect review · CC lane · 2026-06-29
+Repo: astersports-web (serves /aau) · branch: claude/aster-aau-nextup-card-srz61n
+Author: Claude Code (CC)
+
+This single plan supersedes and absorbs three inputs so the architect reviews ONE
+artifact, not three:
+  1. The architect's WORK_ORDER_AAUHUB (H1–H5, shell/responsive/honesty).
+  2. CC's parent-facing review — docs/aau/AAU_HUB_PARENT_REVIEW_2026-06-29.txt
+     (findings A–G), on draft PR #224.
+  3. CC's JTBD deep dive (this session): 4 parallel code-grounding agents + the live
+     parent screenshots + the architect's live 390/1440 review.
+
+EVIDENCE BASIS / honesty note: CC could NOT self-capture fresh live screenshots — the
+sandbox egress proxy serves curl (HTTP 200) but closes headless-Chromium connections
+(ERR_CONNECTION_CLOSED). Visual ground truth = Frank's 12 live screenshots + the
+architect's live review; every structural claim below is verified against component
+source (file:line). All three sources agree.
+
+GROUNDING: [G]=verified in source/screenshot · [UX]=design judgment · [V]=to verify.
+SEVERITY: P0 broken · P1 erodes trust/comprehension · P2 rough edge · P3 nit · E enhancement.
+SCOPE (§2.4): routine=auto-merge on green CI · architect=held for review.
+
+=====================================================================
+1. THE JOB TO BE DONE (Frank's frame)
+=====================================================================
+A parent organizing tournament-weekend life — one kid, multiple kids, or one kid in
+multiple programs — opens the Hub and must instantly get:
+  Q1 Where do I go?            Q2 What's the weather?
+  Q3 Directions / traffic?     Q4 Is there OVERLAP — do I need a babysitter?
+  Q5 My WHOLE weekend, all kids, in order?
+
+The bar: maximized AND simplified — one screen answers it without digging. The two
+goals are not in tension: surfacing the cross-team answers at the top and removing
+dev-console noise makes the hub both more complete and simpler.
+
+=====================================================================
+2. SCORECARD — what the LIVE home (HubHomeV2) answers today
+=====================================================================
+Q1 Where do I go ........... YES.  Venue + Apple/Google directions on the up-next card
+                                   (NextGame.tsx). Solid.
+Q2 Weather ................. PARTIAL. Honest game-TIME forecast (aster-weather
+                                   forecast.ts:202-215), BUT shown on only the single
+                                   soonest game; a self-contradiction bug; the better
+                                   per-game pill is dead code. (§4 WS3-W, WS1-C)
+Q3 Directions / traffic .... HALF. Directions yes. "Traffic" NO — drive time is real
+                                   road routing (OSRM) but TRAFFICLESS, with no UI
+                                   qualifier, so "leave by" can be too late on a busy
+                                   Saturday (driveTime.ts:8,37-53; NextGame.tsx:131). (WS3-T)
+Q4 Overlap / babysitter .... NO.  The detector is fully BUILT, TESTED, GOOD — and
+                                   ORPHANED. Not on the live home at all. (§3, WS1-A)
+Q5 Whole weekend, in order . NO.  Hero = ONE team; no combined chronological agenda;
+                                   child identity modeled but dormant. (§3, WS1-B/D)
+
+Net: excellent PER-TEAM command center; the CROSS-TEAM "organize my weekend" layer —
+which is the actual JTBD — is missing from the live screen.
+
+=====================================================================
+3. THE CORE INSIGHT — the 10/10 is mostly already BUILT, just not WIRED
+=====================================================================
+The hardest parts of the JTBD exist in the codebase but are routed to surfaces the live
+router never mounts. Closing the gap is largely WIRING, not greenfield.
+
+[G] ORPHAN-1 — Conflict / "babysitter" radar.
+  lib/aau/conflicts.ts:86-160 (findConflicts) + components/aau/ConflictRadar.tsx are
+  built and well-tested (conflicts.test.ts): detects time-overlapping games across
+  DIFFERENT tracked teams, dedupes head-to-heads, drops finals/past, and splits
+  same-building ("hop courts") vs different-venue ("split up?"), labeling by kid.
+  Mounted ONLY in MyTeams.tsx:168. MyTeams is imported by NOTHING (grep: only its own
+  def + 2 comments). Live home = HubHomeV2 (AAUBasketball.tsx:169) → zero conflict
+  signal. LIMIT: simultaneity-only; no back-to-back/travel-time conflict (driveTime
+  exists but conflicts.ts doesn't use it).
+
+[G] ORPHAN-2 — Per-game weather pill across the list.
+  components/aau/weather/GameWeather.tsx (honest 7-day-windowed per-game pill) and
+  WeatherCard.tsx are unmounted (zero mounts; they call a separate trpc backend, not
+  aster-weather). Live weather is ONLY the soonest game via NextGame.tsx, so a parent
+  scanning an upcoming list sees weather on one row, not each.
+
+[G] ORPHAN-3 — Child identity.
+  trackingStore.ts:20 has a `kid` field, but track() always sets kid:null (:99) and no
+  live home component reads it. pilotKids.ts:58 is a real per-child model (Frank's two
+  kids, two programs) but dormant/hardcoded, unwired. So the live model groups by
+  PROGRAM (myTeamsModel.ts:124) and cannot distinguish "two kids" from "one kid, two
+  programs."
+
+[G] NO cross-team agenda primitive in the live model.
+  buildMyTeamsModel buckets by team→program (myTeamsModel.ts:85-133); never merges
+  games into one time-ordered list. The hero is mostUrgent→ranked[0] (urgency.ts:76) =
+  one team. The ET day-grouping logic needed for an agenda ALREADY EXISTS inside
+  conflicts.ts (reusable).
+
+=====================================================================
+4. THE WORKSTREAMS (every finding consolidated, de-duplicated)
+=====================================================================
+
+---- WS1 · CROSS-TEAM JTBD LAYER (architect-scoped — new IA, the 10/10 move) ----
+WS1-A · P1 · Mount the conflict/babysitter radar on HubHomeV2.
+  HubHomeV2 already holds the exact props (teams, games — HubHomeV2.tsx:27-28).
+  Render <ConflictRadar tracked={teams} games={games} /> in Zone 2 (above/within the
+  status strip). It self-hides unless ≥2 teams AND a real overlap (ConflictRadar.tsx:19).
+  Near-zero risk; pure wiring of tested code. (Absorbs deep-dive Q4.)
+WS1-B · P1 · Weekend agenda — the combined "your next stops" view.
+  New: a cross-team chronological list (next 48–72h), all tracked teams merged, grouped
+  by ET day, time-ordered: "Sat 9:00 Pink @ House of Sports · Sat 1:30 Black @ … · Sun
+  10:00 Blue @ …". Reuse the ET day-grouping already in conflicts.ts; read over the
+  games HubHomeV2 already fetches. Place as Zone 1 (above or replacing the single hero
+  for multi-team parents; keep the rich countdown hero for the soonest game).
+  (Absorbs review C-2 / deep-dive Q5.)
+WS1-C · P2 · Per-game weather across the upcoming list.
+  Mount a per-row weather pill (revive GameWeather.tsx or extract NextGame's weather
+  line) so every upcoming game in the list/agenda shows its forecast, not just the
+  soonest. (Absorbs deep-dive Q2 gap-2.)
+WS1-D · DECISION · Activate child identity (the `kid` model).
+  Wire the `kid` label (trackingStore.ts:20) into the track flow + home grouping so two
+  teams can read as one child, and "two kids" vs "one kid/two programs" is
+  distinguishable. ConflictRadar already consumes kid labels. See decision D1 (§6).
+
+---- WS2 · SHELL / RESPONSIVE (architect work order H1–H5) ----
+WS2-H2 · P1 · routine · Content behind the fixed bottom nav (DO FIRST — root unblock).
+  [G] Nav is position:fixed (AAUBasketball.tsx:230-244); clearance is reserved in THREE
+  mismatched constants — outer paddingBottom calc(64px+safe) (:68), inner 32 (:168),
+  toast 78px (:207). Fix: ONE nav-height token = nav height + env(safe-area-inset-bottom),
+  applied to the scroll region; verify on the short Find/front-door screen specifically.
+WS2-H1+H5 · P1 · routine · Mobile header wraps + "Aster Sports" twice.
+  [G] Single non-responsive flex row (AAUBasketball.tsx:122-164): back-link "Aster
+  Sports" (:145) AND lockup "Aster Sports AAU Hub" (:159), no mobile collapse. At 390px
+  signed-out (HubAccount = "Sign in" pill) three text blocks share one row → wrap. Fix:
+  mobile collapse to one brand mark + compact title; back-link → icon-only chevron;
+  "Sign in" single-line pill; ≥44px targets.
+WS2-H4 · P2 · routine · Desktop = stretched phone shell.
+  [G] Grounding refinement to the work order: content is NOT literally edge-to-edge —
+  .container caps at max-width:1280px ≥1024px (index.css:141). The real issues: (a)
+  1280 is too wide for a single-column phone shell so it READS stretched; (b) the
+  bottom nav ignores .container (inline left:0;right:0) so the tab bar genuinely spans
+  1440. Fix: tighten the app-frame width (≪1280, ~640–720px column) AND constrain the
+  nav to that width or promote to a top nav ≥md.
+WS2-H3 · P1 · routine(+decision) · LIVE pill honesty.
+  [G] ANSWERED (the work order's blocking question): the Indexed/LIVE/Divisions row is
+  DECORATIVE cycling, not a filter — the lit chip is a 2.6s timer index (AgentConsole.tsx
+  46-55,99-103), chips are <span>s with no onClick; the narration line and lit chip are
+  the same step, so when the cycle hits "Live" it renders "no games live right now"
+  (TournamentDetail.tsx:176) WHILE lighting LIVE. Fix per the work order's decorative
+  branch: omit/relabel the Live step when liveN===0. NOTE: this is a subset of decision
+  D2 (console on parent surfaces) — do the honesty fix regardless; D2 decides the
+  larger treatment.
+
+---- WS3 · PARENT COPY + CORRECTNESS (routine — auto-merge) ----
+WS3-W · P1 · Weather self-contradiction. [G] Reproducible: NextGame.tsx:137 prints
+  `{temp}°F · {description} — {advice}` with description NEVER suppressed; severe fires
+  on temp<20/>100 (forecast.ts:249), so a clear cold morning renders "15°F · clear sky
+  — severe weather — check before you go." Fix: when isSevere/isRain, suppress the plain
+  description and lead with the warning. (Review E-1.)
+WS3-T · P1 · "No live traffic" qualifier on the drive line. [G] Drive ETA is trafficless
+  OSRM (driveTime.ts:8); UI shows "~22 min · leave by 8:40" with no qualifier → over-read
+  risk, "leave by" too late on busy game days. Add a "typical · no live traffic"
+  qualifier (and/or honest footnote). Also harden/queue the OSRM dependency (public demo
+  server, no SLA — single point of failure for the whole drive/leave-by/reminder stack).
+WS3-Waze · P2 · Remove Waze (DECIDED). [G] NextGame.tsx:155-158 + the address-fallback
+  reintroduces Waze ?q= NAME-search (buildDirections.ts:57) — the exact mis-route the
+  platform dropped Waze for. Remove the button; leave Apple + Google; verify
+  buildDirections.waze has no other live consumer.
+WS3-copy · P1/P2 · Engineer-speak → parent copy:
+  • NextGame.tsx:176 provenance "…venue lat/lng. Weather via aster-weather." → delete
+    (and it over-promises drive time it often doesn't show). (A-1)
+  • BrowseTree.tsx:347 "Filters read structured columns — no name-parsing…" → "No
+    tournaments match these filters yet." (A-2)
+  • BracketPath.tsx:77 "Outcomes enumerated exactly" → remove from parent surface. (A-3)
+  • BracketPath.tsx:65 "1081 of 4096 remaining scenarios" → human ratio "about 1 in 4
+    ways left" + exact count secondary. (A-4)
+  • StatusStrip.tsx:29 "no estimate before the model earns it" → plain wording. (A-5)
+WS3-B1 · P2 · Team name repeated 4× per card → drop {who} from NextGame.tsx:110 (the
+  card-internal "X PLAYS IN" duplicates the "UP NEXT · X" eyebrow at :101). (B-1)
+WS3-a11y · P2/P3 · Tap targets: NextGame map buttons py-[9px] (~36-38px) under the 44px
+  floor (NextGame.tsx:148/151/156) → bump. Contrast spot-check gold/muted captions. (F-2/F-3)
+
+---- WS4 · IDENTITY NAMING (separate track — the work order's "team-identity") ----
+WS4 · P1 · architect · Same team renders "Storm (Black)" vs "Storm Black" vs "Storm
+  Blue" across surfaces (review D-1). Root = display-name vs qkey grain; backend
+  (aau_qualified_team_key_regrain_c) is LIVE in prod, the paired frontend (gamesForTeam
+  qkey read + trackingStore v2) is the un-shipped half from PR #1130. Fold
+  one-canonical-name-per-qkey into that frontend PR.
+
+=====================================================================
+5. SEQUENCED PLAN (the one plan)
+=====================================================================
+PHASE 0 — H2 root fix (WS2-H2). routine. First: unblocks honest screenshots of
+          everything else (the work order is right about this).
+PHASE 1 — Routine batch, parallel to everything (no shared files with WS1/WS2-shell):
+          WS3-W, WS3-T, WS3-Waze, WS3-copy, WS3-B1, WS3-a11y. One auto-merge PR.
+PHASE 2 — Shell/responsive: WS2-H1+H5, WS2-H4, WS2-H3(honesty). routine; H3 coordinates
+          with D2 so we don't double-edit AgentConsole.
+PHASE 3 — THE 10/10 LAYER (architect-scoped, design-first): WS1-A (mount ConflictRadar)
+          → WS1-B (weekend agenda) → WS1-C (per-game weather in list). WS1-A is the
+          highest-leverage / lowest-risk single change (pure wiring of tested code) and
+          can land first within this phase.
+PHASE 4 — Identity: WS4 (qkey paired frontend + name normalization) + D1 child-identity
+          if approved. architect-scoped.
+
+Token/centralization guard: WS2 lives in inline-style files (AAUBasketball.tsx,
+AgentConsole.tsx). Introduce ONE nav-height token + ONE app-frame-width token used by
+content + nav + toast together, so H2/H4 don't re-drift into new magic numbers.
+
+=====================================================================
+6. OPEN DECISIONS FOR THE ARCHITECT (request + CC lean, per §2.2)
+=====================================================================
+D1 · Child identity (WS1-D). Activate the `kid` model so two teams group under one
+     child and "two kids" vs "one kid/two programs" is distinguishable?
+     CC LEAN: YES — it's the difference between a team tracker and a family weekend
+     organizer, the model already exists (kid field + pilotKids.ts + ConflictRadar kid
+     labels), and the JTBD is explicitly multi-kid/multi-program.
+D2 · AgentConsole on authenticated parent surfaces. Remove on parent surfaces (keep on
+     landing), or demote below the countdown? (H3 honesty fix happens regardless.)
+     CC LEAN: REMOVE on parent surfaces — HubHomeV2 already excludes it by design (H8);
+     a never-completing progress bar + decorative tabs are comprehension cost with no
+     parent payoff. Keep it on discovery/landing where "watch it work" earns attention.
+D3 · Weekend agenda vs hero (WS1-B). Replace the single hero with the agenda for
+     multi-team parents, or stack agenda above the rich countdown hero?
+     CC LEAN: STACK — keep the rich countdown for the soonest game (the proven hook),
+     add the agenda above it as the "all your stops" index; one team → agenda collapses
+     to just the hero.
+D4 · Conflict radar scope (WS1-A). Ship simultaneity-only now, add travel-time
+     (back-to-back at different venues) later?
+     CC LEAN: YES, ship simultaneity now (it's built + tested); travel-time conflict is
+     a fast-follow using driveTime (a real gap, but don't block the 95% case on it).
+D5 · Traffic (WS3-T / Q3). Accept "typical, no live traffic" honesty qualifier as the
+     answer, or invest in a traffic-aware routing provider?
+     CC LEAN: qualifier NOW (cheap, honest); evaluate a traffic provider as a separate
+     decision — a tournament-Saturday ETA that ignores traffic is the JTBD's weak point.
+
+=====================================================================
+7. ACCEPTANCE / VERIFICATION
+=====================================================================
+- WS2-H2: at 320/390/430/768/1440, no content under the nav at any scroll; iOS safe-area
+  respected; verified on the short Find/front-door screen.
+- WS2-H1: single-row header, no wrap 320–430px; ≥44px targets; one brand reference.
+- WS2-H3: with zero live games, nothing in the widget reads or highlights LIVE.
+- WS2-H4: ≥md content constrained to the app-frame width; nav reads intentional, not
+  full-bleed phone chrome.
+- WS1-A: a parent tracking 2 teams with overlapping Saturday games sees the conflict
+  banner with the correct same-venue vs split-up tone; 0 false positives for a
+  head-to-head or a >50-min gap (conflicts.test.ts invariants hold).
+- WS1-B: a 3-team weekend renders one chronological list, correct ET ordering, no
+  fabricated games (honest absent states preserved).
+- WS3-W: no game card ever renders "<benign sky> — severe weather"; severe leads.
+- WS3-T: drive line carries the no-live-traffic qualifier; OSRM failure degrades to
+  directions-only without breaking the card.
+- All: per aster-sports §16.13 elite gate (optimistic, kindness copy, a11y, honesty).
+
+=====================================================================
+8. OUT OF SCOPE (hard boundary — from the work order, preserved)
+=====================================================================
+- Film tab behavior / the guardian-COPPA gate (canAccessChild stays false). A layout or
+  home-wiring pass must NOT expose Film; if any item lands near it, stop and flag.
+- Standings / odds engine internals (the math is trusted; this plan is render + IA +
+  honesty). Team-identity naming is WS4, sequenced last.
+- Backend RPC correctness, performance/bundle budget, full WCAG sweep.
+
+=====================================================================
+9. ITEM CROSS-REFERENCE (so nothing is lost across the 3 inputs)
+=====================================================================
+Work order H1 → WS2-H1 | H2 → WS2-H2 | H3 → WS2-H3 (answered: decorative) |
+  H4 → WS2-H4 | H5 → WS2-H1.
+Review A-1..A-5 → WS3-copy | B-1 → WS3-B1 | B-2(caps names) → WS4-adjacent (label) |
+  C-1(console) → D2 | C-2(agenda) → WS1-B | D-1(naming) → WS4 | E-1(weather) → WS3-W |
+  E-2(Waze) → WS3-Waze | E-3(counter) → WS3-copy | F-2/F-3 → WS3-a11y |
+  G-1 → WS1-B | G-2(notifications) → backlog (own design doc) | G-3/G-4/G-5 → backlog.
+Deep dive Q1 → OK | Q2 → WS3-W + WS1-C | Q3 → WS3-T/D5 | Q4 → WS1-A | Q5 → WS1-B/WS1-D.
+
+=====================================================================
+END — one plan. CC executes on the architect's go, phase by phase.
+=====================================================================

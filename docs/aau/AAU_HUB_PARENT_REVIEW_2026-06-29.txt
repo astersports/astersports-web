@@ -1,0 +1,354 @@
+AAU HUB — PARENT-FACING REVIEW (visual issues · bugs · enhancements)
+For architect review · CC lane · 2026-06-29
+Repo: astersports-web · branch: claude/aster-aau-nextup-card-srz61n
+Author: Claude Code (CC)
+
+=====================================================================
+0. PURPOSE & METHOD
+=====================================================================
+Frank walked the live AAU Hub on his phone (signed in as a parent tracking the
+three "East Coast Storm" girls teams — Black / Pink / Blue) and sent 12
+screenshots spanning the full flow: Browse/Find → Tournament Detail → Team
+Detail → Home (tracked-teams dashboard). He asked for a comprehensive review of
+"every single thing" — enhancements, bugs, visual issues — written up for the
+architect.
+
+This doc is that review. Every finding is grounded in BOTH the screenshot and
+the actual component source (file:line). The goal frame Frank set is retention:
+"make sure a parent who logs in gets hooked and stays forever." So findings are
+judged not just for correctness but for whether they build or erode the habit.
+
+GROUNDING LEGEND (per §2.3 source hierarchy):
+  [G]   GROUNDED — verified in the component source and/or the screenshot.
+  [UX]  UX JUDGMENT — a design/perception call, not a code fact. Labeled as
+        opinion so the architect can overrule.
+  [V]   TO VERIFY — suspected but not yet confirmed; needs a query/device check.
+
+SEVERITY:
+  P0  broken / blocks use            (none found — the hub works)
+  P1  actively erodes parent trust or comprehension
+  P2  noticeable rough edge / polish
+  P3  minor nit
+  E   enhancement (retention / new capability)
+
+SCOPE (per §2.4):
+  routine    — UI/cosmetic/copy; auto-merges on green CI
+  architect  — schema / RPC / identity-grain / new capability; held for review
+
+=====================================================================
+1. SURFACE & FILE MAP (what was reviewed)
+=====================================================================
+HOME (the parent dashboard) ............ components/aau/HubHomeV2.tsx
+  Zone 1 hero (urgency-selected, 1 game) . components/aau/home/HeroSlot.tsx
+  Zone 2 status strip (3 counters) ....... components/aau/home/StatusStrip.tsx
+  Zone 3 per-team accordion .............. components/aau/home/TeamAccordionCard.tsx
+    └ Up-next card (shared) .............. components/aau/NextGame.tsx
+    └ Division slice .................... components/aau/home/DivisionSlice.tsx
+    └ Bracket path ...................... components/aau/home/BracketPath.tsx
+TEAM DETAIL (drill-in) ................. components/aau/TeamDetail.tsx
+MY TEAMS (list) ....................... components/aau/MyTeams.tsx
+TOURNAMENT DETAIL ..................... components/aau/TournamentDetail.tsx
+BROWSE / FIND ......................... components/aau/find/BrowseTree.tsx
+"Live Aster agent" console (shared) ... components/aau/AgentConsole.tsx
+  used by: TeamDetail, MyTeams, TournamentDetail, standings/StandingsHub,
+  find/FrontDoor, FilmAiReviewGate (NOT used on HubHomeV2 by design — H8).
+
+=====================================================================
+2. WHAT'S WORKING — PRESERVE THESE (the hook already exists)
+=====================================================================
+P-1 [G] The UP-NEXT countdown hero (NextGame.tsx). Big gradient countdown
+    ("2d 11h") → matchup → venue → game-time weather with an ACTIONABLE nudge
+    ("bring water + shade") → one-tap Apple/Google directions → "Remind me to
+    leave" that drops a real calendar event at leave-by (NextGame.tsx:163-173).
+    Countdown + logistics + weather + calendar is precisely the bundle that
+    makes a parent open the app the morning of a game. This is THE retention
+    primitive; protect it. [UX]
+
+P-2 [G] Honesty discipline is strong and should not be diluted. The codebase
+    refuses to fabricate: BracketPath is type-level incapable of showing a
+    probability (BracketPath.tsx:15, oddsPct?: never); StatusStrip blanks
+    "to advance" until pool play wraps (StatusStrip.tsx:25-31); HeroSlot reframes
+    a clinched team as "Still alive — pool play wrapped" instead of "no game"
+    (HeroSlot.tsx:60-70); NextGame self-hides drive/weather until each real
+    source resolves. This earns trust — keep it.
+
+P-3 [G] The "you" highlight in division standings (blue row, "← you") and the
+    decision-tier sort (live team floats to top and auto-expands,
+    HubHomeV2.tsx:88-91) make the dashboard feel personal and alive.
+
+P-4 [G] Smart-default expansion: one team → its card opens; many → only the
+    most-urgent opens (HubHomeV2.tsx:83-87). Good for the multi-kid parent.
+
+=====================================================================
+3. FINDINGS REGISTER
+=====================================================================
+
+---------------------------------------------------------------------
+A. PARENT-FACING COPY THAT SPEAKS ENGINEER (trust leaks)
+---------------------------------------------------------------------
+These violate the kindness/clarity mandate (aster-sports §16.3) and the
+"no diagnostic copy a parent can't act on" rule (§16.14). None are bugs; all
+erode the "this was built for me" feeling.
+
+A-1 · P1 · routine — Provenance footnote under the countdown
+  [G] NextGame.tsx:176-177 renders, under every up-next card:
+      "Countdown + drive time from venue lat/lng. Weather via aster-weather."
+  Two problems: (a) "venue lat/lng" and "via aster-weather" are internal
+  plumbing a parent neither knows nor needs; (b) it PROMISES "drive time" that
+  only renders when getOrigin() resolves (NextGame.tsx:128), so on many loads
+  the caption advertises a feature the card isn't showing.
+  → Recommend: delete the caption. The data is self-evident. If a provenance
+    line is wanted, make it human and conditional (e.g. only when drive shows).
+
+A-2 · P1 · routine — Browse empty/footer copy
+  [G] BrowseTree.tsx:347: "Filters read structured columns — no name-parsing.
+      Past seasons collapse; tap to browse for records."
+  This is an internal engineering rule (the no-name-parsing doctrine) printed
+  to the parent. Screenshot IMG_3786 shows it under a "Nothing in this filter"
+  empty state (BrowseTree.tsx:276) when "Live & upcoming" returns 0.
+  → Recommend: drop the doctrine line. Empty state reads simply, e.g.
+    "No tournaments match these filters yet." + the existing "Clear filters".
+
+A-3 · P1 · routine — "Outcomes enumerated exactly"
+  [G] BracketPath.tsx:77 appends a green-checked line "Outcomes enumerated
+      exactly" to the bracket-path card (IMG_3800).
+  This is reassurance aimed at the architect/H1 honesty rule, not the parent —
+  it reads like a system log. The honesty is real and worth keeping; the WORDING
+  is the issue.
+  → Recommend: remove the line from the parent surface, or fold confidence into
+    the count copy itself (see A-4).
+
+A-4 · P2 · routine — Raw scenario count is intimidating
+  [G] BracketPath.tsx:62-65: "advances in 1081 of 4096 remaining scenarios"
+      (IMG_3800). 4096 = 2^12 — an engineer's number. A parent reads "4096" as
+      noise, not insight.
+  → Recommend: lead with a human ratio, keep the exact count secondary, e.g.
+    "Advances in about 1 in 4 ways the weekend can still play out (1,081 of
+    4,096)." [UX]
+
+A-5 · P3 · routine — Status-strip footnote jargon
+  [G] StatusStrip.tsx:29-30: "To-advance computes when pool play wraps — no
+      estimate before the model earns it." Honest, but "the model earns it" is
+      insider phrasing.
+  → Recommend: "We'll show who's advancing once pool play wraps." [UX]
+
+---------------------------------------------------------------------
+B. VISUAL / LAYOUT
+---------------------------------------------------------------------
+B-1 · P2 · routine — Team name repeated up to 4× per card
+  [G] On Team Detail (IMG_3792) within one viewport the team name appears as:
+      page H1 → console label → eyebrow "UP NEXT · EAST COAST STORM (PINK)"
+      (NextGame.tsx:101) → card-internal "EAST COAST STORM (PINK) PLAYS IN"
+      (NextGame.tsx:109-110) → "East Coast Storm (Pink) vs Metro Hoopers"
+      (NextGame.tsx:120). The card-internal eyebrow duplicates the eyebrow
+      directly above it.
+  → Recommend: NextGame.tsx:110 drop {who} → just "Plays in" / "Tips soon · in".
+    The "UP NEXT · {team}" eyebrow already names the team.
+
+B-2 · P2 · routine — Long ALL-CAPS division names dominate & truncate
+  [G] "GIRLS HIGH SCHOOL (INCOMING GRADE LEVEL FOR FALL 2026-2027)" renders full
+      and ALL-CAPS as the division header (IMG_3797) and truncates with "…" in
+      the accordion subtitle (TeamAccordionCard.tsx:77-79) and team headers
+      (IMG_3799/3795). It's the loudest text on several screens and carries the
+      least per-glance value.
+  → Recommend: a short label ("Girls HS · '26-27") as the primary, full string
+    secondary/ontap. [UX] (Source of the long string is the ingested division
+    name — confirm whether a short form is derivable client-side or needs a
+    structured field. [V])
+
+B-3 · P3 · routine — Live score "–" separator alignment
+  [G] HeroSlot.tsx:39-46 renders the live score as [name][score]–[score][name]
+      with a standalone "–". Fine on the widths seen; flagging as a thing to
+      watch on very long opponent names (two flex-1 columns + 30px nums). [UX]
+
+---------------------------------------------------------------------
+C. FLOW / INFORMATION ARCHITECTURE
+---------------------------------------------------------------------
+C-1 · P1 · architect-ish — The "ASTER-AGENT" console reads as a debug terminal
+  [G] AgentConsole.tsx renders a monospace "terminal" with a green live-dot, a
+      "watching" status, a narration line ("tracing 2 / 4 — next: Metro Hoopers"
+      / "scanning 2 / 4 — no games live right now"), a progress bar that fills
+      and RE-CYCLES every 2.6s (AgentConsole.tsx:49-55), and a chip row
+      (Record/NEXT/Path/Scores) that LOOKS tappable but is decorative
+      (role="img", aria-hidden children). Seen on Team Detail (IMG_3792) and
+      Tournament Detail (IMG_3788), sitting ABOVE the real up-next hook.
+  [UX] To a parent this is the most confusing element in the app: a progress bar
+      that never completes reads as a stuck loader; "tracing 2/4" is jargon; the
+      fake tabs invite taps that do nothing; and it pushes the genuine countdown
+      below the fold. It is a deliberate brand device (the "live agent" language
+      lifted from the landing FrontierSection) and HubHomeV2 already excludes it
+      on purpose (H8, HubHomeV2.tsx:22) — which is the tell that it doesn't
+      belong on a working parent surface either.
+  → Recommend (architect call): demote it BELOW the countdown on the detail
+    pages, or drop it from authenticated parent surfaces entirely and keep it on
+    the marketing/landing page where "watch the agent work" earns attention. CC
+    lean: drop on parent surfaces; the countdown is the hero, the console dilutes
+    it. [UX]
+
+C-2 · P1 · E · architect — Home surfaces only ONE game; no "your weekend" agenda
+  [G] HubHomeV2 selects a SINGLE most-urgent hero (mostUrgent(ranked),
+      HubHomeV2.tsx:73-74). A parent with three teams playing the same weekend
+      sees one countdown; the other two games are reachable only by expanding
+      each accordion card. The status strip counts ("today: N") but doesn't list.
+  [UX] The highest-value daily view for a multi-kid parent is "here is your whole
+      weekend in order": Sat 9:00 Pink @ House of Sports, Sat 1:30 Black @ ...,
+      Sun 10:00 Blue @ ... — one agenda, one screen. That is a stronger
+      open-every-day hook than a single hero.
+  → Recommend: an aggregate "Next up across your teams" agenda (chronological,
+    all tracked teams, next 48-72h) as Zone 1 or directly under the hero. Reads
+    over data the hub already fetches (getTrackedTeamSchedule). Architect-scoped
+    only because it's a new IA surface, not because of data. [UX]
+
+C-3 · P2 · routine — Directions footnote vs. the buttons it describes
+  See A-1; also a flow point — the caption sits between the maps row and the
+  "Remind me to leave" button, adding a line of noise in the primary action zone.
+
+---------------------------------------------------------------------
+D. NAMING / IDENTITY CONSISTENCY (ties to the deferred qkey work)
+---------------------------------------------------------------------
+D-1 · P1 · architect — Same team renders with inconsistent names across surfaces
+  [G] Across the screenshots: "East Coast Storm (Black)" (team header, IMG_3799)
+      vs "East Coast Storm Black" (collapsed accordion + standings, IMG_3800/
+      3797) vs "East Coast Storm Blue" (no parens, IMG_3795) vs "East Coast
+      Storm (Pink)". The parenth…/no-paren and (Color) vs Color treatment is
+      not stable for the same club.
+  [UX] To a parent this reads as a bug ("is this the same team?") and quietly
+      undercuts the trust the honesty discipline builds.
+  ROOT CAUSE [V/architect]: display-name vs the qualified-key grain. This is the
+  exact surface the deferred PR #1130 frontend follow-up targets —
+  teamGames.gamesForTeam matching the per-game qkey + a trackingStore v2
+  localStorage migration. Backend is LIVE in prod (migration
+  aau_qualified_team_key_regrain_c, applied 2026-06-28 — confirmed via
+  schema_migrations). The paired frontend has not shipped.
+  → Recommend: fold name-normalization (one canonical display name per qkey
+    identity) into that paired frontend PR. Architect-scoped (identity grain).
+
+---------------------------------------------------------------------
+E. CORRECTNESS / LANGUAGE BUGS
+---------------------------------------------------------------------
+E-1 · P1 · routine — Weather string can self-contradict
+  [G] NextGame.tsx:134-138 renders "{temp}°F · {description} — {advice}". When a
+      severe/rain WARNING coexists with a clear-sky DESCRIPTION it reads
+      "103°F · clear sky — severe weather — check before you go" (IMG_3795). The
+      condition descriptor and the warning are independent fields, so "clear sky
+      — severe weather" looks like a contradiction.
+  → Recommend: when w.isSevereWarning || w.isRainWarning, suppress the plain
+    description and lead with the warning (e.g. "103°F · severe weather — check
+    before you go"). weatherAdvice() already centralizes the advice string
+    (NextGame.tsx:21-27); the fix is at the render concat (line 137).
+
+E-2 · P2 · routine — Waze button (DECISION ALREADY MADE: remove)
+  [G] NextGame.tsx:155-158 renders a third "Waze" directions button. The main
+      aster-sports app removed Waze entirely (operator-directed 2026-06-13;
+      Waze name/address search mis-routed on Frank's device even with verified
+      coords). Frank confirmed in this session: remove it here too for
+      consistency.
+  → Action: drop the Waze <a> (NextGame.tsx:155-158), leave Apple + Google;
+    update the "Apple / Google / Waze" comment at NextGame.tsx:144. Verify
+    buildDirections.waze has no other consumer before removing the field. [V]
+
+E-3 · P3 · routine — "to advance" counter semantics
+  [G] StatusStrip "to advance" shows the count of CLINCHED tracked teams
+      (HubHomeV2.tsx:61-77 → clinchedCount). The label "to advance" could read
+      as "teams that still need to advance" rather than "teams that have clinched
+      a bracket spot."
+  → Recommend: label it "clinched" (matches the value), or "in the bracket". [UX]
+
+---------------------------------------------------------------------
+F. ACCESSIBILITY (spot checks — not a full audit)
+---------------------------------------------------------------------
+F-1 · P2 — AgentConsole is correctly role="img" with a single aria-label and
+  aria-hidden children (AgentConsole.tsx:74-75), and respects
+  prefers-reduced-motion (49-55). Good. BUT the decorative chip row looks
+  interactive to sighted users (C-1) — an a11y-clean element can still be a
+  sighted-UX trap.
+F-2 · P3 [V] — Confirm the Apple/Google/Waze direction links and the "full
+  division" / "full schedule" deep-links meet the 44px tap-target floor on the
+  smallest target device. NextGame maps buttons are py-[9px] (~36-38px tall) —
+  likely UNDER 44px (NextGame.tsx:148/151/156). aster-sports design system
+  mandates 44px minimum. → bump padding to clear 44px.
+F-3 · P3 [V] — Color-contrast pass on the gold-on-white meta text (#8F6708 on
+  card) and the muted mono captions (#4B5563) at 11-12px against the radial-
+  gradient card backgrounds.
+
+---------------------------------------------------------------------
+G. ENHANCEMENTS — "STAYS FOREVER" (retention strategy)
+---------------------------------------------------------------------
+The hub today is entirely TOURNAMENT-BOUND. When a tracked team's event ends,
+there is no reason to return until the next one is ingested. To convert a
+tournament utility into a daily habit:
+
+G-1 · E · architect — Weekend agenda (see C-2). The single biggest daily-open
+  lever for the multi-kid parent.
+
+G-2 · E · architect — Proactive notifications. Today retention is pull-only
+  ("Remind me to leave" is the one push, and it's manual). The deep hooks:
+  (a) "Your game just went final — 49-53" score push;
+  (b) "Next tournament posted — bracket releases Wednesday";
+  (c) "Bracket game set: Sat 10:00 vs Metro Hoopers."
+  Backend/eventing work — architect-scoped; worth its own decision doc.
+
+G-3 · E · architect — Evergreen between-tournaments content. The Film tab exists
+  (bottom nav) but the season has gaps. Candidates: a per-player / per-team
+  season recap, season-over-season records, a "summer in review" card. Gives the
+  app a heartbeat when no game is on the board (the HeroSlot already has a
+  graceful "Season complete" rest state — HeroSlot.tsx:64-70 — that could host a
+  recap CTA instead of a dead end).
+
+G-4 · E · routine — Make the rest states pull forward. HeroSlot's "Season
+  complete / Still alive — pool play wrapped" states (HeroSlot.tsx:60-81) are
+  honest but terminal. Add a forward action ("Browse next tournament", "See the
+  full bracket") so an idle visit still has somewhere to go.
+
+G-5 · E · routine — Share affordance. A parent's instinct after a win is to text
+  family. A one-tap "share this matchup / result" on the up-next and recent cards
+  turns parents into a free acquisition channel. [UX]
+
+=====================================================================
+4. OPEN QUESTIONS FOR THE ARCHITECT (per §2.2 — request + lean)
+=====================================================================
+Q1. AgentConsole on authenticated parent surfaces (C-1): demote below the
+    countdown, or remove entirely (keep on landing only)?
+    CC lean: REMOVE on parent surfaces. Rationale: HubHomeV2 already excludes it
+    (H8); the countdown is the hero; a never-completing progress bar + fake tabs
+    are a comprehension cost with no parent payoff.
+
+Q2. Weekend agenda (C-2): build the aggregate "next up across your teams" view?
+    CC lean: YES, high-ROI; reads over already-fetched data; strongest daily hook
+    for the multi-kid parent (which the pilot families literally are).
+
+Q3. Name-normalization (D-1): fold one-canonical-name-per-qkey into the deferred
+    PR #1130 frontend (gamesForTeam qkey read + trackingStore v2)?
+    CC lean: YES. The backend grain is already live; the inconsistent names are
+    the visible symptom of the un-shipped frontend half.
+
+Q4. Notifications (G-2): worth a dedicated design pass now, or hold until a
+    tournament is live to test against?
+    CC lean: design doc now, build gated on a live tournament to validate timing.
+
+=====================================================================
+5. PROPOSED PR SEQUENCING (nothing shipped yet — Frank said "review only")
+=====================================================================
+PR-1 (routine, auto-merge): Parent-copy + polish batch — A-1, A-2, A-3, A-4,
+     A-5, B-1, E-1, E-2 (Waze), E-3, F-2 (tap targets). Pure copy/layout, no
+     data. Low risk.
+PR-2 (architect-scoped): AgentConsole treatment on parent surfaces (Q1).
+PR-3 (architect-scoped): qkey paired frontend + name-normalization (D-1/Q3) —
+     the originally-deferred PR #1130 follow-up; backend already live.
+PR-4 (architect-scoped, design-first): Weekend agenda (C-2/Q2).
+PR-5 (design doc): Notifications strategy (G-2/Q4).
+
+=====================================================================
+6. OUT OF SCOPE / NOT REVIEWED
+=====================================================================
+- Film tab internals (FilmHighlights / FilmAiReviewGate) — only seen as a nav
+  item; not walked.
+- Account / auth / tracking-store sync correctness — not exercised in this pass.
+- Backend RPC correctness (standings math, bracket enumeration) — trusted as
+  given; this review is the parent-facing render layer only.
+- Performance / bundle budget — not measured here.
+- Full WCAG audit — F-section is spot checks, not a sweep.
+
+=====================================================================
+END
+=====================================================================
