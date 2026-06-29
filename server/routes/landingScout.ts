@@ -130,20 +130,25 @@ export function registerLandingScoutRoute(app: Express): void {
       return;
     }
 
-    // Bot gate (P5, Fork D): a session must clear Cloudflare Turnstile before its
-    // first model turn. Verified sessions are cached (VERIFIED_TTL_MS) so later
-    // turns skip the round-trip. Only enforced when configured — an unset secret
-    // is surfaced as a boot warning (validateEnv) + a pre-flip blocker, not a hard
-    // block on dark testing. verifyTurnstile FAILS CLOSED on every error path.
+    // Bot gate (P5, Fork D) — BEST-EFFORT by default. When a token is present we
+    // verify it and cache the session (VERIFIED_TTL_MS) so later turns skip the
+    // round-trip. A missing/failed token only HARD-BLOCKS when
+    // LANDING_AGENT_TURNSTILE_REQUIRED=true; otherwise the turn proceeds and the
+    // rate-limit + per-identity + global spend caps remain the hard guards. This
+    // keeps the agent usable when the widget can't load (blocked/misconfigured)
+    // without removing the bot signal where it does work. verifyTurnstile FAILS
+    // CLOSED on every error path.
     if (isTurnstileConfigured() && !landingAgentGuard.isVerified(parsed.sessionId, now)) {
       const ok = await verifyTurnstile(parsed.turnstileToken, ip);
-      if (!ok) {
+      if (ok) {
+        landingAgentGuard.markVerified(parsed.sessionId, now);
+      } else if (ENV.landingAgentTurnstileRequired) {
         sse(res, { type: "denied", reason: "turnstile", message: TURNSTILE_DENY_MESSAGE });
         sse(res, { type: "done", denied: true });
         res.end();
         return;
       }
-      landingAgentGuard.markVerified(parsed.sessionId, now);
+      // soft-fail: not required → fall through and let the turn run.
     }
 
     // Abort the model stream if the visitor navigates away mid-turn.

@@ -46,27 +46,12 @@ export default function ScoutChat() {
     if (notice && turnstileOn) resetTurnstile();
   }, [notice, turnstileOn, resetTurnstile]);
 
-  // When the bot gate is configured, a turn can't be sent until Turnstile has
-  // produced a token (the managed widget auto-solves in ~1-2s). Gating here is
-  // what stops a too-early tap from hitting the server with no token → denial.
-  const awaitingHuman = turnstileOn && !token;
-
-  // If the check never completes (script blocked by an extension, network, etc.)
-  // the token stays null forever — surface an actionable fallback instead of an
-  // indefinite "verifying…" spinner.
-  const [verifyStalled, setVerifyStalled] = useState(false);
-  useEffect(() => {
-    if (!awaitingHuman) {
-      setVerifyStalled(false);
-      return;
-    }
-    const t = setTimeout(() => setVerifyStalled(true), 12_000);
-    return () => clearTimeout(t);
-  }, [awaitingHuman]);
-
-  // Send a question (typed or tapped). Attaches the single-use Turnstile token.
+  // Send a question (typed or tapped). Turnstile is BEST-EFFORT: we attach the
+  // token if the widget has produced one (server verifies + caches the session),
+  // but we never block sending on it — the server soft-fails a missing token, so
+  // the agent stays usable even when the widget can't load (blocked/misconfig).
   const ask = (text: string) => {
-    if (inFlight.current || !text.trim() || awaitingHuman) return;
+    if (inFlight.current || !text.trim()) return;
     inFlight.current = true;
     void send(text, token ?? undefined);
   };
@@ -100,7 +85,7 @@ export default function ScoutChat() {
                   key={q}
                   type="button"
                   onClick={() => ask(q)}
-                  disabled={streaming || awaitingHuman}
+                  disabled={streaming}
                   className="aster-mono text-left text-[11.5px] text-slate-300 border border-white/12 rounded-full px-3 py-1.5 hover:border-[#F6CC55]/45 hover:text-[#F6CC55] transition-colors disabled:opacity-50 disabled:hover:border-white/12 disabled:hover:text-slate-300"
                 >
                   {q}
@@ -135,35 +120,23 @@ export default function ScoutChat() {
         {notice && <p className="text-[12.5px] text-slate-400 leading-snug mt-1">{notice}</p>}
       </div>
 
-      {/* Cloudflare Turnstile bot gate — renders only when VITE_TURNSTILE_SITE_KEY is set */}
+      {/* Cloudflare Turnstile bot gate — best-effort: renders when configured and
+          verifies in the background; never blocks sending. */}
       {turnstileOn && <div ref={containerRef} className="mb-2.5" aria-label="Human verification" />}
-
-      {awaitingHuman && !verifyStalled && (
-        <p className="aster-mono text-[11px] text-slate-400 mb-2 flex items-center gap-2">
-          <span className="aster-dot-live" />
-          verifying you're human…
-        </p>
-      )}
-      {awaitingHuman && verifyStalled && (
-        <p className="text-[12px] text-slate-400 leading-snug mb-2">
-          The human-check didn't load — disable any ad/script blocker and refresh, or reach us on the{" "}
-          <a href="#contact" className="text-[#F6CC55] hover:underline">contact form</a>.
-        </p>
-      )}
 
       <form onSubmit={submit} className="flex items-center gap-2">
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           maxLength={2000}
-          disabled={streaming || awaitingHuman}
-          placeholder={awaitingHuman ? "One moment — verifying…" : "Type a question…"}
+          disabled={streaming}
+          placeholder="Type a question…"
           aria-label="Ask Aster Scout a question"
           className="flex-1 px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/10 text-[13px] text-white placeholder-slate-500 focus:outline-none focus:border-[#F6CC55]/40 focus:ring-1 focus:ring-[#F6CC55]/20 transition-all disabled:opacity-60"
         />
         <button
           type="submit"
-          disabled={streaming || awaitingHuman || draft.trim().length === 0}
+          disabled={streaming || draft.trim().length === 0}
           aria-label="Send"
           className="aster-grad-bg inline-flex items-center justify-center w-10 h-10 rounded-lg text-[#1a0e05] transition-transform duration-160 hover:scale-[1.04] active:scale-[0.96] disabled:opacity-50 disabled:hover:scale-100"
         >

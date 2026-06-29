@@ -84,6 +84,12 @@ export const ENV = {
    *  first turn is denied). Provision this + VITE_TURNSTILE_SITE_KEY (client)
    *  BEFORE flipping LANDING_AGENT_LIVE. Inert while the agent is dark. */
   turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY ?? "",
+  /** Hard-require a passing Turnstile token before the first model turn. Default
+   *  FALSE (best-effort): a present token is still verified + caches the session,
+   *  but a missing/failed token does NOT block — the rate-limit + per-identity +
+   *  global spend caps remain the hard guards. Set LANDING_AGENT_TURNSTILE_REQUIRED
+   *  =true to re-harden once the widget/site-key is confirmed working in prod. */
+  landingAgentTurnstileRequired: process.env.LANDING_AGENT_TURNSTILE_REQUIRED === "true",
   /** Supabase Storage — customer image uploads + signed reads (server/storage.ts,
    *  server/_core/storageProxy.ts). Replaces the Manus Forge presigned-URL/S3 path.
    *  The bucket is PRIVATE; the browser never talks to Supabase directly — it goes
