@@ -47,7 +47,7 @@ function GameRow({ g }: { g: TeamGame }) {
         </div>
         {isFinal ? (
           <span className={`shrink-0 font-[var(--font-mono)] text-[13.8px] font-bold ${won ? "text-[#16A34A]" : "text-[#DC2626]"}`}>
-            {won ? "W" : "L"} {g.myScore}–{g.oppScore}
+            {won ? "W" : "L"} {g.isForfeit ? "forfeit" : `${g.myScore}–${g.oppScore}`}
           </span>
         ) : g.status === "live" ? (
           <span className="shrink-0 font-[var(--font-mono)] text-[12.6px] text-[#16A34A]">LIVE {g.myScore ?? 0}–{g.oppScore ?? 0}</span>

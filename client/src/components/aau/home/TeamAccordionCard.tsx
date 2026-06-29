@@ -106,7 +106,7 @@ export default function TeamAccordionCard({ u, division, expanded, onToggle, onO
                   const won = (g.myScore as number) > (g.oppScore as number);
                   return (
                     <span key={g.gameId} className={`font-[var(--font-mono)] text-[12.6px] font-bold ${won ? "text-[#16A34A]" : "text-[#DC2626]"}`}>
-                      {won ? "W" : "L"} {g.myScore}–{g.oppScore}
+                      {won ? "W" : "L"} {g.isForfeit ? "forfeit" : `${g.myScore}–${g.oppScore}`}
                     </span>
                   );
                 })}
