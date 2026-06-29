@@ -16,7 +16,12 @@ import { Button } from "@/components/ui/button";
 import { Loader2, CreditCard, CheckCircle2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "");
+// Gate Stripe init behind a PRESENT publishable key. `loadStripe("")` throws a
+// console pageerror ("call Stripe() with your publishable key…") on every route
+// that bundles this module — including the landing. Publishable (frontend) key
+// only; secret key / webhook / entitlement writer are untouched.
+const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+const stripePromise = STRIPE_PUBLISHABLE_KEY ? loadStripe(STRIPE_PUBLISHABLE_KEY) : null;
 
 interface CardOnFileFormProps {
   tenantId: number;
@@ -51,6 +56,19 @@ export function CardOnFileForm({ tenantId, onSuccess }: CardOnFileFormProps) {
     setCompleted(true);
     onSuccess?.();
   }, [onSuccess]);
+
+  // No publishable key configured → Stripe can't initialize. Render a graceful
+  // fallback instead of mounting <Elements stripe={null}> (which would throw).
+  if (!stripePromise) {
+    return (
+      <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/30 border border-border">
+        <CreditCard className="h-5 w-5 text-muted-foreground shrink-0" />
+        <p className="text-sm text-muted-foreground">
+          Card entry is temporarily unavailable. Please try again later.
+        </p>
+      </div>
+    );
+  }
 
   // Already saved card
   if (completed) {

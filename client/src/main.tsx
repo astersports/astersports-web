@@ -52,6 +52,19 @@ const trpcClient = trpc.createClient({
   ],
 });
 
+// Analytics (umami) — inject only when configured, so an unset endpoint never
+// fires a request to a literal `%VITE_ANALYTICS_ENDPOINT%` placeholder (the 502
+// observed on astersports.io). No-op when the env vars are absent.
+const ANALYTICS_SRC = import.meta.env.VITE_ANALYTICS_ENDPOINT;
+const ANALYTICS_ID = import.meta.env.VITE_ANALYTICS_WEBSITE_ID;
+if (ANALYTICS_SRC && ANALYTICS_ID) {
+  const s = document.createElement("script");
+  s.defer = true;
+  s.src = `${ANALYTICS_SRC}/umami`;
+  s.setAttribute("data-website-id", ANALYTICS_ID);
+  document.head.appendChild(s);
+}
+
 createRoot(document.getElementById("root")!).render(
   <trpc.Provider client={trpcClient} queryClient={queryClient}>
     <QueryClientProvider client={queryClient}>
