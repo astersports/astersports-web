@@ -44,10 +44,10 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script
-      defer
-      src="%VITE_ANALYTICS_ENDPOINT%/umami"
-      data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>
+    <!-- Analytics (umami) is injected conditionally in main.tsx — only when
+         VITE_ANALYTICS_ENDPOINT is configured. A static tag here shipped the
+         literal `%VITE_ANALYTICS_ENDPOINT%` placeholder when the env var was
+         unset, causing a 502 on every page load. -->
   </body>
 
 </html>

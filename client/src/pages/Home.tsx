@@ -388,16 +388,16 @@ function PlatformSection() {
   const current = PRODUCTS[active];
 
   return (
-    <section id="platform" className="relative pt-2 pb-10 md:pt-4 md:pb-16 bg-[#2b3652]">
+    <section id="platform" className="relative pt-2 pb-10 md:pt-4 md:pb-16 bg-[#EBEEF4]">
       <div className="container aster-constellation" ref={ref}>
         <h2
-          className={`flex items-center gap-3 text-[13px] font-semibold tracking-[0.2em] uppercase text-slate-400 mb-4 transition-all duration-500 ${
+          className={`flex items-center gap-3 text-[13px] font-semibold tracking-[0.2em] uppercase text-[#8f6708] mb-4 transition-all duration-500 ${
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
           }`}
           style={{ fontFamily: "var(--font-display)" }}
         >
           The constellation
-          <span className="flex-1 h-px bg-white/10" />
+          <span className="flex-1 h-px bg-slate-900/10" />
         </h2>
 
         {/* agent console — the scout charting the platform map, live */}
@@ -440,17 +440,17 @@ function PlatformSection() {
         </div>
 
         <div
-          className={`mt-4 flex items-center gap-4 flex-wrap rounded-2xl border border-white/10 bg-white/[0.02] px-5 py-4 text-slate-400 text-[13.5px] transition-all duration-700 delay-300 ${
+          className={`mt-4 flex items-center gap-4 flex-wrap rounded-2xl border border-slate-200 bg-white shadow-sm px-5 py-4 text-slate-600 text-[13.5px] transition-all duration-700 delay-300 ${
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
           }`}
         >
-          <b className="text-white font-semibold tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
+          <b className="text-slate-900 font-semibold tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
             We also build
           </b>
           <span>agency work for brands &amp; orgs</span>
           <div className="flex gap-2 flex-wrap sm:ml-auto">
             {["Brand", "Web", "Apps", "Print"].map((t) => (
-              <span key={t} className="text-xs text-slate-400 border border-white/10 rounded-md px-2.5 py-1">
+              <span key={t} className="text-xs text-slate-500 border border-slate-200 rounded-md px-2.5 py-1">
                 {t}
               </span>
             ))}
