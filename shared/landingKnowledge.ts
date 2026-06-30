@@ -60,7 +60,7 @@ export const KNOWLEDGE_PRODUCTS: KnowledgeProduct[] = [
     tagline: "Track any tournament — live scores & predictor",
     description:
       "Paste a TourneyMachine link and follow any AAU team — live scores, standings, the exact bracket predictor, and game-day directions. Free to browse; track your teams to unlock the dashboard, alerts, and navigation.",
-    href: "/aau",
+    href: "https://www.astersports.app/hub",
     status: "live",
   },
   {
