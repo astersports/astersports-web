@@ -268,5 +268,116 @@ Review A-1..A-5 → WS3-copy | B-1 → WS3-B1 | B-2(caps names) → WS4-adjacent
 Deep dive Q1 → OK | Q2 → WS3-W + WS1-C | Q3 → WS3-T/D5 | Q4 → WS1-A | Q5 → WS1-B/WS1-D.
 
 =====================================================================
+10. ADDITIONAL ENHANCEMENTS (amendment 2026-06-29 — JTBD-driven)
+=====================================================================
+New items surfaced by re-framing on "organize a parent's tournament weekend." Each
+is mapped into the phase plan (§5) or the backlog.
+
+E-EN1 · P1 · architect → fold into WS1-A — TRAVEL-TIME conflicts, not just simultaneous.
+  Today's detector (built, orphaned) catches only same-time games. The bigger pain is
+  back-to-back across venues you physically can't make (gap < drive time). driveTime.ts
+  already exists to compute it. Elevate from "fast-follow (D4)" to ship WITH the radar.
+E-EN2 · P1 · routine → Phase 1/3 — WHOLE-WEEKEND calendar, one tap. Extend calendar.ts
+  (today one game → one .ics) to a single multi-event .ics across every kid's games
+  (venue + leave-by + opponent). Borrow infra (§11).
+E-EN3 · P2 · routine → WS1-B/NextGame — ARRIVE-BY + parking/venue note. Add arrive-by
+  (tip − warm-up buffer) beside leave-by; surface a parking/entrance line. Completes
+  the logistics loop.
+E-EN4 · E · architect → Phase 5 anchor — SCORE-FOLLOW for the game you're missing. When
+  the conflict radar knows you're at kid A's game and can't be at kid B's, offer
+  "text/notify me kid B's score." The emotional core of the multi-kid JTBD; the reason
+  to build notifications (§11 borrow).
+E-EN5 · E · architect → backlog — OFFLINE / PWA resilience. Gyms are signal dead zones;
+  the agenda + directions + leave-by must survive no-signal. Real game-day failure mode.
+E-EN6 · E · architect → rides on WS1-D — AGENDA GROUPED BY KID. With child identity on,
+  show "Maya 9:00, 1:00 · Jacob 10:30" — the parent's actual mental model.
+E-EN7 · E · routine → backlog — WHAT-TO-PACK nudge from weather + game count ("3 games,
+  95°F → water ×3, sunscreen, snacks, chairs"). Uses data already fetched; the weather
+  engine exposes feelsLike + wind that today's advice ignores (§11 weather).
+E-EN8 · E · routine → backlog — SHARE the weekend (read-only) with a spouse/grandparent/
+  carpool driver. Borrow Web Share + QR (§11).
+
+=====================================================================
+11. CANDIDATE SERVICE INTEGRATIONS (grounded cross-repo inventory)
+=====================================================================
+Method: 2 agents inventoried external services across astersports-web, aster-sports,
+aster-weather; CC grep'd st-patricks-armonk + legacy-hoopers. HEADLINE: most of the
+"10/10 services" already exist in the org's stack and the Hub simply doesn't consume
+them — it reimplements thinner versions or lacks them. Only TWO real gaps need a NEW
+vendor (traffic, food/rideshare). [G] = grounded file:line.
+
+11.1 — BORROW (already in the org's stack; no new vendor; just wire into the Hub)
+  S1 · WEB-PUSH notifications [G] — aster-sports `supabase/functions/send-push/index.ts`
+     (VAPID/RFC8291, push_subscriptions, dead-device prune) + st-patricks
+     `server/routers/pushNotifications.ts` + `closureAlert.ts` + client
+     `usePushNotifications.ts` + `NotificationPreferences.tsx`. → enables E-EN4
+     score-follow, schedule-change/cancellation alerts, RSVP nudges. The Hub has NONE
+     today (calendar .ics only). HIGH leverage.
+  S2 · ICS CALENDAR subscribe + multi-event [G] — aster-sports `team-feed`/`family-feed`
+     edge fns render live text/calendar (`webcal://` subscribe) + st-patricks
+     `client/src/lib/icsGenerator.ts`. Hub today: one-game .ics download (calendar.ts:34).
+     → E-EN2 whole-weekend export AND a subscribe-once "my weekend" feed.
+  S3 · EMAIL (Resend) [G] — wired in the Hub already (`server/email.ts:6`, owner/billing)
+     + aster-sports full pipeline `send-tournament-message/index.ts:37` (batch,
+     RFC8058 unsubscribe, delivery webhooks). → parent digest / score email for
+     non-push users. No new vendor.
+  S4 · WEB SHARE + QR [G] — aster-sports `ShareScheduleButton.jsx` (navigator.share +
+     QRCodeSVG of a public URL). → E-EN8 share-the-weekend. Drop-in pattern.
+  S5 · GOOGLE GEOCODING [G] — aster-sports `geocode-venues/index.ts:19`
+     (maps.googleapis.com/geocode, confidence gate, NE viewport bias). → fills missing
+     venue lat/lng so directions/weather/maps stop falling back to name-search
+     (the Waze mis-route + "Venue TBD" class). Improves Q1/Q3 reliability.
+  S6 · ANTHROPIC CLAUDE [G] — in-Hub `@anthropic-ai/sdk` (landing scout) + aster-sports
+     `briefing-ai-draft` / `parse-tournament-schedule`. → optional "what to expect this
+     weekend" briefing; paste-your-TM-link parsing. Already paid-for.
+  S7 · @aster/weather [G] — `forecast.ts:202-255` exposes feelsLike, wind, precip, a
+     Morning/Afternoon/Evening strip, and derived isRain/isSevere flags. The Hub uses a
+     thin slice; E-EN7 + WS3-W should consume feelsLike + wind (today ignored).
+
+11.2 — NET-NEW vendors (NO org integration exists anywhere — genuine adds)
+  N1 · TRAFFIC-AWARE ROUTING — the one real ETA gap (Q3). OSRM is trafficless
+     (driveTime.ts:8). Options: TomTom (free tier + traffic + POI + geocode in one),
+     Google Routes API, or Mapbox. A single provider can also cover N2 (POI) and S5
+     (geocode), consolidating 3 needs into one key. CC LEAN: TomTom (breadth + free tier)
+     unless the org prefers Google (already has a Google geocoding key — Google Routes
+     would reuse that billing account). → fixes "is there traffic / when do I REALLY
+     leave."
+  N2 · FOOD / PARKING POI near the venue — "feed the kids between games." Free with the
+     N1 provider's POI search, or static deep links (Google Places/Yelp). Tournament-day
+     real need; low effort.
+  N3 · RIDESHARE estimate — Uber/Lyft deep link (or API) for "I can't drive both kids."
+     Niche; deep-link is cheap. Backlog.
+  N4 · OFFICIAL SEVERE-WEATHER ALERTS — api.weather.gov (NWS/CAP, free, US). Today
+     "severe" is Open-Meteo-DERIVED thresholds (forecast.ts:248), not official warnings.
+     Upgrades Q2 safety ("is it dangerous") to government alerts. Low effort, high trust.
+
+11.3 — MONETIZATION (present but unwired)
+  M1 · STRIPE is fully available in astersports-web but AAU "Aster Plus" is INERT
+     (PlusGate.tsx cosmetic; entitlement.ts returns false for all). A real Plus tier
+     (traffic ETA, push, multi-kid agenda, calendar subscribe) → wire Stripe checkout.
+     Architect-scoped (money path).
+
+=====================================================================
+12. NEW DECISIONS FOR THE ARCHITECT (extend §6)
+=====================================================================
+D6 · Traffic vendor (N1). TomTom vs Google Routes vs Mapbox vs stay-OSRM-with-qualifier?
+     CC LEAN: add TomTom (or Google Routes if reusing the existing Google billing) —
+     trafficless ETA is the JTBD's weakest point; the qualifier (WS3-T) is the stopgap,
+     a real provider is the fix.
+D7 · Reuse model — call aster-sports edge functions cross-app, or PORT the patterns
+     (push/ICS/share) into astersports-web? CC LEAN: PORT into the Hub (same vendors:
+     Resend, web-push VAPID, Open-Meteo) for deploy independence; the Hub is a separate
+     app/deploy and already cross-calls sibling Railway hosts, but porting keeps the
+     parent surface self-contained.
+D8 · Monetization (M1). Wire Aster Plus → Stripe now, or stay free pre-onboarding?
+     CC LEAN: keep free until the cross-team layer (Phase 3) proves retention; then gate
+     the premium services (traffic/push/agenda) behind Plus.
+
+Revised sequencing note (extends §5): S1/S2/S3/S4/S5 are BORROW tasks — cheaper than
+greenfield, slot into Phase 3/4 alongside the cross-team layer. N1 (traffic) is the one
+net-new vendor decision (D6) and pairs with WS3-T. N4 (NWS alerts) is a low-effort Phase 1
+add to WS3-W. E-EN1 ships WITH WS1-A; E-EN2/E-EN3 with WS1-B.
+
+=====================================================================
 END — one plan. CC executes on the architect's go, phase by phase.
 =====================================================================
