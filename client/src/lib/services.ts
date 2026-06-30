@@ -102,7 +102,11 @@ export const PRODUCTS: ServiceEntry[] = [
     tagline: "Track any tournament — live scores & predictor",
     description:
       "Paste a TourneyMachine link and follow any AAU team — live scores, standings, the exact bracket predictor, and game-day directions. Free to browse; track your teams to unlock the dashboard, alerts, and navigation.",
-    href: "/aau",
+    // Front-door cutover: the AAU Hub now lives in the platform app
+    // (astersports.app/hub). The landing links straight there instead of the
+    // legacy in-repo /aau hub.
+    href: "https://www.astersports.app/hub",
+    external: true,
     status: "live",
     icon: Trophy,
     accent: "#a78bfa",
